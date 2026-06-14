@@ -24,12 +24,12 @@ cd "$ROOT_DIR"
 
 wheel="$(ls -t "$OUT_DIR"/skill_sync_sidecar-*.whl | head -n 1)"
 "$PYTHON_BIN" -m venv "$WORK_DIR/venv"
-"$WORK_DIR/venv/bin/python" -m pip install --no-deps "$wheel"
+env -u PYTHONPATH "$WORK_DIR/venv/bin/python" -m pip install --no-deps --force-reinstall "$wheel"
 
-"$WORK_DIR/venv/bin/skill-sync" --version
-"$WORK_DIR/venv/bin/skill-sync" status --root "smoke=$WORK_DIR/skill-root"
-"$WORK_DIR/venv/bin/skill-sync" snapshot --root "smoke=$WORK_DIR/skill-root" --out "$WORK_DIR/snapshot"
-"$WORK_DIR/venv/bin/skill-sync" remote-status --remote "file://$WORK_DIR/snapshot"
+env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" --version
+env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" status --root "smoke=$WORK_DIR/skill-root"
+env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" snapshot --root "smoke=$WORK_DIR/skill-root" --out "$WORK_DIR/snapshot"
+env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" remote-status --remote "file://$WORK_DIR/snapshot"
 
 printf 'package_smoke=ok\n'
 printf 'wheel=%s\n' "$wheel"

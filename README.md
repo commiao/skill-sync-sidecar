@@ -55,6 +55,18 @@ python3 -m skill_sync_sidecar sync-daemon --local-root /tmp/skill-sync-target --
 python3 -m skill_sync_sidecar rollback --record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --yes
 ```
 
+Current validation node status:
+
+```bash
+scripts/status-current.sh
+```
+
+Release gate:
+
+```bash
+scripts/verify-release.sh
+```
+
 Run against explicit roots:
 
 ```bash

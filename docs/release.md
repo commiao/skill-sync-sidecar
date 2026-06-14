@@ -4,6 +4,20 @@ Use this checklist before handing a build to another device or packaging a tagge
 
 ## Preflight
 
+Run the full release gate:
+
+```bash
+scripts/verify-release.sh
+```
+
+For non-Mac or CI environments that do not have the current validation node paths, skip the operational gate:
+
+```bash
+SKILL_SYNC_SKIP_OPS_STATUS=1 scripts/verify-release.sh
+```
+
+The full gate expands to:
+
 ```bash
 PYTHONPATH=src PYTHONPYCACHEPREFIX=/private/tmp/skill-sync-pycache \
   python3 -m unittest discover -s tests
@@ -28,8 +42,7 @@ The smoke script builds a wheel without network build isolation, installs it int
 ## Operational Gate
 
 ```bash
-PYTHONPATH=src PYTHONPYCACHEPREFIX=/private/tmp/skill-sync-pycache \
-  python3 -m skill_sync_sidecar ops-status --allow-new --fail-on-blocked --fail-on-error
+scripts/status-current.sh
 ```
 
 The gate must be green before a release is promoted from the current Mac validation node.
