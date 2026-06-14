@@ -47,6 +47,43 @@ scripts/status-current.sh
 
 The gate must be green before a release is promoted from the current Mac validation node.
 
+## GitHub Publish
+
+Prerequisites:
+
+- The destination repository exists.
+- The local machine has Git SSH push permission, or `origin` already points at an authenticated HTTPS remote.
+- The worktree is clean.
+- The release tag exists locally.
+
+Default publish target:
+
+```bash
+scripts/publish-github.sh
+```
+
+The default remote is:
+
+```text
+git@github.com:commiao/skill-sync-sidecar.git
+```
+
+Override it when publishing to another repository:
+
+```bash
+scripts/publish-github.sh git@github.com:<owner>/<repo>.git
+```
+
+The script pushes `main` and `v0.1.0`.
+
+If GitHub CLI is preferred, login/create the repository first:
+
+```bash
+gh auth login
+gh repo create commiao/skill-sync-sidecar --private --source=. --remote=origin --push
+git push origin v0.1.0
+```
+
 ## Versioning
 
 Version numbers are currently duplicated in:
