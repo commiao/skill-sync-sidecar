@@ -1,0 +1,289 @@
+# Skill Sync Sidecar Operations
+
+This guide covers the safe path from smoke test to supervised daemon mode.
+
+## Safety Defaults
+
+- Use a dedicated dev prefix until production policy is agreed.
+- Do not write to `cc-switch-sync`; the CLI refuses HTTP uploads to that prefix.
+- Start daemon runs with `--dry-run`.
+- Use `--state-file` so operators can inspect the latest cycle without reading logs.
+- Leave delete propagation disabled; one-sided deletes produce tombstones only.
+
+## WebDAV Smoke Test
+
+Run this after changing remote, sync-cycle, sync-daemon, or service configuration:
+
+```bash
+scripts/webdav-smoke.sh "skill-sync-sidecar-dev/smoke-$(date +%Y%m%d%H%M%S)"
+```
+
+The script validates:
+
+- zero-skill canary upload and pull
+- synthetic `sync-cycle --yes` install into `/private/tmp`
+- synthetic `sync-daemon --yes --max-cycles 1` install into `/private/tmp`
+
+It uploads only synthetic data under the prefix passed as the first argument.
+
+## Local Real-Root Dry Run
+
+Before any real skill content is uploaded to WebDAV, validate the local root through a file-backed remote:
+
+```bash
+scripts/local-real-dryrun.sh "$HOME/.cc-switch/skills"
+```
+
+This uses the real local skill directory, but all snapshot, remote, cache, work, and state files stay under `/private/tmp`. It does not upload real skill content to WebDAV and does not write into the source skill root.
+
+Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is a separate data movement decision. It should require explicit approval because private skills may contain proprietary workflows, prompts, scripts, or operational knowledge even when no credentials are present.
+
+After explicit approval, run:
+
+```bash
+SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD=1 \
+  scripts/real-webdav-dryrun.sh "$HOME/.cc-switch/skills" "skill-sync-sidecar-dev/real-$(hostname -s)-$(date +%Y%m%d%H%M%S)"
+```
+
+The script uploads real private skill content to the provided WebDAV prefix, reads it back, and verifies `sync-daemon --dry-run --max-cycles 1` with a state file. It still does not run `sync-daemon --yes` against the real root.
+
+## One-Shot Dry Run
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar sync-cycle \
+  --local-root "$HOME/.cc-switch/skills" \
+  --cc-switch-webdav \
+  --prefix "skill-sync-sidecar-dev/$(hostname -s)" \
+  --cache-dir "$HOME/Library/Caches/skill-sync-sidecar/cache" \
+  --work-dir "$HOME/Library/Application Support/skill-sync-sidecar/work" \
+  --dry-run \
+  --json
+```
+
+Use `--allow-new` only after reviewing the plan. Use `--yes` only after the dry-run output has no blocked items and the target root is intentional.
+
+## macOS launchd
+
+Template:
+
+```text
+examples/launchd/com.skill-sync-sidecar.plist
+```
+
+Before loading it:
+
+1. Replace `YOUR_USER`, `YOUR_DEVICE`, and `/PATH/TO/skill-sync-sidecar`.
+2. Keep `--dry-run` for the first supervised run.
+3. Keep the prefix under `skill-sync-sidecar-dev/...` until production policy is set.
+4. Confirm `~/.cc-switch/settings.json` has valid WebDAV settings.
+
+Suggested validation:
+
+```bash
+plutil -lint examples/launchd/com.skill-sync-sidecar.plist
+```
+
+Load only after editing a copied plist:
+
+```bash
+launchctl bootstrap gui/$(id -u) "$HOME/Library/LaunchAgents/com.skill-sync-sidecar.plist"
+launchctl print gui/$(id -u)/com.skill-sync-sidecar
+cat "$HOME/Library/Application Support/skill-sync-sidecar/state.json"
+```
+
+Current-device installer:
+
+```bash
+SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD=1 \
+SKILL_SYNC_DAEMON_MODE=yes \
+SKILL_SYNC_PREFIX=skill-sync-sidecar-dev/current-mac \
+  scripts/install-current-launchd.sh
+```
+
+The installer uploads the current local root to the chosen prefix, writes a stable base record, performs a dry-run preflight, writes `~/Library/LaunchAgents/com.skill-sync-sidecar.plist`, then starts `sync-daemon`. Use `SKILL_SYNC_DAEMON_MODE=dry-run` for observation-only mode.
+
+Check status:
+
+```bash
+launchctl print gui/$(id -u)/com.skill-sync-sidecar
+cat "$HOME/Library/Application Support/skill-sync-sidecar/state.json"
+```
+
+One-screen sidecar status:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
+```
+
+By default, `ops-status` also searches `/private/tmp/openclaw-skill-sync-validate` for the latest OpenClaw `reconcile-report.json` and shows the read-only gate state when one exists. Include an explicit report when reviewing a specific peer-writer drift run:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar ops-status \
+  --allow-new \
+  --openclaw-reconcile-report /private/tmp/openclaw-skill-sync-validate/reconcile-20260614-after-drift-3/reconcile/reconcile-report.json
+```
+
+State interpretation:
+
+- `active_cycle={"cycle": N, "status": "running"}` means the daemon has started a cycle and is currently in scan, WebDAV, or apply work.
+- A cycle with `status=error` is recoverable; the daemon records the error and continues on the next interval.
+- `summary={"noop": 91}` with `applied=0` and `uploaded=0` means the local root, cache, and WebDAV snapshot are aligned.
+
+WebDAV write behavior:
+
+- Archives are content-addressed by `content_hash`; existing archive paths are skipped on upload.
+- `index.json` is uploaded last. If a push is interrupted before the final index write, readers keep seeing the previous complete snapshot.
+- If `index.json` ever points to a missing archive, repair by uploading the missing archive first, then uploading the matching `index.json`.
+- Some WebDAV providers reset `HEAD` requests. The client falls back to `PROPFIND` directory checks and caches those directory listings during a push.
+- If direct HTTP(S) WebDAV `PUT` is slow or timing out, prefer a local WebDAV sync folder as a file remote. On the Mac validation device, the installed daemon uses:
+
+```text
+--remote file:///Users/mac/public-sync
+--prefix skill-sync-sidecar-dev/current-mac
+```
+
+In this mode the sidecar writes archives and `index.json` to `/Users/mac/public-sync/skill-sync-sidecar-dev/current-mac`, and the desktop WebDAV client handles cloud upload. This avoids long direct `PUT` calls while preserving the same archive-first, index-last protocol.
+
+Stop the service:
+
+```bash
+launchctl bootout gui/$(id -u) "$HOME/Library/LaunchAgents/com.skill-sync-sidecar.plist"
+```
+
+## Linux / OpenClaw systemd
+
+Template:
+
+```text
+examples/systemd/skill-sync-sidecar.service
+```
+
+OpenClaw preflight:
+
+```bash
+ssh root@oc-vps-aliyun-us 'python3 --version; ls -ld /home/admin/clawd/skills /home/admin/.cc-switch/skills /root/.cc-switch/skills 2>/dev/null || true'
+```
+
+Known OpenClaw constraints:
+
+- `/home/admin/clawd/skills` is the OpenClaw project skill root used for second-node validation.
+- `/home/admin/.cc-switch/settings.json` contains the cc-switch WebDAV configuration.
+- `/root/.cc-switch/settings.json` can exist without WebDAV credentials, so a root-owned service must not assume `--cc-switch-webdav` will read the admin user's config.
+- The observed system Python is 3.6.8, while sidecar requires Python >=3.9.
+- Until a Python >=3.9 runtime is available, use `scripts/remote-inventory-py36.py` only for read-only inventory validation.
+
+Read-only OpenClaw inventory:
+
+```bash
+ssh root@oc-vps-aliyun-us 'python3 - /home/admin/clawd/skills --source openclaw' \
+  < scripts/remote-inventory-py36.py \
+  > /private/tmp/openclaw-inventory.json
+```
+
+OpenClaw is a peer writer, not a downstream-only mirror. When OpenClaw skills are being edited by users or agents, run a reconcile report before any apply or daemon rollout:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar reconcile-report \
+  --local-inventory /private/tmp/openclaw-inventory.json \
+  --remote-snapshot /private/tmp/current-mac-cache \
+  --previous-local-inventory /private/tmp/openclaw-inventory-previous.json \
+  --label openclaw-current-$(date +%Y%m%d) \
+  --out /private/tmp/openclaw-reconcile
+```
+
+Interpretation:
+
+- `same_without_base`: local and remote match; safe candidate for base adoption.
+- `remote_new`: remote has a skill OpenClaw lacks; review before pulling into OpenClaw.
+- `local_new`: OpenClaw has a skill remote lacks; review before pushing to WebDAV.
+- `conflict`: local and remote differ; do not apply automatically.
+- `changed_since_previous`: OpenClaw changed since the last inventory; re-run reconcile before trusting an older plan.
+
+If people continue optimizing OpenClaw skills, this report becomes the gate between normal editing and synchronization. A daemon should stay in dry-run or blocked mode whenever `conflict > 0` or unreviewed `local_new > 0`.
+
+Reusable read-only script:
+
+```bash
+PYTHON_BIN=/path/to/python3 \
+REMOTE_CACHE=/private/tmp/openclaw-skill-sync-validate/current-mac-cache \
+PREVIOUS_INVENTORY=/private/tmp/openclaw-skill-sync-validate/openclaw-inventory-current.json \
+  scripts/openclaw-reconcile-readonly.sh /private/tmp/openclaw-reconcile-$(date +%Y%m%d%H%M%S)
+```
+
+Set `REMOTE_CACHE` to reuse a known complete WebDAV cache and avoid slow full archive downloads on every OpenClaw inventory check. Omit `REMOTE_CACHE` when a fresh WebDAV pull is required.
+
+The script writes both the reconcile report and a machine-readable gate result:
+
+```text
+<out>/reconcile/reconcile-report.json
+<out>/openclaw-gate.json
+<out>/openclaw-gate.txt
+```
+
+Check the latest known OpenClaw gate without SSH:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
+```
+
+Gate behavior:
+
+- Passes when `safe_to_auto_apply=true`, `conflict=0`, `local_new=0`, and `changed_since_previous=0`.
+- Blocks when OpenClaw has local-only skills, conflicts, or fresh changes since the previous inventory.
+- Does not SSH, pull WebDAV, apply files, or write to `/home/admin/clawd/skills`; it only reads existing local reports.
+
+Runtime-state handling:
+
+- Runtime state under `data/session-timers/` and `data/session-archives/` is excluded by default.
+- If a package still shows conflict after these paths are removed, treat it as real source drift.
+- For `session-lifetime-manager`, the remaining drift is source-code files, not timer JSON state.
+
+Conflict review flow:
+
+1. Run `reconcile-report` or `scripts/openclaw-reconcile-readonly.sh`.
+2. Start with `skill_md_only` conflicts. These are usually documentation/front-matter governance changes and are the safest adoption candidates.
+3. Then review `code_or_config`; require code-level diff review before push or pull.
+4. Review `mixed_with_code` last because these combine docs, scripts, and OpenClaw-only files.
+5. Do not update the shared WebDAV baseline while a writable Mac daemon is running unless the daemon's scanner version and base record are coordinated.
+
+Large-asset exception:
+
+- A `skill_md_only` change can still require a large archive upload when the skill directory contains binary assets.
+- `ocr` and `finance-auto-bookkeeping` are examples: small source changes can produce multi-MB archives because the package contains binary assets or data fixtures.
+- If direct WebDAV upload of such a package times out, do not publish an index that points to the missing archive. Use the local WebDAV sync folder file-remote path above, or defer the skill until a per-file/delta strategy exists.
+- Current adoption status: the OpenClaw peer-writer conflicts were reviewed and adopted into `adopt-openclaw-conflicts-complete-20260613`; the final reconcile reported `safe_to_auto_apply=true`, `same_without_base=32`, and no conflicts.
+
+Before enabling it:
+
+1. Replace `YOUR_USER`, `YOUR_DEVICE`, and `/PATH/TO/skill-sync-sidecar`.
+2. Keep `--dry-run` until the state file shows expected plans.
+3. Verify the service user can read cc-switch WebDAV settings or provide env credentials.
+4. Verify the service user's Python runtime is >=3.9.
+5. Keep remote service connectivity checks separate from sidecar rollout.
+6. Review any `conflict` actions before allowing writes to `/home/admin/clawd/skills`.
+
+Suggested validation:
+
+```bash
+systemd-analyze verify examples/systemd/skill-sync-sidecar.service
+```
+
+Install only after editing a copied unit:
+
+```bash
+mkdir -p "$HOME/.config/systemd/user"
+cp examples/systemd/skill-sync-sidecar.service "$HOME/.config/systemd/user/"
+systemctl --user daemon-reload
+systemctl --user start skill-sync-sidecar.service
+systemctl --user status skill-sync-sidecar.service
+cat "$HOME/.local/state/skill-sync-sidecar/state.json"
+```
+
+## Promotion Checklist
+
+- `python3 -m unittest tests/test_scanner.py` passes.
+- `python3 -m compileall -q src tests` passes.
+- `scripts/webdav-smoke.sh ...` passes against a dev prefix.
+- `sync-daemon --dry-run --max-cycles 1 --state-file ...` writes a healthy state file.
+- First real `--yes` run targets a temporary root or a reviewed project root.
+- Production prefix, retention, and conflict review policy are documented before enabling unattended writes.

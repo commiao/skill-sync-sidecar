@@ -1,0 +1,86 @@
+<hr/>
+<h1>九、新增验收用例：libtv-m-forward</h1>
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p><b>定位：</b><code>libtv-m-forward</code> 是 sidecar 的第二个真实资产验收用例。它不是通用 global skill，而是项目级 skill：内容/货在 libtv-m 仓库，分发/版本/适配/安全治理交给 skill-sync-sidecar。</p>
+</callout>
+
+<h2>9.1 资产范围</h2>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">字段</th>
+      <th background-color="light-gray">说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>位置</td>
+      <td><code>libtv-m/skills/libtv-m-forward/</code>，有意放仓库根 <code>skills/</code>，不绑定单一工具目录。</td>
+    </tr>
+    <tr>
+      <td>内容</td>
+      <td><code>SKILL.md</code> 加 <code>scripts/</code>，脚本包括 <code>routes_lib</code>、<code>locate_endpoint</code>、<code>dump_table</code>、<code>sync_feishu</code>。</td>
+    </tr>
+    <tr>
+      <td>安全</td>
+      <td>纯逻辑、无密钥。飞书同步使用调用者本人的 <code>lark-cli</code> OAuth，skill 内不含凭证。</td>
+    </tr>
+    <tr>
+      <td>上下文</td>
+      <td>依赖 libtv/www 路由结构、<code>/api/v1</code> 与 <code>/api/v1/www</code> 前缀规则，因此是 <code>scope=project</code>。</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9.2 为什么适合作为验收用例</h2>
+<ul>
+  <li>带可执行脚本和外部集成，可验证 safety gate 对副作用 skill 的处理。</li>
+  <li>能区分 project skill 与 global skill，验证 <code>manifest.json</code> 的 <code>scope</code>、<code>targets</code> 与 apply 策略。</li>
+  <li>脚本会产生 <code>__pycache__</code>，可验证默认排除生成目录的规则。</li>
+  <li>可作为 P0/P1 第二个黑盒用例，与 91 个 cc-switch skill 快照并列。</li>
+</ul>
+
+<h2>9.3 sidecar 需要统一拍板</h2>
+<checkbox done="true">定义 <code>manifest.json</code> v0：<code>skill_id</code>、<code>scope</code>、<code>targets</code>、<code>exclude</code>、<code>content_hash</code> 口径。</checkbox>
+<checkbox done="true">scanner 识别 <code>skills/&lt;skill-id&gt;/SKILL.md</code> 加根级 <code>AGENTS.md</code> 的 project-scoped 过渡约定。</checkbox>
+<checkbox done="false">apply 阶段默认不把 <code>scope=project</code> 的 skill 安装到全局工具目录。</checkbox>
+<checkbox done="false">明确需加密 skill 文件的标准做法；v0 先采用私有仓/WebDAV 权限，禁止同步密钥。</checkbox>
+
+<h2>9.4 建议 manifest v0 示例</h2>
+<pre lang="json" caption="libtv-m-forward manifest.json"><code>{
+  "protocol_version": 0,
+  "skill_id": "libtv-m-forward",
+  "name": "libtv-m-forward",
+  "description": "Maintain libtv/www upstream forwarding routes for the mobile BFF.",
+  "scope": "project",
+  "targets": ["codex", "cursor", "qoder"],
+  "exclude": ["__pycache__", "*.pyc"]
+}</code></pre>
+
+<h2>9.5 当前 sidecar 实现状态</h2>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">能力</th>
+      <th background-color="light-gray">状态</th>
+      <th background-color="light-gray">验证结果</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>manifest v0 文档</td>
+      <td>已落地</td>
+      <td><code>docs/manifest-v0.md</code></td>
+    </tr>
+    <tr>
+      <td>project skill 扫描</td>
+      <td>已实现</td>
+      <td>识别 <code>libtv-m/skills/libtv-m-forward</code> 为 <code>scope=project</code></td>
+    </tr>
+    <tr>
+      <td>测试</td>
+      <td>已通过</td>
+      <td>13 个单元测试通过，临时 project fixture 可生成 snapshot</td>
+    </tr>
+  </tbody>
+</table>

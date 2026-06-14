@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+snapshot-preview/
+cache-preview/
+webdav-canary-preview/
+webdav-canary-cache/
+webdav-cache-preview/
+webdav-real-cache/
+staging-preview/
+*.log

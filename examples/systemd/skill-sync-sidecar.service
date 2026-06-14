@@ -1,0 +1,24 @@
+[Unit]
+Description=Skill Sync Sidecar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/PATH/TO/skill-sync-sidecar
+Environment=PYTHONPATH=/PATH/TO/skill-sync-sidecar/src
+ExecStart=/usr/bin/python3 -m skill_sync_sidecar sync-daemon \
+  --local-root /home/YOUR_USER/.cc-switch/skills \
+  --cc-switch-webdav \
+  --prefix skill-sync-sidecar-dev/YOUR_DEVICE \
+  --cache-dir /home/YOUR_USER/.cache/skill-sync-sidecar/cache \
+  --work-dir /home/YOUR_USER/.local/state/skill-sync-sidecar/work \
+  --state-file /home/YOUR_USER/.local/state/skill-sync-sidecar/state.json \
+  --dry-run \
+  --interval-seconds 300
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

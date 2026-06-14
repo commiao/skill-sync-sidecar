@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.skill-sync-sidecar</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>-m</string>
+    <string>skill_sync_sidecar</string>
+    <string>sync-daemon</string>
+    <string>--local-root</string>
+    <string>/Users/YOUR_USER/.cc-switch/skills</string>
+    <string>--cc-switch-webdav</string>
+    <string>--prefix</string>
+    <string>skill-sync-sidecar-dev/YOUR_DEVICE</string>
+    <string>--cache-dir</string>
+    <string>/Users/YOUR_USER/Library/Caches/skill-sync-sidecar/cache</string>
+    <string>--work-dir</string>
+    <string>/Users/YOUR_USER/Library/Application Support/skill-sync-sidecar/work</string>
+    <string>--state-file</string>
+    <string>/Users/YOUR_USER/Library/Application Support/skill-sync-sidecar/state.json</string>
+    <string>--dry-run</string>
+    <string>--interval-seconds</string>
+    <string>300</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>/PATH/TO/skill-sync-sidecar/src</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/Library/Logs/skill-sync-sidecar.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/Library/Logs/skill-sync-sidecar.err.log</string>
+</dict>
+</plist>
