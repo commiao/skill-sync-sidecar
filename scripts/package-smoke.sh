@@ -20,7 +20,7 @@ Smoke test body.
 EOF
 
 cd "$ROOT_DIR"
-"$PYTHON_BIN" -m pip wheel --no-deps --no-build-isolation --use-feature=in-tree-build . -w "$OUT_DIR"
+"$PYTHON_BIN" -m pip wheel --no-deps --no-build-isolation . -w "$OUT_DIR"
 
 wheel="$(ls -t "$OUT_DIR"/skill_sync_sidecar-*.whl | head -n 1)"
 "$PYTHON_BIN" -m venv "$WORK_DIR/venv"

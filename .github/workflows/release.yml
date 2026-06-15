@@ -1,0 +1,81 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build release assets
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          mkdir -p dist
+          python -m pip wheel --no-deps --no-build-isolation . -w dist
+          git archive --format=tar.gz \
+            --prefix="skill-sync-sidecar-${RELEASE_TAG#v}/" \
+            -o "dist/skill-sync-sidecar-${RELEASE_TAG#v}-source.tar.gz" \
+            "$RELEASE_TAG"
+          git bundle create "dist/skill-sync-sidecar-${RELEASE_TAG#v}.bundle" \
+            "$RELEASE_TAG"
+          git bundle verify "dist/skill-sync-sidecar-${RELEASE_TAG#v}.bundle"
+
+      - name: Smoke test wheel
+        run: |
+          set -euo pipefail
+          wheel="$(ls -t dist/skill_sync_sidecar-*.whl | head -n 1)"
+          python -m venv /tmp/skill-sync-release-smoke
+          /tmp/skill-sync-release-smoke/bin/python -m pip install --no-deps --force-reinstall "$wheel"
+          mkdir -p /tmp/skill-sync-release-root/demo
+          cat > /tmp/skill-sync-release-root/demo/SKILL.md <<'EOF'
+          ---
+          name: demo
+          description: Demo skill for release smoke validation
+          ---
+
+          Smoke test body.
+          EOF
+          /tmp/skill-sync-release-smoke/bin/skill-sync --version
+          /tmp/skill-sync-release-smoke/bin/skill-sync status --root "smoke=/tmp/skill-sync-release-root"
+          /tmp/skill-sync-release-smoke/bin/skill-sync snapshot --root "smoke=/tmp/skill-sync-release-root" --out /tmp/skill-sync-release-snapshot
+          /tmp/skill-sync-release-smoke/bin/skill-sync remote-status --remote "file:///tmp/skill-sync-release-snapshot"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes_file="docs/release-notes/${RELEASE_TAG}.md"
+          if [ ! -f "$notes_file" ]; then
+            notes_file="docs/release.md"
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/* \
+              --verify-tag \
+              --title "skill-sync-sidecar ${RELEASE_TAG}" \
+              --notes-file "$notes_file"
+          fi

@@ -76,6 +76,22 @@ scripts/publish-github.sh git@github.com:<owner>/<repo>.git
 
 The script pushes `main` and `v0.1.0`.
 
+## GitHub Release
+
+The repository includes `.github/workflows/release.yml` for publishing release assets.
+
+For new tags, pushing `v*` triggers the release workflow automatically. For an existing tag
+such as `v0.1.0`, run the `release` workflow manually from GitHub Actions and keep the
+default tag input.
+
+The workflow builds and uploads:
+
+- `skill_sync_sidecar-<version>-py3-none-any.whl`
+- `skill-sync-sidecar-<version>-source.tar.gz`
+- `skill-sync-sidecar-<version>.bundle`
+
+If a release already exists, the workflow re-uploads the assets with `--clobber`.
+
 If GitHub CLI is preferred, login/create the repository first:
 
 ```bash
