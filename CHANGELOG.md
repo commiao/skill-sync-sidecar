@@ -2,6 +2,18 @@
 
 All notable changes to Skill Sync Sidecar are documented here.
 
+## v0.1.2 - 2026-06-15
+
+Release workflow hardening.
+
+### Added
+
+- Reusable `scripts/build-release-assets.sh` shared by local release checks and GitHub Actions.
+
+### Changed
+
+- GitHub Release workflow installs build dependencies explicitly before building assets.
+
 ## v0.1.1 - 2026-06-15
 
 Release infrastructure and metadata polish.

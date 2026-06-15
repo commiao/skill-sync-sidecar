@@ -4,7 +4,7 @@ set -euo pipefail
 REMOTE_URL="${1:-${SKILL_SYNC_GITHUB_REMOTE:-git@github.com:commiao/skill-sync-sidecar.git}}"
 REMOTE_NAME="${SKILL_SYNC_GITHUB_REMOTE_NAME:-origin}"
 BRANCH="${SKILL_SYNC_GITHUB_BRANCH:-main}"
-TAG="${SKILL_SYNC_RELEASE_TAG:-v0.1.1}"
+TAG="${SKILL_SYNC_RELEASE_TAG:-v0.1.2}"
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "refusing to publish with a dirty worktree" >&2

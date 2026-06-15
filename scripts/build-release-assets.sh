@@ -25,6 +25,10 @@ fi
 VERSION="${RELEASE_TAG#v}"
 mkdir -p "$OUT_DIR"
 
+if [ "${SKILL_SYNC_INSTALL_BUILD_DEPS:-0}" = "1" ]; then
+  "$PYTHON_BIN" -m pip install --upgrade "setuptools>=68" wheel
+fi
+
 rm -f \
   "$OUT_DIR/skill_sync_sidecar-$VERSION-"*.whl \
   "$OUT_DIR/skill-sync-sidecar-$VERSION-source.tar.gz" \

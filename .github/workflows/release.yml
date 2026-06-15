@@ -8,7 +8,7 @@ on:
       tag:
         description: "Release tag to publish"
         required: true
-        default: "v0.1.1"
+        default: "v0.1.2"
 
 permissions:
   contents: write
@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          RELEASE_TAG="$RELEASE_TAG" PYTHON_BIN=python scripts/build-release-assets.sh
+          RELEASE_TAG="$RELEASE_TAG" PYTHON_BIN=python SKILL_SYNC_INSTALL_BUILD_DEPS=1 scripts/build-release-assets.sh
 
       - name: Smoke test wheel
         run: |
