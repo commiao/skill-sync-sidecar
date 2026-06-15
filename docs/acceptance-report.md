@@ -714,6 +714,44 @@ uploaded=0
 
 The 60 `pull_new` entries are expected because OpenClaw intentionally has 32 installed skills while the canonical Mac/WebDAV snapshot has 92. This dry-run proves runtime and WebDAV compatibility only; it is not approval for full live apply.
 
+## 2026-06-15 OpenClaw Dry-Run Systemd Service
+
+The OpenClaw dry-run-only systemd service was installed and started:
+
+```text
+unit=/etc/systemd/system/openclaw-skill-sync-sidecar-dryrun.service
+enabled=true
+active=true
+main_process=/opt/skill-sync-sidecar/venv/bin/python -m skill_sync_sidecar sync-daemon ... --dry-run
+user=admin
+```
+
+First systemd cycle result:
+
+```text
+daemon_status=running
+cycles_run=1
+active_cycle=None
+cycle_status=dry_run
+summary={"noop": 32, "pull_new": 60}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+```
+
+Post-service OpenClaw read-only reconcile remained green:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-systemd-dryrun-20260615224008/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 60, "same_without_base": 32}
+changed_since_previous=0
+```
+
+OpenClaw gateway remained running. No OpenClaw service restart was performed.
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -747,6 +785,7 @@ Ready:
 - OpenClaw live-root `sync-probe` apply, scan verification, and audit-preserving cleanup
 - OpenClaw isolated Python 3.11 runtime and sidecar v0.1.2 installation under `/opt/skill-sync-sidecar`
 - OpenClaw one-cycle daemon dry-run as `admin` using the isolated runtime
+- OpenClaw dry-run-only systemd service installed, enabled, and running
 
 Not yet enabled:
 

@@ -199,6 +199,32 @@ examples/systemd/openclaw-skill-sync-sidecar-dryrun.service
 
 It runs as `admin`, uses the isolated venv, reads `/home/admin/.cc-switch/settings.json`, and remains in `--dry-run`.
 
+The installed OpenClaw unit is:
+
+```text
+/etc/systemd/system/openclaw-skill-sync-sidecar-dryrun.service
+```
+
+Useful checks:
+
+```bash
+systemctl status openclaw-skill-sync-sidecar-dryrun.service --no-pager
+journalctl -u openclaw-skill-sync-sidecar-dryrun.service --no-pager -n 80
+python3 -m json.tool /opt/skill-sync-sidecar/state/openclaw-daemon-dryrun-state.json
+```
+
+Expected steady-state while OpenClaw has only its curated 32 skills:
+
+```text
+cycle_status=dry_run
+summary={"noop": 32, "pull_new": 60}
+blocked=0
+applied=0
+uploaded=0
+```
+
+This service is allowed to stay running because it is dry-run-only. Do not convert it to `--yes` until the 60 `pull_new` skills are explicitly reviewed for OpenClaw live installation.
+
 Read-only OpenClaw inventory:
 
 ```bash
