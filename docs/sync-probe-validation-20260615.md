@@ -145,20 +145,59 @@ The sync mechanism is validated for:
 
 Do not enable OpenClaw live apply or daemon until:
 
-- The 8 real OpenClaw conflicts from `reconcile-20260615-after-skill-work-settled` are reviewed and adopted or merged.
 - A Python `3.9+` runtime or approved isolated container runtime exists on OpenClaw.
 - A dry-run daemon writes auditable state for the intended OpenClaw target.
 - A live-root apply is first tested with `sync-probe` only, not the full 92-skill snapshot.
 
-## Next Recommended Step
+## OpenClaw Optimization Adoption
 
-Adopt the now-stable OpenClaw skill optimizations into the canonical WebDAV snapshot, then rerun:
+The 8 stable OpenClaw skill optimizations from `reconcile-20260615-after-skill-work-settled` were adopted into the Mac canonical root and synced to the `current-mac` WebDAV snapshot.
 
-```bash
-REMOTE_CACHE=/Users/mac/public-sync/skill-sync-sidecar-dev/current-mac \
-PREVIOUS_INVENTORY=/private/tmp/openclaw-skill-sync-validate/reconcile-20260615-after-skill-work-settled/openclaw-inventory.json \
-  scripts/openclaw-reconcile-readonly.sh \
-  /private/tmp/openclaw-skill-sync-validate/reconcile-after-openclaw-adoption
+Adopted files:
+
+```text
+adopted_files=19
+backup_root=/Users/mac/.cc-switch/skills/.skill-sync-backups/openclaw-adopt-20260615-193256
+remote_snapshot_id=20260615T113322.799109Z
+remote_total=92
 ```
 
-Proceed to OpenClaw live `sync-probe` apply only after the real conflict count is `0`.
+Validation:
+
+```text
+python_compile=ok
+node_check=ok
+hash_match=19
+scan_ok=1
+```
+
+OpenClaw read-only reconcile after adoption:
+
+```text
+local: 32
+remote: 92
+safe_to_auto_apply: True
+summary:
+  remote_new: 60
+  same_without_base: 32
+changed_since_previous: 0
+openclaw_gate: ok=True safe_to_auto_apply=True
+```
+
+Current ops status:
+
+```text
+sync_plan: safe_to_apply=True blocked=0 allowed=92
+sync_summary: {'noop': 92}
+openclaw_reconcile: safe_to_auto_apply=True local=32 remote=92
+openclaw_summary: {'remote_new': 60, 'same_without_base': 32}
+openclaw_changed_since_previous: 0
+openclaw_gate: ok=True blockers=[]
+overall_ok: True
+```
+
+Content note: the adopted OpenClaw optimizations still include several `/home/admin/clawd/...` fallbacks behind `LARK_SEND_TEXT_BIN` / `LARK_SEND_FILE_BIN` environment overrides. They are not secrets and do not block the sync mechanism gate, but they should be normalized in the next skill-content optimization pass before treating those skills as fully device-neutral.
+
+## Next Recommended Step
+
+Proceed to OpenClaw live `sync-probe` apply only, still avoiding full 92-skill live apply until an approved OpenClaw runtime/daemon rollout path exists.

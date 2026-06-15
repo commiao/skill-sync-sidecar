@@ -591,6 +591,47 @@ openclaw_gate=ok
 overall_ok=true
 ```
 
+## 2026-06-15 OpenClaw Stable Optimization Adoption
+
+After the OpenClaw skill optimization work stabilized, a fresh read-only reconcile still showed 8 conflicts:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-20260615-after-skill-work-settled/reconcile/reconcile-report.json
+safe_to_auto_apply=false
+summary={"conflict": 8, "remote_new": 60, "same_without_base": 24}
+changed_since_previous=0
+```
+
+Those 8 stable OpenClaw updates were reviewed, backed up, adopted into the Mac canonical root, and synced to the `skill-sync-sidecar-dev/current-mac` WebDAV snapshot.
+
+```text
+adopted_files=19
+backup_root=/Users/mac/.cc-switch/skills/.skill-sync-backups/openclaw-adopt-20260615-193256
+remote_snapshot_id=20260615T113322.799109Z
+remote_total=92
+```
+
+Validation gates:
+
+```text
+python_compile=ok
+node_check=ok
+hash_match=19
+sync_summary={"noop": 92}
+```
+
+Final read-only OpenClaw reconcile after adoption:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-openclaw-adoption-20260615-1933/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 60, "same_without_base": 32}
+changed_since_previous=0
+openclaw_gate=ok
+```
+
+Known content follow-up: several adopted OpenClaw skills still carry `/home/admin/clawd/...` fallbacks behind environment variable overrides. This is acceptable for the sync-mechanism gate but should be normalized during the next skill-content optimization pass.
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -619,9 +660,12 @@ Ready:
 - launchd/systemd template customization
 - current macOS user launchd service running in `--yes` mode against `skill-sync-sidecar-dev/current-mac`
 - OpenClaw second-node read-only inventory and WebDAV comparison
+- OpenClaw stable optimization adoption into Mac/WebDAV canonical snapshot
+- OpenClaw read-only gate passing with zero conflicts and no drift since the settled inventory
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
-- OpenClaw full sidecar daemon, blocked on Python >=3.9 runtime and conflict review
+- OpenClaw full sidecar daemon, blocked on Python >=3.9 runtime or an approved isolated runtime
+- OpenClaw live-root apply beyond a narrow `sync-probe` validation
