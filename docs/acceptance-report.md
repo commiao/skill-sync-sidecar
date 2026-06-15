@@ -632,6 +632,48 @@ openclaw_gate=ok
 
 Known content follow-up: several adopted OpenClaw skills still carry `/home/admin/clawd/...` fallbacks behind environment variable overrides. This is acceptable for the sync-mechanism gate but should be normalized during the next skill-content optimization pass.
 
+## 2026-06-15 OpenClaw Live `sync-probe` Apply Gate
+
+The OpenClaw live-root apply gate was validated with the synthetic `sync-probe` only, not the full 92-skill snapshot. The Python 3.6 compatible bridge script was extended with an explicit `--apply-root ... --yes-apply` mode that refuses non-`sync-probe` live apply.
+
+```text
+local_report=/private/tmp/openclaw-sync-probe-live-20260615201345.json
+remote_out=/tmp/skill-sync-sidecar-validate/sync-probe-live-20260615201345
+snapshot_id=sync-probe-v2-mac
+content_hash=eadf364359152305228dfd63017bc25f702170a95b48e2237b6a6640629f513a
+actual_hash=eadf364359152305228dfd63017bc25f702170a95b48e2237b6a6640629f513a
+target_path=/home/admin/clawd/skills/sync-probe
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/apply-record.json
+previous_exists=False
+```
+
+OpenClaw verified the installed skill:
+
+```text
+owner=admin:admin
+files=SKILL.md, notes/probe.txt
+inventory_total=33
+sync_probe_found=1
+file_count=2
+```
+
+The test skill was then moved out of the live root into the apply backup directory to keep the normal `current-mac` gate clean:
+
+```text
+moved_to=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/sync-probe-live-cleanup
+cleanup_record=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/cleanup-record.json
+```
+
+Post-cleanup reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-live-sync-probe-cleanup-20260615201513/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 60, "same_without_base": 32}
+changed_since_previous=0
+openclaw_gate=ok
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -662,10 +704,11 @@ Ready:
 - OpenClaw second-node read-only inventory and WebDAV comparison
 - OpenClaw stable optimization adoption into Mac/WebDAV canonical snapshot
 - OpenClaw read-only gate passing with zero conflicts and no drift since the settled inventory
+- OpenClaw live-root `sync-probe` apply, scan verification, and audit-preserving cleanup
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full sidecar daemon, blocked on Python >=3.9 runtime or an approved isolated runtime
-- OpenClaw live-root apply beyond a narrow `sync-probe` validation
+- OpenClaw live-root apply beyond the narrow `sync-probe` validation

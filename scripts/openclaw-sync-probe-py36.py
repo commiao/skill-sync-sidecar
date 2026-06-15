@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import sys
+import time
 import zipfile
 
 try:
@@ -137,6 +138,88 @@ def validate_staged_skill(target_dir, manifest, expected_hash):
     return actual_hash
 
 
+def chown_tree_if_root(path, uid, gid):
+    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return False
+    if not os.path.exists(path):
+        return False
+    os.chown(path, uid, gid)
+    if os.path.isdir(path):
+        for root, dirs, files in os.walk(path):
+            for name in dirs:
+                os.chown(os.path.join(root, name), uid, gid)
+            for name in files:
+                os.chown(os.path.join(root, name), uid, gid)
+    return True
+
+
+def apply_staged_probe(stage_skill_dir, manifest, expected_hash, apply_root, skill_id, snapshot_id):
+    if skill_id != "sync-probe":
+        raise RuntimeError("live apply is restricted to sync-probe")
+    if not os.path.isdir(apply_root):
+        raise RuntimeError("apply root does not exist: %s" % apply_root)
+
+    root_stat = os.stat(apply_root)
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    final_target = os.path.join(apply_root, skill_id)
+    backup_root = os.path.join(apply_root, ".skill-sync-backups", "openclaw-sync-probe-%s" % stamp)
+    backup_target = os.path.join(backup_root, skill_id)
+    temp_target = os.path.join(apply_root, ".%s.skill-sync-tmp-%s" % (skill_id, stamp))
+
+    if os.path.exists(temp_target):
+        shutil.rmtree(temp_target)
+    if not os.path.isdir(backup_root):
+        os.makedirs(backup_root)
+
+    previous_exists = os.path.exists(final_target)
+    copied_temp = False
+    moved_existing = False
+    try:
+        shutil.copytree(stage_skill_dir, temp_target)
+        copied_temp = True
+        validate_staged_skill(temp_target, manifest, expected_hash)
+
+        if previous_exists:
+            shutil.move(final_target, backup_target)
+            moved_existing = True
+        os.rename(temp_target, final_target)
+        chown_tree_if_root(final_target, root_stat.st_uid, root_stat.st_gid)
+        chown_tree_if_root(backup_root, root_stat.st_uid, root_stat.st_gid)
+        final_hash = validate_staged_skill(final_target, manifest, expected_hash)
+    except Exception:
+        if copied_temp and os.path.exists(temp_target):
+            shutil.rmtree(temp_target)
+        if moved_existing and not os.path.exists(final_target) and os.path.exists(backup_target):
+            shutil.move(backup_target, final_target)
+        raise
+
+    record = {
+        "record_type": "openclaw-sync-probe-live-apply",
+        "applied_at": stamp,
+        "snapshot_id": snapshot_id,
+        "skill_id": skill_id,
+        "content_hash": expected_hash,
+        "actual_hash": final_hash,
+        "target_path": final_target,
+        "backup_root": backup_root,
+        "previous_exists": previous_exists,
+        "previous_backup_path": backup_target if previous_exists else None,
+    }
+    record_path = os.path.join(backup_root, "apply-record.json")
+    with open(record_path, "w") as handle:
+        json.dump(record, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+    return {
+        "applied": True,
+        "target_path": final_target,
+        "backup_root": backup_root,
+        "apply_record": record_path,
+        "previous_exists": previous_exists,
+        "actual_hash": final_hash,
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--settings", default="/home/admin/.cc-switch/settings.json")
@@ -144,7 +227,14 @@ def main(argv=None):
     parser.add_argument("--out", required=True)
     parser.add_argument("--skill-id", default="sync-probe")
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--apply-root", help="Optional live apply root. Restricted to sync-probe.")
+    parser.add_argument("--yes-apply", action="store_true", help="Actually install sync-probe into --apply-root.")
     args = parser.parse_args(argv)
+
+    if args.yes_apply and not args.apply_root:
+        raise RuntimeError("--yes-apply requires --apply-root")
+    if args.apply_root and not args.yes_apply:
+        raise RuntimeError("--apply-root is dry-run by default; pass --yes-apply to write")
 
     settings = load_webdav_settings(args.settings)
     if os.path.exists(args.out):
@@ -189,6 +279,17 @@ def main(argv=None):
     with open(skill_md_path, "r") as handle:
         skill_md_head = handle.read(512)
 
+    apply_result = None
+    if args.yes_apply:
+        apply_result = apply_staged_probe(
+            target_dir,
+            manifest,
+            skill.get("content_hash"),
+            args.apply_root,
+            skill.get("skill_id") or args.skill_id,
+            index.get("snapshot_id"),
+        )
+
     report = {
         "ok": True,
         "prefix": args.prefix,
@@ -202,6 +303,7 @@ def main(argv=None):
         "file_count": skill.get("file_count"),
         "staged_path": target_dir,
         "skill_md_has_frontmatter": skill_md_head.startswith("---\n"),
+        "apply_result": apply_result,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

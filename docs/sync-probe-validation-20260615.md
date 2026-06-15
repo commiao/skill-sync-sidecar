@@ -147,7 +147,6 @@ Do not enable OpenClaw live apply or daemon until:
 
 - A Python `3.9+` runtime or approved isolated container runtime exists on OpenClaw.
 - A dry-run daemon writes auditable state for the intended OpenClaw target.
-- A live-root apply is first tested with `sync-probe` only, not the full 92-skill snapshot.
 
 ## OpenClaw Optimization Adoption
 
@@ -198,6 +197,70 @@ overall_ok: True
 
 Content note: the adopted OpenClaw optimizations still include several `/home/admin/clawd/...` fallbacks behind `LARK_SEND_TEXT_BIN` / `LARK_SEND_FILE_BIN` environment overrides. They are not secrets and do not block the sync mechanism gate, but they should be normalized in the next skill-content optimization pass before treating those skills as fully device-neutral.
 
+## OpenClaw Live `sync-probe` Apply
+
+The live-root apply gate was validated with `sync-probe` only. The Python 3.6 compatible probe script now supports an explicit write mode:
+
+```text
+--apply-root /home/admin/clawd/skills --yes-apply
+```
+
+Safety controls:
+
+- Write mode is opt-in; `--apply-root` without `--yes-apply` refuses to run.
+- Live apply is restricted to `skill_id=sync-probe`.
+- The staged archive is hash-validated before and after install.
+- The installed tree is ownership-aligned to the OpenClaw skill root owner.
+- An apply record is written under `.skill-sync-backups`.
+
+Live apply result:
+
+```text
+local_report=/private/tmp/openclaw-sync-probe-live-20260615201345.json
+remote_out=/tmp/skill-sync-sidecar-validate/sync-probe-live-20260615201345
+snapshot_id=sync-probe-v2-mac
+skill_id=sync-probe
+content_hash=eadf364359152305228dfd63017bc25f702170a95b48e2237b6a6640629f513a
+actual_hash=eadf364359152305228dfd63017bc25f702170a95b48e2237b6a6640629f513a
+target_path=/home/admin/clawd/skills/sync-probe
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/apply-record.json
+previous_exists=False
+```
+
+OpenClaw live-root verification:
+
+```text
+owner=admin:admin
+files:
+  SKILL.md
+  notes/probe.txt
+inventory_total=33
+sync_probe_found=1
+file_count=2
+```
+
+Cleanup:
+
+```text
+moved_to=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/sync-probe-live-cleanup
+cleanup_record=/home/admin/clawd/skills/.skill-sync-backups/openclaw-sync-probe-20260615201350/cleanup-record.json
+```
+
+The cleanup moved the test skill out of the live root instead of deleting it, preserving the applied artifact for audit while keeping the normal `current-mac` reconcile gate clean.
+
+Post-cleanup OpenClaw read-only reconcile:
+
+```text
+local: 32
+remote: 92
+safe_to_auto_apply: True
+summary:
+  remote_new: 60
+  same_without_base: 32
+changed_since_previous: 0
+openclaw_gate: ok=True safe_to_auto_apply=True
+```
+
 ## Next Recommended Step
 
-Proceed to OpenClaw live `sync-probe` apply only, still avoiding full 92-skill live apply until an approved OpenClaw runtime/daemon rollout path exists.
+Proceed to an OpenClaw dry-run daemon plan against the intended live root only after an approved Python `3.9+` or isolated runtime path exists. Continue avoiding full 92-skill live apply until that runtime and daemon state gate are green.

@@ -170,7 +170,7 @@ Known OpenClaw constraints:
 - `/home/admin/.cc-switch/settings.json` contains the cc-switch WebDAV configuration.
 - `/root/.cc-switch/settings.json` can exist without WebDAV credentials, so a root-owned service must not assume `--cc-switch-webdav` will read the admin user's config.
 - The observed system Python is 3.6.8, while sidecar requires Python >=3.9.
-- Until a Python >=3.9 runtime is available, use `scripts/remote-inventory-py36.py` only for read-only inventory validation.
+- Until a Python >=3.9 runtime is available, use `scripts/remote-inventory-py36.py` for read-only inventory validation. The only approved write bridge is the restricted `sync-probe` live apply mode in `scripts/openclaw-sync-probe-py36.py`.
 
 Read-only OpenClaw inventory:
 
@@ -231,6 +231,24 @@ Gate behavior:
 - Passes when `safe_to_auto_apply=true`, `conflict=0`, `local_new=0`, and `changed_since_previous=0`.
 - Blocks when OpenClaw has local-only skills, conflicts, or fresh changes since the previous inventory.
 - Does not SSH, pull WebDAV, apply files, or write to `/home/admin/clawd/skills`; it only reads existing local reports.
+
+Restricted OpenClaw live `sync-probe` apply:
+
+```bash
+ssh root@oc-vps-aliyun-us \
+  "python3 - --prefix skill-sync-sidecar-dev/sync-probe-YYYYMMDDHHMMSS --out /tmp/skill-sync-sidecar-validate/sync-probe-live --skill-id sync-probe --apply-root /home/admin/clawd/skills --yes-apply" \
+  < scripts/openclaw-sync-probe-py36.py
+```
+
+Safety behavior:
+
+- `--apply-root` refuses to write unless `--yes-apply` is also present.
+- Live apply is restricted to `skill_id=sync-probe`.
+- The archive is hash-validated before and after install.
+- The installed tree owner is aligned to the OpenClaw skill root owner.
+- The apply record is written under `/home/admin/clawd/skills/.skill-sync-backups/...`.
+
+After validating live discovery, move `/home/admin/clawd/skills/sync-probe` into that apply backup directory so normal `current-mac` reconcile does not report `local_new=sync-probe`.
 
 Runtime-state handling:
 
