@@ -26,6 +26,12 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/private/tmp/skill-sync-pycache \
   python3 -m compileall -q src tests
 ```
 
+Build the release artifacts locally with the same script used by GitHub Actions:
+
+```bash
+RELEASE_TAG=v0.1.1 scripts/build-release-assets.sh
+```
+
 ## Package Smoke
 
 ```bash

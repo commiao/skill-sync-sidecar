@@ -32,15 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          mkdir -p dist
-          python -m pip wheel --no-deps --no-build-isolation . -w dist
-          git archive --format=tar.gz \
-            --prefix="skill-sync-sidecar-${RELEASE_TAG#v}/" \
-            -o "dist/skill-sync-sidecar-${RELEASE_TAG#v}-source.tar.gz" \
-            "$RELEASE_TAG"
-          git bundle create "dist/skill-sync-sidecar-${RELEASE_TAG#v}.bundle" \
-            "$RELEASE_TAG"
-          git bundle verify "dist/skill-sync-sidecar-${RELEASE_TAG#v}.bundle"
+          RELEASE_TAG="$RELEASE_TAG" PYTHON_BIN=python scripts/build-release-assets.sh
 
       - name: Smoke test wheel
         run: |
