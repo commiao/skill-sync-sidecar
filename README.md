@@ -28,6 +28,23 @@ The MVP keeps writes behind explicit confirmation flags:
 
 It does not modify tool databases. WebDAV uploads require `push --yes`, and local installs require `apply --yes`, `sync-apply --yes`, or `sync-cycle --yes`.
 
+## Install
+
+From a checked-out repository:
+
+```bash
+python3 -m pip install .
+skill-sync --version
+```
+
+From the GitHub repository:
+
+```bash
+python3 -m pip install "git+https://github.com/commiao/skill-sync-sidecar.git"
+```
+
+For release artifacts, use the wheel attached to the GitHub Release when available.
+
 ## Quick Start
 
 ```bash
