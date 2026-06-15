@@ -74,15 +74,15 @@ Override it when publishing to another repository:
 scripts/publish-github.sh git@github.com:<owner>/<repo>.git
 ```
 
-The script pushes `main` and `v0.1.0`.
+The script pushes `main` and the tag selected by `SKILL_SYNC_RELEASE_TAG`
+(`v0.1.1` by default).
 
 ## GitHub Release
 
 The repository includes `.github/workflows/release.yml` for publishing release assets.
 
-For new tags, pushing `v*` triggers the release workflow automatically. For an existing tag
-such as `v0.1.0`, run the `release` workflow manually from GitHub Actions and keep the
-default tag input.
+For new tags, pushing `v*` triggers the release workflow automatically. For an existing tag,
+run the `release` workflow manually from GitHub Actions and enter the tag.
 
 The workflow builds and uploads:
 
@@ -97,7 +97,7 @@ If GitHub CLI is preferred, login/create the repository first:
 ```bash
 gh auth login
 gh repo create commiao/skill-sync-sidecar --private --source=. --remote=origin --push
-git push origin v0.1.0
+git push origin "$SKILL_SYNC_RELEASE_TAG"
 ```
 
 ## Versioning

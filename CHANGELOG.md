@@ -2,6 +2,19 @@
 
 All notable changes to Skill Sync Sidecar are documented here.
 
+## v0.1.1 - 2026-06-15
+
+Release infrastructure and metadata polish.
+
+### Added
+
+- GitHub Release workflow with wheel, source archive, and git bundle assets.
+- MIT license, security policy, changelog, and README install instructions.
+
+### Changed
+
+- Package smoke test no longer depends on the old pip `in-tree-build` feature flag.
+
 ## v0.1.0 - 2026-06-15
 
 Initial MVP release.
