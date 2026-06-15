@@ -225,6 +225,22 @@ uploaded=0
 
 This service is allowed to stay running because it is dry-run-only. Do not convert it to `--yes` until the 60 `pull_new` skills are explicitly reviewed for OpenClaw live installation.
 
+Admission review:
+
+```text
+docs/openclaw-admission-20260615.md
+```
+
+Current classification:
+
+```text
+p0_candidate=8
+p1_review=18
+p2_defer=34
+```
+
+The P0 candidate set has passed isolated apply validation on both the Mac and OpenClaw `/tmp`, but has not been applied to `/home/admin/clawd/skills`.
+
 Read-only OpenClaw inventory:
 
 ```bash

@@ -752,6 +752,53 @@ changed_since_previous=0
 
 OpenClaw gateway remained running. No OpenClaw service restart was performed.
 
+## 2026-06-15 OpenClaw Admission Review
+
+The dry-run service reports 60 `pull_new` skills. They were classified before any OpenClaw live apply:
+
+```text
+report=docs/openclaw-admission-20260615.md
+remote_snapshot_id=20260615T113322.799109Z
+remote_new_total=60
+p0_candidate=8
+p1_review=18
+p2_defer=34
+```
+
+The P0 candidate set was filtered into an allowlist-only temporary snapshot and validated without touching `/home/admin/clawd/skills`.
+
+Local isolated validation:
+
+```text
+target=/private/tmp/openclaw-admission-p0-local-20260615233256/target
+stage=8
+apply_dry_run=8
+apply=8
+scan=8
+```
+
+OpenClaw isolated validation:
+
+```text
+target=/tmp/openclaw-admission-p0-validate-20260615/target
+stage=8
+apply_dry_run=8
+apply=8
+scan=8
+skill_md_count=8
+```
+
+Post-validation live-root reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p0-isolated-20260615233355/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 60, "same_without_base": 32}
+changed_since_previous=0
+```
+
+No P0 candidate was installed into the live OpenClaw skill root.
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -786,6 +833,7 @@ Ready:
 - OpenClaw isolated Python 3.11 runtime and sidecar v0.1.2 installation under `/opt/skill-sync-sidecar`
 - OpenClaw one-cycle daemon dry-run as `admin` using the isolated runtime
 - OpenClaw dry-run-only systemd service installed, enabled, and running
+- OpenClaw `pull_new=60` admission report and P0 isolated apply validation
 
 Not yet enabled:
 
