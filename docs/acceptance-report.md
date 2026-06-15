@@ -674,6 +674,46 @@ changed_since_previous=0
 openclaw_gate=ok
 ```
 
+## 2026-06-15 OpenClaw Isolated Python Runtime
+
+OpenClaw keeps the system Python untouched:
+
+```text
+/usr/bin/python3 -> Python 3.6.8
+```
+
+An isolated sidecar runtime was installed under `/opt/skill-sync-sidecar`:
+
+```text
+uv=0.11.21
+uv_sha256=8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050
+python=/opt/skill-sync-sidecar/python/cpython-3.11-linux-x86_64-gnu/bin/python3.11
+python_version=3.11.15
+venv=/opt/skill-sync-sidecar/venv
+skill-sync=0.1.2
+wheel_sha256=01ada3f2f5ab3bd72d424a148726daf6644a7e1944c9736da0c4da810b9e090f
+```
+
+The sidecar wheel was installed offline from the copied wheel artifact. No system Python package or global interpreter path was replaced.
+
+OpenClaw one-cycle daemon dry-run using the isolated runtime:
+
+```text
+command_user=admin
+local_root=/home/admin/clawd/skills
+remote_prefix=skill-sync-sidecar-dev/current-mac
+state_file=/opt/skill-sync-sidecar/state/openclaw-daemon-dryrun-state.json
+snapshot_id=20260615T113322.799109Z
+cycle_status=dry_run
+summary={"noop": 32, "pull_new": 60}
+blocked=0
+conflicts=0
+applied=0
+uploaded=0
+```
+
+The 60 `pull_new` entries are expected because OpenClaw intentionally has 32 installed skills while the canonical Mac/WebDAV snapshot has 92. This dry-run proves runtime and WebDAV compatibility only; it is not approval for full live apply.
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -705,10 +745,12 @@ Ready:
 - OpenClaw stable optimization adoption into Mac/WebDAV canonical snapshot
 - OpenClaw read-only gate passing with zero conflicts and no drift since the settled inventory
 - OpenClaw live-root `sync-probe` apply, scan verification, and audit-preserving cleanup
+- OpenClaw isolated Python 3.11 runtime and sidecar v0.1.2 installation under `/opt/skill-sync-sidecar`
+- OpenClaw one-cycle daemon dry-run as `admin` using the isolated runtime
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
-- OpenClaw full sidecar daemon, blocked on Python >=3.9 runtime or an approved isolated runtime
+- OpenClaw full writable sidecar daemon
 - OpenClaw live-root apply beyond the narrow `sync-probe` validation

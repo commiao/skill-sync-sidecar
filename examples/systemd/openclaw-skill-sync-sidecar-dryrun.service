@@ -1,0 +1,24 @@
+[Unit]
+Description=Skill Sync Sidecar OpenClaw Dry Run
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+Environment=HOME=/home/admin
+ExecStart=/opt/skill-sync-sidecar/venv/bin/python -m skill_sync_sidecar sync-daemon \
+  --local-root /home/admin/clawd/skills \
+  --cc-switch-webdav \
+  --prefix skill-sync-sidecar-dev/current-mac \
+  --cache-dir /opt/skill-sync-sidecar/cache/current-mac \
+  --work-dir /opt/skill-sync-sidecar/work/current-mac \
+  --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-dryrun-state.json \
+  --allow-new \
+  --dry-run \
+  --interval-seconds 300
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

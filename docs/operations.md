@@ -170,7 +170,34 @@ Known OpenClaw constraints:
 - `/home/admin/.cc-switch/settings.json` contains the cc-switch WebDAV configuration.
 - `/root/.cc-switch/settings.json` can exist without WebDAV credentials, so a root-owned service must not assume `--cc-switch-webdav` will read the admin user's config.
 - The observed system Python is 3.6.8, while sidecar requires Python >=3.9.
-- Until a Python >=3.9 runtime is available, use `scripts/remote-inventory-py36.py` for read-only inventory validation. The only approved write bridge is the restricted `sync-probe` live apply mode in `scripts/openclaw-sync-probe-py36.py`.
+- Do not replace `/usr/bin/python3`, use `alternatives`, or install sidecar dependencies into system Python. OpenClaw uses an isolated runtime under `/opt/skill-sync-sidecar`.
+
+OpenClaw isolated runtime:
+
+```text
+uv=/opt/skill-sync-sidecar/bin/uv
+python=/opt/skill-sync-sidecar/python/cpython-3.11-linux-x86_64-gnu/bin/python3.11
+venv=/opt/skill-sync-sidecar/venv
+skill-sync=/opt/skill-sync-sidecar/venv/bin/skill-sync
+state=/opt/skill-sync-sidecar/state
+cache=/opt/skill-sync-sidecar/cache
+work=/opt/skill-sync-sidecar/work
+```
+
+System Python remains unchanged:
+
+```text
+/usr/bin/python3 -> Python 3.6.8
+/opt/skill-sync-sidecar/venv/bin/python -> Python 3.11.15
+```
+
+The OpenClaw dry-run systemd template is:
+
+```text
+examples/systemd/openclaw-skill-sync-sidecar-dryrun.service
+```
+
+It runs as `admin`, uses the isolated venv, reads `/home/admin/.cc-switch/settings.json`, and remains in `--dry-run`.
 
 Read-only OpenClaw inventory:
 
@@ -273,11 +300,11 @@ Large-asset exception:
 
 Before enabling it:
 
-1. Replace `YOUR_USER`, `YOUR_DEVICE`, and `/PATH/TO/skill-sync-sidecar`.
-2. Keep `--dry-run` until the state file shows expected plans.
-3. Verify the service user can read cc-switch WebDAV settings or provide env credentials.
-4. Verify the service user's Python runtime is >=3.9.
-5. Keep remote service connectivity checks separate from sidecar rollout.
+1. Keep `--dry-run` until the state file shows expected plans over multiple cycles.
+2. Verify the service user can read cc-switch WebDAV settings or provide env credentials.
+3. Verify the service user's Python runtime is >=3.9.
+4. Keep remote service connectivity checks separate from sidecar rollout.
+5. Do not enable full live apply while `pull_new=60` still requires review.
 6. Review any `conflict` actions before allowing writes to `/home/admin/clawd/skills`.
 
 Suggested validation:
