@@ -36,6 +36,37 @@ class OpenClawGateTest(unittest.TestCase):
             self.assertEqual(gate["blockers"], [])
             self.assertEqual(gate["changed_count"], 0)
 
+    def test_gate_require_complete_blocks_unreviewed_remote_new(self):
+        with TemporaryDirectory() as tmp:
+            report = Path(tmp) / "reconcile-report.json"
+            self._write_report(
+                report,
+                safe_to_auto_apply=True,
+                summary={"same_without_base": 90, "remote_new": 2},
+                changed_since_previous={"changed_count": 0, "changed": []},
+            )
+
+            gate = build_openclaw_gate(report_path=report, require_complete=True)
+
+            self.assertFalse(gate["ok"])
+            self.assertTrue(gate["require_complete"])
+            self.assertIn("remote_new=2", gate["blockers"])
+
+    def test_gate_require_complete_allows_fully_admitted_report(self):
+        with TemporaryDirectory() as tmp:
+            report = Path(tmp) / "reconcile-report.json"
+            self._write_report(
+                report,
+                safe_to_auto_apply=True,
+                summary={"same_without_base": 92},
+                changed_since_previous={"changed_count": 0, "changed": []},
+            )
+
+            gate = build_openclaw_gate(report_path=report, require_complete=True)
+
+            self.assertTrue(gate["ok"])
+            self.assertEqual(gate["blockers"], [])
+
     def test_gate_blocks_conflict_local_new_and_fresh_drift(self):
         with TemporaryDirectory() as tmp:
             report = Path(tmp) / "reconcile-report.json"
@@ -68,6 +99,7 @@ class OpenClawGateTest(unittest.TestCase):
         )
 
         self.assertIn("openclaw_gate: ok=False", text)
+        self.assertIn("require_complete: False", text)
         self.assertIn("blockers: conflict=1", text)
 
     def _write_report(

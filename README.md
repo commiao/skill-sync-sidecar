@@ -51,6 +51,7 @@ For release artifacts, use the wheel attached to the GitHub Release when availab
 python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
+python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 python3 -m skill_sync_sidecar scan --json
 python3 -m skill_sync_sidecar doctor
 python3 -m skill_sync_sidecar snapshot --out ./snapshot-preview
@@ -362,6 +363,14 @@ python3 -m skill_sync_sidecar sync-cycle \
 ```
 
 `sync-daemon` repeats the same cycle on an interval. It defaults to stopping when a cycle is blocked, which prevents a conflict or pending delete from being retried forever without review. Use `--max-cycles` for finite tests or launch checks; omit it only when running under a process supervisor.
+
+For OpenClaw, run the stricter gate before converting a dry-run service into a writable service:
+
+```bash
+python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
+```
+
+The default OpenClaw gate is compatible with supervised allowlist pulls. `--require-complete` additionally blocks when `remote_new` remains, so unattended writes only start after every canonical package has been reviewed or explicitly deferred elsewhere.
 
 ```bash
 python3 -m skill_sync_sidecar sync-daemon \

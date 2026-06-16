@@ -647,9 +647,16 @@ Check the latest known OpenClaw gate without SSH:
 PYTHONPATH=src python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
 ```
 
+Before converting OpenClaw from dry-run-only to automatic writes, use the stricter gate:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
+```
+
 Gate behavior:
 
 - Passes when `safe_to_auto_apply=true`, `conflict=0`, `local_new=0`, and `changed_since_previous=0`.
+- With `--require-complete`, also blocks while `remote_new>0`; this is the precondition for unattended writable OpenClaw service rollout.
 - Blocks when OpenClaw has local-only skills, conflicts, or fresh changes since the previous inventory.
 - Does not SSH, pull WebDAV, apply files, or write to `/home/admin/clawd/skills`; it only reads existing local reports.
 
@@ -698,7 +705,7 @@ Before enabling it:
 2. Verify the service user can read cc-switch WebDAV settings or provide env credentials.
 3. Verify the service user's Python runtime is >=3.9.
 4. Keep remote service connectivity checks separate from sidecar rollout.
-5. Do not enable full live apply until conflict, delete, and peer-writer policies are explicitly approved for automatic OpenClaw writes.
+5. Run `openclaw-gate --require-complete --fail-on-blocked`; it must pass before any writable OpenClaw service rollout.
 6. Review any `conflict` actions before allowing writes to `/home/admin/clawd/skills`.
 
 Suggested validation:

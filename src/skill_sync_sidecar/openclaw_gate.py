@@ -18,7 +18,11 @@ def select_latest_reconcile_report(root: Path) -> Optional[Path]:
     return max(candidates, key=_report_sort_key)
 
 
-def build_openclaw_gate(report_path: Optional[Path] = None, report_root: Optional[Path] = None) -> JsonDict:
+def build_openclaw_gate(
+    report_path: Optional[Path] = None,
+    report_root: Optional[Path] = None,
+    require_complete: bool = False,
+) -> JsonDict:
     selected_path = report_path.expanduser() if report_path else None
     selected_by = "explicit" if selected_path else None
     if selected_path is None and report_root is not None:
@@ -35,11 +39,12 @@ def build_openclaw_gate(report_path: Optional[Path] = None, report_root: Optiona
     summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
     changed = report.get("changed_since_previous")
     changed_count = changed.get("changed_count") if isinstance(changed, dict) else None
-    blockers = _blockers(report, summary, changed_count)
+    blockers = _blockers(report, summary, changed_count, require_complete=require_complete)
 
     return {
         "ok": not blockers,
         "available": True,
+        "require_complete": require_complete,
         "path": str(selected_path),
         "selected_by": selected_by,
         "label": report.get("label"),
@@ -61,6 +66,7 @@ def render_openclaw_gate_text(gate: JsonDict) -> str:
         return f"openclaw_gate: unavailable ({gate.get('reason')})"
     lines = [
         f"openclaw_gate: ok={gate.get('ok')} safe_to_auto_apply={gate.get('safe_to_auto_apply')}",
+        f"require_complete: {gate.get('require_complete', False)}",
         f"report: {gate.get('path')}",
         f"summary: {gate.get('summary')}",
         f"changed_since_previous: {gate.get('changed_count')}",
@@ -71,7 +77,7 @@ def render_openclaw_gate_text(gate: JsonDict) -> str:
     return "\n".join(lines)
 
 
-def _blockers(report: JsonDict, summary: JsonDict, changed_count: Optional[int]) -> list[str]:
+def _blockers(report: JsonDict, summary: JsonDict, changed_count: Optional[int], require_complete: bool) -> list[str]:
     blockers: list[str] = []
     if not report.get("safe_to_auto_apply"):
         blockers.append("safe_to_auto_apply=false")
@@ -81,6 +87,10 @@ def _blockers(report: JsonDict, summary: JsonDict, changed_count: Optional[int])
             blockers.append(f"{key}={count}")
     if changed_count:
         blockers.append(f"changed_since_previous={changed_count}")
+    if require_complete:
+        remote_new = int(summary.get("remote_new", 0) or 0)
+        if remote_new:
+            blockers.append(f"remote_new={remote_new}")
     return blockers
 
 

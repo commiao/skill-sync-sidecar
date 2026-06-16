@@ -63,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
     openclaw_source.add_argument("--report", help="Explicit reconcile-report.json.")
     openclaw_source.add_argument("--report-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest reconcile-report.json.")
+    openclaw_gate.add_argument("--require-complete", action="store_true", help="Block when remote_new remains; use before enabling automatic OpenClaw writes.")
     openclaw_gate.add_argument("--fail-on-blocked", action="store_true", help="Exit non-zero when the gate has blockers.")
     openclaw_gate.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     openclaw_gate.set_defaults(func=cmd_openclaw_gate)
@@ -324,6 +325,7 @@ def cmd_openclaw_gate(args: argparse.Namespace) -> int:
     gate = build_openclaw_gate(
         report_path=Path(args.report) if args.report else None,
         report_root=Path(args.report_root) if args.report_root else None,
+        require_complete=args.require_complete,
     )
     if args.json:
         print(json.dumps(gate, ensure_ascii=False, indent=2))
