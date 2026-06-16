@@ -1785,4 +1785,76 @@ summary={"remote_new": 5, "same_without_base": 87}
 changed_since_previous=0
 ```
 
-The remaining 5 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P2c Wave-12 Live Allowlist Apply
+
+On 2026-06-16, the sixth P2c wave installed the reviewed setup/upgrade workflows:
+
+```text
+allowlist=gstack-upgrade, setup-gbrain
+selection=small high-impact setup/upgrade workflows; warnings reviewed as runtime-only upgrade/init instructions; sync/install stage does not execute migrations, collect secrets, or modify tool state
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+target=/private/tmp/openclaw-admission-p2c-wave12-local-target-20260616
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 0, "warning": 2, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+target=/tmp/openclaw-admission-p2c-wave12-validate-20260616-1355/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 0, "warning": 2, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave12-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 5, "same_without_base": 87}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+state=/tmp/openclaw-p2c-wave12-live-apply-20260616-1356
+stage=2
+apply_dry_run=2
+apply=2
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-135550-807848/.apply-record.json
+applied=gstack-upgrade, setup-gbrain
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=89
+risk={"ok": 79, "warning": 10, "error": 0}
+p2c_wave12_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave12-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 3, "same_without_base": 89}
+changed_since_previous=0
+```
+
+The remaining 3 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.

@@ -2191,6 +2191,68 @@ summary={"remote_new": 5, "same_without_base": 87}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P2c Wave-12 Live Allowlist Apply
+
+P2c Wave-12 installed the reviewed setup/upgrade workflows:
+
+```text
+allowlist=gstack-upgrade, setup-gbrain
+selection=small high-impact setup/upgrade workflows; warnings reviewed as runtime-only upgrade/init instructions; sync/install stage does not execute migrations, collect secrets, or modify tool state
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2c-wave12-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2c-wave12-validate-20260616-1355/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 0, "warning": 2, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave12-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 5, "same_without_base": 87}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave12-snapshot-20260616
+state=/tmp/openclaw-p2c-wave12-live-apply-20260616-1356
+stage=2
+apply_dry_run=2
+apply=2
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-135550-807848/.apply-record.json
+applied=gstack-upgrade, setup-gbrain
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=89
+risk={"ok": 79, "warning": 10, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave12-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 3, "same_without_base": 89}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -2248,10 +2310,11 @@ Ready:
 - OpenClaw P2c Wave-9 live allowlist apply for `ship` and `land-and-deploy`, with post-apply reconcile at `same_without_base=85,pull_new=7`
 - OpenClaw P2c Wave-10 live allowlist apply for `pair-agent`, with post-apply reconcile at `same_without_base=86,pull_new=6`
 - OpenClaw P2c Wave-11 live allowlist apply for `cso`, with post-apply reconcile at `same_without_base=87,pull_new=5`
+- OpenClaw P2c Wave-12 live allowlist apply for `gstack-upgrade` and `setup-gbrain`, with post-apply reconcile at `same_without_base=89,pull_new=3`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, reviewed P2a Wave-1/Wave-2/Wave-3/Wave-4, reviewed P2b Wave-5/Wave-6, and reviewed P2c Wave-7/Wave-8/Wave-9/Wave-10/Wave-11 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, reviewed P2a Wave-1/Wave-2/Wave-3/Wave-4, reviewed P2b Wave-5/Wave-6, and reviewed P2c Wave-7/Wave-8/Wave-9/Wave-10/Wave-11/Wave-12 allowlist validations
