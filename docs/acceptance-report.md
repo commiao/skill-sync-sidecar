@@ -1571,6 +1571,68 @@ summary={"remote_new": 28, "same_without_base": 64}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P2a Wave-2 Live Allowlist Apply
+
+P2a Wave-2 installed two small discovery/browser-foundation skills:
+
+```text
+allowlist=browser, find-skills
+selection=browser is a small CDP helper package and foundation for later browser workflows; find-skills is a small discovery workflow; secret scan found no credential patterns
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2a-wave2-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2a-wave2-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2a-wave2-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2a-wave2-validate-20260616-1027/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 2, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2a-wave2-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 28, "same_without_base": 64}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2a-wave2-snapshot-20260616
+state=/tmp/openclaw-p2a-wave2-live-apply-20260616-1028
+stage=2
+apply_dry_run=2
+apply=2
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-102826-785168/.apply-record.json
+applied=browser, find-skills
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=66
+risk={"ok": 59, "warning": 7, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2a-wave2-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 26, "same_without_base": 66}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1618,10 +1680,11 @@ Ready:
 - OpenClaw P1 Wave-8 live allowlist apply for `codex`, with post-apply reconcile at `same_without_base=57,pull_new=35`
 - OpenClaw P1 Wave-9 live allowlist apply for the `autoplan` review bundle, with post-apply reconcile at `same_without_base=61,pull_new=31`
 - OpenClaw P2a Wave-1 live allowlist apply for `careful`, `guard`, and `pua`, with post-apply reconcile at `same_without_base=64,pull_new=28`
+- OpenClaw P2a Wave-2 live allowlist apply for `browser` and `find-skills`, with post-apply reconcile at `same_without_base=66,pull_new=26`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and reviewed P2a Wave-1 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and reviewed P2a Wave-1/Wave-2 allowlist validations
