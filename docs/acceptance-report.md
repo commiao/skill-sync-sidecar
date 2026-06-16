@@ -1384,6 +1384,68 @@ summary={"remote_new": 36, "same_without_base": 56}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P1 Wave-8 Live Allowlist Apply
+
+P1 Wave-8 installed `codex` as a single-skill batch:
+
+```text
+allowlist=codex
+selection=risk ok, high behavioral impact handled alone after review was installed
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p1-wave8-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p1-wave8-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave8-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p1-wave8-validate-20260616-1004/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave8-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 36, "same_without_base": 56}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave8-snapshot-20260616
+state=/tmp/openclaw-p1-wave8-live-apply-20260616-1006
+stage=1
+apply_dry_run=1
+apply=1
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-100635-761972/.apply-record.json
+applied=codex
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=57
+risk={"ok": 55, "warning": 2, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave8-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 35, "same_without_base": 57}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1428,10 +1490,11 @@ Ready:
 - OpenClaw P1 Wave-5 live allowlist apply for `make-pdf`, with post-apply reconcile at `same_without_base=54,pull_new=38`
 - OpenClaw P1 Wave-6 live allowlist apply for `office-hours`, with post-apply reconcile at `same_without_base=55,pull_new=37`
 - OpenClaw P1 Wave-7 live allowlist apply for `review`, with post-apply reconcile at `same_without_base=56,pull_new=36`
+- OpenClaw P1 Wave-8 live allowlist apply for `codex`, with post-apply reconcile at `same_without_base=57,pull_new=35`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8 allowlist validations
