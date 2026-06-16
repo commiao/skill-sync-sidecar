@@ -2253,6 +2253,98 @@ summary={"remote_new": 3, "same_without_base": 89}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P2c Wave-13 Live Allowlist Apply
+
+P2c Wave-13 installed the reviewed `gstack` core package as a single large-package batch:
+
+```text
+allowlist=gstack
+selection=core gstack package; scanner risk ok; installed alone because package is large and contains many files
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2c-wave13-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2c-wave13-validate-20260616-1359/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight and post-apply reconcile:
+
+```text
+preflight_report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave13-live-20260616/reconcile/reconcile-report.json
+preflight_summary={"remote_new": 3, "same_without_base": 89}
+post_report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave13-live-apply-20260616/reconcile/reconcile-report.json
+post_summary={"remote_new": 2, "same_without_base": 90}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+state=/tmp/openclaw-p2c-wave13-live-apply-20260616-1400
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-135940-450125/.apply-record.json
+applied=gstack
+scan_total=90
+risk={"ok": 80, "warning": 10, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+## 2026-06-16 OpenClaw P2c Wave-14 Final Live Allowlist Apply
+
+P2c Wave-14 installed the final remaining packages, `browse` and `claude-mem`:
+
+```text
+allowlist=browse, claude-mem
+selection=final remaining packages; browse warning is large package size; claude-mem warnings are missing SKILL.md name/description and install-guide curl examples; sync/install stage is inert and carries no real credentials
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2c-wave14-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2c-wave14-validate-20260616-1402/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 0, "warning": 2, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight and final reconcile:
+
+```text
+preflight_report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave14-live-20260616/reconcile/reconcile-report.json
+preflight_summary={"remote_new": 2, "same_without_base": 90}
+final_report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave14-live-apply-20260616/reconcile/reconcile-report.json
+final_summary={"same_without_base": 92}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+state=/tmp/openclaw-p2c-wave14-live-apply-20260616-1403
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-140221-045245/.apply-record.json
+applied=browse, claude-mem
+scan_total=92
+risk={"ok": 80, "warning": 12, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -2311,10 +2403,12 @@ Ready:
 - OpenClaw P2c Wave-10 live allowlist apply for `pair-agent`, with post-apply reconcile at `same_without_base=86,pull_new=6`
 - OpenClaw P2c Wave-11 live allowlist apply for `cso`, with post-apply reconcile at `same_without_base=87,pull_new=5`
 - OpenClaw P2c Wave-12 live allowlist apply for `gstack-upgrade` and `setup-gbrain`, with post-apply reconcile at `same_without_base=89,pull_new=3`
+- OpenClaw P2c Wave-13 live allowlist apply for `gstack`, with post-apply reconcile at `same_without_base=90,pull_new=2`
+- OpenClaw P2c Wave-14 final live allowlist apply for `browse` and `claude-mem`, with final reconcile at `same_without_base=92,pull_new=0`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, reviewed P2a Wave-1/Wave-2/Wave-3/Wave-4, reviewed P2b Wave-5/Wave-6, and reviewed P2c Wave-7/Wave-8/Wave-9/Wave-10/Wave-11/Wave-12 allowlist validations
+- OpenClaw full writable daemon; reviewed live-root allowlist installation is complete, but automatic writes to OpenClaw remain disabled

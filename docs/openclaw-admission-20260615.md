@@ -1857,4 +1857,118 @@ summary={"remote_new": 3, "same_without_base": 89}
 changed_since_previous=0
 ```
 
-The remaining 3 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P2c Wave-13 Live Allowlist Apply
+
+On 2026-06-16, the seventh P2c wave installed the reviewed `gstack` core package as a single large-package batch:
+
+```text
+allowlist=gstack
+selection=core gstack package; scanner risk ok; installed alone because package is large and contains many files
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2c-wave13-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2c-wave13-validate-20260616-1359/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave13-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 3, "same_without_base": 89}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave13-snapshot-20260616
+state=/tmp/openclaw-p2c-wave13-live-apply-20260616-1400
+stage=1
+apply_dry_run=1
+apply=1
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-135940-450125/.apply-record.json
+applied=gstack
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification and reconcile:
+
+```text
+scan_after=90
+risk={"ok": 80, "warning": 10, "error": 0}
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave13-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 2, "same_without_base": 90}
+changed_since_previous=0
+gateway=openclaw-gateway not restarted
+```
+
+## P2c Wave-14 Final Live Allowlist Apply
+
+On 2026-06-16, the final P2c wave installed the remaining reviewed `browse` and `claude-mem` packages:
+
+```text
+allowlist=browse, claude-mem
+selection=final remaining packages; browse warning is large package size; claude-mem warnings are missing SKILL.md name/description and install-guide curl examples; sync/install stage is inert and carries no real credentials
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2c-wave14-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2c-wave14-validate-20260616-1402/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 0, "warning": 2, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave14-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 2, "same_without_base": 90}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave14-snapshot-20260616
+state=/tmp/openclaw-p2c-wave14-live-apply-20260616-1403
+stage=2
+apply_dry_run=2
+apply=2
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-140221-045245/.apply-record.json
+applied=browse, claude-mem
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification and final reconcile:
+
+```text
+scan_after=92
+risk={"ok": 80, "warning": 12, "error": 0}
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave14-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"same_without_base": 92}
+changed_since_previous=0
+gateway=openclaw-gateway not restarted
+```
+
+All 92 packages from the Mac/WebDAV canonical snapshot are now installed or matched on OpenClaw. The writable OpenClaw daemon remains disabled; only the dry-run service is active.
