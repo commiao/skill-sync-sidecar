@@ -880,6 +880,75 @@ isolated_python=/opt/skill-sync-sidecar/venv/bin/python Python 3.11.15
 
 OpenClaw live root has 49 first-level directories excluding `.skill-sync-backups`; 40 contain `SKILL.md` and are sidecar-recognized skill packages. The 9 directories without `SKILL.md` are ignored by sidecar package scanning.
 
+## 2026-06-16 OpenClaw P1 Wave-1 Isolated Validation
+
+The first P1 wave was selected from the remaining 52 `pull_new` skills and validated without touching the live OpenClaw skill root.
+
+Wave-1 allowlist:
+
+```text
+context-restore
+context-save
+investigate
+learn
+plan-tune
+using-superpowers
+```
+
+Local validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p1-wave1-snapshot-20260616
+target=/private/tmp/openclaw-admission-p1-wave1-local-20260616/target
+plan={"pull_new": 6}
+apply_dry_run=6
+apply=6
+scan=6
+risk={"ok": 6, "warning": 0, "error": 0}
+```
+
+OpenClaw isolated validation initially exposed a Linux portability defect:
+
+```text
+failure=/private/tmp/skill-sync-apply-stage-* not found
+root_cause=core temp staging hardcoded a macOS-only path
+fix=skill-sync-sidecar v0.1.3 uses platform default TemporaryDirectory
+```
+
+v0.1.3 was installed into a separate OpenClaw venv from the pushed fork commit `5b07d9360dd11b1c67cc24d1cd2b4656826f3331`:
+
+```text
+venv=/opt/skill-sync-sidecar/venv-0.1.3
+version=skill-sync 0.1.3
+install_mode=pip install --no-deps --no-build-isolation git+https://github.com/commiao/skill-sync-sidecar.git@main
+```
+
+OpenClaw `/tmp` validation after the fix:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave1-snapshot-20260616-0624
+target=/tmp/openclaw-admission-p1-wave1-validate-20260616-0640/target
+plan={"pull_new": 6}
+apply=6
+scan=6
+risk={"ok": 6, "warning": 0, "error": 0}
+apply_record=/tmp/openclaw-admission-p1-wave1-validate-20260616-0640/target/.skill-sync-backups/20260616T064037.581316Z/.apply-record.json
+```
+
+The OpenClaw dry-run systemd service was switched to the validated v0.1.3 venv and restarted. It remains dry-run-only:
+
+```text
+exec=/opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar sync-daemon ... --dry-run
+daemon_status=running
+summary={"noop": 40, "pull_new": 52}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -911,11 +980,12 @@ Ready:
 - OpenClaw stable optimization adoption into Mac/WebDAV canonical snapshot
 - OpenClaw read-only gate passing with zero conflicts and no drift since the settled inventory
 - OpenClaw live-root `sync-probe` apply, scan verification, and audit-preserving cleanup
-- OpenClaw isolated Python 3.11 runtime and sidecar v0.1.2 installation under `/opt/skill-sync-sidecar`
+- OpenClaw isolated Python 3.11 runtime and sidecar v0.1.3 dry-run service under `/opt/skill-sync-sidecar`
 - OpenClaw one-cycle daemon dry-run as `admin` using the isolated runtime
 - OpenClaw dry-run-only systemd service installed, enabled, and running
 - OpenClaw initial `pull_new=60` admission report and P0 isolated apply validation
 - OpenClaw P0 live allowlist apply for 8 reviewed skills, with dry-run service returned to `noop=40,pull_new=52`
+- OpenClaw P1 Wave-1 isolated validation for 6 reviewed skills on both Mac and OpenClaw `/tmp`
 
 Not yet enabled:
 

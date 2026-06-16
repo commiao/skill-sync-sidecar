@@ -2,6 +2,16 @@
 
 All notable changes to Skill Sync Sidecar are documented here.
 
+## v0.1.3 - 2026-06-16
+
+Linux/OpenClaw runtime compatibility patch.
+
+### Fixed
+
+- Removed macOS-only `/private/tmp` assumptions from core sync staging paths.
+- `sync-apply`, conflict packaging, and tombstone packaging now use the platform default temporary directory.
+- Package smoke now rejects stale wheel artifacts whose filename version does not match the current package version.
+
 ## v0.1.2 - 2026-06-15
 
 Release workflow hardening.

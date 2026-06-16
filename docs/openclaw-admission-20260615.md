@@ -242,3 +242,96 @@ task-workflow-engine
 ```
 
 The remaining 52 `pull_new` skills stay uninstalled pending P1/P2 review. The service remains dry-run-only; no full 92-skill live apply was performed.
+
+## P1 Wave-1 Isolated Validation
+
+On 2026-06-16, the first P1 review wave was selected from the original P1 list. The wave intentionally includes low-blast-radius process and workflow skills before larger design, PDF, browser, deploy, or multi-agent packages.
+
+Wave-1 allowlist:
+
+```text
+context-restore
+context-save
+investigate
+learn
+plan-tune
+using-superpowers
+```
+
+Selection policy:
+
+```text
+risk_level=ok
+scope=global
+targets include openclaw
+small file_count packages
+no live service/deploy/browser/PDF generation package in first P1 wave
+```
+
+Local filtered snapshot:
+
+```text
+snapshot_id=openclaw-admission-p1-wave1-20260616
+total=6
+local_snapshot=/private/tmp/openclaw-admission-p1-wave1-snapshot-20260616
+```
+
+Local isolated target validation:
+
+```text
+target=/private/tmp/openclaw-admission-p1-wave1-local-20260616/target
+plan={"pull_new": 6}
+apply_dry_run=6
+apply=6
+scan=6
+risk={"ok": 6, "warning": 0, "error": 0}
+```
+
+OpenClaw isolated validation first exposed a Linux portability bug in sidecar itself:
+
+```text
+failure=FileNotFoundError: /private/tmp/skill-sync-apply-stage-...
+root_cause=core sync-apply staging hardcoded macOS /private/tmp
+fix=skill-sync-sidecar v0.1.3 uses platform default TemporaryDirectory
+```
+
+OpenClaw v0.1.3 validation was performed in a separate venv before touching the running service:
+
+```text
+venv=/opt/skill-sync-sidecar/venv-0.1.3
+install_source=github.com/commiao/skill-sync-sidecar.git@main
+commit=5b07d9360dd11b1c67cc24d1cd2b4656826f3331
+version=skill-sync 0.1.3
+```
+
+OpenClaw `/tmp` isolated target validation after the fix:
+
+```text
+remote_cache=/tmp/openclaw-admission-p1-wave1-full-cache-20260616-0624
+snapshot=/tmp/openclaw-admission-p1-wave1-snapshot-20260616-0624
+target=/tmp/openclaw-admission-p1-wave1-validate-20260616-0640/target
+plan={"pull_new": 6}
+apply_dry_run=6
+apply=6
+scan=6
+risk={"ok": 6, "warning": 0, "error": 0}
+apply_record=/tmp/openclaw-admission-p1-wave1-validate-20260616-0640/target/.skill-sync-backups/20260616T064037.581316Z/.apply-record.json
+```
+
+The OpenClaw dry-run systemd service was then switched from the old v0.1.2 venv to the validated v0.1.3 venv. It remains dry-run-only:
+
+```text
+unit=/etc/systemd/system/openclaw-skill-sync-sidecar-dryrun.service
+exec=/opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar sync-daemon ... --dry-run
+backup=/etc/systemd/system/openclaw-skill-sync-sidecar-dryrun.service.bak-20260616-0641
+daemon_status=running
+summary={"noop": 40, "pull_new": 52}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+```
+
+No P1 Wave-1 skill was installed into `/home/admin/clawd/skills` during this validation.

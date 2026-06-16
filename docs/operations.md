@@ -188,7 +188,7 @@ System Python remains unchanged:
 
 ```text
 /usr/bin/python3 -> Python 3.6.8
-/opt/skill-sync-sidecar/venv/bin/python -> Python 3.11.15
+/opt/skill-sync-sidecar/venv-0.1.3/bin/python -> Python 3.11.15
 ```
 
 The OpenClaw dry-run systemd template is:
@@ -225,6 +225,14 @@ uploaded=0
 
 This service is allowed to stay running because it is dry-run-only. Do not convert it to `--yes` until the remaining 52 `pull_new` skills are explicitly reviewed for OpenClaw live installation.
 
+Current installed OpenClaw dry-run service runtime:
+
+```text
+version=skill-sync 0.1.3
+exec=/opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar sync-daemon ... --dry-run
+unit_backup=/etc/systemd/system/openclaw-skill-sync-sidecar-dryrun.service.bak-20260616-0641
+```
+
 Admission review:
 
 ```text
@@ -252,6 +260,20 @@ dryrun_service_summary={"noop": 40, "pull_new": 52}
 The first live attempt failed before installing anything because `.skill-sync-backups` was root-owned. The directory was corrected to `admin:admin` mode `755`, and the second apply succeeded. Keep future live operations running as `admin` or ensure backup/work directories are owned by the service user before applying.
 
 OpenClaw live root currently has 49 first-level directories excluding `.skill-sync-backups`; 40 contain `SKILL.md` and are recognized by the sidecar scanner. The 9 directories without `SKILL.md` are ignored by package scanning.
+
+P1 Wave-1 isolated validation:
+
+```text
+allowlist=context-restore, context-save, investigate, learn, plan-tune, using-superpowers
+local_snapshot=/private/tmp/openclaw-admission-p1-wave1-snapshot-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave1-snapshot-20260616-0624
+openclaw_target=/tmp/openclaw-admission-p1-wave1-validate-20260616-0640/target
+apply=6
+scan=6
+live_root_apply=false
+```
+
+During this validation, v0.1.2 failed on Linux because core staging used macOS-only `/private/tmp`. v0.1.3 removed that hardcoded temp path from `sync-apply`, conflict packaging, and tombstone packaging. Use v0.1.3 or later for any future OpenClaw apply validation.
 
 Read-only OpenClaw inventory:
 
