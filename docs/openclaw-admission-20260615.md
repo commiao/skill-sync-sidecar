@@ -920,4 +920,76 @@ summary={"remote_new": 35, "same_without_base": 57}
 changed_since_previous=0
 ```
 
-The remaining 35 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P1 Wave-9 Live Allowlist Apply
+
+On 2026-06-16, the ninth P1 wave installed the dependency-complete `autoplan` review bundle:
+
+```text
+allowlist=autoplan, plan-ceo-review, plan-devex-review, plan-eng-review
+selection=autoplan requires the three plan review skills; warnings reviewed as gstack cleanup/instructional destructive patterns, not install-time mutations
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+target=/private/tmp/openclaw-admission-p1-wave9-local-target-20260616
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 1, "warning": 3, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+target=/tmp/openclaw-admission-p1-wave9-validate-20260616-1010/target
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 1, "warning": 3, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave9-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 35, "same_without_base": 57}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+state=/tmp/openclaw-p1-wave9-live-apply-20260616-1012
+stage=4
+apply_dry_run=4
+apply=4
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-101258-541631/.apply-record.json
+applied=autoplan, plan-ceo-review, plan-devex-review, plan-eng-review
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=61
+risk={"ok": 56, "warning": 5, "error": 0}
+wave9_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave9-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 31, "same_without_base": 61}
+changed_since_previous=0
+```
+
+The remaining 31 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.

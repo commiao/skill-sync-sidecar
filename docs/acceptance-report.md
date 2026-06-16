@@ -1446,6 +1446,68 @@ summary={"remote_new": 35, "same_without_base": 57}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P1 Wave-9 Live Allowlist Apply
+
+P1 Wave-9 installed the dependency-complete `autoplan` review bundle:
+
+```text
+allowlist=autoplan, plan-ceo-review, plan-devex-review, plan-eng-review
+selection=autoplan requires the three plan review skills; warnings reviewed as gstack cleanup/instructional destructive patterns, not install-time mutations
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p1-wave9-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p1-wave9-validate-20260616-1010/target
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 1, "warning": 3, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave9-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 35, "same_without_base": 57}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave9-snapshot-20260616
+state=/tmp/openclaw-p1-wave9-live-apply-20260616-1012
+stage=4
+apply_dry_run=4
+apply=4
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-101258-541631/.apply-record.json
+applied=autoplan, plan-ceo-review, plan-devex-review, plan-eng-review
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=61
+risk={"ok": 56, "warning": 5, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave9-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 31, "same_without_base": 61}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1491,10 +1553,11 @@ Ready:
 - OpenClaw P1 Wave-6 live allowlist apply for `office-hours`, with post-apply reconcile at `same_without_base=55,pull_new=37`
 - OpenClaw P1 Wave-7 live allowlist apply for `review`, with post-apply reconcile at `same_without_base=56,pull_new=36`
 - OpenClaw P1 Wave-8 live allowlist apply for `codex`, with post-apply reconcile at `same_without_base=57,pull_new=35`
+- OpenClaw P1 Wave-9 live allowlist apply for the `autoplan` review bundle, with post-apply reconcile at `same_without_base=61,pull_new=31`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9 allowlist validations
