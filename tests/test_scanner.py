@@ -1,10 +1,14 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import ast
 import re
 import unittest
 from zipfile import ZipFile
 from argparse import Namespace
 
+from skill_sync_sidecar import conflicts as conflicts_module
+from skill_sync_sidecar import sync_apply as sync_apply_module
+from skill_sync_sidecar import tombstones as tombstones_module
 from skill_sync_sidecar.apply import ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
 from skill_sync_sidecar.config import load_cc_switch_webdav_settings
 from skill_sync_sidecar.cli import guard_http_upload
@@ -24,6 +28,22 @@ from skill_sync_sidecar.tombstones import build_tombstones
 
 
 class ScannerTest(unittest.TestCase):
+    def test_core_tempdirs_are_platform_neutral(self):
+        modules = [sync_apply_module, conflicts_module, tombstones_module]
+        for module in modules:
+            source = Path(module.__file__).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                for keyword in node.keywords:
+                    if keyword.arg == "dir" and isinstance(keyword.value, ast.Constant):
+                        self.assertNotEqual(
+                            keyword.value.value,
+                            "/private/tmp",
+                            f"{module.__name__} hardcodes a macOS-only temp directory",
+                        )
+
     def test_scan_skill_with_metadata_and_hash(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -123,7 +123,7 @@ def execute_sync_apply(
 
     apply_result = None
     if pull_count:
-        with TemporaryDirectory(prefix="skill-sync-apply-stage-", dir="/private/tmp") as tmp:
+        with TemporaryDirectory(prefix="skill-sync-apply-stage-") as tmp:
             stage_index = stage_snapshot(remote_snapshot_dir, Path(tmp), clean=True)
             staged_by_skill_id = {str(skill["skill_id"]): dict(skill) for skill in stage_index.get("skills", [])}
             apply_plan = _build_pull_apply_plan(local_root, remote_snapshot_dir, stage_index, staged_by_skill_id, preview, target, backup_root)
@@ -246,7 +246,7 @@ def _assert_remote_matches_cache(remote: Remote, remote_prefix: str, remote_snap
 
 
 def _push_local_snapshot(local_root: Path, remote: Remote, remote_prefix: str, push_skill_ids: Optional[Set[str]] = None) -> Dict[str, object]:
-    with TemporaryDirectory(prefix="skill-sync-push-snapshot-", dir="/private/tmp") as tmp:
+    with TemporaryDirectory(prefix="skill-sync-push-snapshot-") as tmp:
         snapshot_dir = Path(tmp) / "snapshot"
         index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, _timestamp_id())
         include_paths = _archive_paths_for_skill_ids(index, push_skill_ids) if push_skill_ids else None

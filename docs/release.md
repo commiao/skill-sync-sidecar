@@ -29,13 +29,13 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/private/tmp/skill-sync-pycache \
 Build the release artifacts locally with the same script used by GitHub Actions:
 
 ```bash
-RELEASE_TAG=v0.1.2 scripts/build-release-assets.sh
+RELEASE_TAG=v0.1.3 scripts/build-release-assets.sh
 ```
 
 CI can opt into build dependency installation:
 
 ```bash
-SKILL_SYNC_INSTALL_BUILD_DEPS=1 RELEASE_TAG=v0.1.2 scripts/build-release-assets.sh
+SKILL_SYNC_INSTALL_BUILD_DEPS=1 RELEASE_TAG=v0.1.3 scripts/build-release-assets.sh
 ```
 
 ## Package Smoke
@@ -87,7 +87,7 @@ scripts/publish-github.sh git@github.com:<owner>/<repo>.git
 ```
 
 The script pushes `main` and the tag selected by `SKILL_SYNC_RELEASE_TAG`
-(`v0.1.2` by default).
+(`v0.1.3` by default).
 
 ## GitHub Release
 

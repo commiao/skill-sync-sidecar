@@ -26,7 +26,7 @@ def build_conflict_packages(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     packages = []
-    with TemporaryDirectory(prefix="skill-sync-conflict-stage-", dir="/private/tmp") as tmp:
+    with TemporaryDirectory(prefix="skill-sync-conflict-stage-") as tmp:
         staged_by_skill_id = {}
         if conflicts:
             stage_index = stage_snapshot(remote_snapshot_dir, Path(tmp), clean=True)

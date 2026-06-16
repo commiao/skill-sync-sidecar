@@ -6,6 +6,14 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-/private/tmp/skill-sync-package-smoke}"
 export PIP_NO_CACHE_DIR=1
+EXPECTED_VERSION="$("$PYTHON_BIN" - <<'PY'
+import configparser
+
+config = configparser.ConfigParser()
+config.read("setup.cfg")
+print(config["metadata"]["version"])
+PY
+)"
 
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR/skill-root/demo" "$OUT_DIR"
@@ -20,13 +28,26 @@ Smoke test body.
 EOF
 
 cd "$ROOT_DIR"
+find "$OUT_DIR" -maxdepth 1 -name 'skill_sync_sidecar-*.whl' -delete
 "$PYTHON_BIN" -m pip wheel --no-deps --no-build-isolation . -w "$OUT_DIR"
 
 wheel="$(ls -t "$OUT_DIR"/skill_sync_sidecar-*.whl | head -n 1)"
+case "$wheel" in
+  *-"$EXPECTED_VERSION"-*) ;;
+  *)
+    echo "wheel version mismatch: expected $EXPECTED_VERSION, got $wheel" >&2
+    exit 1
+    ;;
+esac
 "$PYTHON_BIN" -m venv "$WORK_DIR/venv"
 env -u PYTHONPATH "$WORK_DIR/venv/bin/python" -m pip install --no-deps --force-reinstall "$wheel"
 
-env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" --version
+actual_version="$(env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" --version)"
+printf '%s\n' "$actual_version"
+if [ "$actual_version" != "skill-sync $EXPECTED_VERSION" ]; then
+  echo "cli version mismatch: expected skill-sync $EXPECTED_VERSION, got $actual_version" >&2
+  exit 1
+fi
 env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" status --root "smoke=$WORK_DIR/skill-root"
 env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" snapshot --root "smoke=$WORK_DIR/skill-root" --out "$WORK_DIR/snapshot"
 env -u PYTHONPATH "$WORK_DIR/venv/bin/skill-sync" remote-status --remote "file://$WORK_DIR/snapshot"

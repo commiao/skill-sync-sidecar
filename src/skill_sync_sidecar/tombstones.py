@@ -29,7 +29,7 @@ def build_tombstones(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     tombstones = []
-    with TemporaryDirectory(prefix="skill-sync-tombstone-stage-", dir="/private/tmp") as tmp:
+    with TemporaryDirectory(prefix="skill-sync-tombstone-stage-") as tmp:
         staged_by_skill_id = {}
         if any(item["remote_hash"] for item in delete_items):
             stage_index = stage_snapshot(remote_snapshot_dir, Path(tmp), clean=True)
