@@ -334,4 +334,70 @@ uploaded=0
 gateway=openclaw-gateway still running
 ```
 
-No P1 Wave-1 skill was installed into `/home/admin/clawd/skills` during this validation.
+## P1 Wave-1 Live Allowlist Apply
+
+On 2026-06-16, P1 Wave-1 was applied to the live OpenClaw skill root after the fresh preflight reconcile remained green:
+
+```text
+preflight_report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave1-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 52, "same_without_base": 40}
+changed_since_previous=0
+```
+
+The first live attempt intentionally used `sync-apply` against the filtered six-skill snapshot. It was refused before writing because `sync-apply` is a two-way operation and saw the existing 40 live OpenClaw skills as `push_new` relative to the filtered snapshot:
+
+```text
+dryrun_summary={"pull_new": 6, "push_new": 40}
+result=refused
+reason=push actions require a remote destination
+live_written=false
+```
+
+The correct live allowlist path is one-way `stage` + `apply` from the filtered snapshot:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave1-snapshot-20260616-0624
+state=/tmp/openclaw-p1-wave1-live-apply-20260616-0648
+stage=6
+apply_dry_run=6
+apply=6
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-071526-975930/.apply-record.json
+applied=context-restore, context-save, investigate, learn, plan-tune, using-superpowers
+```
+
+Post-apply verification:
+
+```text
+scan_after=46
+risk={"ok": 44, "warning": 2, "error": 0}
+wave1_present=true
+owner=admin:admin
+skill_md_mode=644
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave1-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 46, "same_without_base": 46}
+changed_since_previous=0
+```
+
+Dry-run service steady state after restart:
+
+```text
+service=openclaw-skill-sync-sidecar-dryrun.service
+active=true
+daemon_status=running
+summary={"noop": 46, "pull_new": 46}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+```
+
+The remaining 46 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
