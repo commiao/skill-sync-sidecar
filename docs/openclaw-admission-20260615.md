@@ -1281,4 +1281,76 @@ summary={"remote_new": 18, "same_without_base": 74}
 changed_since_previous=0
 ```
 
-The remaining 18 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P2b Wave-5 Live Allowlist Apply
+
+On 2026-06-16, the fifth P2b wave installed two reviewed skill-authoring workflows:
+
+```text
+allowlist=skill-creator, skillify
+selection=directly supports creating, optimizing, evaluating, and codifying skills; install-time inert; secret scan found no credential patterns
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p2b-wave5-snapshot-20260616
+target=/private/tmp/openclaw-admission-p2b-wave5-local-target-20260616
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 2, "warning": 0, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p2b-wave5-snapshot-20260616
+target=/tmp/openclaw-admission-p2b-wave5-validate-20260616-1300/target
+plan={"pull_new": 2}
+apply=2
+scan=2
+risk={"ok": 2, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2b-wave5-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 18, "same_without_base": 74}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2b-wave5-snapshot-20260616
+state=/tmp/openclaw-p2b-wave5-live-apply-20260616-1303
+stage=2
+apply_dry_run=2
+apply=2
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-130334-775563/.apply-record.json
+applied=skill-creator, skillify
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=76
+risk={"ok": 69, "warning": 7, "error": 0}
+p2b_wave5_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2b-wave5-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 16, "same_without_base": 76}
+changed_since_previous=0
+```
+
+The remaining 16 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
