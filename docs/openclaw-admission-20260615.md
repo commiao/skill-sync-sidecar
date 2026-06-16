@@ -1497,4 +1497,76 @@ summary={"remote_new": 10, "same_without_base": 82}
 changed_since_previous=0
 ```
 
-The remaining 10 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P2c Wave-8 Live Allowlist Apply
+
+On 2026-06-16, the second P2c wave installed the reviewed `qa` workflow as a single-skill batch:
+
+```text
+allowlist=qa
+selection=runtime can modify code and commit fixes, so installed alone; install-time inert; sensitive-pattern scan found no credential or destructive shell matches
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p2c-wave8-snapshot-20260616
+target=/private/tmp/openclaw-admission-p2c-wave8-local-target-20260616
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave8-snapshot-20260616
+target=/tmp/openclaw-admission-p2c-wave8-validate-20260616-1328/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2c-wave8-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 10, "same_without_base": 82}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2c-wave8-snapshot-20260616
+state=/tmp/openclaw-p2c-wave8-live-apply-20260616-1330
+stage=1
+apply_dry_run=1
+apply=1
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-132948-209789/.apply-record.json
+applied=qa
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=83
+risk={"ok": 76, "warning": 7, "error": 0}
+p2c_wave8_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2c-wave8-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 9, "same_without_base": 83}
+changed_since_previous=0
+```
+
+The remaining 9 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
