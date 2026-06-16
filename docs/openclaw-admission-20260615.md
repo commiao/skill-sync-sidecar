@@ -560,4 +560,76 @@ summary={"remote_new": 40, "same_without_base": 52}
 changed_since_previous=0
 ```
 
-The remaining 40 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P1 Wave-4 Live Allowlist Apply
+
+On 2026-06-16, the fourth P1 wave completed the reviewed design-tooling set with a single-skill batch:
+
+```text
+allowlist=design-html
+selection=risk ok, pairs with Wave-3 design workflow, isolated because it includes an extra vendor/pretext file
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p1-wave4-snapshot-20260616
+target=/private/tmp/openclaw-admission-p1-wave4-local-target-20260616
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave4-snapshot-20260616
+target=/tmp/openclaw-admission-p1-wave4-validate-20260616-0915/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave4-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 40, "same_without_base": 52}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave4-snapshot-20260616
+state=/tmp/openclaw-p1-wave4-live-apply-20260616-0918
+stage=1
+apply_dry_run=1
+apply=1
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-091809-502825/.apply-record.json
+applied=design-html
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=53
+risk={"ok": 51, "warning": 2, "error": 0}
+wave4_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave4-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 39, "same_without_base": 53}
+changed_since_previous=0
+```
+
+The remaining 39 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
