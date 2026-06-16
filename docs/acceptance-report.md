@@ -1007,6 +1007,73 @@ summary={"remote_new": 46, "same_without_base": 46}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P1 Wave-2 Live Allowlist Apply
+
+P1 Wave-2 selected three additional reviewed skills:
+
+```text
+allowlist=hackernews-frontpage, mcp-builder, pdf
+selection=risk ok, bounded package size, lower blast radius than design/autoplan/review/codex packages
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p1-wave2-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p1-wave2-local-20260616/target
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave2-snapshot-20260616-0733
+openclaw_target=/tmp/openclaw-admission-p1-wave2-validate-20260616-0733/target
+plan={"pull_new": 3}
+apply=3
+scan=3
+risk={"ok": 3, "warning": 0, "error": 0}
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave2-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 46, "same_without_base": 46}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave2-snapshot-20260616-0733
+state=/tmp/openclaw-p1-wave2-live-apply-20260616-0735
+stage=3
+apply_dry_run=3
+apply=3
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-073448-384841/.apply-record.json
+applied=hackernews-frontpage, mcp-builder, pdf
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=49
+risk={"ok": 47, "warning": 2, "error": 0}
+owners=admin:admin
+dryrun_service=active
+dryrun_summary={"noop": 49, "pull_new": 43}
+blocked=0
+conflicts=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave2-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 43, "same_without_base": 49}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1045,10 +1112,11 @@ Ready:
 - OpenClaw P0 live allowlist apply for 8 reviewed skills, with dry-run service returned to `noop=40,pull_new=52`
 - OpenClaw P1 Wave-1 isolated validation for 6 reviewed skills on both Mac and OpenClaw `/tmp`
 - OpenClaw P1 Wave-1 live allowlist apply for 6 reviewed skills, with dry-run service returned to `noop=46,pull_new=46`
+- OpenClaw P1 Wave-2 live allowlist apply for 3 reviewed skills, with dry-run service returned to `noop=49,pull_new=43`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2 allowlist validations

@@ -401,3 +401,91 @@ gateway=openclaw-gateway still running
 ```
 
 The remaining 46 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+
+## P1 Wave-2 Live Allowlist Apply
+
+On 2026-06-16, the second P1 wave was selected as another small reviewed batch:
+
+```text
+allowlist=hackernews-frontpage, mcp-builder, pdf
+selection=risk ok, bounded package size, lower blast radius than design/autoplan/review/codex packages
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p1-wave2-snapshot-20260616
+target=/private/tmp/openclaw-admission-p1-wave2-local-20260616/target
+plan={"pull_new": 3}
+apply=3
+scan=3
+risk={"ok": 3, "warning": 0, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave2-snapshot-20260616-0733
+target=/tmp/openclaw-admission-p1-wave2-validate-20260616-0733/target
+plan={"pull_new": 3}
+apply=3
+scan=3
+risk={"ok": 3, "warning": 0, "error": 0}
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave2-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 46, "same_without_base": 46}
+changed_since_previous=0
+```
+
+Live allowlist apply used the one-way `stage` + `apply` path:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave2-snapshot-20260616-0733
+state=/tmp/openclaw-p1-wave2-live-apply-20260616-0735
+stage=3
+apply_dry_run=3
+apply=3
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-073448-384841/.apply-record.json
+applied=hackernews-frontpage, mcp-builder, pdf
+```
+
+Post-apply verification:
+
+```text
+scan_after=49
+risk={"ok": 47, "warning": 2, "error": 0}
+wave2_present=true
+owner=admin:admin
+skill_md_mode=644
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave2-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 43, "same_without_base": 49}
+changed_since_previous=0
+```
+
+Dry-run service steady state after restart:
+
+```text
+service=openclaw-skill-sync-sidecar-dryrun.service
+active=true
+daemon_status=running
+summary={"noop": 49, "pull_new": 43}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+```
+
+The remaining 43 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
