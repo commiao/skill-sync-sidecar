@@ -797,7 +797,88 @@ summary={"remote_new": 60, "same_without_base": 32}
 changed_since_previous=0
 ```
 
-No P0 candidate was installed into the live OpenClaw skill root.
+## 2026-06-16 OpenClaw P0 Live Allowlist Apply
+
+The 8 P0 candidates from `docs/openclaw-admission-20260615.md` were applied to the live OpenClaw skill root after the local and OpenClaw `/tmp` isolated validations passed.
+
+Scope:
+
+```text
+target=/home/admin/clawd/skills
+snapshot=/tmp/openclaw-admission-p0-snapshot-20260615
+installed=8
+not_installed=52
+full_snapshot_apply=false
+```
+
+The first live attempt failed before installing any skill because the existing backup directory was root-owned from earlier root-run probe work:
+
+```text
+failure=permission denied creating /home/admin/clawd/skills/.skill-sync-backups/<timestamp>
+installed=0
+fix=chown admin:admin /home/admin/clawd/skills/.skill-sync-backups && chmod 755 ...
+```
+
+The corrected supervised apply succeeded:
+
+```text
+state_base=/opt/skill-sync-sidecar/state/openclaw-p0-live-apply-20260616-2
+stage=8
+apply_dry_run=8
+apply=8
+scan_after=40
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-035050-088751/.apply-record.json
+owner=admin:admin
+```
+
+Installed allowlist:
+
+```text
+aliyun-sls-query
+codeup-personal-git
+freeze
+gstack-openclaw-ceo-review
+gstack-openclaw-investigate
+gstack-openclaw-office-hours
+gstack-openclaw-retro
+unfreeze
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p0-live-apply-20260616115117/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 52, "same_without_base": 40}
+changed_since_previous=8 added, 0 changed, 0 removed
+```
+
+Baseline reconcile immediately afterward:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p0-live-baseline-20260616115123/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 52, "same_without_base": 40}
+changed_since_previous=0
+```
+
+Dry-run service and OpenClaw health after restart:
+
+```text
+service=openclaw-skill-sync-sidecar-dryrun.service active
+daemon_status=running
+summary={"noop": 40, "pull_new": 52}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+gateway=openclaw-gateway still running
+system_python=/usr/bin/python3 Python 3.6.8 unchanged
+isolated_python=/opt/skill-sync-sidecar/venv/bin/python Python 3.11.15
+```
+
+OpenClaw live root has 49 first-level directories excluding `.skill-sync-backups`; 40 contain `SKILL.md` and are sidecar-recognized skill packages. The 9 directories without `SKILL.md` are ignored by sidecar package scanning.
 
 ## Safety Boundary
 
@@ -833,11 +914,12 @@ Ready:
 - OpenClaw isolated Python 3.11 runtime and sidecar v0.1.2 installation under `/opt/skill-sync-sidecar`
 - OpenClaw one-cycle daemon dry-run as `admin` using the isolated runtime
 - OpenClaw dry-run-only systemd service installed, enabled, and running
-- OpenClaw `pull_new=60` admission report and P0 isolated apply validation
+- OpenClaw initial `pull_new=60` admission report and P0 isolated apply validation
+- OpenClaw P0 live allowlist apply for 8 reviewed skills, with dry-run service returned to `noop=40,pull_new=52`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe` validation
+- OpenClaw live-root apply beyond the narrow `sync-probe` and reviewed P0 allowlist validations

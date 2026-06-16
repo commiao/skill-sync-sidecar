@@ -21,7 +21,7 @@ summary={'p0_candidate': 8, 'p1_review': 18, 'p2_defer': 34}
 
 ## P0 Candidates
 
-*_Still dry-run only. These are candidates for the first supervised OpenClaw live batch, not approved installs._
+These were the initial candidates for the first supervised OpenClaw live batch.
 
 | Skill | Risk | Files | Size | Reason |
 | --- | --- | ---: | ---: | --- |
@@ -96,7 +96,7 @@ summary={'p0_candidate': 8, 'p1_review': 18, 'p2_defer': 34}
 | skill-creator | ok | 18 | 224992 | tooling, browser, deploy, setup, or automation side effects |
 | skillify | ok | 2 | 62861 | tooling, browser, deploy, setup, or automation side effects |
 
-## Next Gate
+## Initial Next Gate
 
 1. Review the P0 list and select a tiny first batch.
 2. Run an isolated target-root apply test for that batch, not `/home/admin/clawd/skills`.
@@ -157,4 +157,88 @@ summary={"remote_new": 60, "same_without_base": 32}
 changed_since_previous=0
 ```
 
-No live OpenClaw skill root apply was performed for the P0 set.
+## P0 Live Allowlist Apply
+
+On 2026-06-16, the P0 allowlist was applied to the live OpenClaw skill root after both isolated validations passed. The dry-run systemd service was stopped only during the supervised apply and was restarted immediately afterward.
+
+The first live attempt failed before installing any skill because the existing backup directory was root-owned:
+
+```text
+backup_dir=/home/admin/clawd/skills/.skill-sync-backups
+before_owner=root:root
+failure=permission denied while creating .skill-sync-backups/<timestamp>
+installed=0
+```
+
+The backup directory ownership was corrected to match the OpenClaw skill root owner:
+
+```text
+backup_dir=/home/admin/clawd/skills/.skill-sync-backups
+after_owner=admin:admin
+mode=755
+```
+
+The second live apply succeeded:
+
+```text
+snapshot=/tmp/openclaw-admission-p0-snapshot-20260615
+target=/home/admin/clawd/skills
+state_base=/opt/skill-sync-sidecar/state/openclaw-p0-live-apply-20260616-2
+stage=8
+apply_dry_run=8
+apply=8
+scan_after=40
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-035050-088751/.apply-record.json
+```
+
+All installed P0 directories and `SKILL.md` files are owned by `admin:admin`.
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p0-live-apply-20260616115117/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 52, "same_without_base": 40}
+changed_since_previous=8 added, 0 changed, 0 removed
+added=aliyun-sls-query, codeup-personal-git, freeze, gstack-openclaw-ceo-review, gstack-openclaw-investigate, gstack-openclaw-office-hours, gstack-openclaw-retro, unfreeze
+```
+
+Post-apply baseline reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p0-live-baseline-20260616115123/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 52, "same_without_base": 40}
+changed_since_previous=0
+```
+
+Dry-run service steady state after restart:
+
+```text
+service=openclaw-skill-sync-sidecar-dryrun.service
+active=true
+daemon_status=running
+cycles_run=2
+summary={"noop": 40, "pull_new": 52}
+blocked=0
+conflicts=0
+tombstones=0
+applied=0
+uploaded=0
+```
+
+OpenClaw live root currently has 49 first-level directories excluding `.skill-sync-backups`; 40 contain `SKILL.md` and are recognized as sidecar skill packages. The 9 non-package directories are not counted by the sidecar scanner:
+
+```text
+cron-protection
+email-manager
+hook-framework
+investment-monitor
+latency-analyzer
+leonardo-image-gen
+notes
+steer-mode-monitor
+task-workflow-engine
+```
+
+The remaining 52 `pull_new` skills stay uninstalled pending P1/P2 review. The service remains dry-run-only; no full 92-skill live apply was performed.
