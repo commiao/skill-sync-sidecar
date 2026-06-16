@@ -213,17 +213,17 @@ journalctl -u openclaw-skill-sync-sidecar-dryrun.service --no-pager -n 80
 python3 -m json.tool /opt/skill-sync-sidecar/state/openclaw-daemon-dryrun-state.json
 ```
 
-Expected steady-state after the reviewed P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3 allowlists have been installed:
+Expected steady-state after the reviewed P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3/Wave-4 allowlists have been installed:
 
 ```text
 cycle_status=dry_run
-summary={"noop": 70, "pull_new": 22}
+summary={"noop": 74, "pull_new": 18}
 blocked=0
 applied=0
 uploaded=0
 ```
 
-This service is allowed to stay running because it is dry-run-only. Do not convert it to `--yes` until the remaining 22 `pull_new` skills are explicitly reviewed for OpenClaw live installation.
+This service is allowed to stay running because it is dry-run-only. Do not convert it to `--yes` until the remaining 18 `pull_new` skills are explicitly reviewed for OpenClaw live installation.
 
 Current installed OpenClaw dry-run service runtime:
 
@@ -259,7 +259,7 @@ dryrun_service_summary={"noop": 40, "pull_new": 52}
 
 The first live attempt failed before installing anything because `.skill-sync-backups` was root-owned. The directory was corrected to `admin:admin` mode `755`, and the second apply succeeded. Keep future live operations running as `admin` or ensure backup/work directories are owned by the service user before applying.
 
-OpenClaw live root currently has 70 sidecar-recognized skill packages after the reviewed P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3 allowlist applies. Existing non-package directories without `SKILL.md` are ignored by package scanning.
+OpenClaw live root currently has 74 sidecar-recognized skill packages after the reviewed P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3/Wave-4 allowlist applies. Existing non-package directories without `SKILL.md` are ignored by package scanning.
 
 P1 Wave-1 isolated validation:
 
@@ -429,6 +429,20 @@ dryrun_service=active
 gateway=openclaw-gateway not restarted
 ```
 
+P2a Wave-4 live allowlist apply:
+
+```text
+allowlist=design-review, devex-review, qa-only, scrape
+selection=browser-dependent audit/report workflow batch; secret scan found no credential patterns
+preflight_summary={"remote_new": 22, "same_without_base": 70}
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-103752-268650/.apply-record.json
+installed=4
+scan_after=74
+post_apply_summary={"remote_new": 18, "same_without_base": 74}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
 Read-only OpenClaw inventory:
 
 ```bash
@@ -526,7 +540,7 @@ Large-asset exception:
 - A `skill_md_only` change can still require a large archive upload when the skill directory contains binary assets.
 - `ocr` and `finance-auto-bookkeeping` are examples: small source changes can produce multi-MB archives because the package contains binary assets or data fixtures.
 - If direct WebDAV upload of such a package times out, do not publish an index that points to the missing archive. Use the local WebDAV sync folder file-remote path above, or defer the skill until a per-file/delta strategy exists.
-- Current adoption status: the OpenClaw peer-writer conflicts were reviewed and adopted into `adopt-openclaw-conflicts-complete-20260613`; the P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3 allowlists were later installed on OpenClaw and the current reconcile report shows `safe_to_auto_apply=true`, `same_without_base=70`, `pull_new=22`, and no conflicts.
+- Current adoption status: the OpenClaw peer-writer conflicts were reviewed and adopted into `adopt-openclaw-conflicts-complete-20260613`; the P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, and P2a Wave-1/Wave-2/Wave-3/Wave-4 allowlists were later installed on OpenClaw and the current reconcile report shows `safe_to_auto_apply=true`, `same_without_base=74`, `pull_new=18`, and no conflicts.
 
 Before enabling it:
 
@@ -534,7 +548,7 @@ Before enabling it:
 2. Verify the service user can read cc-switch WebDAV settings or provide env credentials.
 3. Verify the service user's Python runtime is >=3.9.
 4. Keep remote service connectivity checks separate from sidecar rollout.
-5. Do not enable full live apply while `pull_new=22` still requires review.
+5. Do not enable full live apply while `pull_new=18` still requires review.
 6. Review any `conflict` actions before allowing writes to `/home/admin/clawd/skills`.
 
 Suggested validation:
