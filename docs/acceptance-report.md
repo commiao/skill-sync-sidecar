@@ -1198,6 +1198,68 @@ summary={"remote_new": 39, "same_without_base": 53}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P1 Wave-5 Live Allowlist Apply
+
+P1 Wave-5 installed `make-pdf` as a single-skill batch:
+
+```text
+allowlist=make-pdf
+selection=risk ok, self-contained document generation workflow, isolated because package has 18 files
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p1-wave5-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p1-wave5-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave5-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p1-wave5-validate-20260616-0922/target
+plan={"pull_new": 1}
+apply=1
+scan=1
+risk={"ok": 1, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave5-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 39, "same_without_base": 53}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave5-snapshot-20260616
+state=/tmp/openclaw-p1-wave5-live-apply-20260616-0924
+stage=1
+apply_dry_run=1
+apply=1
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-092324-622312/.apply-record.json
+applied=make-pdf
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=54
+risk={"ok": 52, "warning": 2, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave5-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 38, "same_without_base": 54}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1239,10 +1301,11 @@ Ready:
 - OpenClaw P1 Wave-2 live allowlist apply for 3 reviewed skills, with dry-run service returned to `noop=49,pull_new=43`
 - OpenClaw P1 Wave-3 live allowlist apply for 3 reviewed design skills, with post-apply reconcile at `same_without_base=52,pull_new=40`
 - OpenClaw P1 Wave-4 live allowlist apply for `design-html`, with post-apply reconcile at `same_without_base=53,pull_new=39`
+- OpenClaw P1 Wave-5 live allowlist apply for `make-pdf`, with post-apply reconcile at `same_without_base=54,pull_new=38`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5 allowlist validations
