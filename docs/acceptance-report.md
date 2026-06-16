@@ -1074,6 +1074,68 @@ summary={"remote_new": 43, "same_without_base": 49}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P1 Wave-3 Live Allowlist Apply
+
+P1 Wave-3 selected a cohesive design workflow batch:
+
+```text
+allowlist=design-consultation, design-shotgun, plan-design-review
+selection=risk ok, all OpenClaw-targeted, small reviewed design batch
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p1-wave3-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p1-wave3-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p1-wave3-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p1-wave3-validate-20260616-0906/target
+plan={"pull_new": 3}
+apply=3
+scan=3
+risk={"ok": 3, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p1-wave3-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 43, "same_without_base": 49}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p1-wave3-snapshot-20260616
+state=/tmp/openclaw-p1-wave3-live-apply-20260616-0909
+stage=3
+apply_dry_run=3
+apply=3
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-090724-681477/.apply-record.json
+applied=design-consultation, design-shotgun, plan-design-review
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=52
+risk={"ok": 50, "warning": 2, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p1-wave3-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 40, "same_without_base": 52}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1113,10 +1175,11 @@ Ready:
 - OpenClaw P1 Wave-1 isolated validation for 6 reviewed skills on both Mac and OpenClaw `/tmp`
 - OpenClaw P1 Wave-1 live allowlist apply for 6 reviewed skills, with dry-run service returned to `noop=46,pull_new=46`
 - OpenClaw P1 Wave-2 live allowlist apply for 3 reviewed skills, with dry-run service returned to `noop=49,pull_new=43`
+- OpenClaw P1 Wave-3 live allowlist apply for 3 reviewed design skills, with post-apply reconcile at `same_without_base=52,pull_new=40`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, and reviewed P1 Wave-1/Wave-2/Wave-3 allowlist validations
