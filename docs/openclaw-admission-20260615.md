@@ -1353,4 +1353,76 @@ summary={"remote_new": 16, "same_without_base": 76}
 changed_since_previous=0
 ```
 
-The remaining 16 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.
+## P2b Wave-6 Live Allowlist Apply
+
+On 2026-06-16, the sixth P2b wave installed four reviewed browser, observability, and performance workflows:
+
+```text
+allowlist=benchmark-models, benchmark, open-gstack-browser, canary
+selection=browser/observability/performance monitoring toolchain; install-time inert; sensitive-pattern scan found no credential or destructive shell matches
+```
+
+Local isolated validation:
+
+```text
+snapshot=/private/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+target=/private/tmp/openclaw-admission-p2b-wave6-local-target-20260616
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 4, "warning": 0, "error": 0}
+```
+
+OpenClaw `/tmp` isolated validation:
+
+```text
+snapshot=/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+target=/tmp/openclaw-admission-p2b-wave6-validate-20260616-1312/target
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 4, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile before live apply:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2b-wave6-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 16, "same_without_base": 76}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+state=/tmp/openclaw-p2b-wave6-live-apply-20260616-1314
+stage=4
+apply_dry_run=4
+apply=4
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-131338-203842/.apply-record.json
+applied=benchmark-models, benchmark, open-gstack-browser, canary
+service=openclaw-skill-sync-sidecar-dryrun.service active
+```
+
+Post-apply verification:
+
+```text
+scan_after=80
+risk={"ok": 73, "warning": 7, "error": 0}
+p2b_wave6_present=true
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2b-wave6-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 12, "same_without_base": 80}
+changed_since_previous=0
+```
+
+The remaining 12 `pull_new` skills stay uninstalled pending review. No full 92-skill live apply was performed.

@@ -1819,6 +1819,68 @@ summary={"remote_new": 16, "same_without_base": 76}
 changed_since_previous=0
 ```
 
+## 2026-06-16 OpenClaw P2b Wave-6 Live Allowlist Apply
+
+P2b Wave-6 installed four reviewed browser, observability, and performance workflows:
+
+```text
+allowlist=benchmark-models, benchmark, open-gstack-browser, canary
+selection=browser/observability/performance monitoring toolchain; install-time inert; sensitive-pattern scan found no credential or destructive shell matches
+```
+
+Local and OpenClaw `/tmp` isolated validation:
+
+```text
+local_snapshot=/private/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+local_target=/private/tmp/openclaw-admission-p2b-wave6-local-target-20260616
+openclaw_snapshot=/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+openclaw_target=/tmp/openclaw-admission-p2b-wave6-validate-20260616-1312/target
+plan={"pull_new": 4}
+apply=4
+scan=4
+risk={"ok": 4, "warning": 0, "error": 0}
+runtime=/opt/skill-sync-sidecar/venv-0.1.3/bin/skill-sync
+```
+
+Preflight reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-before-p2b-wave6-live-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 16, "same_without_base": 76}
+changed_since_previous=0
+```
+
+Live allowlist apply:
+
+```text
+snapshot=/tmp/openclaw-admission-p2b-wave6-snapshot-20260616
+state=/tmp/openclaw-p2b-wave6-live-apply-20260616-1314
+stage=4
+apply_dry_run=4
+apply=4
+apply_record=/home/admin/clawd/skills/.skill-sync-backups/20260616-131338-203842/.apply-record.json
+applied=benchmark-models, benchmark, open-gstack-browser, canary
+```
+
+Post-apply OpenClaw state:
+
+```text
+scan_total=80
+risk={"ok": 73, "warning": 7, "error": 0}
+dryrun_service=active
+gateway=openclaw-gateway not restarted
+```
+
+Post-apply reconcile:
+
+```text
+report=/private/tmp/openclaw-skill-sync-validate/reconcile-after-p2b-wave6-live-apply-20260616/reconcile/reconcile-report.json
+safe_to_auto_apply=true
+summary={"remote_new": 12, "same_without_base": 80}
+changed_since_previous=0
+```
+
 ## Safety Boundary
 
 Uploading the real `~/.cc-switch/skills` snapshot to WebDAV is now validated only under a sidecar dev prefix after explicit approval. Official or production prefixes remain a separate decision.
@@ -1870,10 +1932,11 @@ Ready:
 - OpenClaw P2a Wave-3 live allowlist apply for `document-release`, `health`, `landing-report`, and `retro`, with post-apply reconcile at `same_without_base=70,pull_new=22`
 - OpenClaw P2a Wave-4 live allowlist apply for `design-review`, `devex-review`, `qa-only`, and `scrape`, with post-apply reconcile at `same_without_base=74,pull_new=18`
 - OpenClaw P2b Wave-5 live allowlist apply for `skill-creator` and `skillify`, with post-apply reconcile at `same_without_base=76,pull_new=16`
+- OpenClaw P2b Wave-6 live allowlist apply for `benchmark-models`, `benchmark`, `open-gstack-browser`, and `canary`, with post-apply reconcile at `same_without_base=80,pull_new=12`
 
 Not yet enabled:
 
 - destructive delete propagation
 - official production prefix usage
 - OpenClaw full writable sidecar daemon
-- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, reviewed P2a Wave-1/Wave-2/Wave-3/Wave-4, and reviewed P2b Wave-5 allowlist validations
+- OpenClaw live-root apply beyond the narrow `sync-probe`, reviewed P0, reviewed P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, reviewed P2a Wave-1/Wave-2/Wave-3/Wave-4, and reviewed P2b Wave-5/Wave-6 allowlist validations
