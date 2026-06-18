@@ -808,6 +808,25 @@ status_summary={"unchanged": 92}
 gateway_process=still_running
 ```
 
+Validated OpenClaw autosync canary:
+
+```text
+docs/openclaw-autosync-canary-20260619.md
+skill_id=sync-probe-autosync
+snapshot=autosync-canary
+remote_total=93
+openclaw_summary={"noop": 92, "pull_new": 1}
+blocked=0
+conflicts=0
+applied=1
+uploaded=0
+openclaw_scan_total=93
+canary_risk=ok
+mac_status={"unchanged": 93}
+openclaw_status={"unchanged": 93}
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
