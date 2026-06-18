@@ -789,6 +789,25 @@ dryrun_service=active
 gateway_process=still_running
 ```
 
+Validated OpenClaw pull-only automatic sync rollout:
+
+```text
+docs/openclaw-pullonly-autosync-20260619.md
+commit=54cf057
+unit=openclaw-skill-sync-sidecar-pullonly.service
+enabled=true
+active=true
+writer_policy=pull-only
+mode=--yes
+cycles_run=1
+summary={"noop": 92}
+blocked=0
+applied=0
+uploaded=0
+status_summary={"unchanged": 92}
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
