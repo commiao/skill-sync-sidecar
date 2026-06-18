@@ -715,6 +715,20 @@ Expected post-adoption summary:
 summary={"unchanged": 92}
 ```
 
+Validated OpenClaw base adoption:
+
+```text
+docs/openclaw-base-adoption-20260618.md
+commit=b014ec0
+base_record=/opt/skill-sync-sidecar/state/openclaw-base-record.json
+post_adopt_summary={"unchanged": 92}
+post_adopt_rehearsal_summary={"noop": 92}
+applied=0
+uploaded=0
+dryrun_service=active
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
