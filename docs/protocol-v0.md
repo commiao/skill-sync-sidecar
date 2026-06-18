@@ -164,6 +164,8 @@ skill-sync rollback --record /tmp/skill-sync-target/.skill-sync-backups/<apply-i
 
 For project-scoped skills, `sync-apply --target codex-project --project-root <repo>` installs only `scope=project` packages into `<repo>/skills/<skill-id>` and writes rollback metadata under `<repo>/.skill-sync-backups`. Global skills are refused for project targets, and project skills are refused for global targets.
 
+For peer-device skill roots that intentionally mirror both global and project-scoped private skills, use `--target mixed-scope-root --local-root <skill-root>`. This target accepts `scope=global` and `scope=project` packages into the same explicit root while still refusing unsupported scopes, conflicts, deletions, and unapproved new skills according to the normal sync plan. Use it for roots such as `~/.cc-switch/skills` or `/home/admin/clawd/skills` only after deciding that the root is a governed mixed package store, not a pure global adapter root.
+
 After a successful push, the sidecar writes `.skill-sync-bases/<sync-id>.json` under the local root. That record contains the new local/remote hashes and should be passed as the next `--last-applied-record`, preventing stale-base false conflicts after local changes have been published. `sync-apply` still refuses conflicts, deletions, and scope-target mismatches.
 
 `sync-cycle` composes the manual commands into one automation-safe pass:

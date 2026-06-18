@@ -355,6 +355,19 @@ python3 -m skill_sync_sidecar sync-apply \
 
 For `codex-project`, `--local-root` defaults to `<project-root>/skills` and rollback metadata is written under `<project-root>/.skill-sync-backups`.
 
+Peer-device roots that intentionally contain both global and project-scoped private skills should use `mixed-scope-root`:
+
+```bash
+python3 -m skill_sync_sidecar sync-apply \
+  --target mixed-scope-root \
+  --local-root ~/.cc-switch/skills \
+  --remote-snapshot ./cache-preview \
+  --allow-new \
+  --dry-run
+```
+
+This keeps `cc-switch-global` and `codex-project` strict for pure adapter roots while giving governed mixed roots, such as `~/.cc-switch/skills` or `/home/admin/clawd/skills`, an explicit route for both scopes.
+
 `sync-cycle` is the one-shot automation layer. It always downloads the remote snapshot into `--cache-dir`, builds `sync-status` and `sync-plan`, and writes conflict packages or tombstones under `--work-dir` when needed. With `--dry-run` it stops there. With `--yes`, it executes only the same safe `sync-apply` subset: one-sided pull/push actions with no blocked items, no conflicts, and no delete propagation.
 
 ```bash

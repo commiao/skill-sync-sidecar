@@ -462,6 +462,36 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(plan["skipped"], 1)
             self.assertIn("project-scoped", plan["items"][0]["reason"])
 
+    def test_apply_plan_mixed_scope_root_allows_global_and_project(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            global_root = base / "global-root"
+            project_root = base / "project-root"
+            snapshot_dir = base / "snapshot"
+            stage_dir = base / "stage"
+
+            self._write_skill(
+                global_root / "global-demo",
+                "global-demo",
+                "Global demo skill",
+                {"notes.txt": "global\n"},
+            )
+            self._write_skill(
+                project_root / "skills" / "project-demo",
+                "project-demo",
+                "Project demo skill",
+                {"manifest.json": '{"protocol_version":0,"scope":"project","targets":["codex"]}'},
+            )
+            (project_root / "AGENTS.md").write_text("Use project skills.\n", encoding="utf-8")
+            write_snapshot(scan_roots([f"global={global_root}", f"project={project_root}"]), snapshot_dir, "mixed-snapshot")
+            stage_snapshot(snapshot_dir, stage_dir)
+
+            plan = build_apply_plan(stage_dir / "mixed-snapshot", "mixed-scope-root", target_root=base / "target")
+
+            self.assertEqual(plan["allowed"], 2)
+            self.assertEqual(plan["skipped"], 0)
+            self.assertEqual({item["scope"] for item in plan["items"]}, {"global", "project"})
+
     def test_apply_plan_requires_project_root_for_codex_project(self):
         with TemporaryDirectory() as tmp:
             staged = Path(tmp) / "staged"
@@ -1012,6 +1042,46 @@ class ScannerTest(unittest.TestCase):
             self.assertIn(backup_root, record_path.parents)
             status = build_sync_status(local_root, remote_snapshot, Path(result["apply_result"]["record_path"]))
             self.assertEqual(status["summary"], {"unchanged": 1})
+
+    def test_sync_apply_mixed_scope_root_pulls_global_and_project_skills(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_global = base / "remote-global"
+            remote_project = base / "remote-project"
+            remote_snapshot = base / "remote-snapshot"
+            local_root.mkdir()
+
+            self._write_skill(
+                remote_global / "global-demo",
+                "global-demo",
+                "Global demo skill",
+                {"notes.txt": "global body\n"},
+            )
+            self._write_skill(
+                remote_project / "skills" / "project-demo",
+                "project-demo",
+                "Project demo skill",
+                {"manifest.json": '{"protocol_version":0,"scope":"project","targets":["codex"]}'},
+            )
+            (remote_project / "AGENTS.md").write_text("Use project skills.\n", encoding="utf-8")
+            write_snapshot(scan_roots([f"global={remote_global}", f"project={remote_project}"]), remote_snapshot, "mixed-snapshot")
+
+            preview = build_sync_apply_preview(local_root, remote_snapshot, allow_new=True, target="mixed-scope-root")
+
+            self.assertEqual(preview["summary"], {"pull_new": 2})
+            self.assertEqual(preview["expected_scope"], "global,project")
+            self.assertEqual(preview["executable"], 2)
+            self.assertEqual(preview["unsupported"], 0)
+
+            result = execute_sync_apply(local_root, remote_snapshot, allow_new=True, target="mixed-scope-root")
+
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["applied"], 2)
+            self.assertTrue((local_root / "global-demo" / "SKILL.md").exists())
+            self.assertTrue((local_root / "project-demo" / "SKILL.md").exists())
+            status = build_sync_status(local_root, remote_snapshot, Path(result["apply_result"]["record_path"]))
+            self.assertEqual(status["summary"], {"unchanged": 2})
 
     def test_sync_apply_rejects_global_skill_for_project_target(self):
         with TemporaryDirectory() as tmp:

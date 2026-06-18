@@ -109,7 +109,23 @@ The approved recruitment skills are `scope=project` packages. A normal `cc-switc
 --local-root /Users/mac/.cc-switch/skills
 ```
 
-This kept the scope guard intact while applying the reviewed project-scoped OpenClaw skills into the existing local skill root. Future unattended Mac sync for mixed global/project packages needs an explicit target policy instead of assuming all remote packages are global.
+This kept the scope guard intact while applying the reviewed project-scoped OpenClaw skills into the existing local skill root. It was a one-shot transition path, not the long-term daemon target.
+
+Future unattended Mac/OpenClaw sync for governed roots that intentionally contain both global and project-scoped packages should use:
+
+```text
+--target mixed-scope-root
+--local-root /Users/mac/.cc-switch/skills
+```
+
+or the equivalent OpenClaw root:
+
+```text
+--target mixed-scope-root
+--local-root /home/admin/clawd/skills
+```
+
+This keeps scope mismatch protection for pure targets while making the mixed private-skill store explicit.
 
 ## Outcome
 

@@ -26,7 +26,9 @@ SUPPORTED_ACTIONS = {"noop", *EXECUTABLE_ACTIONS}
 TARGET_SCOPES = {
     "cc-switch-global": "global",
     "codex-project": "project",
+    "mixed-scope-root": None,
 }
+ALLOWED_SCOPES = {"global", "project"}
 
 
 def build_sync_apply_preview(
@@ -39,6 +41,7 @@ def build_sync_apply_preview(
     target: str = "cc-switch-global",
 ) -> Dict[str, object]:
     expected_scope = _expected_scope(target)
+    allowed_scopes = _allowed_scopes(target)
     status = build_sync_status(local_root, remote_snapshot_dir, last_applied_record)
     plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     remote_entries = _remote_entries_by_skill_id(remote_snapshot_dir)
@@ -60,7 +63,7 @@ def build_sync_apply_preview(
         if not item["allowed"]:
             enriched["sync_apply_supported"] = False
         elif action in PULL_ACTIONS:
-            if scope != expected_scope:
+            if scope not in allowed_scopes:
                 enriched["sync_apply_supported"] = False
                 enriched["sync_apply_reason"] = f"{scope}-scoped skills are not installed into {target}"
                 unsupported += 1
@@ -82,7 +85,7 @@ def build_sync_apply_preview(
         "dry_run": True,
         "mode": "two-way-safe",
         "target": target,
-        "expected_scope": expected_scope,
+        "expected_scope": expected_scope or "global,project",
         "executable": executable,
         "unsupported": unsupported,
         "supported_to_apply": plan["blocked"] == 0 and unsupported == 0,
@@ -173,7 +176,7 @@ def _build_pull_apply_plan(
     target: str,
     backup_root_override: Optional[Path] = None,
 ) -> Dict[str, object]:
-    expected_scope = _expected_scope(target)
+    allowed_scopes = _allowed_scopes(target)
     apply_id = _timestamp_id()
     backup_root = (backup_root_override or local_root / ".skill-sync-backups") / apply_id
     items: List[Dict[str, object]] = []
@@ -185,7 +188,8 @@ def _build_pull_apply_plan(
         staged = staged_by_skill_id.get(skill_id)
         if staged is None:
             raise SyncApplyError(f"remote skill was not present after staging: {skill_id}")
-        if staged.get("scope") != expected_scope:
+        staged_scope = str(staged.get("scope") or "global")
+        if staged_scope not in allowed_scopes:
             raise SyncApplyError(f"refusing to install {staged.get('scope')}-scoped skill into {target}: {skill_id}")
         items.append(
             {
@@ -196,7 +200,7 @@ def _build_pull_apply_plan(
                 "target_path": str(local_root / skill_id),
                 "backup_path": str(backup_root / skill_id),
                 "action": "install_or_replace",
-                "scope": staged.get("scope") or "global",
+                "scope": staged_scope,
                 "allowed": True,
                 "reason": item.get("reason"),
             }
@@ -316,11 +320,18 @@ def _hashes_by_skill_id(index: Dict[str, object]) -> Dict[str, str]:
     }
 
 
-def _expected_scope(target: str) -> str:
+def _expected_scope(target: str) -> Optional[str]:
     try:
         return TARGET_SCOPES[target]
     except KeyError as exc:
         raise SyncApplyError(f"unsupported sync-apply target: {target}") from exc
+
+
+def _allowed_scopes(target: str) -> Set[str]:
+    expected = _expected_scope(target)
+    if expected is None:
+        return set(ALLOWED_SCOPES)
+    return {expected}
 
 
 def _timestamp_id() -> str:

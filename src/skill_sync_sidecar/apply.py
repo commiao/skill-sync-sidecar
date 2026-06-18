@@ -64,6 +64,29 @@ def build_apply_plan(
                     reason=None if allowed else "project-scoped skills are not installed into global roots",
                 )
             )
+    elif target == "mixed-scope-root":
+        if target_root is None:
+            raise ApplyPlanError("--target-root is required for mixed-scope-root")
+        root = target_root
+        backup_root = root / ".skill-sync-backups" / apply_id
+        for skill in stage_index.get("skills", []):
+            skill_id = str(skill.get("skill_id"))
+            scope = str(skill.get("scope") or "global")
+            allowed = scope in {"global", "project"}
+            items.append(
+                ApplyPlanItem(
+                    key=str(skill.get("key")),
+                    skill_id=skill_id,
+                    content_hash=str(skill.get("content_hash") or ""),
+                    source_path=str(skill.get("output_path")),
+                    target_path=str(root / skill_id),
+                    backup_path=str(backup_root / skill_id),
+                    action="install_or_replace" if allowed else "skip",
+                    scope=scope,
+                    allowed=allowed,
+                    reason=None if allowed else f"{scope}-scoped skills are not installed into mixed-scope-root",
+                )
+            )
     elif target == "codex-project":
         if project_root is None:
             raise ApplyPlanError("--project-root is required for codex-project")

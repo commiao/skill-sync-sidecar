@@ -30,6 +30,9 @@ from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
 
 
+APPLY_TARGETS = ["cc-switch-global", "codex-project", "mixed-scope-root"]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="skill-sync",
@@ -113,8 +116,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     apply = subcommands.add_parser("apply", help="Install from a staged snapshot with dry-run and explicit --yes modes.")
     apply.add_argument("--staged-dir", required=True, help="Staged snapshot directory containing .stage-index.json.")
-    apply.add_argument("--target", required=True, choices=["cc-switch-global", "codex-project"], help="Apply target adapter.")
-    apply.add_argument("--target-root", help="Override target root for cc-switch-global.")
+    apply.add_argument("--target", required=True, choices=APPLY_TARGETS, help="Apply target adapter.")
+    apply.add_argument("--target-root", help="Override target root for cc-switch-global or set the mixed-scope-root root.")
     apply.add_argument("--project-root", help="Project root for codex-project.")
     apply_mode = apply.add_mutually_exclusive_group(required=True)
     apply_mode.add_argument("--dry-run", action="store_true", help="Print an apply plan without writing files.")
@@ -149,7 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync_apply = subcommands.add_parser("sync-apply", help="Execute safe pull/push sync actions from a sync plan.")
     sync_apply.add_argument("--local-root", help="Local installed skill root to scan and update.")
-    sync_apply.add_argument("--target", default="cc-switch-global", choices=["cc-switch-global", "codex-project"], help="Apply target adapter.")
+    sync_apply.add_argument("--target", default="cc-switch-global", choices=APPLY_TARGETS, help="Apply target adapter.")
     sync_apply.add_argument("--project-root", help="Project root for codex-project; defaults local root to <project-root>/skills.")
     sync_apply.add_argument("--remote-snapshot", required=True, help="Local remote snapshot/cache directory with index.json.")
     sync_apply.add_argument("--last-applied-record", help="Optional .apply-record.json used as the base version.")
@@ -238,7 +241,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync_cycle = subcommands.add_parser("sync-cycle", help="Run one safe pull-plan-apply cycle against a remote snapshot.")
     sync_cycle.add_argument("--local-root", help="Local installed skill root to scan and update.")
-    sync_cycle.add_argument("--target", default="cc-switch-global", choices=["cc-switch-global", "codex-project"], help="Apply target adapter.")
+    sync_cycle.add_argument("--target", default="cc-switch-global", choices=APPLY_TARGETS, help="Apply target adapter.")
     sync_cycle.add_argument("--project-root", help="Project root for codex-project; defaults local root to <project-root>/skills.")
     sync_cycle_remote = sync_cycle.add_mutually_exclusive_group(required=True)
     sync_cycle_remote.add_argument("--remote", help="Remote URL. Supports file:// for tests and http(s) WebDAV.")
@@ -261,7 +264,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync_daemon = subcommands.add_parser("sync-daemon", help="Run repeated safe sync-cycle passes against a remote snapshot.")
     sync_daemon.add_argument("--local-root", help="Local installed skill root to scan and update.")
-    sync_daemon.add_argument("--target", default="cc-switch-global", choices=["cc-switch-global", "codex-project"], help="Apply target adapter.")
+    sync_daemon.add_argument("--target", default="cc-switch-global", choices=APPLY_TARGETS, help="Apply target adapter.")
     sync_daemon.add_argument("--project-root", help="Project root for codex-project; defaults local root to <project-root>/skills.")
     sync_daemon_remote = sync_daemon.add_mutually_exclusive_group(required=True)
     sync_daemon_remote.add_argument("--remote", help="Remote URL. Supports file:// for tests and http(s) WebDAV.")
@@ -571,8 +574,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
 
 
 def cmd_apply(args: argparse.Namespace) -> int:
-    if args.yes and args.target == "cc-switch-global" and not args.target_root:
-        print("real cc-switch-global apply requires explicit --target-root", file=sys.stderr)
+    if args.yes and args.target in {"cc-switch-global", "mixed-scope-root"} and not args.target_root:
+        print(f"real {args.target} apply requires explicit --target-root", file=sys.stderr)
         return 2
     try:
         plan = build_apply_plan(
@@ -815,7 +818,7 @@ def sync_apply_roots_from_args(args: argparse.Namespace) -> Tuple[Path, Optional
         local_root = Path(args.local_root).expanduser() if args.local_root else project_root / "skills"
         return local_root, project_root / ".skill-sync-backups"
     if not args.local_root:
-        raise ValueError("--local-root is required for --target cc-switch-global")
+        raise ValueError(f"--local-root is required for --target {args.target}")
     return Path(args.local_root).expanduser(), None
 
 

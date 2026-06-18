@@ -895,6 +895,17 @@ gateway_process=still_running
 scope_note=project-scoped skills required one-shot Mac pull with --target codex-project
 ```
 
+Follow-up target policy:
+
+```text
+target=mixed-scope-root
+local_root=/Users/mac/.cc-switch/skills or /home/admin/clawd/skills
+purpose=peer-device roots that intentionally contain both global and project-scoped private skills
+guardrails=conflicts/deletions/new-skills still require normal sync-plan approval
+```
+
+Use `mixed-scope-root` for unattended sync on governed peer roots after the mixed-scope support release is deployed. Keep `cc-switch-global` for pure global adapter roots and `codex-project` for repository-local `skills/` directories.
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
