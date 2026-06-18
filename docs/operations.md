@@ -906,6 +906,17 @@ guardrails=conflicts/deletions/new-skills still require normal sync-plan approva
 
 Use `mixed-scope-root` for unattended sync on governed peer roots after the mixed-scope support release is deployed. Keep `cc-switch-global` for pure global adapter roots and `codex-project` for repository-local `skills/` directories.
 
+Validated mixed-scope rollout:
+
+```text
+docs/mixed-scope-rollout-20260619.md
+commit=350e800
+mac_launchagent=running target=mixed-scope-root summary={"noop": 94}
+openclaw_pullonly=active target=mixed-scope-root summary={"noop": 94}
+openclaw_dryrun=active target=mixed-scope-root summary={"noop": 94}
+gateway_process=still_running pid=2966537
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
