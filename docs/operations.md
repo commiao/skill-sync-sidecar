@@ -827,6 +827,23 @@ openclaw_status={"unchanged": 93}
 gateway_process=still_running
 ```
 
+Validated OpenClaw pull-only local edit block rehearsal:
+
+```text
+docs/openclaw-pullonly-block-rehearsal-20260619.md
+skill_id=sync-probe-autosync
+writer_policy=pull-only
+blocked_report=/opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.md
+blocked_summary={"writer_policy": 1}
+blocked_reason=writer policy pull-only blocks push
+blocked_action=push
+applied=0
+uploaded=0
+post_restore_openclaw_status={"unchanged": 93}
+post_restore_mac_status={"unchanged": 93}
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
