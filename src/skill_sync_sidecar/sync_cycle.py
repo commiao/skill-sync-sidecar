@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional
 
+from .blocked_report import build_blocked_report
 from .conflicts import build_conflict_packages
 from .remote import Remote, download_snapshot
 from .sync_apply import execute_sync_apply
@@ -37,6 +38,16 @@ def run_sync_cycle(
     plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     conflicts = _build_conflicts_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
     tombstones = _build_tombstones_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
+    blocked_report = _build_blocked_report_if_needed(
+        plan,
+        local_root,
+        cache_dir,
+        work_dir,
+        last_applied_record,
+        allow_new,
+        allow_delete,
+        writer_policy,
+    )
     delete_actions = _count_delete_plan_actions(plan)
 
     apply_result = None
@@ -69,6 +80,7 @@ def run_sync_cycle(
         "sync_plan": plan,
         "conflicts": conflicts,
         "tombstones": tombstones,
+        "blocked_report": blocked_report,
         "delete_actions": delete_actions,
         "apply_result": apply_result,
         "reason": _reason(dry_run, plan, conflicts, tombstones, delete_actions),
@@ -97,6 +109,29 @@ def _build_tombstones_if_needed(
     if not any(item["action"] in {"local_deleted", "remote_deleted"} for item in status.get("items", [])):
         return None
     return build_tombstones(local_root, cache_dir, work_dir / "tombstones", last_applied_record)
+
+
+def _build_blocked_report_if_needed(
+    plan: Dict[str, object],
+    local_root: Path,
+    cache_dir: Path,
+    work_dir: Path,
+    last_applied_record: Optional[Path],
+    allow_new: bool,
+    allow_delete: bool,
+    writer_policy: str,
+) -> Optional[Dict[str, object]]:
+    if not plan.get("blocked"):
+        return None
+    return build_blocked_report(
+        local_root,
+        cache_dir,
+        work_dir / "blocked-report",
+        last_applied_record,
+        allow_new=allow_new,
+        allow_delete=allow_delete,
+        writer_policy=writer_policy,
+    )
 
 
 def _count_delete_plan_actions(plan: Dict[str, object]) -> int:

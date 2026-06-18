@@ -134,6 +134,7 @@ skill-sync sync-status --local-root /tmp/skill-sync-target --remote-snapshot ./c
 skill-sync sync-plan --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --fail-on-blocked
 skill-sync conflict-package --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --out ./conflicts
 skill-sync tombstone --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --out ./tombstones
+skill-sync blocked-report --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --writer-policy pull-only --out ./blocked-report
 skill-sync sync-apply --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run
 skill-sync sync-apply --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --yes
 skill-sync sync-cycle --local-root /tmp/skill-sync-target --remote https://example.com/dav/cc-skill-sync --prefix snapshots/current --cache-dir ./cache-preview --work-dir ./sync-work --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run
@@ -151,6 +152,8 @@ skill-sync rollback --record /tmp/skill-sync-target/.skill-sync-backups/<apply-i
 
 `tombstone` is the handoff path for one-sided deletes. For `local_deleted` it records a pending `delete_remote`; for `remote_deleted` it records a pending `delete_local`. Tombstones copy the surviving side's files plus base metadata, but do not execute deletion. Actual delete propagation requires a later explicit retention/rollback gate.
 
+`blocked-report` is the handoff path for blocked sync-plan items, especially writer-policy blocks. It writes `blocked-report.json` and `blocked-report.md` with the blocked skill id, status action, plan action, local/remote/base hashes, category, and recommended next step. It does not copy skill contents or apply changes.
+
 `sync-apply` executes the safe subset of that plan. It is still dry-run by default. With `--yes`, remote-to-local `pull` and `pull_new` actions stage the remote cache, verify archive hashes, install into the explicit local root, and write rollback metadata. Local-to-remote `push` and `push_new` actions require a remote destination; before upload, the client verifies that the remote's current index still matches the local cache. If the remote drifted, the push is refused and the user must run `pull-cache` and re-plan.
 
 For project-scoped skills, `sync-apply --target codex-project --project-root <repo>` installs only `scope=project` packages into `<repo>/skills/<skill-id>` and writes rollback metadata under `<repo>/.skill-sync-backups`. Global skills are refused for project targets, and project skills are refused for global targets.
@@ -163,8 +166,9 @@ After a successful push, the sidecar writes `.skill-sync-bases/<sync-id>.json` u
 2. Build `sync-status` and `sync-plan` against `--last-applied-record`.
 3. Materialize conflict packages under `--work-dir/conflicts` when local and remote both changed.
 4. Materialize tombstones under `--work-dir/tombstones` for one-sided deletes.
-5. With `--dry-run`, stop before any apply or upload.
-6. With `--yes`, execute only non-blocked pull/push actions through `sync-apply`.
+5. Materialize blocked review reports under `--work-dir/blocked-report` when the plan has blocked items.
+6. With `--dry-run`, stop before any apply or upload.
+7. With `--yes`, execute only non-blocked pull/push actions through `sync-apply`.
 
 `sync-cycle --yes` does not execute deletions. Even with `--allow-delete`, deletes are represented as tombstones and the cycle reports `blocked` until a later explicit delete gate exists. This keeps automatic sync safe for peer devices where Mac, Windows, and OpenClaw can all be writers.
 

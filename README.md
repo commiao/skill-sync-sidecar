@@ -23,6 +23,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `sync-apply`: execute safe pull and push actions from the plan; dry-run unless `--yes` is provided.
 - `conflict-package`: materialize local, remote, and base metadata for conflicts without applying changes.
 - `tombstone`: materialize non-destructive delete records for one-sided deletes without deleting files.
+- `blocked-report`: materialize JSON/Markdown review reports for blocked sync-plan items.
 - `sync-cycle`: run one safe remote download, status, plan, review-material, and optional apply cycle.
 - `sync-daemon`: run repeated `sync-cycle` passes with explicit dry-run/yes mode and blocked-state stop behavior.
 
@@ -66,6 +67,7 @@ python3 -m skill_sync_sidecar sync-status --local-root /tmp/skill-sync-target --
 python3 -m skill_sync_sidecar sync-plan --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --fail-on-blocked
 python3 -m skill_sync_sidecar conflict-package --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --out ./conflicts
 python3 -m skill_sync_sidecar tombstone --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --out ./tombstones
+python3 -m skill_sync_sidecar blocked-report --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --writer-policy pull-only --out ./blocked-report
 python3 -m skill_sync_sidecar sync-apply --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run
 python3 -m skill_sync_sidecar sync-apply --local-root /tmp/skill-sync-target --remote-snapshot ./cache-preview --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --yes
 python3 -m skill_sync_sidecar sync-cycle --local-root /tmp/skill-sync-target --remote file:///tmp/skill-sync-remote --prefix snapshots/current --cache-dir ./cache-preview --work-dir ./sync-work --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run
@@ -292,6 +294,19 @@ python3 -m skill_sync_sidecar tombstone \
 ```
 
 Each tombstone contains `tombstone.json`, `base.json`, and whichever side still has material (`local/` or `remote/`). Tombstones are non-destructive markers; they do not delete local files or remove remote archives. Later delete execution should consume these records with an explicit retention and rollback gate.
+
+When blocked items are caused by policy rather than content conflicts, materialize a review report:
+
+```bash
+python3 -m skill_sync_sidecar blocked-report \
+  --local-root /tmp/skill-sync-target \
+  --remote-snapshot ./cache-preview \
+  --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json \
+  --writer-policy pull-only \
+  --out ./blocked-report
+```
+
+The command writes `blocked-report.json` and `blocked-report.md`. It classifies blocked items as `writer_policy`, `conflict`, `delete_review`, `new_skill_review`, or `manual_review`, and includes the local/remote/base hashes plus a recommended next step. `sync-cycle` writes the same report under `--work-dir/blocked-report` whenever a cycle is blocked.
 
 `sync-plan` turns the status into a dry-run execution plan:
 

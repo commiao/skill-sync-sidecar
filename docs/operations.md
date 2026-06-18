@@ -758,6 +758,21 @@ gateway_process=still_running
 
 OpenClaw promotion rule: after base adoption, default to `--writer-policy pull-only`. This lets OpenClaw receive WebDAV updates while preventing local OpenClaw edits from being uploaded automatically. If OpenClaw needs to publish a local change, review the blocked plan and run an explicit approved push path instead of changing the unattended service policy.
 
+When a `pull-only` OpenClaw cycle blocks because a local skill changed, materialize a review report:
+
+```bash
+sudo -iu admin \
+  PYTHONPATH=/opt/skill-sync-sidecar/releases/<commit>/src \
+  /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar blocked-report \
+    --local-root /home/admin/clawd/skills \
+    --remote-snapshot /opt/skill-sync-sidecar/cache/openclaw-writable-rehearsal \
+    --last-applied-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+    --writer-policy pull-only \
+    --out /opt/skill-sync-sidecar/work/openclaw-blocked-review
+```
+
+`sync-cycle` and `sync-daemon` also write this report under `--work-dir/blocked-report` whenever a cycle is blocked. Treat it as the approval queue for OpenClaw-to-WebDAV publishing; do not switch the unattended service to `push-pull` just to clear the block.
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash

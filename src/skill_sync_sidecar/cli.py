@@ -10,6 +10,7 @@ from typing import Optional, Sequence, Tuple
 from . import __version__
 from .apply import ApplyError, ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
 from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
+from .blocked_report import build_blocked_report
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .daemon import run_sync_daemon
@@ -195,6 +196,18 @@ def build_parser() -> argparse.ArgumentParser:
     tombstone.add_argument("--fail-on-empty", action="store_true", help="Exit non-zero when no one-sided deletes are found.")
     tombstone.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     tombstone.set_defaults(func=cmd_tombstone)
+
+    blocked_report = subcommands.add_parser("blocked-report", help="Write a JSON/Markdown review report for blocked sync-plan items.")
+    blocked_report.add_argument("--local-root", required=True, help="Local installed skill root to scan.")
+    blocked_report.add_argument("--remote-snapshot", required=True, help="Local remote snapshot/cache directory with index.json.")
+    blocked_report.add_argument("--last-applied-record", help="Optional .apply-record.json or base record used as the common ancestor.")
+    blocked_report.add_argument("--allow-new", action="store_true", help="Evaluate blocked items with new skills allowed.")
+    blocked_report.add_argument("--allow-delete", action="store_true", help="Evaluate blocked items with delete propagation planned.")
+    add_writer_policy_arg(blocked_report)
+    blocked_report.add_argument("--out", required=True, help="Output directory for blocked-report.json and blocked-report.md.")
+    blocked_report.add_argument("--fail-on-empty", action="store_true", help="Exit non-zero when no blocked items are found.")
+    blocked_report.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    blocked_report.set_defaults(func=cmd_blocked_report)
 
     reconcile_report = subcommands.add_parser("reconcile-report", help="Build a multi-writer adoption/reconcile report.")
     reconcile_source = reconcile_report.add_mutually_exclusive_group(required=True)
@@ -834,6 +847,34 @@ def cmd_tombstone(args: argparse.Namespace) -> int:
         for tombstone in result["tombstones"]:
             print(f"{tombstone['action']} {tombstone['skill_id']}: {tombstone['path']}")
     if args.fail_on_empty and result["total_tombstones"] == 0:
+        return 3
+    return 0
+
+
+def cmd_blocked_report(args: argparse.Namespace) -> int:
+    try:
+        result = build_blocked_report(
+            Path(args.local_root).expanduser(),
+            Path(args.remote_snapshot).expanduser(),
+            Path(args.out).expanduser(),
+            Path(args.last_applied_record).expanduser() if args.last_applied_record else None,
+            allow_new=args.allow_new,
+            allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
+        )
+    except (SyncStateError, ValueError) as exc:
+        print(f"blocked-report failed: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"blocked: {result['total']}")
+        print(f"out: {result['out']}")
+        print("summary:")
+        for category, count in result["summary"].items():
+            print(f"  {category}: {count}")
+    if args.fail_on_empty and result["total"] == 0:
         return 3
     return 0
 

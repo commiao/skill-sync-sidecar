@@ -11,6 +11,7 @@ from skill_sync_sidecar import sync_apply as sync_apply_module
 from skill_sync_sidecar import tombstones as tombstones_module
 from skill_sync_sidecar.apply import ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
 from skill_sync_sidecar.base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
+from skill_sync_sidecar.blocked_report import build_blocked_report
 from skill_sync_sidecar.config import load_cc_switch_webdav_settings
 from skill_sync_sidecar.cli import guard_http_upload
 from skill_sync_sidecar.conflicts import build_conflict_packages
@@ -635,6 +636,31 @@ class ScannerTest(unittest.TestCase):
         self.assertEqual(no_writes["summary"], {"blocked": 4, "noop": 1})
         self.assertFalse(no_writes["safe_to_apply"])
 
+    def test_blocked_report_materializes_writer_policy_review(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            record_path = base / "apply-record.json"
+            out = base / "blocked"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(remote_source, "base")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            self._write_demo_skill(local_root, "local change")
+
+            report = build_blocked_report(local_root, remote_snapshot, out, record_path, writer_policy="pull-only")
+
+            self.assertEqual(report["total"], 1)
+            self.assertEqual(report["summary"], {"writer_policy": 1})
+            self.assertEqual(report["items"][0]["skill_id"], "demo")
+            self.assertEqual(report["items"][0]["category"], "writer_policy")
+            self.assertIn("explicit approved push path", report["items"][0]["recommendation"])
+            self.assertTrue((out / "blocked-report.json").exists())
+            self.assertIn("demo", (out / "blocked-report.md").read_text(encoding="utf-8"))
+
     def test_sync_apply_pulls_remote_change_and_writes_new_base_record(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -1131,6 +1157,43 @@ class ScannerTest(unittest.TestCase):
             self.assertIsNone(result["apply_result"])
             self.assertTrue((work_dir / "conflicts" / "conflict-index.json").exists())
             self.assertIn("local change", (local_root / "demo" / "SKILL.md").read_text(encoding="utf-8"))
+
+    def test_sync_cycle_writes_blocked_report_for_policy_block(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            cache_dir = base / "cache"
+            work_dir = base / "work"
+            record_path = base / "apply-record.json"
+            prefix = "snapshots/current"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(remote_source, "base")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            self._write_demo_skill(local_root, "local change")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            result = run_sync_cycle(
+                local_root,
+                remote,
+                prefix,
+                cache_dir,
+                work_dir,
+                record_path,
+                writer_policy="pull-only",
+                dry_run=False,
+            )
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["sync_plan"]["summary"], {"blocked": 1})
+            self.assertEqual(result["blocked_report"]["summary"], {"writer_policy": 1})
+            self.assertIsNone(result["apply_result"])
+            self.assertTrue((work_dir / "blocked-report" / "blocked-report.json").exists())
 
     def test_sync_daemon_runs_limited_dry_run_cycles(self):
         with TemporaryDirectory() as tmp:
