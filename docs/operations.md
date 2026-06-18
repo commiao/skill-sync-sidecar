@@ -673,6 +673,18 @@ sudo -iu admin \
 
 This is the promotion rehearsal before any writable systemd rollout. It runs `openclaw-gate --require-complete --fail-on-blocked` first, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It does not edit systemd units, does not stop or restart OpenClaw gateway processes, and does not install a long-running service. In the current 92/92 aligned state, expected result is a finite no-op cycle with `applied=0`, `uploaded=0`, and a state file under `/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json`.
 
+Validated rehearsal:
+
+```text
+docs/openclaw-writable-rehearsal-20260618.md
+commit=4d9a143
+summary={"noop": 92}
+applied=0
+uploaded=0
+dryrun_service=active
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
