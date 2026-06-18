@@ -2,6 +2,20 @@
 
 All notable changes to Skill Sync Sidecar are documented here.
 
+## Unreleased
+
+### Added
+
+- Explicit writer policy controls for `sync-plan`, `sync-apply`, `sync-cycle`, `sync-daemon`, and ops status.
+- `pull-only`, `push-only`, and `no-writes` modes for peers that must not publish or consume changes automatically.
+- `blocked-report` command and automatic `sync-cycle` blocked review reports for policy blocks, conflicts, new-skill review, and delete review.
+- OpenClaw base-adoption, writer-policy, and blocked-report deployment validation documents.
+
+### Changed
+
+- OpenClaw rehearsals and service templates now use explicit `--writer-policy pull-only`.
+- Desktop launchd/systemd examples make their writer policy explicit instead of relying on CLI defaults.
+
 ## v0.1.3 - 2026-06-16
 
 Linux/OpenClaw runtime compatibility patch.
