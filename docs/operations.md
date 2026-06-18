@@ -740,6 +740,24 @@ dryrun_service=active
 gateway_process=still_running
 ```
 
+Validated OpenClaw writer policy rehearsal:
+
+```text
+docs/openclaw-writer-policy-20260619.md
+commit=149dcd6
+writer_policy=pull-only
+base_record=/opt/skill-sync-sidecar/state/openclaw-base-record.json
+summary={"noop": 92}
+blocked=0
+conflicts=0
+applied=0
+uploaded=0
+dryrun_service=active
+gateway_process=still_running
+```
+
+OpenClaw promotion rule: after base adoption, default to `--writer-policy pull-only`. This lets OpenClaw receive WebDAV updates while preventing local OpenClaw edits from being uploaded automatically. If OpenClaw needs to publish a local change, review the blocked plan and run an explicit approved push path instead of changing the unattended service policy.
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
@@ -786,7 +804,8 @@ Before enabling it:
 3. Verify the service user's Python runtime is >=3.9.
 4. Keep remote service connectivity checks separate from sidecar rollout.
 5. Run `openclaw-gate --require-complete --fail-on-blocked`; it must pass before any writable OpenClaw service rollout.
-6. Review any `conflict` actions before allowing writes to `/home/admin/clawd/skills`.
+6. Require `--writer-policy pull-only` for OpenClaw unless there is an explicit approval that this peer may publish local edits upstream.
+7. Review any `conflict`, blocked push, or delete actions before allowing writes to `/home/admin/clawd/skills` or WebDAV.
 
 Suggested validation:
 
