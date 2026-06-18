@@ -10,6 +10,7 @@ from skill_sync_sidecar import conflicts as conflicts_module
 from skill_sync_sidecar import sync_apply as sync_apply_module
 from skill_sync_sidecar import tombstones as tombstones_module
 from skill_sync_sidecar.apply import ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
+from skill_sync_sidecar.approved_push import ApprovedPushError, build_approved_push_preview, execute_approved_push
 from skill_sync_sidecar.base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from skill_sync_sidecar.blocked_report import build_blocked_report
 from skill_sync_sidecar.config import load_cc_switch_webdav_settings
@@ -863,6 +864,92 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(len([path for path in counting.put_paths if path.endswith(".zip")]), 1)
             self.assertIn("/alpha/", [path for path in counting.put_paths if path.endswith(".zip")][0])
             self.assertEqual(counting.put_paths[-1], "snapshots/current/index.json")
+
+    def test_approved_push_publishes_only_selected_blocked_local_change(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            pulled_cache = base / "pulled-cache"
+            record_path = base / "apply-record.json"
+            blocked_out = base / "blocked"
+            approval_out = base / "approved"
+            base_record_out = base / "state" / "base-record.json"
+            prefix = "snapshots/current"
+
+            self._write_skill(local_root / "alpha", "alpha", "Alpha", {"notes.txt": "base alpha\n"})
+            self._write_skill(local_root / "beta", "beta", "Beta", {"notes.txt": "base beta\n"})
+            base_hashes = {skill.skill_id: skill.content_hash for skill in scan_roots([f"cc-switch={local_root}"]).skills}
+            self._write_apply_record(record_path, base_hashes)
+            self._write_skill(remote_source / "alpha", "alpha", "Alpha", {"notes.txt": "base alpha\n"})
+            self._write_skill(remote_source / "beta", "beta", "Beta", {"notes.txt": "base beta\n"})
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            self._write_skill(local_root / "alpha", "alpha", "Alpha", {"notes.txt": "approved alpha change\n"})
+            self._write_skill(local_root / "beta", "beta", "Beta", {"notes.txt": "unapproved beta change\n"})
+            report = build_blocked_report(local_root, remote_snapshot, blocked_out, record_path, writer_policy="pull-only")
+
+            self.assertEqual(report["summary"], {"writer_policy": 2})
+
+            preview = build_approved_push_preview(local_root, remote_snapshot, blocked_out / "blocked-report.json", ["alpha"], record_path)
+
+            self.assertEqual(preview["approved_skill_ids"], ["alpha"])
+            self.assertEqual([item["skill_id"] for item in preview["deferred_pushes"]], ["beta"])
+
+            result = execute_approved_push(
+                local_root,
+                remote_snapshot,
+                blocked_out / "blocked-report.json",
+                ["alpha"],
+                remote,
+                remote_prefix=prefix,
+                last_applied_record=record_path,
+                base_record_out=base_record_out,
+                out_dir=approval_out,
+            )
+
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["approved_skill_ids"], ["alpha"])
+            self.assertGreater(result["uploaded_files"], 0)
+            self.assertTrue(base_record_out.exists())
+            self.assertTrue((approval_out / "approved-push-record.json").exists())
+
+            download_snapshot(remote, pulled_cache, prefix)
+            remote_index = __import__("json").loads((pulled_cache / "index.json").read_text(encoding="utf-8"))
+            remote_hashes = {skill["skill_id"]: skill["content_hash"] for skill in remote_index["skills"]}
+            local_hashes = {skill.skill_id: skill.content_hash for skill in scan_roots([f"cc-switch={local_root}"]).skills}
+
+            self.assertEqual(remote_hashes["alpha"], local_hashes["alpha"])
+            self.assertEqual(remote_hashes["beta"], base_hashes["beta"])
+
+            status = build_sync_status(local_root, pulled_cache, base_record_out)
+            self.assertEqual(status["summary"], {"push": 1, "unchanged": 1})
+            by_id = {item["skill_id"]: item for item in status["items"]}
+            self.assertEqual(by_id["beta"]["action"], "push")
+
+    def test_approved_push_rejects_stale_blocked_report_hashes(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            record_path = base / "apply-record.json"
+            blocked_out = base / "blocked"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(remote_source, "base")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            self._write_demo_skill(local_root, "local change")
+            build_blocked_report(local_root, remote_snapshot, blocked_out, record_path, writer_policy="pull-only")
+            self._write_demo_skill(local_root, "second local change")
+
+            with self.assertRaises(ApprovedPushError):
+                build_approved_push_preview(local_root, remote_snapshot, blocked_out / "blocked-report.json", ["demo"], record_path)
 
     def test_sync_apply_push_refuses_stale_remote_cache(self):
         with TemporaryDirectory() as tmp:

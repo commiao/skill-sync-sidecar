@@ -773,6 +773,26 @@ sudo -iu admin \
 
 `sync-cycle` and `sync-daemon` also write this report under `--work-dir/blocked-report` whenever a cycle is blocked. Treat it as the approval queue for OpenClaw-to-WebDAV publishing; do not switch the unattended service to `push-pull` just to clear the block.
 
+After reviewing a blocked OpenClaw local edit, publish only the approved skill with `approved-push`. First run the dry-run:
+
+```bash
+sudo -iu admin \
+  PYTHONPATH=/opt/skill-sync-sidecar/releases/<commit>/src \
+  /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar approved-push \
+    --local-root /home/admin/clawd/skills \
+    --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
+    --last-applied-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+    --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
+    --skill-id <reviewed-skill-id> \
+    --cc-switch-webdav \
+    --prefix skill-sync-sidecar-dev/current-mac \
+    --base-record-out /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+    --out /opt/skill-sync-sidecar/work/current-mac-pullonly/approved-push \
+    --dry-run
+```
+
+Then run the same command with `--yes`. `approved-push` refuses stale approval reports: the selected skill's base/local/remote hashes must still match the blocked report, and the live remote `index.json` must still match `/opt/skill-sync-sidecar/cache/current-mac-pullonly`. It uploads only the selected approved skill archives plus the final merged `index.json`; other OpenClaw-local edits remain unapproved and continue to be visible in future blocked reports.
+
 Validated OpenClaw blocked-report deployment:
 
 ```text
