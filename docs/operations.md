@@ -879,6 +879,22 @@ pullonly_service=active running
 gateway_process=still_running
 ```
 
+Validated real recruitment approved-push:
+
+```text
+docs/openclaw-approved-push-recruitment-20260619.md
+skills=beijing-recruitment,lark-cli-adapter,tianjin-recruitment
+blocked_report_summary={"writer_policy": 3}
+approved_push_uploaded_files=4
+remote_snapshot=approved-push-20260618T172643.235262Z
+remote_total=94
+openclaw_status={"unchanged": 94}
+mac_status={"noop": 94}
+pullonly_service=active running
+gateway_process=still_running
+scope_note=project-scoped skills required one-shot Mac pull with --target codex-project
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
