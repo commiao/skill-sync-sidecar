@@ -23,7 +23,7 @@ from .snapshot import write_snapshot
 from .stage import StageError, stage_snapshot
 from .sync_apply import SyncApplyError, build_sync_apply_preview, execute_sync_apply
 from .sync_cycle import run_sync_cycle
-from .sync_plan import build_sync_plan
+from .sync_plan import WRITER_POLICIES, build_sync_plan
 from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
 
@@ -55,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     ops_status.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
     ops_status.add_argument("--allow-new", action="store_true", help="Evaluate the sync plan with new skills allowed.")
     ops_status.add_argument("--allow-delete", action="store_true", help="Evaluate the sync plan with delete propagation allowed.")
+    add_writer_policy_arg(ops_status)
     ops_status.add_argument("--fail-on-error", action="store_true", help="Exit non-zero when required local artifacts are unreadable.")
     ops_status.add_argument("--fail-on-blocked", action="store_true", help="Exit non-zero when the sync plan has blocked items.")
     ops_status.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
@@ -139,6 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_plan.add_argument("--last-applied-record", help="Optional .apply-record.json used as the base version.")
     sync_plan.add_argument("--allow-new", action="store_true", help="Allow new local/remote skills to be planned for push/pull.")
     sync_plan.add_argument("--allow-delete", action="store_true", help="Allow one-sided deletes to be planned.")
+    add_writer_policy_arg(sync_plan)
     sync_plan.add_argument("--fail-on-blocked", action="store_true", help="Exit non-zero when any item is blocked.")
     sync_plan.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     sync_plan.set_defaults(func=cmd_sync_plan)
@@ -151,6 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_apply.add_argument("--last-applied-record", help="Optional .apply-record.json used as the base version.")
     sync_apply.add_argument("--allow-new", action="store_true", help="Allow new local/remote skills to be pushed or pulled.")
     sync_apply.add_argument("--allow-delete", action="store_true", help="Plan deletions, but real deletion execution is not enabled yet.")
+    add_writer_policy_arg(sync_apply)
     sync_apply_remote = sync_apply.add_mutually_exclusive_group()
     sync_apply_remote.add_argument("--remote", help="Remote URL for push actions. Supports file:// for tests and http(s) WebDAV.")
     sync_apply_remote.add_argument("--cc-switch-webdav", action="store_true", help="Use WebDAV settings from ~/.cc-switch/settings.json for push actions.")
@@ -219,6 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_cycle.add_argument("--last-applied-record", help="Optional .apply-record.json used as the base version.")
     sync_cycle.add_argument("--allow-new", action="store_true", help="Allow new local/remote skills to be pushed or pulled.")
     sync_cycle.add_argument("--allow-delete", action="store_true", help="Plan deletions as tombstones; delete execution is not automatic.")
+    add_writer_policy_arg(sync_cycle)
     sync_cycle_mode = sync_cycle.add_mutually_exclusive_group(required=True)
     sync_cycle_mode.add_argument("--dry-run", action="store_true", help="Download and plan without changing local or remote skill contents.")
     sync_cycle_mode.add_argument("--yes", action="store_true", help="Apply supported pull/push actions when the plan is safe.")
@@ -241,6 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_daemon.add_argument("--last-applied-record", help="Optional .apply-record.json used as the base version.")
     sync_daemon.add_argument("--allow-new", action="store_true", help="Allow new local/remote skills to be pushed or pulled.")
     sync_daemon.add_argument("--allow-delete", action="store_true", help="Plan deletions as tombstones; delete execution is not automatic.")
+    add_writer_policy_arg(sync_daemon)
     sync_daemon.add_argument("--interval-seconds", type=float, default=300.0, help="Seconds to sleep between cycles.")
     sync_daemon.add_argument("--max-cycles", type=int, help="Stop after this many cycles; omit for continuous daemon mode.")
     sync_daemon.add_argument("--continue-on-blocked", action="store_true", help="Keep polling when a cycle is blocked.")
@@ -272,6 +277,15 @@ def add_common_remote_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--username-env", default="SKILL_SYNC_WEBDAV_USER", help="Environment variable containing WebDAV username.")
     parser.add_argument("--password-env", default="SKILL_SYNC_WEBDAV_PASSWORD", help="Environment variable containing WebDAV password.")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+
+
+def add_writer_policy_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--writer-policy",
+        choices=WRITER_POLICIES,
+        default="push-pull",
+        help="Restrict automatic sync direction. Default preserves existing push/pull behavior.",
+    )
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
@@ -317,6 +331,7 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
         allow_new=args.allow_new,
         allow_delete=args.allow_delete,
+        writer_policy=args.writer_policy,
     )
     if args.json:
         print(json.dumps(status, ensure_ascii=False, indent=2))
@@ -622,15 +637,16 @@ def cmd_sync_plan(args: argparse.Namespace) -> int:
             Path(args.remote_snapshot).expanduser(),
             Path(args.last_applied_record).expanduser() if args.last_applied_record else None,
         )
-    except SyncStateError as exc:
+    except (SyncStateError, ValueError) as exc:
         print(f"sync-plan failed: {exc}", file=sys.stderr)
         return 2
-    plan = build_sync_plan(status, allow_new=args.allow_new, allow_delete=args.allow_delete)
+    plan = build_sync_plan(status, allow_new=args.allow_new, allow_delete=args.allow_delete, writer_policy=args.writer_policy)
     if args.json:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
     else:
         print("dry-run: no files changed")
         print(f"total: {plan['total']}")
+        print(f"writer_policy: {plan['writer_policy']}")
         print(f"allowed: {plan['allowed']}")
         print(f"blocked: {plan['blocked']}")
         print("summary:")
@@ -661,9 +677,10 @@ def cmd_sync_apply(args: argparse.Namespace) -> int:
                 last_applied_record=last_applied,
                 allow_new=args.allow_new,
                 allow_delete=args.allow_delete,
+                writer_policy=args.writer_policy,
                 target=args.target,
             )
-        except SyncStateError as exc:
+        except (SyncStateError, ValueError) as exc:
             print(f"sync-apply failed: {exc}", file=sys.stderr)
             return 2
         if args.json:
@@ -696,12 +713,13 @@ def cmd_sync_apply(args: argparse.Namespace) -> int:
             last_applied_record=last_applied,
             allow_new=args.allow_new,
             allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
             remote=remote,
             remote_prefix=args.prefix,
             target=args.target,
             backup_root=backup_root,
         )
-    except (SyncStateError, SyncApplyError, StageError, ApplyError) as exc:
+    except (SyncStateError, SyncApplyError, StageError, ApplyError, ValueError) as exc:
         print(f"sync-apply failed: {exc}", file=sys.stderr)
         return 2
 
@@ -874,6 +892,7 @@ def cmd_sync_cycle(args: argparse.Namespace) -> int:
             last_applied_record=Path(args.last_applied_record).expanduser() if args.last_applied_record else None,
             allow_new=args.allow_new,
             allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
             dry_run=args.dry_run,
             target=args.target,
             backup_root=backup_root,
@@ -932,6 +951,7 @@ def cmd_sync_daemon(args: argparse.Namespace) -> int:
             last_applied_record=Path(args.last_applied_record).expanduser() if args.last_applied_record else None,
             allow_new=args.allow_new,
             allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
             dry_run=args.dry_run,
             target=args.target,
             backup_root=backup_root,

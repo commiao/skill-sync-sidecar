@@ -604,6 +604,37 @@ class ScannerTest(unittest.TestCase):
         self.assertTrue(by_id["new-local"]["allowed"])
         self.assertFalse(by_id["both-change"]["allowed"])
 
+    def test_sync_plan_writer_policy_blocks_disallowed_directions(self):
+        status = {
+            "local_root": "/tmp/local",
+            "remote_snapshot": "/tmp/remote",
+            "last_applied_record": "/tmp/record.json",
+            "items": [
+                {"skill_id": "same", "action": "unchanged", "base_hash": "1", "local_hash": "1", "remote_hash": "1"},
+                {"skill_id": "remote-change", "action": "pull", "base_hash": "1", "local_hash": "1", "remote_hash": "2"},
+                {"skill_id": "local-change", "action": "push", "base_hash": "1", "local_hash": "2", "remote_hash": "1"},
+                {"skill_id": "new-remote", "action": "remote_new", "base_hash": None, "local_hash": None, "remote_hash": "3"},
+                {"skill_id": "new-local", "action": "local_new", "base_hash": None, "local_hash": "4", "remote_hash": None},
+            ],
+        }
+
+        pull_only = build_sync_plan(status, allow_new=True, writer_policy="pull-only")
+        pull_only_by_id = {item["skill_id"]: item for item in pull_only["items"]}
+
+        self.assertEqual(pull_only["writer_policy"], "pull-only")
+        self.assertEqual(pull_only["summary"], {"blocked": 2, "noop": 1, "pull": 1, "pull_new": 1})
+        self.assertTrue(pull_only_by_id["remote-change"]["allowed"])
+        self.assertTrue(pull_only_by_id["new-remote"]["allowed"])
+        self.assertFalse(pull_only_by_id["local-change"]["allowed"])
+        self.assertEqual(pull_only_by_id["local-change"]["reason"], "writer policy pull-only blocks push")
+        self.assertFalse(pull_only_by_id["new-local"]["allowed"])
+        self.assertEqual(pull_only_by_id["new-local"]["reason"], "writer policy pull-only blocks push_new")
+
+        no_writes = build_sync_plan(status, allow_new=True, writer_policy="no-writes")
+
+        self.assertEqual(no_writes["summary"], {"blocked": 4, "noop": 1})
+        self.assertFalse(no_writes["safe_to_apply"])
+
     def test_sync_apply_pulls_remote_change_and_writes_new_base_record(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)

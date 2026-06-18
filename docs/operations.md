@@ -671,7 +671,18 @@ sudo -iu admin \
   /path/to/skill-sync-sidecar/scripts/openclaw-writable-rehearsal.sh
 ```
 
-This is the promotion rehearsal before any writable systemd rollout. It runs `openclaw-gate --require-complete --fail-on-blocked` first, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It does not edit systemd units, does not stop or restart OpenClaw gateway processes, and does not install a long-running service. In the current 92/92 aligned state, expected result is a finite no-op cycle with `applied=0`, `uploaded=0`, and a state file under `/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json`.
+This is the promotion rehearsal before any writable systemd rollout. It runs `openclaw-gate --require-complete --fail-on-blocked` first, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0 --writer-policy pull-only`. It does not edit systemd units, does not stop or restart OpenClaw gateway processes, and does not install a long-running service. In the current 92/92 aligned state, expected result is a finite no-op cycle with `applied=0`, `uploaded=0`, and a state file under `/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json`.
+
+Writer policies:
+
+```text
+push-pull = allow safe pulls and pushes; default compatibility mode
+pull-only = allow WebDAV-to-local pulls; block local-to-WebDAV pushes
+push-only = allow local-to-WebDAV pushes; block WebDAV-to-local pulls
+no-writes = allow only no-op cycles
+```
+
+OpenClaw should use `pull-only` until there is an explicit policy decision that OpenClaw may publish local edits upstream. Under `pull-only`, a local OpenClaw edit is surfaced as a blocked sync plan instead of being uploaded to WebDAV.
 
 Validated rehearsal:
 

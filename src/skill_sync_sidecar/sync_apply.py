@@ -35,11 +35,12 @@ def build_sync_apply_preview(
     last_applied_record: Optional[Path] = None,
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
     target: str = "cc-switch-global",
 ) -> Dict[str, object]:
     expected_scope = _expected_scope(target)
     status = build_sync_status(local_root, remote_snapshot_dir, last_applied_record)
-    plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete)
+    plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     remote_entries = _remote_entries_by_skill_id(remote_snapshot_dir)
     items: List[Dict[str, object]] = []
     executable = 0
@@ -95,6 +96,7 @@ def execute_sync_apply(
     last_applied_record: Optional[Path] = None,
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
     remote: Optional[Remote] = None,
     remote_prefix: str = "",
     target: str = "cc-switch-global",
@@ -106,6 +108,7 @@ def execute_sync_apply(
         last_applied_record=last_applied_record,
         allow_new=allow_new,
         allow_delete=allow_delete,
+        writer_policy=writer_policy,
         target=target,
     )
     if preview["blocked"]:

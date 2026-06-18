@@ -95,6 +95,8 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("--yes", text)
         self.assertIn("--max-cycles 1", text)
         self.assertIn("--interval-seconds 0", text)
+        self.assertIn("--writer-policy", text)
+        self.assertIn("SKILL_SYNC_WRITER_POLICY:-pull-only", text)
         self.assertNotIn("systemctl", text)
         self.assertNotIn("service", text.lower().replace("long-running service", ""))
         self.assertIn("one-cycle writable", help_text)

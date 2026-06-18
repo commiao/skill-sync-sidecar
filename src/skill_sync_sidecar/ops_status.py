@@ -21,6 +21,7 @@ def build_ops_status(
     openclaw_reconcile_root: Optional[Path] = None,
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
 ) -> JsonDict:
     local_root = local_root.expanduser()
     remote_snapshot = remote_snapshot.expanduser()
@@ -29,7 +30,7 @@ def build_ops_status(
     openclaw_reconcile_report = openclaw_reconcile_report.expanduser() if openclaw_reconcile_report else None
     openclaw_reconcile_root = openclaw_reconcile_root.expanduser() if openclaw_reconcile_root else None
 
-    sync_plan = _sync_plan_summary(local_root, remote_snapshot, base_record, allow_new=allow_new, allow_delete=allow_delete)
+    sync_plan = _sync_plan_summary(local_root, remote_snapshot, base_record, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     openclaw_gate = build_openclaw_gate(openclaw_reconcile_report, openclaw_reconcile_root)
     artifact_sections = [
         snapshot_summary(remote_snapshot),
@@ -53,6 +54,7 @@ def build_ops_status(
         "openclaw_gate": openclaw_gate,
         "allow_new": allow_new,
         "allow_delete": allow_delete,
+        "writer_policy": writer_policy,
         "error_count": error_count,
     }
 
@@ -164,14 +166,16 @@ def _sync_plan_summary(
     base_record: Optional[Path],
     allow_new: bool,
     allow_delete: bool,
+    writer_policy: str,
 ) -> JsonDict:
     try:
         status = build_sync_status(local_root, remote_snapshot, base_record)
-        plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete)
-    except SyncStateError as exc:
+        plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
+    except (SyncStateError, ValueError) as exc:
         return {"ok": False, "error": str(exc)}
     return {
         "ok": True,
+        "writer_policy": plan["writer_policy"],
         "total": plan["total"],
         "summary": plan["summary"],
         "allowed": plan["allowed"],
@@ -230,6 +234,7 @@ def _render_sync_plan(plan: Optional[JsonDict]) -> list[str]:
         return [f"sync_plan: unavailable ({plan.get('error')})"]
     return [
         f"sync_plan: safe_to_apply={plan.get('safe_to_apply')} blocked={plan.get('blocked')} allowed={plan.get('allowed')}",
+        f"writer_policy: {plan.get('writer_policy')}",
         f"sync_summary: {plan.get('summary')}",
         f"status_summary: {plan.get('status_summary')}",
     ]

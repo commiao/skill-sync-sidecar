@@ -4,6 +4,15 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 
+WRITER_POLICIES = ("push-pull", "pull-only", "push-only", "no-writes")
+POLICY_ALLOWED_ACTIONS = {
+    "push-pull": {"noop", "pull", "pull_new", "push", "push_new", "delete_local", "delete_remote", "blocked"},
+    "pull-only": {"noop", "pull", "pull_new", "blocked"},
+    "push-only": {"noop", "push", "push_new", "blocked"},
+    "no-writes": {"noop", "blocked"},
+}
+
+
 @dataclass(frozen=True)
 class SyncPlanItem:
     skill_id: str
@@ -20,8 +29,12 @@ def build_sync_plan(
     status: Dict[str, object],
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
 ) -> Dict[str, object]:
-    items = [_plan_item(item, allow_new=allow_new, allow_delete=allow_delete) for item in status.get("items", [])]
+    if writer_policy not in POLICY_ALLOWED_ACTIONS:
+        raise ValueError(f"unsupported writer policy: {writer_policy}")
+    raw_items = [_plan_item(item, allow_new=allow_new, allow_delete=allow_delete) for item in status.get("items", [])]
+    items = [_apply_writer_policy(item, writer_policy) for item in raw_items]
     summary: Dict[str, int] = {}
     for item in items:
         summary[item.plan_action] = summary.get(item.plan_action, 0) + 1
@@ -32,6 +45,7 @@ def build_sync_plan(
         "local_root": status.get("local_root"),
         "remote_snapshot": status.get("remote_snapshot"),
         "last_applied_record": status.get("last_applied_record"),
+        "writer_policy": writer_policy,
         "total": len(items),
         "summary": dict(sorted(summary.items())),
         "allowed": sum(1 for item in items if item.allowed),
@@ -99,6 +113,23 @@ def _plan_item(item: dict, allow_new: bool, allow_delete: bool) -> SyncPlanItem:
             remote_hash,
         )
     return _item(skill_id, status_action, "blocked", False, "conflict or unknown state requires manual resolution", base_hash, local_hash, remote_hash)
+
+
+def _apply_writer_policy(item: SyncPlanItem, writer_policy: str) -> SyncPlanItem:
+    if not item.allowed:
+        return item
+    if item.plan_action in POLICY_ALLOWED_ACTIONS[writer_policy]:
+        return item
+    return SyncPlanItem(
+        item.skill_id,
+        item.status_action,
+        "blocked",
+        False,
+        f"writer policy {writer_policy} blocks {item.plan_action}",
+        item.base_hash,
+        item.local_hash,
+        item.remote_hash,
+    )
 
 
 def _item(

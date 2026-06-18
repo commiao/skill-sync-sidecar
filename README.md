@@ -364,6 +364,15 @@ python3 -m skill_sync_sidecar sync-cycle \
 
 `sync-daemon` repeats the same cycle on an interval. It defaults to stopping when a cycle is blocked, which prevents a conflict or pending delete from being retried forever without review. Use `--max-cycles` for finite tests or launch checks; omit it only when running under a process supervisor.
 
+Writer policy controls which side is allowed to make automatic content changes:
+
+- `push-pull`: default, preserves existing behavior and allows safe pulls and pushes.
+- `pull-only`: allows WebDAV-to-local pulls but blocks local-to-WebDAV pushes.
+- `push-only`: allows local-to-WebDAV pushes but blocks WebDAV-to-local pulls.
+- `no-writes`: allows only no-op cycles.
+
+For OpenClaw, use `--writer-policy pull-only` unless there is an explicit decision that OpenClaw may publish local edits upstream. Under `pull-only`, local OpenClaw edits become blocked plan items and require review instead of being uploaded.
+
 For OpenClaw, run the stricter gate before converting a dry-run service into a writable service:
 
 ```bash
@@ -378,7 +387,7 @@ Before changing any OpenClaw service unit, run the finite writable rehearsal:
 scripts/openclaw-writable-rehearsal.sh
 ```
 
-The rehearsal first enforces the strict gate, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It is intentionally a one-shot command and does not edit systemd units or install a long-running writable daemon.
+The rehearsal first enforces the strict gate, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0 --writer-policy pull-only`. It is intentionally a one-shot command and does not edit systemd units or install a long-running writable daemon.
 
 When a peer root and the remote snapshot already match but no common base exists, adopt that state before long-running multi-writer sync:
 
@@ -402,6 +411,7 @@ python3 -m skill_sync_sidecar sync-daemon \
   --work-dir ./sync-work \
   --state-file ./sync-work/state.json \
   --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json \
+  --writer-policy pull-only \
   --dry-run \
   --interval-seconds 300 \
   --max-cycles 1

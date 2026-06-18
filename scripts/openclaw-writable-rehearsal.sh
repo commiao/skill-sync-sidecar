@@ -12,7 +12,7 @@ Run a gated one-cycle writable sync-daemon rehearsal for OpenClaw.
 The script never edits systemd units and never starts a long-running service.
 It first requires a clean OpenClaw reconcile gate, then runs:
 
-  sync-daemon --yes --max-cycles 1 --interval-seconds 0
+  sync-daemon --yes --max-cycles 1 --interval-seconds 0 --writer-policy pull-only
 
 Environment overrides:
   PYTHON_BIN                         Python 3.9+ interpreter. Default: python3
@@ -25,6 +25,7 @@ Environment overrides:
   SKILL_SYNC_STATE_FILE              State JSON. Default: /opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json
   SKILL_SYNC_BASE_RECORD_FILE        Stable base record. Default: /opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-base-record.json
   SKILL_SYNC_LAST_APPLIED_RECORD     Optional base/apply record. Defaults to SKILL_SYNC_BASE_RECORD_FILE when it exists.
+  SKILL_SYNC_WRITER_POLICY           Sync direction policy. Default: pull-only
   OPENCLAW_RECONCILE_REPORT          Explicit reconcile-report.json for the strict gate.
   OPENCLAW_RECONCILE_ROOT            Report root when no explicit report is set.
 EOF
@@ -45,6 +46,7 @@ WORK_DIR="${SKILL_SYNC_WORK_DIR:-/opt/skill-sync-sidecar/work/openclaw-writable-
 STATE_FILE="${SKILL_SYNC_STATE_FILE:-/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json}"
 BASE_RECORD_FILE="${SKILL_SYNC_BASE_RECORD_FILE:-/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-base-record.json}"
 LAST_APPLIED_RECORD="${SKILL_SYNC_LAST_APPLIED_RECORD:-}"
+WRITER_POLICY="${SKILL_SYNC_WRITER_POLICY:-pull-only}"
 OPENCLAW_RECONCILE_REPORT="${OPENCLAW_RECONCILE_REPORT:-}"
 OPENCLAW_RECONCILE_ROOT="${OPENCLAW_RECONCILE_ROOT:-/private/tmp/openclaw-skill-sync-validate}"
 
@@ -81,6 +83,7 @@ daemon_args=(
   --work-dir "$WORK_DIR"
   --state-file "$STATE_FILE"
   --base-record-file "$BASE_RECORD_FILE"
+  --writer-policy "$WRITER_POLICY"
   --yes
   --max-cycles 1
   --interval-seconds 0

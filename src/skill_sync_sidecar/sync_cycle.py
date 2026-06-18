@@ -27,13 +27,14 @@ def run_sync_cycle(
     last_applied_record: Optional[Path] = None,
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
     dry_run: bool = True,
     target: str = "cc-switch-global",
     backup_root: Optional[Path] = None,
 ) -> Dict[str, object]:
     snapshot_index = download_snapshot(remote, cache_dir, remote_prefix)
     status = build_sync_status(local_root, cache_dir, last_applied_record)
-    plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete)
+    plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     conflicts = _build_conflicts_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
     tombstones = _build_tombstones_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
     delete_actions = _count_delete_plan_actions(plan)
@@ -47,6 +48,7 @@ def run_sync_cycle(
             last_applied_record=last_applied_record,
             allow_new=allow_new,
             allow_delete=allow_delete,
+            writer_policy=writer_policy,
             remote=remote,
             remote_prefix=remote_prefix,
             target=target,

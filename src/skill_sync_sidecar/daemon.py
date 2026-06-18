@@ -20,6 +20,7 @@ def run_sync_daemon(
     last_applied_record: Optional[Path] = None,
     allow_new: bool = False,
     allow_delete: bool = False,
+    writer_policy: str = "push-pull",
     dry_run: bool = True,
     target: str = "cc-switch-global",
     backup_root: Optional[Path] = None,
@@ -42,6 +43,7 @@ def run_sync_daemon(
                 interval_seconds,
                 max_cycles,
                 stop_on_blocked,
+                writer_policy,
                 count,
                 cycles,
                 "running",
@@ -59,6 +61,7 @@ def run_sync_daemon(
                 last_applied_record=current_base_record,
                 allow_new=allow_new,
                 allow_delete=allow_delete,
+                writer_policy=writer_policy,
                 dry_run=dry_run,
                 target=target,
                 backup_root=backup_root,
@@ -73,7 +76,7 @@ def run_sync_daemon(
         cycles.append(cycle)
         _write_state_file(
             state_file,
-            _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, count, cycles, "running", current_base_record),
+            _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, count, cycles, "running", current_base_record),
         )
 
         if stop_on_blocked and cycle["status"] == "blocked":
@@ -82,7 +85,7 @@ def run_sync_daemon(
             break
         sleep_fn(interval_seconds)
 
-    summary = _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, count, cycles, "complete", current_base_record)
+    summary = _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, count, cycles, "complete", current_base_record)
     _write_state_file(state_file, summary)
     return summary
 
@@ -92,6 +95,7 @@ def _daemon_summary(
     interval_seconds: float,
     max_cycles: Optional[int],
     stop_on_blocked: bool,
+    writer_policy: str,
     count: int,
     cycles: List[Dict[str, object]],
     status: str,
@@ -107,6 +111,7 @@ def _daemon_summary(
         "interval_seconds": interval_seconds,
         "max_cycles": max_cycles,
         "stop_on_blocked": stop_on_blocked,
+        "writer_policy": writer_policy,
         "cycles_run": count,
         "cycles": cycles,
     }
