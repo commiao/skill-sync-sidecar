@@ -13,11 +13,20 @@ device_name="$(hostname -s | tr -c 'A-Za-z0-9._-' '-' | sed 's/-$//')"
 prefix="${SKILL_SYNC_PREFIX:-skill-sync-sidecar-dev/current-${device_name}}"
 mode="${SKILL_SYNC_DAEMON_MODE:-yes}"
 interval_seconds="${SKILL_SYNC_INTERVAL_SECONDS:-300}"
+writer_policy="${SKILL_SYNC_WRITER_POLICY:-push-pull}"
 
 case "$mode" in
   dry-run|yes) ;;
   *)
     echo "SKILL_SYNC_DAEMON_MODE must be dry-run or yes" >&2
+    exit 2
+    ;;
+esac
+
+case "$writer_policy" in
+  push-pull|pull-only|push-only|no-writes) ;;
+  *)
+    echo "SKILL_SYNC_WRITER_POLICY must be push-pull, pull-only, push-only, or no-writes" >&2
     exit 2
     ;;
 esac
@@ -110,13 +119,14 @@ PY
   --state-file "$preflight_state" \
   --base-record-file "$base_record_file" \
   --last-applied-record "$base_record_file" \
+  --writer-policy "$writer_policy" \
   --dry-run \
   --max-cycles 1 \
   --json >"$run_base/preflight-daemon.json"
 
 daemon_flag="--$mode"
 
-PLIST_PATH="$plist_path" PYTHON_BIN="$python_bin" REPO_ROOT="$repo_root" LOCAL_ROOT="$local_root" PREFIX="$prefix" CACHE_DIR="$cache_dir" WORK_DIR="$work_dir" STATE_FILE="$state_file" BASE_RECORD_FILE="$base_record_file" DAEMON_FLAG="$daemon_flag" INTERVAL_SECONDS="$interval_seconds" LOGS_DIR="$logs_dir" "$python_bin" - <<'PY'
+PLIST_PATH="$plist_path" PYTHON_BIN="$python_bin" REPO_ROOT="$repo_root" LOCAL_ROOT="$local_root" PREFIX="$prefix" CACHE_DIR="$cache_dir" WORK_DIR="$work_dir" STATE_FILE="$state_file" BASE_RECORD_FILE="$base_record_file" DAEMON_FLAG="$daemon_flag" INTERVAL_SECONDS="$interval_seconds" WRITER_POLICY="$writer_policy" LOGS_DIR="$logs_dir" "$python_bin" - <<'PY'
 import os
 from pathlib import Path
 from plistlib import dump
@@ -143,6 +153,8 @@ plist = {
         os.environ["BASE_RECORD_FILE"],
         "--last-applied-record",
         os.environ["BASE_RECORD_FILE"],
+        "--writer-policy",
+        os.environ["WRITER_POLICY"],
         os.environ["DAEMON_FLAG"],
         "--interval-seconds",
         os.environ["INTERVAL_SECONDS"],
@@ -188,6 +200,7 @@ print(f"prefix={os.environ['PREFIX']}")
 print(f"plist={os.environ['PLIST_PATH']}")
 print(f"state_file={state_path}")
 print(f"base_record_file={os.environ['BASE_RECORD_FILE']}")
+print(f"writer_policy={state.get('writer_policy')}")
 print(f"run_base={run_base}")
 print(f"snapshot_total={snapshot['total']}")
 print(f"push_files={push['files']}")

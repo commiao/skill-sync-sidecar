@@ -15,6 +15,7 @@ ExecStart=/opt/skill-sync-sidecar/venv/bin/python -m skill_sync_sidecar sync-dae
   --work-dir /opt/skill-sync-sidecar/work/current-mac \
   --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-dryrun-state.json \
   --allow-new \
+  --writer-policy pull-only \
   --dry-run \
   --interval-seconds 300
 Restart=on-failure

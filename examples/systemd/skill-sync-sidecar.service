@@ -15,6 +15,7 @@ ExecStart=/usr/bin/python3 -m skill_sync_sidecar sync-daemon \
   --cache-dir /home/YOUR_USER/.cache/skill-sync-sidecar/cache \
   --work-dir /home/YOUR_USER/.local/state/skill-sync-sidecar/work \
   --state-file /home/YOUR_USER/.local/state/skill-sync-sidecar/state.json \
+  --writer-policy push-pull \
   --dry-run \
   --interval-seconds 300
 Restart=on-failure

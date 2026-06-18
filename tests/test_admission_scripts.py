@@ -101,6 +101,20 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("service", text.lower().replace("long-running service", ""))
         self.assertIn("one-cycle writable", help_text)
 
+    def test_service_templates_make_writer_policy_explicit(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        openclaw_unit = (repo_root / "examples" / "systemd" / "openclaw-skill-sync-sidecar-dryrun.service").read_text(encoding="utf-8")
+        generic_unit = (repo_root / "examples" / "systemd" / "skill-sync-sidecar.service").read_text(encoding="utf-8")
+        launchd = (repo_root / "examples" / "launchd" / "com.skill-sync-sidecar.plist").read_text(encoding="utf-8")
+        installer = (repo_root / "scripts" / "install-current-launchd.sh").read_text(encoding="utf-8")
+
+        self.assertIn("--writer-policy pull-only", openclaw_unit)
+        self.assertIn("--writer-policy push-pull", generic_unit)
+        self.assertIn("<string>--writer-policy</string>", launchd)
+        self.assertIn("<string>push-pull</string>", launchd)
+        self.assertIn("SKILL_SYNC_WRITER_POLICY:-push-pull", installer)
+        self.assertIn("WRITER_POLICY", installer)
+
 
 if __name__ == "__main__":
     unittest.main()
