@@ -773,6 +773,22 @@ sudo -iu admin \
 
 `sync-cycle` and `sync-daemon` also write this report under `--work-dir/blocked-report` whenever a cycle is blocked. Treat it as the approval queue for OpenClaw-to-WebDAV publishing; do not switch the unattended service to `push-pull` just to clear the block.
 
+Validated OpenClaw blocked-report deployment:
+
+```text
+docs/openclaw-blocked-report-20260619.md
+commit=0e67181
+release_path=/opt/skill-sync-sidecar/releases/0e67181
+blocked_report_command=available
+writer_policy=pull-only
+summary={"noop": 92}
+blocked=0
+applied=0
+uploaded=0
+dryrun_service=active
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
