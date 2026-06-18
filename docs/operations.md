@@ -660,6 +660,19 @@ Gate behavior:
 - Blocks when OpenClaw has local-only skills, conflicts, or fresh changes since the previous inventory.
 - Does not SSH, pull WebDAV, apply files, or write to `/home/admin/clawd/skills`; it only reads existing local reports.
 
+OpenClaw one-cycle writable rehearsal:
+
+```bash
+sudo -iu admin \
+  PYTHON_BIN=/opt/skill-sync-sidecar/venv-0.1.3/bin/python \
+  SKILL_SYNC_LOCAL_ROOT=/home/admin/clawd/skills \
+  SKILL_SYNC_PREFIX=skill-sync-sidecar-dev/current-mac \
+  OPENCLAW_RECONCILE_REPORT=/private/tmp/openclaw-skill-sync-validate/reconcile-final/reconcile/reconcile-report.json \
+  /path/to/skill-sync-sidecar/scripts/openclaw-writable-rehearsal.sh
+```
+
+This is the promotion rehearsal before any writable systemd rollout. It runs `openclaw-gate --require-complete --fail-on-blocked` first, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It does not edit systemd units, does not stop or restart OpenClaw gateway processes, and does not install a long-running service. In the current 92/92 aligned state, expected result is a finite no-op cycle with `applied=0`, `uploaded=0`, and a state file under `/opt/skill-sync-sidecar/state/openclaw-writable-rehearsal-state.json`.
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash

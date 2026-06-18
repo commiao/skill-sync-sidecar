@@ -372,6 +372,14 @@ python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 
 The default OpenClaw gate is compatible with supervised allowlist pulls. `--require-complete` additionally blocks when `remote_new` remains, so unattended writes only start after every canonical package has been reviewed or explicitly deferred elsewhere.
 
+Before changing any OpenClaw service unit, run the finite writable rehearsal:
+
+```bash
+scripts/openclaw-writable-rehearsal.sh
+```
+
+The rehearsal first enforces the strict gate, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It is intentionally a one-shot command and does not edit systemd units or install a long-running writable daemon.
+
 ```bash
 python3 -m skill_sync_sidecar sync-daemon \
   --local-root /tmp/skill-sync-target \

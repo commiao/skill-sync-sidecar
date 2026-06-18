@@ -80,6 +80,25 @@ class AdmissionScriptsTest(unittest.TestCase):
             self.assertEqual({row["skill_id"] for row in report["rows"]}, {"small-one", "big-browser"})
             self.assertTrue(out_md.read_text(encoding="utf-8").startswith("# OpenClaw Admission Report"))
 
+    def test_openclaw_writable_rehearsal_is_gated_and_finite(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-writable-rehearsal.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+        self.assertIn("openclaw-gate", text)
+        self.assertIn("--require-complete", text)
+        self.assertIn("--fail-on-blocked", text)
+        self.assertIn("sync-daemon", text)
+        self.assertIn("--yes", text)
+        self.assertIn("--max-cycles 1", text)
+        self.assertIn("--interval-seconds 0", text)
+        self.assertNotIn("systemctl", text)
+        self.assertNotIn("service", text.lower().replace("long-running service", ""))
+        self.assertIn("one-cycle writable", help_text)
+
 
 if __name__ == "__main__":
     unittest.main()
