@@ -380,6 +380,19 @@ scripts/openclaw-writable-rehearsal.sh
 
 The rehearsal first enforces the strict gate, then runs `sync-daemon --yes --max-cycles 1 --interval-seconds 0`. It is intentionally a one-shot command and does not edit systemd units or install a long-running writable daemon.
 
+When a peer root and the remote snapshot already match but no common base exists, adopt that state before long-running multi-writer sync:
+
+```bash
+python3 -m skill_sync_sidecar adopt-base \
+  --local-root /home/admin/clawd/skills \
+  --remote-snapshot /opt/skill-sync-sidecar/cache/openclaw-writable-rehearsal \
+  --out /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+  --prefix skill-sync-sidecar-dev/current-mac \
+  --dry-run
+```
+
+Use `--yes` only when the dry run reports `safe_to_adopt=true` and every item is `same_without_base`, `unchanged`, or `already_converged`. The resulting base record makes follow-up `sync-status --last-applied-record ...` report `unchanged` instead of `same_without_base`.
+
 ```bash
 python3 -m skill_sync_sidecar sync-daemon \
   --local-root /tmp/skill-sync-target \

@@ -9,6 +9,7 @@ from typing import Optional, Sequence, Tuple
 
 from . import __version__
 from .apply import ApplyError, ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
+from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .daemon import run_sync_daemon
@@ -161,6 +162,18 @@ def build_parser() -> argparse.ArgumentParser:
     sync_apply_mode.add_argument("--yes", action="store_true", help="Actually apply supported pull actions and/or push local snapshot changes.")
     sync_apply.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     sync_apply.set_defaults(func=cmd_sync_apply)
+
+    adopt_base = subcommands.add_parser("adopt-base", help="Write a stable base record when local and remote hashes already match.")
+    adopt_base.add_argument("--local-root", required=True, help="Local installed skill root to scan.")
+    adopt_base.add_argument("--remote-snapshot", required=True, help="Local remote snapshot/cache directory with index.json.")
+    adopt_base.add_argument("--out", required=True, help="Stable base record path to write when --yes is set.")
+    adopt_base.add_argument("--last-applied-record", help="Optional existing base/apply record.")
+    adopt_base.add_argument("--prefix", default="", help="Remote path prefix recorded in the base record.")
+    adopt_base_mode = adopt_base.add_mutually_exclusive_group(required=True)
+    adopt_base_mode.add_argument("--dry-run", action="store_true", help="Validate adoption without writing a base record.")
+    adopt_base_mode.add_argument("--yes", action="store_true", help="Write the base record when adoption is safe.")
+    adopt_base.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    adopt_base.set_defaults(func=cmd_adopt_base)
 
     conflict_package = subcommands.add_parser("conflict-package", help="Materialize local/remote/base conflict packages for review.")
     conflict_package.add_argument("--local-root", required=True, help="Local installed skill root to scan.")
@@ -705,6 +718,46 @@ def cmd_sync_apply(args: argparse.Namespace) -> int:
         if result.get("base_record_path"):
             print(f"base_record: {result['base_record_path']}")
     return 0
+
+
+def cmd_adopt_base(args: argparse.Namespace) -> int:
+    local_root = Path(args.local_root).expanduser()
+    remote_snapshot = Path(args.remote_snapshot).expanduser()
+    last_applied = Path(args.last_applied_record).expanduser() if args.last_applied_record else None
+    out = Path(args.out).expanduser()
+
+    try:
+        if args.dry_run:
+            result = build_base_adoption_preview(local_root, remote_snapshot, last_applied)
+        else:
+            result = execute_base_adoption(
+                local_root,
+                remote_snapshot,
+                out,
+                last_applied_record=last_applied,
+                remote_prefix=args.prefix,
+            )
+    except (SyncStateError, BaseAdoptionError) as exc:
+        print(f"adopt-base failed: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"mode: {result['mode']}")
+        print(f"safe_to_adopt: {result['safe_to_adopt']}")
+        print(f"total: {result['total']}")
+        print(f"adoptable: {result['adoptable']}")
+        print(f"blocked: {result['blocked']}")
+        print("summary:")
+        for action, count in result["summary"].items():
+            print(f"  {action}: {count}")
+        if result.get("record_path"):
+            print(f"record: {result['record_path']}")
+        for item in result.get("blocked_items", []):
+            print(f"blocked {item['skill_id']}: {item['action']} {item['reason']}")
+
+    return 0 if result["safe_to_adopt"] else 3
 
 
 def sync_apply_roots_from_args(args: argparse.Namespace) -> Tuple[Path, Optional[Path]]:

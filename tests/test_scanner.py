@@ -10,6 +10,7 @@ from skill_sync_sidecar import conflicts as conflicts_module
 from skill_sync_sidecar import sync_apply as sync_apply_module
 from skill_sync_sidecar import tombstones as tombstones_module
 from skill_sync_sidecar.apply import ApplyPlanError, build_apply_plan, execute_apply_plan, rollback_apply_record
+from skill_sync_sidecar.base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from skill_sync_sidecar.config import load_cc_switch_webdav_settings
 from skill_sync_sidecar.cli import guard_http_upload
 from skill_sync_sidecar.conflicts import build_conflict_packages
@@ -701,6 +702,59 @@ class ScannerTest(unittest.TestCase):
             self.assertIn("local change", (local_root / "demo" / "SKILL.md").read_text(encoding="utf-8"))
             status = build_sync_status(local_root, pulled_cache, Path(result["base_record_path"]))
             self.assertEqual(status["summary"], {"unchanged": 1})
+
+    def test_base_adoption_writes_record_for_matching_local_and_remote(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_snapshot = base / "remote"
+            out = base / "state" / "base-record.json"
+
+            local_hash = self._write_demo_skill(local_root, "base")
+            self._write_remote_index(remote_snapshot, {"demo": local_hash})
+
+            preview = build_base_adoption_preview(local_root, remote_snapshot)
+
+            self.assertTrue(preview["safe_to_adopt"])
+            self.assertEqual(preview["summary"], {"same_without_base": 1})
+            self.assertEqual(preview["adoptable"], 1)
+
+            result = execute_base_adoption(local_root, remote_snapshot, out, remote_prefix="snapshots/current")
+            record = __import__("json").loads(out.read_text(encoding="utf-8"))
+
+            self.assertEqual(result["record_path"], str(out.resolve()))
+            self.assertEqual(record["record_type"], "skill-sync-base")
+            self.assertEqual(record["remote_prefix"], "snapshots/current")
+            self.assertEqual(record["applied"], [{"skill_id": "demo", "content_hash": local_hash}])
+
+            status = build_sync_status(local_root, remote_snapshot, out)
+            self.assertEqual(status["summary"], {"unchanged": 1})
+
+    def test_base_adoption_rejects_unmatched_or_one_sided_state(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_snapshot = base / "remote"
+            out = base / "base-record.json"
+
+            self._write_demo_skill(local_root, "local")
+            remote_hash = self._hash_for_body(base / "remote-skill", "remote")
+            self._write_remote_index(remote_snapshot, {"demo": remote_hash})
+
+            preview = build_base_adoption_preview(local_root, remote_snapshot)
+
+            self.assertFalse(preview["safe_to_adopt"])
+            self.assertEqual(preview["summary"], {"conflict": 1})
+            self.assertEqual(preview["blocked"], 1)
+            with self.assertRaises(BaseAdoptionError):
+                execute_base_adoption(local_root, remote_snapshot, out)
+
+            local_hash = self._write_demo_skill(local_root, "local")
+            self._write_remote_index(remote_snapshot, {"demo": local_hash, "remote-only": remote_hash})
+            preview = build_base_adoption_preview(local_root, remote_snapshot)
+
+            self.assertFalse(preview["safe_to_adopt"])
+            self.assertEqual(preview["summary"], {"remote_new": 1, "same_without_base": 1})
 
     def test_sync_apply_push_uploads_only_changed_archives_and_index(self):
         class CountingRemote(Remote):

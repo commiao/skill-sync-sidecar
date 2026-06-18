@@ -685,6 +685,36 @@ dryrun_service=active
 gateway_process=still_running
 ```
 
+Adopt the OpenClaw base only after the strict gate and writable rehearsal have both passed:
+
+```bash
+sudo -iu admin \
+  PYTHONPATH=/opt/skill-sync-sidecar/releases/<commit>/src \
+  /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar adopt-base \
+    --local-root /home/admin/clawd/skills \
+    --remote-snapshot /opt/skill-sync-sidecar/cache/openclaw-writable-rehearsal \
+    --out /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+    --prefix skill-sync-sidecar-dev/current-mac \
+    --dry-run
+```
+
+Then rerun with `--yes`. A valid adoption writes only the stable base record; it does not install, delete, or upload skill content. Validate the result with:
+
+```bash
+sudo -iu admin \
+  PYTHONPATH=/opt/skill-sync-sidecar/releases/<commit>/src \
+  /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar sync-status \
+    --local-root /home/admin/clawd/skills \
+    --remote-snapshot /opt/skill-sync-sidecar/cache/openclaw-writable-rehearsal \
+    --last-applied-record /opt/skill-sync-sidecar/state/openclaw-base-record.json
+```
+
+Expected post-adoption summary:
+
+```text
+summary={"unchanged": 92}
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
