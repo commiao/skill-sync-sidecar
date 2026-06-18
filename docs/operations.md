@@ -864,6 +864,21 @@ post_restore_mac_status={"unchanged": 93}
 gateway_process=still_running
 ```
 
+Validated OpenClaw approved-push workflow:
+
+```text
+docs/openclaw-approved-push-workflow-20260619.md
+commit=c2401cf
+release_path=/opt/skill-sync-sidecar/releases/c2401cf
+command=skill-sync approved-push
+purpose=publish explicitly approved writer-policy-blocked local pushes
+tests=77 passed
+compileall=passed
+openclaw_help_check=passed
+pullonly_service=active running
+gateway_process=still_running
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
