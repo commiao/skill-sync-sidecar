@@ -121,10 +121,10 @@ PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
 - `yellow`: services/artifacts are readable, but sync has blocked review items.
 - `red`: a required artifact is unreadable or the plan cannot be built.
 
-For OpenClaw, include the pull-only blocked report so the same command shows the approval queue. Use the currently deployed release path; release `707e006` was validated on 2026-06-23:
+For OpenClaw, include the pull-only blocked report so the same command shows the approval queue. Use the currently deployed release path; release `976c069` was validated on 2026-06-23:
 
 ```bash
-PYTHONPATH=/opt/skill-sync-sidecar/releases/707e006/src \
+PYTHONPATH=/opt/skill-sync-sidecar/releases/976c069/src \
   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
     --local-root /home/admin/clawd/skills \
     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \

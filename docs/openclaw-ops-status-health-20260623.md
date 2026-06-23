@@ -20,10 +20,17 @@ commit=707e006
 title=Add local runtime overrides for sync status
 ```
 
-Release `707e006` was unpacked to:
+Packaging signal code:
 
 ```text
-/opt/skill-sync-sidecar/releases/707e006
+commit=976c069
+title=Flag missing referenced package files
+```
+
+Release `976c069` was unpacked to:
+
+```text
+/opt/skill-sync-sidecar/releases/976c069
 ```
 
 The OpenClaw gateway was not restarted.
@@ -44,10 +51,10 @@ Interpretation: Mac, WebDAV cache, and last applied state are converged.
 
 ## OpenClaw Result
 
-OpenClaw status command after local override support:
+OpenClaw status command after local override and packaging-signal support:
 
 ```bash
-PYTHONPATH=/opt/skill-sync-sidecar/releases/707e006/src \
+PYTHONPATH=/opt/skill-sync-sidecar/releases/976c069/src \
   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
     --local-root /home/admin/clawd/skills \
     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
@@ -77,12 +84,12 @@ overall_ok: False
 
 Interpretation: OpenClaw is healthy but has one review-required local new skill. Nothing was uploaded or applied automatically.
 
-The sidecar services were updated to release `707e006`:
+The sidecar services were updated to release `976c069`:
 
 ```text
 openclaw-skill-sync-sidecar-pullonly.service: active
 openclaw-skill-sync-sidecar-dryrun.service: active
-PYTHONPATH=/opt/skill-sync-sidecar/releases/707e006/src
+PYTHONPATH=/opt/skill-sync-sidecar/releases/976c069/src
 ```
 
 OpenClaw gateway stayed online:
@@ -96,6 +103,7 @@ OpenClaw gateway stayed online:
 Do not publish `disk-cleanup` yet:
 
 - `disk-cleanup`: local new skill, but it references `/home/admin/clawd/scripts/disk-cleanup.sh`; package is not portable until the script is bundled or declared as an external dependency.
+- Scanner validation now reports `missing_referenced_package_file`: `SKILL.md references scripts/disk-cleanup.sh, but that file is not included in the skill package.`
 
 `lark-cli-adapter` is no longer a blocked publish candidate. It is acknowledged by `/home/admin/clawd/skills/.skill-sync-local-overrides.json`:
 
