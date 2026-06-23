@@ -917,6 +917,17 @@ openclaw_dryrun=active target=mixed-scope-root summary={"noop": 94}
 gateway_process=still_running pid=2966537
 ```
 
+Validated OpenClaw observer policy alignment and blocked review:
+
+```text
+docs/openclaw-observer-and-blocked-review-20260623.md
+dryrun_writer_policy=pull-only
+dryrun_last_applied_record=/opt/skill-sync-sidecar/state/openclaw-base-record.json
+pullonly_summary={"blocked": 2, "noop": 93}
+dryrun_summary={"blocked": 2, "noop": 93}
+blocked_review=disk-cleanup do_not_publish_yet, lark-cli-adapter do_not_publish
+```
+
 Restricted OpenClaw live `sync-probe` apply:
 
 ```bash
