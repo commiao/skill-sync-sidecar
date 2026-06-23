@@ -121,10 +121,10 @@ PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
 - `yellow`: services/artifacts are readable, but sync has blocked review items.
 - `red`: a required artifact is unreadable or the plan cannot be built.
 
-For OpenClaw, include the pull-only blocked report so the same command shows the approval queue. Use the currently deployed release path; release `bb51726` was validated on 2026-06-23:
+For OpenClaw, include the pull-only blocked report so the same command shows the approval queue. Use the currently deployed release path; release `707e006` was validated on 2026-06-23:
 
 ```bash
-PYTHONPATH=/opt/skill-sync-sidecar/releases/bb51726/src \
+PYTHONPATH=/opt/skill-sync-sidecar/releases/707e006/src \
   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
     --local-root /home/admin/clawd/skills \
     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
@@ -135,15 +135,16 @@ PYTHONPATH=/opt/skill-sync-sidecar/releases/bb51726/src \
     --writer-policy pull-only
 ```
 
-Expected OpenClaw output while local-only edits are pending review:
+Expected OpenClaw output while `disk-cleanup` is still pending packaging review and `lark-cli-adapter` is acknowledged as a peer-local override:
 
 ```text
 health: yellow
-last_cycle: blocked snapshot=tianjin-sidecar-doc-20260622 blocked=2 summary={'blocked': 2, 'noop': 93}
-blocked_report: total=2 writer_policy=pull-only
+last_cycle: blocked snapshot=tianjin-sidecar-doc-20260622 blocked=1 summary={'blocked': 1, 'noop': 94}
+blocked_report: total=1 writer_policy=pull-only
 blocked_item: disk-cleanup category=writer_policy status=local_new plan=blocked reason=writer policy pull-only blocks push_new
-blocked_item: lark-cli-adapter category=writer_policy status=push plan=blocked reason=writer policy pull-only blocks push
-sync_plan: safe_to_apply=False blocked=2 allowed=93
+sync_plan: safe_to_apply=False blocked=1 allowed=94
+status_summary: {'already_converged': 1, 'local_new': 1, 'local_override': 1, 'unchanged': 92}
+local_overrides: {'total': 1, 'skills': ['lark-cli-adapter']}
 ```
 
 This yellow state is expected: pull-only is preventing OpenClaw-local changes from being silently published to WebDAV.
