@@ -151,11 +151,7 @@ gateway_process=still_running
 
 ## Next Plan
 
-1. Add an explicit `ops-status` view that reports:
-   - Mac daemon status and last cycle.
-   - OpenClaw dry-run and pull-only status.
-   - Current blocked queue with review decisions.
-   - Whether a blocked item is publishable, local-only, or incomplete.
+1. Done: add an explicit `ops-status` view that reports Mac/OpenClaw health and the current blocked queue. Validation is recorded in `docs/openclaw-ops-status-health-20260623.md`.
 2. Add a local override design for peer-specific runtime patches such as shebangs.
 3. Define a packaging rule for skills that depend on external scripts, using `disk-cleanup` as the first test case.
 4. Only use `approved-push` when a blocked item is reviewed as portable and complete.
