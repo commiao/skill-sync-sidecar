@@ -45,12 +45,66 @@ class OpsStatusTest(unittest.TestCase):
             status = build_ops_status(local_root, snapshot_dir, base_record=base_record, state_file=state_file)
 
             self.assertTrue(status["ok"])
+            self.assertEqual(status["health"], "green")
             self.assertEqual(status["remote_snapshot"]["snapshot_id"], "snap-1")
             self.assertEqual(status["remote_snapshot"]["total"], 1)
             self.assertEqual(status["base_record"]["applied_count"], 1)
             self.assertEqual(status["daemon_state"]["cycles_run"], 3)
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertTrue(status["sync_plan"]["safe_to_apply"])
+
+    def test_build_ops_status_reports_blocked_queue_as_yellow(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+            blocked_report = root / "blocked-report.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
+            self._write_base_record(base_record, index)
+            blocked_report.write_text(
+                json.dumps(
+                    {
+                        "record_type": "skill-sync-blocked-report",
+                        "created_at": "2026-06-23T00:00:00Z",
+                        "writer_policy": "pull-only",
+                        "total": 1,
+                        "summary": {"writer_policy": 1},
+                        "items": [
+                            {
+                                "skill_id": "demo",
+                                "category": "writer_policy",
+                                "status_action": "push",
+                                "plan_action": "blocked",
+                                "reason": "writer policy pull-only blocks push",
+                                "recommendation": "Review before approved-push.",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_ops_status(
+                local_root,
+                snapshot_dir,
+                base_record=base_record,
+                blocked_report=blocked_report,
+                writer_policy="pull-only",
+            )
+
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["health"], "yellow")
+            self.assertEqual(status["blocked_report"]["total"], 1)
+            self.assertEqual(status["blocked_report"]["items"][0]["skill_id"], "demo")
+
+            text = render_ops_status_text(status)
+
+            self.assertIn("health: yellow", text)
+            self.assertIn("blocked_report: total=1 writer_policy=pull-only", text)
+            self.assertIn("blocked_item: demo", text)
 
     def test_reconcile_summary_extracts_openclaw_adoption_signals(self):
         with TemporaryDirectory() as tmp:
@@ -155,6 +209,7 @@ class OpsStatusTest(unittest.TestCase):
     def test_render_ops_status_text_includes_key_operational_lines(self):
         status = {
             "ok": True,
+            "health": "green",
             "local_root": "/tmp/skills",
             "remote_snapshot": {"ok": True, "snapshot_id": "snap-1", "total": 1, "created_at": "now"},
             "base_record": {"ok": True, "sync_id": "base-1", "snapshot_id": "snap-1", "applied_count": 1},
@@ -165,6 +220,7 @@ class OpsStatusTest(unittest.TestCase):
                 "updated_at": "now",
                 "last_cycle": {"status": "complete", "snapshot_id": "snap-1", "blocked": 0, "summary": {"noop": 1}},
             },
+            "blocked_report": None,
             "sync_plan": {
                 "ok": True,
                 "safe_to_apply": True,
@@ -187,6 +243,8 @@ class OpsStatusTest(unittest.TestCase):
         text = render_ops_status_text(status)
 
         self.assertIn("remote_snapshot: snap-1 total=1", text)
+        self.assertIn("health: green", text)
+        self.assertIn("blocked_report: none", text)
         self.assertIn("sync_plan: safe_to_apply=True blocked=0", text)
         self.assertIn("openclaw_reconcile: safe_to_auto_apply=True", text)
         self.assertIn("openclaw_gate: ok=True", text)

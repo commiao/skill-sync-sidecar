@@ -51,6 +51,7 @@ For release artifacts, use the wheel attached to the GitHub Release when availab
 ```bash
 python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
+python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
 python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 python3 -m skill_sync_sidecar scan --json

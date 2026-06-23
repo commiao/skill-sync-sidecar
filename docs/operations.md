@@ -115,6 +115,26 @@ One-screen sidecar status:
 PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
 ```
 
+`ops-status` reports `health=green|yellow|red`:
+
+- `green`: artifacts are readable and the latest plan has no blocked items.
+- `yellow`: services/artifacts are readable, but sync has blocked review items.
+- `red`: a required artifact is unreadable or the plan cannot be built.
+
+For OpenClaw, include the pull-only blocked report so the same command shows the approval queue:
+
+```bash
+PYTHONPATH=/opt/skill-sync-sidecar/releases/<release>/src \
+  /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
+    --local-root /home/admin/clawd/skills \
+    --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
+    --base-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+    --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-pullonly-state.json \
+    --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
+    --allow-new \
+    --writer-policy pull-only
+```
+
 By default, `ops-status` also searches `/private/tmp/openclaw-skill-sync-validate` for the latest OpenClaw `reconcile-report.json` and shows the read-only gate state when one exists. Include an explicit report when reviewing a specific peer-writer drift run:
 
 ```bash

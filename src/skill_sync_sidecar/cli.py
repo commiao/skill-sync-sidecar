@@ -56,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     ops_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     ops_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
     ops_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    ops_status.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
     ops_status.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
     ops_status.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
     ops_status.add_argument("--allow-new", action="store_true", help="Evaluate the sync plan with new skills allowed.")
@@ -359,6 +360,7 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         Path(args.remote_snapshot),
         base_record=Path(args.base_record) if args.base_record else None,
         state_file=Path(args.state_file) if args.state_file else None,
+        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
         openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
         openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
         allow_new=args.allow_new,

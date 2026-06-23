@@ -17,6 +17,7 @@ def build_ops_status(
     remote_snapshot: Path,
     base_record: Optional[Path] = None,
     state_file: Optional[Path] = None,
+    blocked_report: Optional[Path] = None,
     openclaw_reconcile_report: Optional[Path] = None,
     openclaw_reconcile_root: Optional[Path] = None,
     allow_new: bool = False,
@@ -27,28 +28,34 @@ def build_ops_status(
     remote_snapshot = remote_snapshot.expanduser()
     base_record = base_record.expanduser() if base_record else None
     state_file = state_file.expanduser() if state_file else None
+    blocked_report = blocked_report.expanduser() if blocked_report else None
     openclaw_reconcile_report = openclaw_reconcile_report.expanduser() if openclaw_reconcile_report else None
     openclaw_reconcile_root = openclaw_reconcile_root.expanduser() if openclaw_reconcile_root else None
 
     sync_plan = _sync_plan_summary(local_root, remote_snapshot, base_record, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
+    blocked = blocked_report_summary(blocked_report)
     openclaw_gate = build_openclaw_gate(openclaw_reconcile_report, openclaw_reconcile_root)
     artifact_sections = [
         snapshot_summary(remote_snapshot),
         base_record_summary(base_record),
         daemon_state_summary(state_file),
+        blocked,
         sync_plan,
     ]
     artifact_errors = [section for section in artifact_sections if section is not None and not section.get("ok")]
     gate_error = not openclaw_gate.get("available", False) and bool(openclaw_gate.get("error"))
     gate_blocked = openclaw_gate.get("available", False) and not openclaw_gate.get("ok", True)
     error_count = len(artifact_errors) + (1 if gate_error else 0)
+    health = _health(error_count, sync_plan, blocked, gate_blocked)
 
     return {
-        "ok": error_count == 0 and not gate_blocked,
+        "ok": health == "green",
+        "health": health,
         "local_root": str(local_root.resolve()),
         "remote_snapshot": snapshot_summary(remote_snapshot),
         "base_record": base_record_summary(base_record),
         "daemon_state": daemon_state_summary(state_file),
+        "blocked_report": blocked,
         "sync_plan": sync_plan,
         "openclaw_reconcile": reconcile_summary(Path(openclaw_gate["path"])) if openclaw_gate.get("available") else None,
         "openclaw_gate": openclaw_gate,
@@ -94,6 +101,44 @@ def base_record_summary(record_path: Optional[Path]) -> Optional[JsonDict]:
             "snapshot_id": record.get("snapshot_id"),
             "created_at": record.get("created_at"),
             "applied_count": len(applied) if isinstance(applied, list) else 0,
+        }
+    )
+    return payload
+
+
+def blocked_report_summary(report_path: Optional[Path]) -> Optional[JsonDict]:
+    if report_path is None:
+        return None
+    report, error = _load_json_file(report_path)
+    payload: JsonDict = {"ok": error is None, "path": str(report_path.expanduser())}
+    if error:
+        payload["error"] = error
+        return payload
+    assert report is not None
+    raw_items = report.get("items", [])
+    items = raw_items if isinstance(raw_items, list) else []
+    blocked_items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        blocked_items.append(
+            {
+                "skill_id": item.get("skill_id"),
+                "category": item.get("category"),
+                "status_action": item.get("status_action"),
+                "plan_action": item.get("plan_action"),
+                "reason": item.get("reason"),
+                "recommendation": item.get("recommendation"),
+            }
+        )
+    payload.update(
+        {
+            "record_type": report.get("record_type"),
+            "created_at": report.get("created_at"),
+            "writer_policy": report.get("writer_policy"),
+            "total": report.get("total", len(blocked_items)),
+            "summary": report.get("summary", {}),
+            "items": blocked_items,
         }
     )
     return payload
@@ -149,10 +194,12 @@ def reconcile_summary(report_path: Optional[Path]) -> Optional[JsonDict]:
 
 def render_ops_status_text(status: JsonDict) -> str:
     lines = ["skill-sync ops status"]
+    lines.append(f"health: {status.get('health', 'unknown')}")
     lines.append(f"local_root: {status['local_root']}")
     lines.extend(_render_snapshot(status.get("remote_snapshot")))
     lines.extend(_render_base_record(status.get("base_record")))
     lines.extend(_render_daemon_state(status.get("daemon_state")))
+    lines.extend(_render_blocked_report(status.get("blocked_report")))
     lines.extend(_render_sync_plan(status.get("sync_plan")))
     lines.extend(_render_reconcile(status.get("openclaw_reconcile")))
     lines.extend(_render_openclaw_gate(status.get("openclaw_gate")))
@@ -184,6 +231,23 @@ def _sync_plan_summary(
         "status_summary": status["summary"],
         "has_conflicts": status["has_conflicts"],
     }
+
+
+def _health(error_count: int, sync_plan: Optional[JsonDict], blocked_report: Optional[JsonDict], gate_blocked: bool) -> str:
+    if error_count:
+        return "red"
+    if sync_plan and sync_plan.get("ok") is False:
+        return "red"
+    if blocked_report and blocked_report.get("ok") is False:
+        return "red"
+    blocked_count = 0
+    if sync_plan and isinstance(sync_plan.get("blocked"), int):
+        blocked_count += int(sync_plan["blocked"])
+    if blocked_report and isinstance(blocked_report.get("total"), int):
+        blocked_count += int(blocked_report["total"])
+    if blocked_count or gate_blocked:
+        return "yellow"
+    return "green"
 
 
 def _render_snapshot(snapshot: Optional[JsonDict]) -> list[str]:
@@ -223,6 +287,27 @@ def _render_daemon_state(state: Optional[JsonDict]) -> list[str]:
             "last_cycle: "
             f"{last_cycle.get('status')} snapshot={last_cycle.get('snapshot_id')} "
             f"blocked={last_cycle.get('blocked')} summary={last_cycle.get('summary')}"
+        )
+    return lines
+
+
+def _render_blocked_report(report: Optional[JsonDict]) -> list[str]:
+    if report is None:
+        return ["blocked_report: none"]
+    if not report.get("ok"):
+        return [f"blocked_report: unavailable ({report.get('error')})"]
+    lines = [
+        f"blocked_report: total={report.get('total')} writer_policy={report.get('writer_policy')}",
+        f"blocked_summary: {report.get('summary')}",
+    ]
+    for item in report.get("items", []):
+        lines.append(
+            "blocked_item: "
+            f"{item.get('skill_id')} "
+            f"category={item.get('category')} "
+            f"status={item.get('status_action')} "
+            f"plan={item.get('plan_action')} "
+            f"reason={item.get('reason')}"
         )
     return lines
 
