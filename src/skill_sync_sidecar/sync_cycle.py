@@ -38,7 +38,7 @@ def run_sync_cycle(
     plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
     conflicts = _build_conflicts_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
     tombstones = _build_tombstones_if_needed(status, local_root, cache_dir, work_dir, last_applied_record)
-    blocked_report = _build_blocked_report_if_needed(
+    blocked_report = _write_blocked_report(
         plan,
         local_root,
         cache_dir,
@@ -111,7 +111,7 @@ def _build_tombstones_if_needed(
     return build_tombstones(local_root, cache_dir, work_dir / "tombstones", last_applied_record)
 
 
-def _build_blocked_report_if_needed(
+def _write_blocked_report(
     plan: Dict[str, object],
     local_root: Path,
     cache_dir: Path,
@@ -121,8 +121,6 @@ def _build_blocked_report_if_needed(
     allow_delete: bool,
     writer_policy: str,
 ) -> Optional[Dict[str, object]]:
-    if not plan.get("blocked"):
-        return None
     return build_blocked_report(
         local_root,
         cache_dir,

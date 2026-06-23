@@ -1508,6 +1508,49 @@ class ScannerTest(unittest.TestCase):
             self.assertIsNone(result["apply_result"])
             self.assertTrue((work_dir / "blocked-report" / "blocked-report.json").exists())
 
+    def test_sync_cycle_clears_stale_blocked_report_when_plan_is_clean(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            cache_dir = base / "cache"
+            work_dir = base / "work"
+            record_path = base / "apply-record.json"
+            prefix = "snapshots/current"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(remote_source, "base")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            stale_dir = work_dir / "blocked-report"
+            stale_dir.mkdir(parents=True)
+            (stale_dir / "blocked-report.json").write_text(
+                '{"record_type":"skill-sync-blocked-report","total":1,"summary":{"writer_policy":1},"items":[]}',
+                encoding="utf-8",
+            )
+
+            result = run_sync_cycle(
+                local_root,
+                remote,
+                prefix,
+                cache_dir,
+                work_dir,
+                record_path,
+                writer_policy="pull-only",
+                dry_run=True,
+            )
+            report = __import__("json").loads((stale_dir / "blocked-report.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(result["sync_plan"]["summary"], {"noop": 1})
+            self.assertEqual(result["blocked_report"]["total"], 0)
+            self.assertEqual(report["total"], 0)
+            self.assertEqual(report["summary"], {})
+
     def test_sync_daemon_runs_limited_dry_run_cycles(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
