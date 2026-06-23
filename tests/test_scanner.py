@@ -179,6 +179,40 @@ class ScannerTest(unittest.TestCase):
             self.assertIn("/home/admin/clawd/scripts/disk-cleanup.sh", external_issues[0].message)
             self.assertNotIn("https://example.test", external_issues[0].message)
 
+    def test_missing_referenced_package_files_are_flagged(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "disk-cleanup"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                "---\nname: disk-cleanup\ndescription: Disk cleanup\n---\n\n"
+                "Run `./scripts/disk-cleanup.sh safe`.\n",
+                encoding="utf-8",
+            )
+
+            record = scan_roots([f"test={root}"]).skills[0]
+            missing_issues = [issue for issue in record.issues if issue.code == "missing_referenced_package_file"]
+
+            self.assertEqual(record.risk_level, "warning")
+            self.assertEqual(len(missing_issues), 1)
+            self.assertIn("scripts/disk-cleanup.sh", missing_issues[0].message)
+
+    def test_packaged_referenced_files_are_not_flagged_missing(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "reporter"
+            skill.mkdir()
+            (skill / "scripts").mkdir()
+            (skill / "scripts" / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (skill / "SKILL.md").write_text(
+                "---\nname: reporter\ndescription: Reporter\n---\n\nRun `./scripts/run.sh`.\n",
+                encoding="utf-8",
+            )
+
+            record = scan_roots([f"test={root}"]).skills[0]
+
+            self.assertFalse(any(issue.code == "missing_referenced_package_file" for issue in record.issues))
+
     def test_parent_skill_hash_excludes_nested_skill_package(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

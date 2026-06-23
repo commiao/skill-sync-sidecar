@@ -171,7 +171,7 @@ When the only local difference is under `ignore_paths`, `sync-status` reports `l
 
 ### External dependency packaging signal
 
-`doctor` and `scan` warn when `SKILL.md` references common local absolute paths such as `/home/...`, `/Users/...`, `/opt/...`, `/var/...`, or `/etc/...`. This usually means the skill depends on files that are not inside the package and should not be approved for cross-device publishing yet.
+`doctor` and `scan` warn when `SKILL.md` references common local absolute paths such as `/home/...`, `/Users/...`, `/opt/...`, `/var/...`, or `/etc/...`. They also warn when `SKILL.md` references a package-relative script such as `./scripts/run.sh` but that file is not included under the skill directory.
 
 For example, `disk-cleanup` should remain blocked until `/home/admin/clawd/scripts/disk-cleanup.sh` is either bundled inside the skill package or declared through a future explicit external dependency contract.
 

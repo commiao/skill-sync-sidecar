@@ -73,6 +73,7 @@ MAX_RECOMMENDED_FILE_COUNT = 500
 FRONT_MATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n", re.DOTALL)
 SAFE_ID_RE = re.compile(r"[^a-z0-9._-]+")
 LOCAL_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w:/.-])(?P<path>/(?:home|Users|opt|var|etc|private|tmp)/[^\s`'\"),\]]+)")
+PACKAGE_RELATIVE_PATH_RE = re.compile(r"(?<![\w/.-])(?:\./)?(?P<path>scripts/[A-Za-z0-9._/-]+)")
 
 
 def default_roots() -> List[Tuple[str, Path]]:
@@ -397,6 +398,20 @@ def validate_skill(
                 str(skill_md),
             )
         )
+
+    referenced_package_paths = sorted(
+        set(match.group("path").rstrip(".,;:") for match in PACKAGE_RELATIVE_PATH_RE.finditer(skill_text))
+    )
+    for rel_path in referenced_package_paths[:10]:
+        if not (skill_dir / rel_path).exists():
+            issues.append(
+                SkillIssue(
+                    "warning",
+                    "missing_referenced_package_file",
+                    f"SKILL.md references {rel_path}, but that file is not included in the skill package.",
+                    str(skill_md),
+                )
+            )
 
     return issues
 
