@@ -169,6 +169,12 @@ Create `<skill-root>/.skill-sync-local-overrides.json`:
 
 When the only local difference is under `ignore_paths`, `sync-status` reports `local_override` and `sync-plan` treats it as `noop`. If remote content changes outside the ignored paths, the sidecar still reports pull or conflict as usual. Do not use local overrides for content changes that should be shared.
 
+### External dependency packaging signal
+
+`doctor` and `scan` warn when `SKILL.md` references common local absolute paths such as `/home/...`, `/Users/...`, `/opt/...`, `/var/...`, or `/etc/...`. This usually means the skill depends on files that are not inside the package and should not be approved for cross-device publishing yet.
+
+For example, `disk-cleanup` should remain blocked until `/home/admin/clawd/scripts/disk-cleanup.sh` is either bundled inside the skill package or declared through a future explicit external dependency contract.
+
 By default, `ops-status` also searches `/private/tmp/openclaw-skill-sync-validate` for the latest OpenClaw `reconcile-report.json` and shows the read-only gate state when one exists. Include an explicit report when reviewing a specific peer-writer drift run:
 
 ```bash

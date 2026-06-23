@@ -114,5 +114,5 @@ Do not publish `disk-cleanup` yet:
 ## Next Work
 
 1. Done: add and deploy a local override mechanism for peer-specific runtime patches such as shebangs.
-2. Add a packaging rule for skills that depend on external scripts.
+2. Done: add a scanner/doctor warning for local absolute path references that make packages non-portable.
 3. Wire `ops-status` into a scheduled or UI-facing status surface so the current state is visible as green/yellow/red.

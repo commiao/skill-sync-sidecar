@@ -159,6 +159,26 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(record.risk_level, "warning")
             self.assertTrue(any(issue.code == "curl_pipe_shell" for issue in record.issues))
 
+    def test_external_absolute_path_references_are_flagged(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "disk-cleanup"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                "---\nname: disk-cleanup\ndescription: Disk cleanup\n---\n\n"
+                "Run `/home/admin/clawd/scripts/disk-cleanup.sh --dry-run`.\n"
+                "Docs live at https://example.test/path and should not be treated as local files.\n",
+                encoding="utf-8",
+            )
+
+            record = scan_roots([f"test={root}"]).skills[0]
+            external_issues = [issue for issue in record.issues if issue.code == "external_absolute_path_reference"]
+
+            self.assertEqual(record.risk_level, "warning")
+            self.assertEqual(len(external_issues), 1)
+            self.assertIn("/home/admin/clawd/scripts/disk-cleanup.sh", external_issues[0].message)
+            self.assertNotIn("https://example.test", external_issues[0].message)
+
     def test_parent_skill_hash_excludes_nested_skill_package(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

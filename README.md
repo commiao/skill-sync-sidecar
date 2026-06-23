@@ -8,7 +8,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `status`: summarize counts, sources, risks, and duplicate skill ids.
 - `ops-status`: summarize daemon state, base record, remote snapshot, sync plan, and optional OpenClaw reconcile state.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
-- `doctor`: validate skill metadata, size, file count, symlinks, and risky shell patterns.
+- `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, and local absolute path references that make a package non-portable.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
 - `remote-status`: read remote snapshot metadata.
 - `push`: upload a local snapshot to a remote; dry-run unless `--yes` is provided.

@@ -72,6 +72,7 @@ MAX_RECOMMENDED_FILE_COUNT = 500
 
 FRONT_MATTER_RE = re.compile(r"^---\s*\n(?P<body>.*?)\n---\s*\n", re.DOTALL)
 SAFE_ID_RE = re.compile(r"[^a-z0-9._-]+")
+LOCAL_ABSOLUTE_PATH_RE = re.compile(r"(?<![\w:/.-])(?P<path>/(?:home|Users|opt|var|etc|private|tmp)/[^\s`'\"),\]]+)")
 
 
 def default_roots() -> List[Tuple[str, Path]]:
@@ -385,6 +386,17 @@ def validate_skill(
                     str(skill_md),
                 )
             )
+
+    external_paths = sorted(set(match.group("path").rstrip(".,;:") for match in LOCAL_ABSOLUTE_PATH_RE.finditer(skill_text)))
+    for external_path in external_paths[:5]:
+        issues.append(
+            SkillIssue(
+                "warning",
+                "external_absolute_path_reference",
+                f"SKILL.md references a local absolute path outside the package: {external_path}",
+                str(skill_md),
+            )
+        )
 
     return issues
 
