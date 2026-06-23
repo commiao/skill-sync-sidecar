@@ -124,7 +124,7 @@ PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
 For OpenClaw, include the pull-only blocked report so the same command shows the approval queue. Use the currently deployed release path; release `976c069` was validated on 2026-06-23:
 
 ```bash
-PYTHONPATH=/opt/skill-sync-sidecar/releases/976c069/src \
+PYTHONPATH=/opt/skill-sync-sidecar/releases/2e4499f/src \
   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
     --local-root /home/admin/clawd/skills \
     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
@@ -135,19 +135,18 @@ PYTHONPATH=/opt/skill-sync-sidecar/releases/976c069/src \
     --writer-policy pull-only
 ```
 
-Expected OpenClaw output while `disk-cleanup` is still pending packaging review and `lark-cli-adapter` is acknowledged as a peer-local override:
+Expected OpenClaw output when `disk-cleanup` is marked local-only and `lark-cli-adapter` is acknowledged as a peer-local override:
 
 ```text
-health: yellow
-last_cycle: blocked snapshot=tianjin-sidecar-doc-20260622 blocked=1 summary={'blocked': 1, 'noop': 94}
-blocked_report: total=1 writer_policy=pull-only
-blocked_item: disk-cleanup category=writer_policy status=local_new plan=blocked reason=writer policy pull-only blocks push_new
-sync_plan: safe_to_apply=False blocked=1 allowed=94
-status_summary: {'already_converged': 1, 'local_new': 1, 'local_override': 1, 'unchanged': 92}
-local_overrides: {'total': 1, 'skills': ['lark-cli-adapter']}
+health: green
+last_cycle: complete snapshot=tianjin-sidecar-doc-20260622 blocked=0 summary={'noop': 95}
+blocked_report: total=0 writer_policy=pull-only
+sync_plan: safe_to_apply=True blocked=0 allowed=95
+status_summary: {'already_converged': 1, 'local_only': 1, 'local_override': 1, 'unchanged': 92}
+local_overrides: {'total': 2, 'skills': ['disk-cleanup', 'lark-cli-adapter']}
 ```
 
-This yellow state is expected: pull-only is preventing OpenClaw-local changes from being silently published to WebDAV.
+This green state means the peer has no review-required sync work. OpenClaw-private skills still exist locally, but are deliberately outside WebDAV publishing.
 
 ### Local overrides
 
