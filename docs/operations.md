@@ -169,6 +169,22 @@ Create `<skill-root>/.skill-sync-local-overrides.json`:
 
 When the only local difference is under `ignore_paths`, `sync-status` reports `local_override` and `sync-plan` treats it as `noop`. If remote content changes outside the ignored paths, the sidecar still reports pull or conflict as usual. Do not use local overrides for content changes that should be shared.
 
+For a peer-private skill that should never be published to WebDAV, mark the whole skill as local-only:
+
+```json
+{
+  "version": 0,
+  "skills": {
+    "disk-cleanup": {
+      "local_only": true,
+      "reason": "OpenClaw internal private skill"
+    }
+  }
+}
+```
+
+When a local-only skill exists only on the current peer, `sync-status` reports `local_only` and `sync-plan` treats it as `noop`. This is the right handling for OpenClaw operational skills that are useful on the server but not portable to Mac/Windows or other tools.
+
 ### External dependency packaging signal
 
 `doctor` and `scan` warn when `SKILL.md` references common local absolute paths such as `/home/...`, `/Users/...`, `/opt/...`, `/var/...`, or `/etc/...`. They also warn when `SKILL.md` references a package-relative script such as `./scripts/run.sh` but that file is not included under the skill directory.

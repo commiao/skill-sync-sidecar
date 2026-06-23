@@ -28,6 +28,7 @@ class SyncStateItem:
 class LocalOverride:
     skill_id: str
     ignore_paths: List[str]
+    local_only: bool
     reason: str
 
 
@@ -80,6 +81,15 @@ def _classify_skill_with_override(
     remote_snapshot_dir: Path,
 ) -> SyncStateItem:
     item = _classify_skill(skill_id, base, local, remote)
+    if override and override.local_only and local and not remote:
+        return _item(
+            skill_id,
+            "local_only",
+            item.base_hash,
+            item.local_hash,
+            item.remote_hash,
+            f"local-only skill acknowledged: {override.reason}",
+        )
     if not override or item.action not in {"push", "conflict", "same_without_base"}:
         return item
     if not local or not remote:
@@ -198,11 +208,13 @@ def _load_local_overrides(local_root: Path, explicit_path: Optional[Path]) -> Di
             continue
         skill_id = str(raw.get("skill_id") or "").strip()
         ignore_paths = [str(item).strip("/") for item in raw.get("ignore_paths", []) if str(item).strip("/")]
-        if not skill_id or not ignore_paths:
+        local_only = bool(raw.get("local_only"))
+        if not skill_id or (not ignore_paths and not local_only):
             continue
         overrides[skill_id] = LocalOverride(
             skill_id=skill_id,
             ignore_paths=ignore_paths,
+            local_only=local_only,
             reason=str(raw.get("reason") or "peer-local override"),
         )
     return overrides

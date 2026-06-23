@@ -704,6 +704,47 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(plan["blocked"], 0)
             self.assertIn("OpenClaw runtime launcher", plan["items"][0]["reason"])
 
+    def test_sync_status_acknowledges_declared_local_only_skill(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_snapshot = base / "remote-snapshot"
+
+            self._write_skill(
+                local_root / "disk-cleanup",
+                "disk-cleanup",
+                "OpenClaw-local disk cleanup",
+                {"scripts/disk-cleanup.sh": "#!/usr/bin/env bash\n"},
+            )
+            self._write_remote_index(remote_snapshot, {})
+            (local_root / ".skill-sync-local-overrides.json").write_text(
+                __import__("json").dumps(
+                    {
+                        "version": 0,
+                        "skills": {
+                            "disk-cleanup": {
+                                "local_only": True,
+                                "reason": "OpenClaw internal private skill",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_sync_status(local_root, remote_snapshot)
+            item = status["items"][0]
+
+            self.assertEqual(status["summary"], {"local_only": 1})
+            self.assertEqual(item["action"], "local_only")
+            self.assertIn("OpenClaw internal", item["reason"])
+
+            plan = build_sync_plan(status, allow_new=True, writer_policy="pull-only")
+            self.assertEqual(plan["summary"], {"noop": 1})
+            self.assertEqual(plan["blocked"], 0)
+            self.assertTrue(plan["safe_to_apply"])
+            self.assertEqual(plan["items"][0]["status_action"], "local_only")
+
     def test_sync_status_rejects_old_apply_record_without_hashes(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
