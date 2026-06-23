@@ -79,6 +79,6 @@ Do not publish these two items yet:
 
 ## Next Work
 
-1. Add a local override mechanism for peer-specific runtime patches such as shebangs.
+1. Done in the next implementation step: add a local override mechanism for peer-specific runtime patches such as shebangs.
 2. Add a packaging rule for skills that depend on external scripts.
 3. Wire `ops-status` into a scheduled or UI-facing status surface so the current state is visible as green/yellow/red.

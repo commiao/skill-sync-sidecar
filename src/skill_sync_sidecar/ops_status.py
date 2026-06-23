@@ -229,6 +229,7 @@ def _sync_plan_summary(
         "blocked": plan["blocked"],
         "safe_to_apply": plan["safe_to_apply"],
         "status_summary": status["summary"],
+        "local_overrides": status.get("local_overrides"),
         "has_conflicts": status["has_conflicts"],
     }
 
@@ -322,6 +323,7 @@ def _render_sync_plan(plan: Optional[JsonDict]) -> list[str]:
         f"writer_policy: {plan.get('writer_policy')}",
         f"sync_summary: {plan.get('summary')}",
         f"status_summary: {plan.get('status_summary')}",
+        f"local_overrides: {plan.get('local_overrides')}",
     ]
 
 

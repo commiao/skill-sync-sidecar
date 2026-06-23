@@ -148,6 +148,26 @@ sync_plan: safe_to_apply=False blocked=2 allowed=93
 
 This yellow state is expected: pull-only is preventing OpenClaw-local changes from being silently published to WebDAV.
 
+### Local overrides
+
+Use a local override when a peer must carry a runtime-only edit that should not be published to WebDAV. The canonical example is OpenClaw using a local Linuxbrew Python shebang for one adapter script while the portable WebDAV package keeps `#!/usr/bin/env python3`.
+
+Create `<skill-root>/.skill-sync-local-overrides.json`:
+
+```json
+{
+  "version": 0,
+  "skills": {
+    "lark-cli-adapter": {
+      "ignore_paths": ["bin/lark_send_text.py"],
+      "reason": "OpenClaw runtime launcher uses Linuxbrew Python"
+    }
+  }
+}
+```
+
+When the only local difference is under `ignore_paths`, `sync-status` reports `local_override` and `sync-plan` treats it as `noop`. If remote content changes outside the ignored paths, the sidecar still reports pull or conflict as usual. Do not use local overrides for content changes that should be shared.
+
 By default, `ops-status` also searches `/private/tmp/openclaw-skill-sync-validate` for the latest OpenClaw `reconcile-report.json` and shows the read-only gate state when one exists. Include an explicit report when reviewing a specific peer-writer drift run:
 
 ```bash

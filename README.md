@@ -29,6 +29,8 @@ The MVP keeps writes behind explicit confirmation flags:
 
 It does not modify tool databases. WebDAV uploads require `push --yes`, and local installs require `apply --yes`, `sync-apply --yes`, or `sync-cycle --yes`.
 
+Peer-specific runtime edits can be declared locally with `<skill-root>/.skill-sync-local-overrides.json`. These overrides affect sync comparison only; they are not packaged into WebDAV snapshots.
+
 ## Install
 
 From a checked-out repository:

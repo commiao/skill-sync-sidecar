@@ -4,8 +4,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+from zipfile import ZipFile
 
-from .scanner import scan_roots
+from .model import SkillFile
+from .scanner import hash_skill_files, is_excluded, iter_skill_files, parse_skill_manifest, scan_roots, sha256_file
 
 
 class SyncStateError(RuntimeError):
@@ -22,18 +24,35 @@ class SyncStateItem:
     reason: str
 
 
+@dataclass(frozen=True)
+class LocalOverride:
+    skill_id: str
+    ignore_paths: List[str]
+    reason: str
+
+
 def build_sync_status(
     local_root: Path,
     remote_snapshot_dir: Path,
     last_applied_record: Optional[Path] = None,
     source_name: str = "local",
+    local_overrides: Optional[Path] = None,
 ) -> Dict[str, object]:
+    local_root = local_root.expanduser()
     local = _local_entries_by_skill_id(local_root, source_name)
     remote = _snapshot_entries_by_skill_id(remote_snapshot_dir)
     base = _base_entries_by_skill_id(last_applied_record) if last_applied_record else {}
+    overrides = _load_local_overrides(local_root, local_overrides)
 
     items = [
-        _classify_skill(skill_id, base.get(skill_id), local.get(skill_id), remote.get(skill_id))
+        _classify_skill_with_override(
+            skill_id,
+            base.get(skill_id),
+            local.get(skill_id),
+            remote.get(skill_id),
+            overrides.get(skill_id),
+            remote_snapshot_dir,
+        )
         for skill_id in sorted(set(base) | set(local) | set(remote))
     ]
     summary: Dict[str, int] = {}
@@ -47,8 +66,42 @@ def build_sync_status(
         "total": len(items),
         "summary": dict(sorted(summary.items())),
         "has_conflicts": any(item.action == "conflict" for item in items),
+        "local_overrides": _local_override_summary(overrides),
         "items": [item.__dict__ for item in items],
     }
+
+
+def _classify_skill_with_override(
+    skill_id: str,
+    base: Optional[dict],
+    local: Optional[dict],
+    remote: Optional[dict],
+    override: Optional[LocalOverride],
+    remote_snapshot_dir: Path,
+) -> SyncStateItem:
+    item = _classify_skill(skill_id, base, local, remote)
+    if not override or item.action not in {"push", "conflict", "same_without_base"}:
+        return item
+    if not local or not remote:
+        return item
+    if item.action == "conflict" and _hash(base) != _hash(remote):
+        return item
+
+    local_path = local.get("path")
+    if not local_path:
+        return item
+    local_projected = _projected_local_hash(Path(str(local_path)), override.ignore_paths)
+    remote_projected = _projected_remote_hash(remote_snapshot_dir, remote, override.ignore_paths)
+    if local_projected and remote_projected and local_projected == remote_projected:
+        return _item(
+            skill_id,
+            "local_override",
+            item.base_hash,
+            item.local_hash,
+            item.remote_hash,
+            f"local override acknowledged: {override.reason}",
+        )
+    return item
 
 
 def _classify_skill(
@@ -112,6 +165,93 @@ def _local_entries_by_skill_id(local_root: Path, source_name: str) -> Dict[str, 
         ),
         "local",
     )
+
+
+def _load_local_overrides(local_root: Path, explicit_path: Optional[Path]) -> Dict[str, LocalOverride]:
+    path = explicit_path.expanduser() if explicit_path else local_root / ".skill-sync-local-overrides.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SyncStateError(f"local overrides file is not valid JSON: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SyncStateError(f"local overrides file must contain a JSON object: {path}")
+
+    raw_skills = data.get("skills", {})
+    if isinstance(raw_skills, list):
+        iterable = raw_skills
+    elif isinstance(raw_skills, dict):
+        iterable = []
+        for skill_id, value in raw_skills.items():
+            if not isinstance(value, dict):
+                continue
+            item = dict(value)
+            item.setdefault("skill_id", skill_id)
+            iterable.append(item)
+    else:
+        raise SyncStateError(f"local overrides 'skills' must be an object or list: {path}")
+
+    overrides: Dict[str, LocalOverride] = {}
+    for raw in iterable:
+        if not isinstance(raw, dict):
+            continue
+        skill_id = str(raw.get("skill_id") or "").strip()
+        ignore_paths = [str(item).strip("/") for item in raw.get("ignore_paths", []) if str(item).strip("/")]
+        if not skill_id or not ignore_paths:
+            continue
+        overrides[skill_id] = LocalOverride(
+            skill_id=skill_id,
+            ignore_paths=ignore_paths,
+            reason=str(raw.get("reason") or "peer-local override"),
+        )
+    return overrides
+
+
+def _local_override_summary(overrides: Dict[str, LocalOverride]) -> Dict[str, object]:
+    return {
+        "total": len(overrides),
+        "skills": sorted(overrides),
+    }
+
+
+def _projected_local_hash(skill_dir: Path, ignore_paths: List[str]) -> Optional[str]:
+    if not skill_dir.exists():
+        return None
+    manifest = parse_skill_manifest(skill_dir / "manifest.json")
+    exclude_patterns = list(manifest.get("exclude") or []) + ignore_paths
+    files: List[SkillFile] = []
+    for file_path in iter_skill_files(skill_dir, exclude_patterns):
+        if not file_path.is_file():
+            continue
+        stat = file_path.stat()
+        rel = file_path.relative_to(skill_dir).as_posix()
+        files.append(SkillFile(rel, stat.st_size, sha256_file(file_path)))
+    files.sort(key=lambda file: file.path)
+    return hash_skill_files(files)
+
+
+def _projected_remote_hash(remote_snapshot_dir: Path, remote_entry: dict, ignore_paths: List[str]) -> Optional[str]:
+    archive = remote_entry.get("archive")
+    if not archive:
+        return None
+    archive_path = remote_snapshot_dir / str(archive)
+    try:
+        with ZipFile(archive_path, "r") as zip_file:
+            manifest = json.loads(zip_file.read(".skill-sync/manifest.json").decode("utf-8"))
+    except (OSError, KeyError, json.JSONDecodeError) as exc:
+        raise SyncStateError(f"cannot read remote skill manifest for override projection: {archive_path}: {exc}") from exc
+
+    files = []
+    for raw in manifest.get("files", []):
+        if not isinstance(raw, dict):
+            continue
+        rel = str(raw.get("path") or "")
+        if not rel or is_excluded(rel, ignore_paths):
+            continue
+        files.append(SkillFile(rel, int(raw.get("size") or 0), str(raw.get("sha256") or "")))
+    files.sort(key=lambda file: file.path)
+    return hash_skill_files(files)
 
 
 def _snapshot_entries_by_skill_id(snapshot_dir: Path) -> Dict[str, dict]:

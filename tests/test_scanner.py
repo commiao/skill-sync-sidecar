@@ -589,6 +589,67 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(status["items"][0]["action"], "conflict")
             self.assertTrue(status["has_conflicts"])
 
+    def test_sync_status_acknowledges_declared_local_override(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            record_path = base / "apply-record.json"
+
+            self._write_skill(
+                local_root / "demo",
+                "demo",
+                "Demo skill",
+                {"bin/send.py": "#!/usr/bin/env python3\nprint('send')\n"},
+            )
+            self._write_skill(
+                remote_source / "demo",
+                "demo",
+                "Demo skill",
+                {"bin/send.py": "#!/usr/bin/env python3\nprint('send')\n"},
+            )
+            remote_index = write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            base_hash = remote_index["skills"][0]["content_hash"]
+            self._write_apply_record(record_path, {"demo": base_hash})
+
+            (local_root / "demo" / "bin" / "send.py").write_text(
+                "#!/home/linuxbrew/.linuxbrew/bin/python3\nprint('send')\n",
+                encoding="utf-8",
+            )
+
+            status_without_override = build_sync_status(local_root, remote_snapshot, record_path)
+            self.assertEqual(status_without_override["items"][0]["action"], "push")
+
+            (local_root / ".skill-sync-local-overrides.json").write_text(
+                __import__("json").dumps(
+                    {
+                        "version": 0,
+                        "skills": {
+                            "demo": {
+                                "ignore_paths": ["bin/send.py"],
+                                "reason": "OpenClaw runtime launcher uses Linuxbrew Python",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_sync_status(local_root, remote_snapshot, record_path)
+            item = status["items"][0]
+
+            self.assertEqual(status["summary"], {"local_override": 1})
+            self.assertEqual(status["local_overrides"], {"total": 1, "skills": ["demo"]})
+            self.assertEqual(item["action"], "local_override")
+            self.assertNotEqual(item["local_hash"], item["remote_hash"])
+            self.assertIn("OpenClaw runtime launcher", item["reason"])
+
+            plan = build_sync_plan(status, writer_policy="pull-only")
+            self.assertEqual(plan["summary"], {"noop": 1})
+            self.assertEqual(plan["blocked"], 0)
+            self.assertIn("OpenClaw runtime launcher", plan["items"][0]["reason"])
+
     def test_sync_status_rejects_old_apply_record_without_hashes(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
