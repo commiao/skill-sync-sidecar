@@ -266,13 +266,24 @@ class OpsStatusTest(unittest.TestCase):
             peer_status.write_text(
                 json.dumps(
                     {
-                        "health": "green",
+                        "health": "yellow",
                         "writer_policy": "pull-only",
                         "remote_snapshot": {"total": 95},
                         "sync_plan": {
                             "writer_policy": "pull-only",
-                            "blocked": 0,
+                            "blocked": 1,
                             "local_overrides": {"total": 2, "skills": ["disk-cleanup", "lark-cli-adapter"]},
+                        },
+                        "blocked_report": {
+                            "total": 1,
+                            "items": [
+                                {
+                                    "skill_id": "beijing-recruitment",
+                                    "status_action": "push",
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push",
+                                }
+                            ],
                         },
                     }
                 ),
@@ -293,7 +304,12 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["health"], "green")
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertIn("dashboard", status)
-            self.assertEqual(devices["oc-vps"]["health"], "green")
+            self.assertEqual(status["dashboard"]["health"], "yellow")
+            self.assertEqual(status["dashboard"]["blocked"], 1)
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["peer_id"], "oc-vps")
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "beijing-recruitment")
+            self.assertEqual(devices["oc-vps"]["health"], "yellow")
+            self.assertEqual(devices["oc-vps"]["blocked"], 1)
             self.assertEqual(devices["oc-vps"]["skills"], 95)
             self.assertEqual(devices["oc-vps"]["local_policy"], ["disk-cleanup", "lark-cli-adapter"])
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in status["dashboard"]["tools"]))

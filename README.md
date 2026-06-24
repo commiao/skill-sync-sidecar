@@ -56,6 +56,8 @@ python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
 python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only --peer-status oc-vps=./openclaw-status.json
+scripts/refresh-openclaw-peer-status.sh
+scripts/install-openclaw-peer-status-launchd.sh
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
 python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 python3 -m skill_sync_sidecar scan --json

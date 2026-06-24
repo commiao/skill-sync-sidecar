@@ -136,22 +136,16 @@ Dashboard v1 separates status into:
 - Queue: blocked items that require review.
 - Details: daemon, local-only/local-override policy, and artifact paths.
 
-To show a real OpenClaw card on the Mac dashboard, mirror OpenClaw's read-only `ops-status --json` into a local peer file and pass it with `--peer-status`:
+To show a real OpenClaw card on the Mac dashboard, mirror OpenClaw's read-only `ops-status --json` into a local peer file and pass it with `--peer-status`. For a one-shot refresh:
 
 ```bash
-mkdir -p "$HOME/Library/Application Support/skill-sync-sidecar/peers"
-ssh root@100.79.177.102 \
-  "PYTHONPATH=/opt/skill-sync-sidecar/releases/2e4499f/src \
-   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
-     --local-root /home/admin/clawd/skills \
-     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
-     --base-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
-     --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-pullonly-state.json \
-     --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
-     --allow-new \
-     --writer-policy pull-only \
-     --json" \
-  > "$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json"
+scripts/refresh-openclaw-peer-status.sh
+```
+
+To keep it fresh automatically on macOS, install the local LaunchAgent:
+
+```bash
+scripts/install-openclaw-peer-status-launchd.sh
 ```
 
 Then start the Mac dashboard with:
@@ -162,6 +156,14 @@ PYTHONPATH=src python3 -m skill_sync_sidecar dashboard \
   --writer-policy pull-only \
   --peer-status "oc-vps=$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json"
 ```
+
+The LaunchAgent defaults to a 300-second refresh interval. It writes:
+
+- Peer file: `~/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json`.
+- Plist: `~/Library/LaunchAgents/com.skill-sync-sidecar.openclaw-peer-status.plist`.
+- Logs: `~/Library/Logs/skill-sync-openclaw-peer-status.out.log` and `~/Library/Logs/skill-sync-openclaw-peer-status.err.log`.
+
+Set `OPENCLAW_PEER_REFRESH_INTERVAL_SECONDS`, `OPENCLAW_SSH_TARGET`, `OPENCLAW_RELEASE`, or `OPENCLAW_PYTHON` before running the installer when a peer path changes.
 
 `ops-status` reports `health=green|yellow|red`:
 

@@ -115,6 +115,29 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("SKILL_SYNC_WRITER_POLICY:-push-pull", installer)
         self.assertIn("WRITER_POLICY", installer)
 
+    def test_openclaw_peer_status_refresh_scripts_are_read_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        refresh = repo_root / "scripts" / "refresh-openclaw-peer-status.sh"
+        installer = repo_root / "scripts" / "install-openclaw-peer-status-launchd.sh"
+        refresh_text = refresh.read_text(encoding="utf-8")
+        installer_text = installer.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(refresh)])
+        subprocess.check_call(["bash", "-n", str(installer)])
+
+        self.assertIn("ssh", refresh_text)
+        self.assertIn("ops-status", refresh_text)
+        self.assertIn("--writer-policy pull-only", refresh_text)
+        self.assertIn("peer status JSON does not contain health", refresh_text)
+        self.assertNotIn("sync-apply", refresh_text)
+        self.assertNotIn("sync-cycle", refresh_text)
+        self.assertNotIn("systemctl", refresh_text)
+
+        self.assertIn("refresh-openclaw-peer-status.sh", installer_text)
+        self.assertIn("StartInterval", installer_text)
+        self.assertIn("com.skill-sync-sidecar.openclaw-peer-status", installer_text)
+        self.assertIn("launchctl bootstrap", installer_text)
+
 
 if __name__ == "__main__":
     unittest.main()

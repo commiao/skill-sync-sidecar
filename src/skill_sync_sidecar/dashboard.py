@@ -39,8 +39,13 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         writer_policy=config.writer_policy,
     )
     peers = _load_peer_status_files(config.peer_status_files or {})
+    devices = _device_overview(status, peers)
+    blocked_items = _blocked_items(status, peers)
     status["dashboard"] = {
-        "devices": _device_overview(status, peers),
+        "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
+        "blocked": len(blocked_items),
+        "blocked_items": blocked_items,
+        "devices": devices,
         "tools": _tool_overview(),
     }
     return status
@@ -153,6 +158,40 @@ def _peer_device(
         "note": note,
         "local_policy": local_overrides.get("skills", []),
     }
+
+
+def _aggregate_health(values: list[Optional[str]]) -> str:
+    ranked = {"red": 3, "yellow": 2, "green": 1}
+    worst = "green"
+    for value in values:
+        if value in {"not_configured", "not_connected", None}:
+            continue
+        if ranked.get(str(value), 0) > ranked.get(worst, 0):
+            worst = str(value)
+    return worst
+
+
+def _blocked_items(status: dict, peers: Dict[str, dict]) -> list[dict]:
+    items: list[dict] = []
+    items.extend(_blocked_report_items("mac", "Mac 本机", status))
+    for peer_id, peer_status in peers.items():
+        peer_name = "oc-vps / OpenClaw" if peer_id in {"oc-vps", "openclaw"} else peer_id
+        items.extend(_blocked_report_items(peer_id, peer_name, peer_status))
+    return items
+
+
+def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[dict]:
+    report = status.get("blocked_report") if isinstance(status.get("blocked_report"), dict) else {}
+    raw_items = report.get("items") if isinstance(report.get("items"), list) else []
+    items = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        copied = dict(item)
+        copied["peer_id"] = peer_id
+        copied["peer_name"] = peer_name
+        items.append(copied)
+    return items
 
 
 def _tool_overview() -> list[dict]:
@@ -621,29 +660,29 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function render(status) {
       $("error").style.display = "none";
-      const health = status.health || "unknown";
+      const dashboard = status.dashboard || {};
+      const health = dashboard.health || status.health || "unknown";
       $("health-card").className = `panel health ${health}`;
       $("health").textContent = health;
-      $("next-action").textContent = nextAction(status);
+      $("next-action").textContent = nextAction({ ...status, health });
       const plan = status.sync_plan || {};
       const snapshot = status.remote_snapshot || {};
       const daemon = status.daemon_state || {};
       const blockedReport = status.blocked_report || {};
-      $("blocked").textContent = text(plan.blocked ?? blockedReport.total);
+      $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
       $("allowed").textContent = text(plan.allowed);
       $("remote-total").textContent = text(snapshot.total);
       $("cycles").textContent = text(daemon.cycles_run);
       $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-      const dashboard = status.dashboard || {};
       renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
 
-      const blockedItems = Array.isArray(blockedReport.items) ? blockedReport.items : [];
+      const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
       $("blocked-empty").hidden = blockedItems.length > 0;
       $("blocked-table").hidden = blockedItems.length === 0;
       $("blocked-body").innerHTML = blockedItems.map((item) => `
         <tr>
-          <td class="mono">${escapeHtml(text(item.skill_id))}</td>
+          <td class="mono">${escapeHtml(text(item.peer_name || item.peer_id))} / ${escapeHtml(text(item.skill_id))}</td>
           <td>${escapeHtml(text(item.status_action))}</td>
           <td>${escapeHtml(text(item.category))}</td>
           <td>${escapeHtml(text(item.reason))}</td>
