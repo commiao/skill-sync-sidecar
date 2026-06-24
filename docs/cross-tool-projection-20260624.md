@@ -53,6 +53,28 @@ record=~/.codex/skills/.skill-sync-backups/20260624-095756-114277/.apply-record.
 Codex: installed=29 targeted=94 missing=91 drift=0 not_targeted=0 unsupported_scope=2 blocked_error=0 extra_local=28
 ```
 
+The first skillshub allowlist attempt included `smart-reporter` and `task-complete-summary`, but local scanning showed portability warnings after install:
+
+```text
+smart-reporter: external OpenClaw absolute paths
+task-complete-summary: external OpenClaw adapter path and missing scripts/task-archive.sh
+```
+
+That batch was rolled back with its apply record. The retained skillshub batch installed only staged packages that scanned as `ok`:
+
+```text
+command=skill-sync apply --target skillshub-global --target-root ~/.skillshub \
+  --skill-id calendar \
+  --skill-id searxng \
+  --skill-id skill-finder-cn \
+  --skill-id task \
+  --skill-id trigger-manager \
+  --yes
+applied=5
+record=~/.skillshub/.skill-sync-backups/20260624-115822-958474/.apply-record.json
+skillshub: installed=92 targeted=92 missing=28 drift=4 not_targeted=2 unsupported_scope=0 blocked_error=0 extra_local=28
+```
+
 ## Interpretation
 
 - `cc-switch` is the governed mixed-scope root and is aligned with the canonical snapshot.
