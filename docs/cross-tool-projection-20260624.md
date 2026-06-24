@@ -185,3 +185,21 @@ The command writes:
 
 This preview package still does not write to `~/.skillshub`; it is the handoff
 artifact before an explicit apply command exists.
+
+The first apply layer is intentionally narrow:
+
+```text
+command=skill-sync hub-import-apply --preview /tmp/skillshub-import-preview/preview.json
+```
+
+Without `--yes`, it only prints an apply plan. With `--yes`, it imports only
+`preview_import` actions whose target path is still absent under the Hub root and
+whose source hash has not changed since preview generation:
+
+```text
+command=skill-sync hub-import-apply --preview /tmp/skillshub-import-preview/preview.json --yes --out /tmp/skillshub-import-apply
+```
+
+`review_update` and `review_duplicate_import` remain blocked by design. This
+keeps the first writable path limited to new Hub skills and prevents accidental
+overwrites.

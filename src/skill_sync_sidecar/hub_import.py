@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -44,6 +45,10 @@ REASON_LABELS = {
 
 
 class HubImportDiagnosisError(RuntimeError):
+    pass
+
+
+class HubImportApplyError(RuntimeError):
     pass
 
 
@@ -227,6 +232,89 @@ def render_hub_import_preview_markdown(package: Dict[str, object]) -> str:
     for action in actions:
         lines.extend(_render_preview_action_markdown(action))
     return "\n".join(lines) + "\n"
+
+
+def build_hub_import_apply_plan(preview_json: Path) -> Dict[str, object]:
+    package = _load_preview_package(preview_json)
+    items = [_apply_plan_item(action, package) for action in _preview_actions(package)]
+    allowed = sum(1 for item in items if item["allowed"])
+    blocked = len(items) - allowed
+    return {
+        "record_type": "skill-sync-hub-import-apply-plan",
+        "dry_run": True,
+        "preview_json": str(preview_json.expanduser()),
+        "hub_root": package.get("hub_root"),
+        "total": len(items),
+        "allowed": allowed,
+        "blocked": blocked,
+        "items": items,
+    }
+
+
+def execute_hub_import_apply(preview_json: Path, *, yes: bool = False, out_dir: Optional[Path] = None) -> Dict[str, object]:
+    plan = build_hub_import_apply_plan(preview_json)
+    if not yes:
+        return plan
+
+    imported = []
+    failed = []
+    for item in plan["items"]:
+        if not item.get("allowed"):
+            continue
+        try:
+            _import_skill_dir(Path(str(item["source_path"])), Path(str(item["target_path"])), str(item["skill_id"]))
+        except Exception as exc:  # pragma: no cover - defensive execution boundary
+            failed.append({**item, "error": str(exc)})
+            continue
+        imported.append(item)
+
+    record = {
+        **plan,
+        "record_type": "skill-sync-hub-import-apply-record",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "dry_run": False,
+        "status": "complete" if not failed else "partial",
+        "imported": len(imported),
+        "failed": len(failed),
+        "blocked": plan["blocked"],
+        "imported_items": imported,
+        "failed_items": failed,
+    }
+    if out_dir is not None:
+        out_dir = out_dir.expanduser()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        record["out_dir"] = str(out_dir)
+        (out_dir / "hub-import-apply-record.json").write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (out_dir / "hub-import-apply-record.md").write_text(render_hub_import_apply_text(record) + "\n", encoding="utf-8")
+    return record
+
+
+def render_hub_import_apply_text(plan: Dict[str, object]) -> str:
+    lines = [
+        f"record_type: {plan.get('record_type')}",
+        f"dry_run: {str(plan.get('dry_run')).lower()}",
+        f"preview_json: {plan.get('preview_json')}",
+        f"hub_root: {plan.get('hub_root')}",
+        f"total: {plan.get('total')}",
+        f"allowed: {plan.get('allowed')}",
+        f"blocked: {plan.get('blocked')}",
+    ]
+    if not plan.get("dry_run"):
+        lines.extend([
+            f"imported: {plan.get('imported')}",
+            f"failed: {plan.get('failed')}",
+            f"status: {plan.get('status')}",
+        ])
+    items = plan.get("items") if isinstance(plan.get("items"), list) else []
+    if items:
+        lines.append("")
+        lines.append("items:")
+    for item in items[:40]:
+        state = "allow" if item.get("allowed") else "block"
+        lines.append(f"- {state}: {item.get('skill_id')} -> {item.get('reason')}")
+    if len(items) > 40:
+        lines.append(f"... {len(items) - 40} more")
+    return "\n".join(lines)
 
 
 def _scan_root(source_id: str, root: Path) -> List[SkillRecord]:
@@ -503,6 +591,102 @@ def _render_preview_action_markdown(action: Dict[str, object]) -> List[str]:
         if diff.get("truncated"):
             lines.extend(["Diff truncated.", ""])
     return lines
+
+
+def _load_preview_package(preview_json: Path) -> Dict[str, object]:
+    preview_json = preview_json.expanduser()
+    if not preview_json.exists():
+        raise HubImportApplyError(f"preview package not found: {preview_json}")
+    package = json.loads(preview_json.read_text(encoding="utf-8"))
+    if package.get("record_type") != "skill-sync-hub-import-preview":
+        raise HubImportApplyError("input is not a skill-sync hub import preview package")
+    if package.get("mode") != "dry_run" or package.get("writes_files") is not False:
+        raise HubImportApplyError("preview package must be non-writing dry_run output")
+    return package
+
+
+def _preview_actions(package: Dict[str, object]) -> List[Dict[str, object]]:
+    actions = package.get("actions")
+    if not isinstance(actions, list):
+        raise HubImportApplyError("preview package actions must be a list")
+    return [dict(action) for action in actions if isinstance(action, dict)]
+
+
+def _apply_plan_item(action: Dict[str, object], package: Dict[str, object]) -> Dict[str, object]:
+    skill_id = str(action.get("skill_id") or "")
+    source_path = Path(str(action.get("source_path") or "")).expanduser()
+    target_path = Path(str(action.get("target_path") or "")).expanduser()
+    hub_root = Path(str(package.get("hub_root") or "")).expanduser()
+    base = {
+        "skill_id": skill_id,
+        "action": action.get("action"),
+        "source_path": str(source_path),
+        "target_path": str(target_path),
+        "allowed": False,
+        "reason": "",
+    }
+    if action.get("action") != "preview_import":
+        return {**base, "reason": "only preview_import actions can be applied; updates require review"}
+    if action.get("requires_review"):
+        return {**base, "reason": "action requires review"}
+    if not skill_id:
+        return {**base, "reason": "missing skill_id"}
+    if target_path.name != skill_id:
+        return {**base, "reason": "target path name must match skill_id"}
+    if not _path_is_relative_to(target_path, hub_root):
+        return {**base, "reason": "target path is outside hub_root"}
+    if target_path.exists():
+        return {**base, "reason": "target already exists; refusing to overwrite"}
+    source_record = _scan_preview_record(str(action.get("source") or "source"), source_path)
+    if source_record is None:
+        return {**base, "reason": "source skill cannot be scanned"}
+    expected_hash = str(action.get("source_hash") or "")
+    if expected_hash and source_record.content_hash != expected_hash:
+        return {**base, "reason": "source hash changed since preview"}
+    return {
+        **base,
+        "allowed": True,
+        "reason": "ready to import as a new Hub skill",
+        "content_hash": source_record.content_hash,
+        "file_count": source_record.file_count,
+        "size_bytes": source_record.size_bytes,
+    }
+
+
+def _import_skill_dir(source_path: Path, target_path: Path, skill_id: str) -> None:
+    if target_path.exists():
+        raise HubImportApplyError(f"target already exists: {target_path}")
+    source_record = _scan_preview_record("source", source_path)
+    if source_record is None:
+        raise HubImportApplyError(f"source skill cannot be scanned: {source_path}")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_target = target_path.with_name(f".{skill_id}.skill-sync-import-tmp-{_timestamp_id()}")
+    if temp_target.exists():
+        raise HubImportApplyError(f"temporary target already exists: {temp_target}")
+    try:
+        temp_target.mkdir(parents=True)
+        for file in source_record.files:
+            source_file = source_path / file.path
+            target_file = temp_target / file.path
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_file, target_file)
+        temp_target.rename(target_path)
+    except Exception:
+        if temp_target.exists() and _path_is_relative_to(temp_target, target_path.parent):
+            shutil.rmtree(temp_target)
+        raise
+
+
+def _path_is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _timestamp_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
 
 
 def _resolved_path(path: Path) -> str:

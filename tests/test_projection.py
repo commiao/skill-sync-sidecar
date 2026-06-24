@@ -3,7 +3,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from skill_sync_sidecar.hub_import import build_hub_import_diagnosis, build_hub_import_preview_package, parse_hub_source_spec
+from skill_sync_sidecar.hub_import import (
+    build_hub_import_diagnosis,
+    build_hub_import_preview_package,
+    execute_hub_import_apply,
+    parse_hub_source_spec,
+)
 from skill_sync_sidecar.projection import ToolAdapter, build_tool_projection, parse_tool_adapter_spec
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -151,6 +156,36 @@ class ToolProjectionTest(unittest.TestCase):
             self.assertIn("-old", "\n".join(actions["stale"]["skill_md_diff"]["lines"]))
             self.assertIn("+new", "\n".join(actions["stale"]["skill_md_diff"]["lines"]))
             self.assertIn("Skillshub Import Preview", (out / "preview.md").read_text(encoding="utf-8"))
+
+    def test_hub_import_apply_only_imports_new_preview_actions_with_yes(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            hub = root / "hub"
+            agents = root / "agents"
+            preview_out = root / "preview"
+            apply_out = root / "apply"
+
+            self._write_skill(hub / "stale", "stale", "global", ["skillshub"], body="old")
+            self._write_skill(agents / "stale", "stale", "global", ["skillshub"], body="new")
+            self._write_skill(agents / "fresh", "fresh", "global", ["skillshub"], body="fresh")
+
+            package = build_hub_import_preview_package(hub, [("agents", agents)], out_dir=preview_out)
+            preview_json = Path(package["preview_json"])
+
+            plan = execute_hub_import_apply(preview_json)
+            self.assertTrue(plan["dry_run"])
+            self.assertEqual(plan["allowed"], 1)
+            self.assertEqual(plan["blocked"], 1)
+            self.assertFalse((hub / "fresh").exists())
+
+            record = execute_hub_import_apply(preview_json, yes=True, out_dir=apply_out)
+            self.assertFalse(record["dry_run"])
+            self.assertEqual(record["imported"], 1)
+            self.assertEqual(record["blocked"], 1)
+            self.assertTrue((hub / "fresh" / "SKILL.md").exists())
+            self.assertIn("fresh", (hub / "fresh" / "SKILL.md").read_text(encoding="utf-8"))
+            self.assertIn("old", (hub / "stale" / "SKILL.md").read_text(encoding="utf-8"))
+            self.assertTrue((apply_out / "hub-import-apply-record.json").exists())
 
     def _write_skill(self, skill: Path, skill_id: str, scope: str, targets: list[str], body: str):
         skill.mkdir(parents=True, exist_ok=True)

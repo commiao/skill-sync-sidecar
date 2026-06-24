@@ -18,10 +18,13 @@ from .dashboard import DashboardConfig, serve_dashboard
 from .daemon import run_sync_daemon
 from .diff import diff_snapshot_dirs
 from .hub_import import (
+    HubImportApplyError,
     HubImportDiagnosisError,
     build_hub_import_diagnosis,
     build_hub_import_preview_package,
+    execute_hub_import_apply,
     parse_hub_source_spec,
+    render_hub_import_apply_text,
     render_hub_import_diagnosis_text,
     render_hub_import_preview_text,
 )
@@ -121,6 +124,13 @@ def build_parser() -> argparse.ArgumentParser:
     hub_import_preview.add_argument("--max-diff-lines", type=int, default=160, help="Maximum SKILL.md diff lines per update action.")
     hub_import_preview.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     hub_import_preview.set_defaults(func=cmd_hub_import_preview)
+
+    hub_import_apply = subcommands.add_parser("hub-import-apply", help="Apply preview_import actions from a skillshub import preview package.")
+    hub_import_apply.add_argument("--preview", required=True, help="Path to preview.json from hub-import-preview.")
+    hub_import_apply.add_argument("--yes", action="store_true", help="Actually import allowed preview_import skills. Without this flag, only prints a plan.")
+    hub_import_apply.add_argument("--out", help="Optional output directory for apply records when --yes is used.")
+    hub_import_apply.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    hub_import_apply.set_defaults(func=cmd_hub_import_apply)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
@@ -522,6 +532,23 @@ def cmd_hub_import_preview(args: argparse.Namespace) -> int:
         print(json.dumps(package, ensure_ascii=False, indent=2))
     else:
         print(render_hub_import_preview_text(package))
+    return 0
+
+
+def cmd_hub_import_apply(args: argparse.Namespace) -> int:
+    try:
+        result = execute_hub_import_apply(
+            Path(args.preview),
+            yes=args.yes,
+            out_dir=Path(args.out) if args.out else None,
+        )
+    except (HubImportApplyError, OSError, ValueError) as exc:
+        print(f"hub-import-apply failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(render_hub_import_apply_text(result))
     return 0
 
 
