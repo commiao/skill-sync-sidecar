@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Sequence, Tuple
 
-from .hub_import import build_hub_import_diagnosis
+from .hub_import import build_hub_import_diagnosis, build_hub_import_preview_package, execute_hub_import_apply
 from .ops_status import build_ops_status
 from .projection import ProjectionError, build_tool_projection
 from .scanner import scan_roots
@@ -25,6 +26,7 @@ class DashboardConfig:
     allow_delete: bool = False
     writer_policy: str = "push-pull"
     peer_status_files: Optional[Dict[str, Path]] = None
+    hub_import_work_dir: Optional[Path] = None
 
 
 def build_dashboard_status(config: DashboardConfig) -> dict:
@@ -59,6 +61,39 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     return status
 
 
+def build_hub_import_preview_response(
+    work_dir: Optional[Path] = None,
+    *,
+    hub_root: Optional[Path] = None,
+    source_roots: Optional[Sequence[Tuple[str, Path]]] = None,
+) -> dict:
+    root = Path(work_dir or _default_hub_import_work_dir()).expanduser()
+    preview_dir = root / _timestamp_id()
+    package = build_hub_import_preview_package(hub_root or Path.home() / ".skillshub", source_roots=source_roots, out_dir=preview_dir)
+    apply_plan = execute_hub_import_apply(Path(str(package["preview_json"])))
+    return {
+        "ok": True,
+        "record_type": "skill-sync-dashboard-hub-import-preview",
+        "mode": "dry_run",
+        "writes_files": False,
+        "preview": {
+            "out_dir": package.get("out_dir"),
+            "preview_json": package.get("preview_json"),
+            "preview_md": package.get("preview_md"),
+            "action_summary": package.get("action_summary"),
+            "review_required": package.get("review_required"),
+            "actions": len(package.get("actions", [])) if isinstance(package.get("actions"), list) else 0,
+        },
+        "apply_plan": {
+            "dry_run": apply_plan.get("dry_run"),
+            "allowed": apply_plan.get("allowed"),
+            "blocked": apply_plan.get("blocked"),
+            "total": apply_plan.get("total"),
+            "items": apply_plan.get("items", [])[:40],
+        },
+    }
+
+
 def _load_peer_status_files(peer_status_files: Dict[str, Path]) -> Dict[str, dict]:
     peers = {}
     for peer_id, path in peer_status_files.items():
@@ -90,6 +125,14 @@ def _safe_hub_import_diagnosis() -> dict:
         return data
     except Exception as exc:  # pragma: no cover - diagnosis should not break dashboard
         return {"ok": False, "error": str(exc), "summary": {}, "items": []}
+
+
+def _default_hub_import_work_dir() -> Path:
+    return Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "work" / "hub-import-preview"
+
+
+def _timestamp_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
 
 
 def _merge_tool_projection(tools: list[dict], projection: dict) -> list[dict]:
@@ -370,7 +413,8 @@ def _tool_overview() -> list[dict]:
 
 def serve_dashboard(host: str, port: int, config: DashboardConfig) -> None:
     status_provider = lambda: build_dashboard_status(config)
-    handler = _handler_factory(status_provider)
+    preview_provider = lambda: build_hub_import_preview_response(config.hub_import_work_dir)
+    handler = _handler_factory(status_provider, preview_provider)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"skill-sync dashboard: http://{host}:{server.server_port}", flush=True)
     try:
@@ -379,7 +423,7 @@ def serve_dashboard(host: str, port: int, config: DashboardConfig) -> None:
         server.server_close()
 
 
-def _handler_factory(status_provider: Callable[[], dict]):
+def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_provider: Optional[Callable[[], dict]] = None):
     class DashboardHandler(BaseHTTPRequestHandler):
         server_version = "SkillSyncDashboard/0"
 
@@ -404,6 +448,23 @@ def _handler_factory(status_provider: Callable[[], dict]):
                 self._send(204, "image/x-icon", b"")
                 return
             self._send(404, "text/plain; charset=utf-8", b"not found\n")
+
+        def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
+            path = self.path.split("?", 1)[0]
+            self._drain_request_body()
+            if path == "/api/hub-import-preview":
+                if hub_import_preview_provider is None:
+                    self._send(404, "application/json; charset=utf-8", b'{"ok":false,"error":"hub import preview is unavailable"}\n')
+                    return
+                try:
+                    payload = hub_import_preview_provider()
+                    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                    self._send(200, "application/json; charset=utf-8", body)
+                except Exception as exc:  # pragma: no cover - defensive server boundary
+                    body = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False).encode("utf-8")
+                    self._send(500, "application/json; charset=utf-8", body)
+                return
+            self._send(404, "application/json; charset=utf-8", b'{"ok":false,"error":"not found"}\n')
 
         def do_HEAD(self) -> None:  # noqa: N802 - stdlib hook name
             path = self.path.split("?", 1)[0]
@@ -431,6 +492,14 @@ def _handler_factory(status_provider: Callable[[], dict]):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
+
+        def _drain_request_body(self) -> None:
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+            except ValueError:
+                length = 0
+            if length > 0:
+                self.rfile.read(length)
 
     return DashboardHandler
 
@@ -496,6 +565,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 7px 11px;
       font: inherit;
       cursor: pointer;
+    }
+    button:disabled {
+      cursor: default;
+      color: var(--muted);
+      background: #f3f5f8;
     }
     button:hover { border-color: #aeb7c6; }
     .operator-band {
@@ -689,6 +763,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 8px;
       min-width: 0;
     }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .panel-head h2 { margin: 0; }
     .key { color: var(--muted); }
     .value { overflow-wrap: anywhere; }
     .pill {
@@ -794,9 +876,18 @@ DASHBOARD_HTML = r"""<!doctype html>
     </div>
     <section id="tools" class="cards"></section>
     <div class="panel">
-      <h2>skillshub 导入诊断</h2>
+      <div class="panel-head">
+        <h2>skillshub 导入诊断</h2>
+        <button id="hub-import-preview-button" type="button">生成预览包</button>
+      </div>
       <div id="hub-import-summary" class="kv"></div>
       <div id="hub-import-plan" class="plan-strip"></div>
+      <div id="hub-import-preview-status" class="operator-text"></div>
+      <div id="hub-import-preview-result" class="kv"></div>
+      <table id="hub-import-apply-table" hidden>
+        <thead><tr><th>Skill</th><th>Apply</th><th>原因</th></tr></thead>
+        <tbody id="hub-import-apply-body"></tbody>
+      </table>
       <table id="hub-import-table" hidden>
         <thead><tr><th>Skill</th><th>判断</th><th>建议</th><th>来源</th></tr></thead>
         <tbody id="hub-import-body"></tbody>
@@ -1009,6 +1100,47 @@ DASHBOARD_HTML = r"""<!doctype html>
       `).join("");
     }
 
+    async function generateHubImportPreview() {
+      const button = $("hub-import-preview-button");
+      button.disabled = true;
+      $("hub-import-preview-status").textContent = "生成预览包中...";
+      $("hub-import-preview-result").innerHTML = "";
+      $("hub-import-apply-table").hidden = true;
+      $("hub-import-apply-body").innerHTML = "";
+      try {
+        const response = await fetch("/api/hub-import-preview", { method: "POST", cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        renderHubImportPreview(payload);
+      } catch (error) {
+        $("hub-import-preview-status").textContent = `生成失败：${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderHubImportPreview(payload) {
+      const preview = payload.preview || {};
+      const applyPlan = payload.apply_plan || {};
+      $("hub-import-preview-status").textContent = "预览包已生成，当前只展示 apply dry-run，不执行写入。";
+      $("hub-import-preview-result").innerHTML = [
+        row("preview_json", preview.preview_json),
+        row("preview_md", preview.preview_md),
+        row("dry_run_allowed", applyPlan.allowed),
+        row("dry_run_blocked", applyPlan.blocked),
+        row("dry_run_total", applyPlan.total),
+      ].join("");
+      const items = Array.isArray(applyPlan.items) ? applyPlan.items.slice(0, 12) : [];
+      $("hub-import-apply-table").hidden = items.length === 0;
+      $("hub-import-apply-body").innerHTML = items.map((item) => `
+        <tr>
+          <td class="mono">${escapeHtml(text(item.skill_id))}</td>
+          <td>${pill(item.allowed ? "allow" : "block", item.allowed ? "green" : "yellow")}<div class="mini-label">${escapeHtml(text(item.action))}</div></td>
+          <td>${escapeHtml(text(item.reason))}</td>
+        </tr>
+      `).join("");
+    }
+
     function planCell(label, value) {
       return `<div class="plan-cell"><div class="mini-label">${escapeHtml(label)}</div><div class="mini-value mono">${escapeHtml(text(value))}</div></div>`;
     }
@@ -1068,6 +1200,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     $("refresh").addEventListener("click", refresh);
+    $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
     refresh();
     setInterval(refresh, 30000);
   </script>

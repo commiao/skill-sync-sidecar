@@ -203,3 +203,9 @@ command=skill-sync hub-import-apply --preview /tmp/skillshub-import-preview/prev
 `review_update` and `review_duplicate_import` remain blocked by design. This
 keeps the first writable path limited to new Hub skills and prevents accidental
 overwrites.
+
+The dashboard exposes the safe half of this flow under `skillshub 导入诊断`.
+Clicking `生成预览包` calls `POST /api/hub-import-preview`, writes a timestamped
+preview package under the sidecar work directory, and displays the corresponding
+`hub-import-apply` dry-run result. The dashboard does not expose a writing
+`--yes` action yet.

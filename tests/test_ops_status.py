@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skill_sync_sidecar.cli import build_parser, parse_peer_status_files
-from skill_sync_sidecar.dashboard import DASHBOARD_HTML, DashboardConfig, build_dashboard_status
+from skill_sync_sidecar.dashboard import DASHBOARD_HTML, DashboardConfig, build_dashboard_status, build_hub_import_preview_response
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -331,6 +331,34 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"tools\"", DASHBOARD_HTML)
             self.assertIn("id=\"operator-headline\"", DASHBOARD_HTML)
             self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
+            self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
+            self.assertIn("id=\"hub-import-preview-button\"", DASHBOARD_HTML)
+
+    def test_dashboard_hub_import_preview_response_is_non_writing_dry_run(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            home = root / "home"
+            hub = home / ".skillshub"
+            cc_switch = home / ".cc-switch" / "skills"
+            work = root / "work"
+
+            self._write_skill(hub / "stale", "stale", "old")
+            self._write_skill(cc_switch / "stale", "stale", "new")
+            self._write_skill(cc_switch / "fresh", "fresh", "fresh")
+
+            response = build_hub_import_preview_response(
+                work,
+                hub_root=hub,
+                source_roots=[("cc-switch", cc_switch)],
+            )
+
+            self.assertTrue(response["ok"])
+            self.assertEqual(response["mode"], "dry_run")
+            self.assertFalse(response["writes_files"])
+            self.assertTrue(Path(response["preview"]["preview_json"]).exists())
+            self.assertEqual(response["apply_plan"]["allowed"], 1)
+            self.assertEqual(response["apply_plan"]["blocked"], 1)
+            self.assertFalse((hub / "fresh").exists())
 
     def test_dashboard_parser_accepts_ops_status_arguments(self):
         parser = build_parser()
