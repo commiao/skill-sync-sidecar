@@ -25,7 +25,16 @@ Tool directories are projections, not the canonical store. A tool can have fewer
 
 This does not write to any tool directory.
 
-## Current Mac Result
+`skill-sync apply` now also supports explicit global tool adapters:
+
+- `skillshub-global`
+- `codex-global`
+- `cursor-global`
+- `claude-code-global`
+
+These adapters only install `scope=global` packages whose manifest `targets` include the target tool. Real writes to those tool roots require both an explicit `--target-root` and at least one `--skill-id` allowlist entry.
+
+## Initial Read-Only Projection Result
 
 ```text
 cc-switch: installed=94 targeted=92 missing=0 drift=0 not_targeted=2 unsupported_scope=0 blocked_error=0 extra_local=0
@@ -33,6 +42,15 @@ skillshub: installed=87 targeted=92 missing=33 drift=4 not_targeted=2 unsupporte
 Codex: installed=28 targeted=94 missing=92 drift=0 not_targeted=0 unsupported_scope=2 blocked_error=0 extra_local=28
 Cursor: installed=18 targeted=2 missing=0 drift=0 not_targeted=92 unsupported_scope=2 blocked_error=0 extra_local=17
 Claude Code: installed=1 targeted=0 missing=0 drift=0 not_targeted=94 unsupported_scope=0 blocked_error=0 extra_local=1
+```
+
+After the first Codex allowlist apply:
+
+```text
+command=skill-sync apply --target codex-global --target-root ~/.codex/skills --skill-id hackernews-frontpage --yes
+applied=1
+record=~/.codex/skills/.skill-sync-backups/20260624-095756-114277/.apply-record.json
+Codex: installed=29 targeted=94 missing=91 drift=0 not_targeted=0 unsupported_scope=2 blocked_error=0 extra_local=28
 ```
 
 ## Interpretation

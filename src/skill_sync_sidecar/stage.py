@@ -21,6 +21,7 @@ class StagedSkill:
     skill_id: str
     source: str
     scope: str
+    targets: List[str]
     content_hash: str
     output_path: str
     file_count: int
@@ -95,6 +96,7 @@ def stage_skill(snapshot_dir: Path, stage_root: Path, skill: dict) -> StagedSkil
         skill_id=str(skill.get("skill_id") or skill_id),
         source=str(skill.get("source") or source),
         scope=str(skill.get("scope") or manifest.get("scope") or "global"),
+        targets=[str(item) for item in (skill.get("targets") or manifest.get("targets") or [])],
         content_hash=str(skill.get("content_hash") or ""),
         output_path=str(target_dir),
         file_count=int(skill.get("file_count") or len(manifest.get("files") or [])),

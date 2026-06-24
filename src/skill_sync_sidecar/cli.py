@@ -32,7 +32,16 @@ from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
 
 
-APPLY_TARGETS = ["cc-switch-global", "codex-project", "mixed-scope-root"]
+APPLY_TARGETS = [
+    "cc-switch-global",
+    "skillshub-global",
+    "codex-global",
+    "cursor-global",
+    "claude-code-global",
+    "codex-project",
+    "mixed-scope-root",
+]
+TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -142,8 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     apply = subcommands.add_parser("apply", help="Install from a staged snapshot with dry-run and explicit --yes modes.")
     apply.add_argument("--staged-dir", required=True, help="Staged snapshot directory containing .stage-index.json.")
     apply.add_argument("--target", required=True, choices=APPLY_TARGETS, help="Apply target adapter.")
-    apply.add_argument("--target-root", help="Override target root for cc-switch-global or set the mixed-scope-root root.")
+    apply.add_argument("--target-root", help="Override target root for global tool targets or set the mixed-scope-root root.")
     apply.add_argument("--project-root", help="Project root for codex-project.")
+    apply.add_argument("--skill-id", action="append", default=[], help="Only apply this skill id. Repeat for a small allowlist.")
     apply_mode = apply.add_mutually_exclusive_group(required=True)
     apply_mode.add_argument("--dry-run", action="store_true", help="Print an apply plan without writing files.")
     apply_mode.add_argument("--yes", action="store_true", help="Actually install allowed skills and write rollback metadata.")
@@ -667,8 +677,11 @@ def cmd_stage(args: argparse.Namespace) -> int:
 
 
 def cmd_apply(args: argparse.Namespace) -> int:
-    if args.yes and args.target in {"cc-switch-global", "mixed-scope-root"} and not args.target_root:
+    if args.yes and args.target in {"cc-switch-global", "mixed-scope-root", *TOOL_GLOBAL_TARGETS} and not args.target_root:
         print(f"real {args.target} apply requires explicit --target-root", file=sys.stderr)
+        return 2
+    if args.yes and args.target in TOOL_GLOBAL_TARGETS and not args.skill_id:
+        print(f"real {args.target} apply requires at least one --skill-id allowlist entry", file=sys.stderr)
         return 2
     try:
         plan = build_apply_plan(
@@ -676,6 +689,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
             args.target,
             target_root=Path(args.target_root).expanduser() if args.target_root else None,
             project_root=Path(args.project_root).expanduser() if args.project_root else None,
+            skill_ids=args.skill_id,
         )
     except ApplyPlanError as exc:
         print(f"apply plan failed: {exc}", file=sys.stderr)

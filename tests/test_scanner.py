@@ -546,6 +546,52 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(plan["skipped"], 0)
             self.assertEqual({item["scope"] for item in plan["items"]}, {"global", "project"})
 
+    def test_apply_plan_for_tool_global_requires_matching_targets_and_allowlist(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root = base / "root"
+            snapshot_dir = base / "snapshot"
+            stage_dir = base / "stage"
+
+            self._write_skill(
+                root / "codex-demo",
+                "codex-demo",
+                "Codex demo skill",
+                {"manifest.json": '{"protocol_version":0,"scope":"global","targets":["codex"]}'},
+            )
+            self._write_skill(
+                root / "cursor-demo",
+                "cursor-demo",
+                "Cursor demo skill",
+                {"manifest.json": '{"protocol_version":0,"scope":"global","targets":["cursor"]}'},
+            )
+            write_snapshot(scan_roots([f"test={root}"]), snapshot_dir, "tool-snapshot")
+            stage_snapshot(snapshot_dir, stage_dir)
+
+            plan = build_apply_plan(
+                stage_dir / "tool-snapshot",
+                "codex-global",
+                target_root=base / "codex-target",
+                skill_ids=["codex-demo", "cursor-demo"],
+            )
+            items = {item["skill_id"]: item for item in plan["items"]}
+
+            self.assertEqual(plan["allowed"], 1)
+            self.assertTrue(items["codex-demo"]["allowed"])
+            self.assertFalse(items["cursor-demo"]["allowed"])
+            self.assertIn("targets", items["cursor-demo"]["reason"])
+
+            allowlisted = build_apply_plan(
+                stage_dir / "tool-snapshot",
+                "codex-global",
+                target_root=base / "codex-target",
+                skill_ids=["codex-demo"],
+            )
+
+            self.assertEqual(allowlisted["selected_skill_ids"], ["codex-demo"])
+            self.assertEqual(allowlisted["allowed"], 1)
+            self.assertEqual(allowlisted["skipped"], 1)
+
     def test_apply_plan_requires_project_root_for_codex_project(self):
         with TemporaryDirectory() as tmp:
             staged = Path(tmp) / "staged"
@@ -574,9 +620,12 @@ class ScannerTest(unittest.TestCase):
 
             result = execute_apply_plan(plan)
             record_path = Path(result["record_path"])
+            record_data = __import__("json").loads(record_path.read_text(encoding="utf-8"))
 
             self.assertEqual(result["status"], "complete")
             self.assertFalse(result["dry_run"])
+            self.assertEqual(record_data["total_applied"], 1)
+            self.assertEqual(record_data["total_skipped"], 0)
             self.assertTrue((target_root / "demo" / "SKILL.md").exists())
             self.assertTrue(record_path.exists())
 

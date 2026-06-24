@@ -5,7 +5,7 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Set
 
 
 class ApplyPlanError(RuntimeError):
@@ -26,8 +26,43 @@ class ApplyPlanItem:
     backup_path: str
     action: str
     scope: str
+    targets: List[str]
     allowed: bool
     reason: Optional[str] = None
+
+
+GLOBAL_TOOL_TARGETS = {
+    "cc-switch-global": {
+        "default_root": Path.home() / ".cc-switch" / "skills",
+        "scopes": {"global"},
+        "aliases": {"cc-switch"},
+        "scope_skip": "project-scoped skills are not installed into global roots",
+    },
+    "skillshub-global": {
+        "default_root": Path.home() / ".skillshub",
+        "scopes": {"global"},
+        "aliases": {"skillshub"},
+        "scope_skip": "project-scoped skills are not installed into skillshub global root",
+    },
+    "codex-global": {
+        "default_root": Path.home() / ".codex" / "skills",
+        "scopes": {"global"},
+        "aliases": {"codex"},
+        "scope_skip": "project-scoped skills are not installed into Codex global root",
+    },
+    "cursor-global": {
+        "default_root": Path.home() / ".cursor" / "skills-cursor",
+        "scopes": {"global"},
+        "aliases": {"cursor"},
+        "scope_skip": "project-scoped skills are not installed into Cursor global root",
+    },
+    "claude-code-global": {
+        "default_root": Path.home() / ".claude" / "skills",
+        "scopes": {"global"},
+        "aliases": {"claude-code", "claude"},
+        "scope_skip": "project-scoped skills are not installed into Claude Code global root",
+    },
+}
 
 
 def build_apply_plan(
@@ -35,6 +70,7 @@ def build_apply_plan(
     target: str,
     target_root: Optional[Path] = None,
     project_root: Optional[Path] = None,
+    skill_ids: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
     stage_index_path = staged_snapshot_dir / ".stage-index.json"
     if not stage_index_path.exists():
@@ -42,14 +78,17 @@ def build_apply_plan(
     stage_index = json.loads(stage_index_path.read_text(encoding="utf-8"))
     apply_id = _timestamp_id()
     items: List[ApplyPlanItem] = []
+    selected_skill_ids = _normalize_skill_ids(skill_ids)
 
-    if target == "cc-switch-global":
-        root = target_root or Path.home() / ".cc-switch" / "skills"
+    if target in GLOBAL_TOOL_TARGETS:
+        config = GLOBAL_TOOL_TARGETS[target]
+        root = target_root or Path(config["default_root"])
         backup_root = root / ".skill-sync-backups" / apply_id
         for skill in stage_index.get("skills", []):
             skill_id = str(skill.get("skill_id"))
             scope = str(skill.get("scope") or "global")
-            allowed = scope == "global"
+            targets = [str(item) for item in (skill.get("targets") or [])]
+            allowed, reason = _global_tool_allowance(skill_id, scope, targets, config, selected_skill_ids)
             items.append(
                 ApplyPlanItem(
                     key=str(skill.get("key")),
@@ -60,8 +99,9 @@ def build_apply_plan(
                     backup_path=str(backup_root / skill_id),
                     action="install_or_replace" if allowed else "skip",
                     scope=scope,
+                    targets=targets,
                     allowed=allowed,
-                    reason=None if allowed else "project-scoped skills are not installed into global roots",
+                    reason=reason,
                 )
             )
     elif target == "mixed-scope-root":
@@ -72,7 +112,9 @@ def build_apply_plan(
         for skill in stage_index.get("skills", []):
             skill_id = str(skill.get("skill_id"))
             scope = str(skill.get("scope") or "global")
-            allowed = scope in {"global", "project"}
+            targets = [str(item) for item in (skill.get("targets") or [])]
+            selected = _selected(skill_id, selected_skill_ids)
+            allowed = selected and scope in {"global", "project"}
             items.append(
                 ApplyPlanItem(
                     key=str(skill.get("key")),
@@ -83,8 +125,9 @@ def build_apply_plan(
                     backup_path=str(backup_root / skill_id),
                     action="install_or_replace" if allowed else "skip",
                     scope=scope,
+                    targets=targets,
                     allowed=allowed,
-                    reason=None if allowed else f"{scope}-scoped skills are not installed into mixed-scope-root",
+                    reason=_mixed_scope_skip_reason(scope, selected),
                 )
             )
     elif target == "codex-project":
@@ -95,7 +138,10 @@ def build_apply_plan(
         for skill in stage_index.get("skills", []):
             skill_id = str(skill.get("skill_id"))
             scope = str(skill.get("scope") or "global")
-            allowed = scope == "project"
+            targets = [str(item) for item in (skill.get("targets") or [])]
+            selected = _selected(skill_id, selected_skill_ids)
+            targeted = _targets_tool(targets, {"codex"})
+            allowed = selected and scope == "project" and targeted
             items.append(
                 ApplyPlanItem(
                     key=str(skill.get("key")),
@@ -106,8 +152,9 @@ def build_apply_plan(
                     backup_path=str(backup_root / skill_id),
                     action="install_or_replace" if allowed else "skip",
                     scope=scope,
+                    targets=targets,
                     allowed=allowed,
-                    reason=None if allowed else "global skills are not installed into project roots by default",
+                    reason=_codex_project_skip_reason(scope, selected, targeted),
                 )
             )
     else:
@@ -121,11 +168,63 @@ def build_apply_plan(
         "snapshot_id": stage_index.get("snapshot_id"),
         "staged_snapshot": str(staged_snapshot_dir.resolve()),
         "dry_run": True,
+        "selected_skill_ids": sorted(selected_skill_ids) if selected_skill_ids else [],
         "total": len(items),
         "allowed": sum(1 for item in items if item.allowed),
         "skipped": sum(1 for item in items if not item.allowed),
         "items": [item.__dict__ for item in items],
     }
+
+
+def _global_tool_allowance(
+    skill_id: str,
+    scope: str,
+    targets: Sequence[str],
+    config: Dict[str, object],
+    selected_skill_ids: Set[str],
+) -> tuple[bool, Optional[str]]:
+    selected = _selected(skill_id, selected_skill_ids)
+    if not selected:
+        return False, "not selected by --skill-id allowlist"
+    if scope not in config["scopes"]:
+        return False, str(config["scope_skip"])
+    if not _targets_tool(targets, config["aliases"]):
+        return False, f"manifest targets do not include {sorted(config['aliases'])[0]}"
+    return True, None
+
+
+def _mixed_scope_skip_reason(scope: str, selected: bool) -> Optional[str]:
+    if not selected:
+        return "not selected by --skill-id allowlist"
+    if scope not in {"global", "project"}:
+        return f"{scope}-scoped skills are not installed into mixed-scope-root"
+    return None
+
+
+def _codex_project_skip_reason(scope: str, selected: bool, targeted: bool) -> Optional[str]:
+    if not selected:
+        return "not selected by --skill-id allowlist"
+    if scope != "project":
+        return "global skills are not installed into project roots by default"
+    if not targeted:
+        return "manifest targets do not include codex"
+    return None
+
+
+def _normalize_skill_ids(skill_ids: Optional[Sequence[str]]) -> Set[str]:
+    return {str(skill_id).strip() for skill_id in (skill_ids or []) if str(skill_id).strip()}
+
+
+def _selected(skill_id: str, selected_skill_ids: Set[str]) -> bool:
+    return not selected_skill_ids or skill_id in selected_skill_ids
+
+
+def _targets_tool(targets: Sequence[str], aliases: object) -> bool:
+    if not targets:
+        return True
+    normalized = {str(target).strip().lower() for target in targets}
+    normalized_aliases = {str(alias).strip().lower() for alias in aliases}
+    return bool(normalized & normalized_aliases)
 
 
 def execute_apply_plan(plan: Dict[str, object]) -> Dict[str, object]:
@@ -257,10 +356,10 @@ def _apply_item(item: Dict[str, object], apply_id: str) -> Dict[str, object]:
 
 def _write_apply_record(record: Dict[str, object], record_path: Path) -> Dict[str, object]:
     record_path.parent.mkdir(parents=True, exist_ok=True)
-    record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    record["record_path"] = str(record_path)
     record["total_applied"] = len(record.get("applied", []))
     record["total_skipped"] = len(record.get("skipped", []))
+    record["record_path"] = str(record_path)
+    record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return record
 
 

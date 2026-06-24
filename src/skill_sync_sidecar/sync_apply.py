@@ -25,8 +25,21 @@ EXECUTABLE_ACTIONS = {*PULL_ACTIONS, *PUSH_ACTIONS}
 SUPPORTED_ACTIONS = {"noop", *EXECUTABLE_ACTIONS}
 TARGET_SCOPES = {
     "cc-switch-global": "global",
+    "skillshub-global": "global",
+    "codex-global": "global",
+    "cursor-global": "global",
+    "claude-code-global": "global",
     "codex-project": "project",
     "mixed-scope-root": None,
+}
+TARGET_ALIASES = {
+    "cc-switch-global": {"cc-switch"},
+    "skillshub-global": {"skillshub"},
+    "codex-global": {"codex"},
+    "cursor-global": {"cursor"},
+    "claude-code-global": {"claude-code", "claude"},
+    "codex-project": {"codex"},
+    "mixed-scope-root": set(),
 }
 ALLOWED_SCOPES = {"global", "project"}
 
@@ -55,7 +68,9 @@ def build_sync_apply_preview(
         action = str(item["plan_action"])
         remote_entry = remote_entries.get(skill_id, {})
         scope = str(remote_entry.get("scope") or "global")
+        targets = [str(target) for target in (remote_entry.get("targets") or [])]
         enriched["remote_scope"] = scope
+        enriched["remote_targets"] = targets
         enriched["sync_apply_action"] = "none"
         enriched["sync_apply_supported"] = True
         enriched["sync_apply_reason"] = item["reason"]
@@ -66,6 +81,10 @@ def build_sync_apply_preview(
             if scope not in allowed_scopes:
                 enriched["sync_apply_supported"] = False
                 enriched["sync_apply_reason"] = f"{scope}-scoped skills are not installed into {target}"
+                unsupported += 1
+            elif not _targets_tool(targets, target):
+                enriched["sync_apply_supported"] = False
+                enriched["sync_apply_reason"] = f"manifest targets do not include {target}"
                 unsupported += 1
             else:
                 enriched["sync_apply_action"] = "install_or_replace"
@@ -332,6 +351,14 @@ def _allowed_scopes(target: str) -> Set[str]:
     if expected is None:
         return set(ALLOWED_SCOPES)
     return {expected}
+
+
+def _targets_tool(targets: List[str], target: str) -> bool:
+    aliases = TARGET_ALIASES.get(target, set())
+    if not aliases or not targets:
+        return True
+    normalized = {item.strip().lower() for item in targets}
+    return bool(normalized & aliases)
 
 
 def _timestamp_id() -> str:
