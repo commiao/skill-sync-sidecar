@@ -677,6 +677,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px 12px;
       padding-top: 4px;
     }
+    .plan-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
+    .plan-cell {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      min-width: 0;
+    }
     .key { color: var(--muted); }
     .value { overflow-wrap: anywhere; }
     .pill {
@@ -715,11 +727,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-band .panel { grid-column: 1 / -1; }
       .cards { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
+      .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
+      .plan-strip { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -782,6 +796,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div class="panel">
       <h2>skillshub 导入诊断</h2>
       <div id="hub-import-summary" class="kv"></div>
+      <div id="hub-import-plan" class="plan-strip"></div>
       <table id="hub-import-table" hidden>
         <thead><tr><th>Skill</th><th>判断</th><th>建议</th><th>来源</th></tr></thead>
         <tbody id="hub-import-body"></tbody>
@@ -965,12 +980,21 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderHubImport(hubImport) {
       const summary = hubImport.summary || {};
+      const actionPlan = hubImport.action_plan || {};
+      const actionSummary = actionPlan.summary || {};
       $("hub-import-summary").innerHTML = [
         row("Hub 已有", hubImport.hub_total),
         row("外部候选", hubImport.source_total),
         row("可导入", summary.importable || 0),
         row("可更新", summary.update_available || 0),
         row("无需导入", summary.already_in_hub || 0),
+      ].join("");
+      $("hub-import-plan").innerHTML = [
+        planCell("模式", actionPlan.mode || "dry_run"),
+        planCell("预演导入", actionSummary.preview_import || 0),
+        planCell("更新审查", actionSummary.review_update || 0),
+        planCell("选择来源", actionSummary.review_duplicate_import || 0),
+        planCell("跳过", actionSummary.skip_existing || 0),
       ].join("");
       const items = hubImportPreviewItems(Array.isArray(hubImport.items) ? hubImport.items : []);
       $("hub-import-empty").hidden = items.length > 0;
@@ -983,6 +1007,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           <td class="mono">${escapeHtml(text(item.source))}<div class="mini-label">${escapeHtml(duplicateSourceText(item))}</div></td>
         </tr>
       `).join("");
+    }
+
+    function planCell(label, value) {
+      return `<div class="plan-cell"><div class="mini-label">${escapeHtml(label)}</div><div class="mini-value mono">${escapeHtml(text(value))}</div></div>`;
     }
 
     function hubImportPreviewItems(items) {

@@ -87,12 +87,43 @@ class ToolProjectionTest(unittest.TestCase):
             self.assertEqual(items[("agents", "fresh")]["reason_label"], "Hub 中没有这个 skill ID。")
             self.assertIn("resolves", items[("codex", "same")]["reason"])
             self.assertEqual(diagnosis["items"][0]["status"], "importable")
+            action_summary = diagnosis["action_plan"]["summary"]
+            self.assertEqual(action_summary["preview_import"], 1)
+            self.assertEqual(action_summary["review_update"], 1)
+            self.assertEqual(action_summary["skip_existing"], 2)
+            self.assertFalse(diagnosis["action_plan"]["safe_to_apply_automatically"])
+            actions = {(action["source"], action["skill_id"]): action for action in diagnosis["action_plan"]["actions"]}
+            self.assertEqual(actions[("agents", "fresh")]["action"], "preview_import")
+            self.assertFalse(actions[("agents", "fresh")]["writes_files"])
+            self.assertEqual(actions[("agents", "stale")]["action"], "review_update")
+            self.assertTrue(actions[("agents", "stale")]["requires_review"])
 
     def test_parse_hub_source_spec(self):
         source_id, path = parse_hub_source_spec("agents=~/skills")
 
         self.assertEqual(source_id, "agents")
         self.assertEqual(path, Path("~/skills").expanduser())
+
+    def test_hub_import_plan_requires_review_for_duplicate_import_sources(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            hub = root / "hub"
+            agents = root / "agents"
+            codex = root / "codex"
+
+            hub.mkdir(parents=True)
+            self._write_skill(agents / "fresh", "fresh", "global", ["skillshub"], body="agents")
+            self._write_skill(codex / "fresh", "fresh", "global", ["skillshub"], body="codex")
+
+            diagnosis = build_hub_import_diagnosis(hub, [("agents", agents), ("codex", codex)])
+
+            self.assertEqual(diagnosis["summary"]["importable"], 2)
+            self.assertEqual(diagnosis["action_plan"]["summary"]["review_duplicate_import"], 2)
+            self.assertEqual(diagnosis["action_plan"]["review_required"], 2)
+            for action in diagnosis["action_plan"]["actions"]:
+                self.assertEqual(action["action"], "review_duplicate_import")
+                self.assertTrue(action["requires_review"])
+                self.assertFalse(action["writes_files"])
 
     def _write_skill(self, skill: Path, skill_id: str, scope: str, targets: list[str], body: str):
         skill.mkdir(parents=True, exist_ok=True)

@@ -90,6 +90,7 @@ def build_hub_import_diagnosis(
         "source_total": len(source_records),
         "summary": dict(sorted(summary.items())),
         "status_metadata": STATUS_METADATA,
+        "action_plan": _build_action_plan(items, hub_root),
         "items": sorted(items, key=_item_sort_key),
     }
 
@@ -108,6 +109,17 @@ def render_hub_import_diagnosis_text(diagnosis: Dict[str, object], *, max_items:
             summary.get("importable", 0),
         )
     )
+    action_plan = diagnosis.get("action_plan") if isinstance(diagnosis.get("action_plan"), dict) else {}
+    action_summary = action_plan.get("summary") if isinstance(action_plan.get("summary"), dict) else {}
+    if action_summary:
+        lines.append(
+            "dry-run plan: 预演导入={} 更新前审查={} 选择来源={} 跳过={}".format(
+                action_summary.get("preview_import", 0),
+                action_summary.get("review_update", 0),
+                action_summary.get("review_duplicate_import", 0),
+                action_summary.get("skip_existing", 0),
+            )
+        )
     items = diagnosis.get("items") if isinstance(diagnosis.get("items"), list) else []
     if items:
         lines.append("")
@@ -235,6 +247,71 @@ def _with_status_metadata(item: Dict[str, object]) -> Dict[str, object]:
     }
 
 
+def _build_action_plan(items: Sequence[Dict[str, object]], hub_root: Path) -> Dict[str, object]:
+    actions = [_build_action(item, hub_root) for item in items]
+    summary: Dict[str, int] = {}
+    for action in actions:
+        action_id = str(action["action"])
+        summary[action_id] = summary.get(action_id, 0) + 1
+    review_required = sum(1 for action in actions if action.get("requires_review"))
+    return {
+        "mode": "dry_run",
+        "safe_to_apply_automatically": False,
+        "summary": dict(sorted(summary.items())),
+        "review_required": review_required,
+        "actions": sorted(actions, key=_action_sort_key),
+    }
+
+
+def _build_action(item: Dict[str, object], hub_root: Path) -> Dict[str, object]:
+    status = str(item.get("status") or "")
+    skill_id = str(item.get("skill_id") or "")
+    duplicate_sources = item.get("duplicate_sources") if isinstance(item.get("duplicate_sources"), list) else []
+    base = {
+        "source": item.get("source"),
+        "skill_id": skill_id,
+        "source_path": item.get("path"),
+        "status": status,
+        "status_label": item.get("status_label"),
+        "writes_files": False,
+    }
+    if status == "importable" and duplicate_sources:
+        return {
+            **base,
+            "action": "review_duplicate_import",
+            "action_label": "先选择来源",
+            "target_path": str(hub_root / skill_id),
+            "requires_review": True,
+            "reason": "多个外部来源提供同名 skill；导入前需要选定 canonical 来源。",
+        }
+    if status == "importable":
+        return {
+            **base,
+            "action": "preview_import",
+            "action_label": "预演导入",
+            "target_path": str(hub_root / skill_id),
+            "requires_review": False,
+            "reason": "Hub 中不存在该 skill；当前仅生成导入预演，不写入文件。",
+        }
+    if status == "update_available":
+        return {
+            **base,
+            "action": "review_update",
+            "action_label": "更新前审查",
+            "target_path": item.get("hub_path"),
+            "requires_review": True,
+            "reason": "Hub 中已有同名 skill 且内容不同；更新前必须查看差异并显式确认。",
+        }
+    return {
+        **base,
+        "action": "skip_existing",
+        "action_label": "跳过",
+        "target_path": item.get("hub_path"),
+        "requires_review": False,
+        "reason": "Hub 中已有相同 skill；不需要导入。",
+    }
+
+
 def _item_sort_key(item: Dict[str, object]) -> Tuple[int, str, str, str]:
     rank = {"importable": 0, "update_available": 1, "already_in_hub": 2}
     return (
@@ -242,6 +319,16 @@ def _item_sort_key(item: Dict[str, object]) -> Tuple[int, str, str, str]:
         str(item.get("source")),
         str(item.get("skill_id")),
         str(item.get("path")),
+    )
+
+
+def _action_sort_key(action: Dict[str, object]) -> Tuple[int, str, str, str]:
+    rank = {"preview_import": 0, "review_duplicate_import": 1, "review_update": 2, "skip_existing": 3}
+    return (
+        rank.get(str(action.get("action")), 9),
+        str(action.get("source")),
+        str(action.get("skill_id")),
+        str(action.get("source_path")),
     )
 
 

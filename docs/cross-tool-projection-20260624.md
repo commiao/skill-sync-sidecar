@@ -156,3 +156,16 @@ prioritizes actionable rows first:
 
 The CLI JSON keeps the raw `status` values for automation and also includes
 `status_label`, `operator_action`, and `reason_label` for UI or report rendering.
+
+It also includes an `action_plan` in `dry_run` mode. The plan separates:
+
+- `preview_import`: Hub does not contain the skill and a single external source
+  can be staged as an import candidate.
+- `review_duplicate_import`: Hub does not contain the skill, but multiple
+  external roots provide the same skill ID; an operator must choose the source.
+- `review_update`: Hub contains the same skill ID with different content; inspect
+  the diff before replacing anything.
+- `skip_existing`: Hub already has the same skill; no import is needed.
+
+The action plan is intentionally non-writing (`writes_files=false` and
+`safe_to_apply_automatically=false`) until an explicit apply flow exists.
