@@ -1625,6 +1625,7 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(result["cycles_run"], 1)
             self.assertTrue(state_file.exists())
             self.assertEqual(state["daemon_status"], "complete")
+            self.assertEqual(state["target"], "cc-switch-global")
             self.assertEqual(state["cycles"][0]["summary"], {"pull": 1})
 
     def test_sync_daemon_records_cycle_errors_without_exiting(self):

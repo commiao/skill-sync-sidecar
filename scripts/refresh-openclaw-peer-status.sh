@@ -10,7 +10,8 @@ OUT_FILE="${OPENCLAW_PEER_STATUS_OUT:-$HOME/Library/Application Support/skill-sy
 LOG_PREFIX="${LOG_PREFIX:-skill-sync-openclaw-peer}"
 
 mkdir -p "$(dirname "$OUT_FILE")"
-tmp_file="${OUT_FILE}.tmp"
+tmp_file="$(mktemp "${OUT_FILE}.tmp.XXXXXX")"
+trap 'rm -f "$tmp_file"' EXIT
 
 ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SSH_TARGET" \
   "PYTHONPATH=/opt/skill-sync-sidecar/releases/${OPENCLAW_RELEASE}/src ${OPENCLAW_PYTHON} -m skill_sync_sidecar ops-status \
@@ -35,4 +36,5 @@ if not isinstance(data, dict) or "health" not in data:
 PY
 
 mv "$tmp_file" "$OUT_FILE"
+trap - EXIT
 echo "${LOG_PREFIX}: wrote ${OUT_FILE}"

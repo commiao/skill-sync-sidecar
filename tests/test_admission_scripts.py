@@ -114,6 +114,10 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("<string>push-pull</string>", launchd)
         self.assertIn("SKILL_SYNC_WRITER_POLICY:-push-pull", installer)
         self.assertIn("WRITER_POLICY", installer)
+        self.assertIn("SKILL_SYNC_TARGET:-mixed-scope-root", installer)
+        self.assertIn("SYNC_TARGET", installer)
+        self.assertIn("SKILL_SYNC_CONTINUE_ON_BLOCKED:-1", installer)
+        self.assertIn("--continue-on-blocked", installer)
 
     def test_openclaw_peer_status_refresh_scripts_are_read_only(self):
         repo_root = Path(__file__).resolve().parents[1]
@@ -127,6 +131,8 @@ class AdmissionScriptsTest(unittest.TestCase):
 
         self.assertIn("ssh", refresh_text)
         self.assertIn("ops-status", refresh_text)
+        self.assertIn("mktemp", refresh_text)
+        self.assertIn("trap 'rm -f", refresh_text)
         self.assertIn("--writer-policy pull-only", refresh_text)
         self.assertIn("peer status JSON does not contain health", refresh_text)
         self.assertNotIn("sync-apply", refresh_text)

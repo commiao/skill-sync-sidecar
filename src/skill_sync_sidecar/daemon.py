@@ -44,6 +44,7 @@ def run_sync_daemon(
                 max_cycles,
                 stop_on_blocked,
                 writer_policy,
+                target,
                 count,
                 cycles,
                 "running",
@@ -76,7 +77,7 @@ def run_sync_daemon(
         cycles.append(cycle)
         _write_state_file(
             state_file,
-            _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, count, cycles, "running", current_base_record),
+            _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, target, count, cycles, "running", current_base_record),
         )
 
         if stop_on_blocked and cycle["status"] == "blocked":
@@ -85,7 +86,7 @@ def run_sync_daemon(
             break
         sleep_fn(interval_seconds)
 
-    summary = _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, count, cycles, "complete", current_base_record)
+    summary = _daemon_summary(dry_run, interval_seconds, max_cycles, stop_on_blocked, writer_policy, target, count, cycles, "complete", current_base_record)
     _write_state_file(state_file, summary)
     return summary
 
@@ -96,6 +97,7 @@ def _daemon_summary(
     max_cycles: Optional[int],
     stop_on_blocked: bool,
     writer_policy: str,
+    target: str,
     count: int,
     cycles: List[Dict[str, object]],
     status: str,
@@ -112,6 +114,7 @@ def _daemon_summary(
         "max_cycles": max_cycles,
         "stop_on_blocked": stop_on_blocked,
         "writer_policy": writer_policy,
+        "target": target,
         "cycles_run": count,
         "cycles": cycles,
     }

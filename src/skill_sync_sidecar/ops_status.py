@@ -162,6 +162,8 @@ def daemon_state_summary(state_file: Optional[Path]) -> Optional[JsonDict]:
             "updated_at": state.get("updated_at"),
             "cycles_run": state.get("cycles_run"),
             "current_base_record": state.get("current_base_record"),
+            "target": state.get("target"),
+            "stop_on_blocked": state.get("stop_on_blocked"),
             "last_cycle": last_cycle,
             "active_cycle": state.get("active_cycle"),
         }

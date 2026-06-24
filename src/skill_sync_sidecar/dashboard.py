@@ -697,6 +697,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       ].join("");
       $("daemon").innerHTML = [
         row("status", daemon.daemon_status || daemon.status),
+        row("target", daemon.target),
+        row("stop_on_blocked", daemon.stop_on_blocked),
         row("updated_at", daemon.updated_at),
         row("last_cycle", daemon.last_cycle),
         row("state_file", daemon.path),

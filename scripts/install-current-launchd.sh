@@ -14,6 +14,8 @@ prefix="${SKILL_SYNC_PREFIX:-skill-sync-sidecar-dev/current-${device_name}}"
 mode="${SKILL_SYNC_DAEMON_MODE:-yes}"
 interval_seconds="${SKILL_SYNC_INTERVAL_SECONDS:-300}"
 writer_policy="${SKILL_SYNC_WRITER_POLICY:-push-pull}"
+sync_target="${SKILL_SYNC_TARGET:-mixed-scope-root}"
+continue_on_blocked="${SKILL_SYNC_CONTINUE_ON_BLOCKED:-1}"
 
 case "$mode" in
   dry-run|yes) ;;
@@ -27,6 +29,22 @@ case "$writer_policy" in
   push-pull|pull-only|push-only|no-writes) ;;
   *)
     echo "SKILL_SYNC_WRITER_POLICY must be push-pull, pull-only, push-only, or no-writes" >&2
+    exit 2
+    ;;
+esac
+
+case "$sync_target" in
+  cc-switch-global|codex-project|mixed-scope-root) ;;
+  *)
+    echo "SKILL_SYNC_TARGET must be cc-switch-global, codex-project, or mixed-scope-root" >&2
+    exit 2
+    ;;
+esac
+
+case "$continue_on_blocked" in
+  0|1) ;;
+  *)
+    echo "SKILL_SYNC_CONTINUE_ON_BLOCKED must be 0 or 1" >&2
     exit 2
     ;;
 esac
@@ -110,8 +128,15 @@ tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding
 tmp.replace(target)
 PY
 
+daemon_flag="--$mode"
+continue_args=()
+if [ "$continue_on_blocked" = "1" ]; then
+  continue_args=(--continue-on-blocked)
+fi
+
 "$python_bin" -m skill_sync_sidecar sync-daemon \
   --local-root "$local_root" \
+  --target "$sync_target" \
   --cc-switch-webdav \
   --prefix "$prefix" \
   --cache-dir "$cache_dir" \
@@ -122,43 +147,48 @@ PY
   --writer-policy "$writer_policy" \
   --dry-run \
   --max-cycles 1 \
+  "${continue_args[@]}" \
   --json >"$run_base/preflight-daemon.json"
 
-daemon_flag="--$mode"
-
-PLIST_PATH="$plist_path" PYTHON_BIN="$python_bin" REPO_ROOT="$repo_root" LOCAL_ROOT="$local_root" PREFIX="$prefix" CACHE_DIR="$cache_dir" WORK_DIR="$work_dir" STATE_FILE="$state_file" BASE_RECORD_FILE="$base_record_file" DAEMON_FLAG="$daemon_flag" INTERVAL_SECONDS="$interval_seconds" WRITER_POLICY="$writer_policy" LOGS_DIR="$logs_dir" "$python_bin" - <<'PY'
+PLIST_PATH="$plist_path" PYTHON_BIN="$python_bin" REPO_ROOT="$repo_root" LOCAL_ROOT="$local_root" PREFIX="$prefix" CACHE_DIR="$cache_dir" WORK_DIR="$work_dir" STATE_FILE="$state_file" BASE_RECORD_FILE="$base_record_file" DAEMON_FLAG="$daemon_flag" INTERVAL_SECONDS="$interval_seconds" WRITER_POLICY="$writer_policy" SYNC_TARGET="$sync_target" CONTINUE_ON_BLOCKED="$continue_on_blocked" LOGS_DIR="$logs_dir" "$python_bin" - <<'PY'
 import os
 from pathlib import Path
 from plistlib import dump
 
+program_args = [
+    os.environ["PYTHON_BIN"],
+    "-m",
+    "skill_sync_sidecar",
+    "sync-daemon",
+    "--target",
+    os.environ["SYNC_TARGET"],
+    "--local-root",
+    os.environ["LOCAL_ROOT"],
+    "--cc-switch-webdav",
+    "--prefix",
+    os.environ["PREFIX"],
+    "--cache-dir",
+    os.environ["CACHE_DIR"],
+    "--work-dir",
+    os.environ["WORK_DIR"],
+    "--state-file",
+    os.environ["STATE_FILE"],
+    "--base-record-file",
+    os.environ["BASE_RECORD_FILE"],
+    "--last-applied-record",
+    os.environ["BASE_RECORD_FILE"],
+    "--writer-policy",
+    os.environ["WRITER_POLICY"],
+    os.environ["DAEMON_FLAG"],
+    "--interval-seconds",
+    os.environ["INTERVAL_SECONDS"],
+]
+if os.environ["CONTINUE_ON_BLOCKED"] == "1":
+    program_args.append("--continue-on-blocked")
+
 plist = {
     "Label": "com.skill-sync-sidecar",
-    "ProgramArguments": [
-        os.environ["PYTHON_BIN"],
-        "-m",
-        "skill_sync_sidecar",
-        "sync-daemon",
-        "--local-root",
-        os.environ["LOCAL_ROOT"],
-        "--cc-switch-webdav",
-        "--prefix",
-        os.environ["PREFIX"],
-        "--cache-dir",
-        os.environ["CACHE_DIR"],
-        "--work-dir",
-        os.environ["WORK_DIR"],
-        "--state-file",
-        os.environ["STATE_FILE"],
-        "--base-record-file",
-        os.environ["BASE_RECORD_FILE"],
-        "--last-applied-record",
-        os.environ["BASE_RECORD_FILE"],
-        "--writer-policy",
-        os.environ["WRITER_POLICY"],
-        os.environ["DAEMON_FLAG"],
-        "--interval-seconds",
-        os.environ["INTERVAL_SECONDS"],
-    ],
+    "ProgramArguments": program_args,
     "EnvironmentVariables": {
         "PYTHONPATH": str(Path(os.environ["REPO_ROOT"]) / "src"),
     },
@@ -201,6 +231,8 @@ print(f"plist={os.environ['PLIST_PATH']}")
 print(f"state_file={state_path}")
 print(f"base_record_file={os.environ['BASE_RECORD_FILE']}")
 print(f"writer_policy={state.get('writer_policy')}")
+print(f"target={state.get('target')}")
+print(f"stop_on_blocked={state.get('stop_on_blocked')}")
 print(f"run_base={run_base}")
 print(f"snapshot_total={snapshot['total']}")
 print(f"push_files={push['files']}")

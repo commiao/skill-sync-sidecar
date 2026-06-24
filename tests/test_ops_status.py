@@ -30,6 +30,8 @@ class OpsStatusTest(unittest.TestCase):
                         "updated_at": "2026-06-14T00:00:00Z",
                         "cycles_run": 3,
                         "current_base_record": str(base_record),
+                        "target": "mixed-scope-root",
+                        "stop_on_blocked": False,
                         "cycles": [
                             {
                                 "status": "complete",
@@ -52,6 +54,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["remote_snapshot"]["total"], 1)
             self.assertEqual(status["base_record"]["applied_count"], 1)
             self.assertEqual(status["daemon_state"]["cycles_run"], 3)
+            self.assertEqual(status["daemon_state"]["target"], "mixed-scope-root")
+            self.assertFalse(status["daemon_state"]["stop_on_blocked"])
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertTrue(status["sync_plan"]["safe_to_apply"])
 
