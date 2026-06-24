@@ -136,6 +136,33 @@ Dashboard v1 separates status into:
 - Queue: blocked items that require review.
 - Details: daemon, local-only/local-override policy, and artifact paths.
 
+To show a real OpenClaw card on the Mac dashboard, mirror OpenClaw's read-only `ops-status --json` into a local peer file and pass it with `--peer-status`:
+
+```bash
+mkdir -p "$HOME/Library/Application Support/skill-sync-sidecar/peers"
+ssh root@100.79.177.102 \
+  "PYTHONPATH=/opt/skill-sync-sidecar/releases/2e4499f/src \
+   /opt/skill-sync-sidecar/venv-0.1.3/bin/python -m skill_sync_sidecar ops-status \
+     --local-root /home/admin/clawd/skills \
+     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
+     --base-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
+     --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-pullonly-state.json \
+     --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
+     --allow-new \
+     --writer-policy pull-only \
+     --json" \
+  > "$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json"
+```
+
+Then start the Mac dashboard with:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar dashboard \
+  --allow-new \
+  --writer-policy pull-only \
+  --peer-status "oc-vps=$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json"
+```
+
 `ops-status` reports `health=green|yellow|red`:
 
 - `green`: artifacts are readable and the latest plan has no blocked items.

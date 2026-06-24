@@ -81,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_writer_policy_arg(dashboard)
     dashboard.add_argument("--host", default="127.0.0.1", help="Dashboard listen host.")
     dashboard.add_argument("--port", type=int, default=8765, help="Dashboard listen port. Use 0 to allocate a free port.")
+    dashboard.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
     dashboard.set_defaults(func=cmd_dashboard)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
@@ -400,6 +401,11 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
 
 
 def cmd_dashboard(args: argparse.Namespace) -> int:
+    try:
+        peer_status_files = parse_peer_status_files(args.peer_status)
+    except ValueError as exc:
+        print(f"dashboard failed: {exc}", file=sys.stderr)
+        return 2
     config = DashboardConfig(
         local_root=Path(args.local_root),
         remote_snapshot=Path(args.remote_snapshot),
@@ -411,9 +417,24 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         allow_new=args.allow_new,
         allow_delete=args.allow_delete,
         writer_policy=args.writer_policy,
+        peer_status_files=peer_status_files,
     )
     serve_dashboard(args.host, args.port, config)
     return 0
+
+
+def parse_peer_status_files(values: Sequence[str]) -> dict[str, Path]:
+    result: dict[str, Path] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--peer-status must be id=/path/status.json: {value}")
+        peer_id, raw_path = value.split("=", 1)
+        peer_id = peer_id.strip()
+        raw_path = raw_path.strip()
+        if not peer_id or not raw_path:
+            raise ValueError(f"--peer-status must be id=/path/status.json: {value}")
+        result[peer_id] = Path(raw_path).expanduser()
+    return result
 
 
 def cmd_openclaw_gate(args: argparse.Namespace) -> int:

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
 from .ops_status import build_ops_status
 from .scanner import scan_roots
@@ -22,6 +22,7 @@ class DashboardConfig:
     allow_new: bool = False
     allow_delete: bool = False
     writer_policy: str = "push-pull"
+    peer_status_files: Optional[Dict[str, Path]] = None
 
 
 def build_dashboard_status(config: DashboardConfig) -> dict:
@@ -37,18 +38,47 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         allow_delete=config.allow_delete,
         writer_policy=config.writer_policy,
     )
+    peers = _load_peer_status_files(config.peer_status_files or {})
     status["dashboard"] = {
-        "devices": _device_overview(status),
+        "devices": _device_overview(status, peers),
         "tools": _tool_overview(),
     }
     return status
 
 
-def _device_overview(status: dict) -> list[dict]:
+def _load_peer_status_files(peer_status_files: Dict[str, Path]) -> Dict[str, dict]:
+    peers = {}
+    for peer_id, path in peer_status_files.items():
+        try:
+            data = json.loads(path.expanduser().read_text(encoding="utf-8"))
+        except Exception as exc:
+            peers[peer_id] = {
+                "id": peer_id,
+                "health": "red",
+                "error": str(exc),
+            }
+            continue
+        if isinstance(data, dict):
+            peers[peer_id] = data
+    return peers
+
+
+def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> list[dict]:
+    peers = peers or {}
     sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
     blocked = sync_plan.get("blocked")
     local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
     current_note = "同步正常，无待处理项" if status.get("health") == "green" else "需要查看待处理队列"
+    openclaw = peers.get("oc-vps") or peers.get("openclaw")
+    openclaw_device = _peer_device(
+        "oc-vps",
+        "oc-vps / OpenClaw",
+        "已接入设备",
+        openclaw,
+        fallback_policy="pull-only + local-only",
+        fallback_note="OpenClaw 已部署 sidecar；本机 dashboard 尚未读取到 peer status 文件",
+        fallback_local_policy=["disk-cleanup", "lark-cli-adapter"],
+    )
     return [
         {
             "id": "mac",
@@ -61,17 +91,7 @@ def _device_overview(status: dict) -> list[dict]:
             "note": current_note,
             "local_policy": local_overrides.get("skills", []),
         },
-        {
-            "id": "oc-vps",
-            "name": "oc-vps / OpenClaw",
-            "kind": "已接入设备",
-            "health": "not_connected",
-            "skills": None,
-            "blocked": None,
-            "policy": "pull-only + local-only",
-            "note": "OpenClaw 已部署 sidecar；本机 dashboard v1 尚未拉取远端 peer 状态",
-            "local_policy": ["disk-cleanup", "lark-cli-adapter"],
-        },
+        openclaw_device,
         {
             "id": "win",
             "name": "Windows",
@@ -84,6 +104,55 @@ def _device_overview(status: dict) -> list[dict]:
             "local_policy": [],
         },
     ]
+
+
+def _peer_device(
+    peer_id: str,
+    name: str,
+    kind: str,
+    status: Optional[dict],
+    fallback_policy: str,
+    fallback_note: str,
+    fallback_local_policy: list[str],
+) -> dict:
+    if not status:
+        return {
+            "id": peer_id,
+            "name": name,
+            "kind": kind,
+            "health": "not_connected",
+            "skills": None,
+            "blocked": None,
+            "policy": fallback_policy,
+            "note": fallback_note,
+            "local_policy": fallback_local_policy,
+        }
+    sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
+    remote_snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
+    local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
+    health = status.get("health", "unknown")
+    blocked = sync_plan.get("blocked")
+    if status.get("error"):
+        note = f"读取 peer status 失败：{status.get('error')}"
+    elif health == "green":
+        note = "远端同步正常，无待处理项"
+    elif health == "yellow":
+        note = "远端有待审批或待处理项"
+    elif health == "red":
+        note = "远端状态异常，需要检查 sidecar"
+    else:
+        note = "远端状态未知"
+    return {
+        "id": peer_id,
+        "name": name,
+        "kind": kind,
+        "health": health,
+        "skills": remote_snapshot.get("total"),
+        "blocked": blocked,
+        "policy": sync_plan.get("writer_policy") or status.get("writer_policy") or fallback_policy,
+        "note": note,
+        "local_policy": local_overrides.get("skills", []),
+    }
 
 
 def _tool_overview() -> list[dict]:

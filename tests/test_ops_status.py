@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from skill_sync_sidecar.cli import build_parser
+from skill_sync_sidecar.cli import build_parser, parse_peer_status_files
 from skill_sync_sidecar.dashboard import DASHBOARD_HTML, DashboardConfig, build_dashboard_status
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
@@ -258,10 +258,26 @@ class OpsStatusTest(unittest.TestCase):
             local_root = root / "skills"
             snapshot_dir = root / "remote"
             base_record = root / "base-record.json"
+            peer_status = root / "openclaw-status.json"
 
             self._write_skill(local_root / "demo", "Demo", "Demo skill")
             index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
             self._write_base_record(base_record, index)
+            peer_status.write_text(
+                json.dumps(
+                    {
+                        "health": "green",
+                        "writer_policy": "pull-only",
+                        "remote_snapshot": {"total": 95},
+                        "sync_plan": {
+                            "writer_policy": "pull-only",
+                            "blocked": 0,
+                            "local_overrides": {"total": 2, "skills": ["disk-cleanup", "lark-cli-adapter"]},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             status = build_dashboard_status(
                 DashboardConfig(
@@ -269,13 +285,17 @@ class OpsStatusTest(unittest.TestCase):
                     remote_snapshot=snapshot_dir,
                     base_record=base_record,
                     allow_new=True,
+                    peer_status_files={"oc-vps": peer_status},
                 )
             )
+            devices = {device["id"]: device for device in status["dashboard"]["devices"]}
 
             self.assertEqual(status["health"], "green")
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertIn("dashboard", status)
-            self.assertTrue(any(device["id"] == "mac" for device in status["dashboard"]["devices"]))
+            self.assertEqual(devices["oc-vps"]["health"], "green")
+            self.assertEqual(devices["oc-vps"]["skills"], 95)
+            self.assertEqual(devices["oc-vps"]["local_policy"], ["disk-cleanup", "lark-cli-adapter"])
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in status["dashboard"]["tools"]))
             self.assertIn("/api/status", DASHBOARD_HTML)
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
@@ -299,6 +319,8 @@ class OpsStatusTest(unittest.TestCase):
                 "127.0.0.1",
                 "--port",
                 "0",
+                "--peer-status",
+                "oc-vps=/tmp/openclaw.json",
             ]
         )
 
@@ -306,6 +328,10 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(args.writer_policy, "pull-only")
         self.assertTrue(args.allow_new)
         self.assertEqual(args.port, 0)
+        self.assertEqual(parse_peer_status_files(args.peer_status)["oc-vps"], Path("/tmp/openclaw.json"))
+
+        with self.assertRaises(ValueError):
+            parse_peer_status_files(["broken"])
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)
