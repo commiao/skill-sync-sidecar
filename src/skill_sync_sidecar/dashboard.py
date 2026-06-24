@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .ops_status import build_ops_status
+from .scanner import scan_roots
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class DashboardConfig:
 
 
 def build_dashboard_status(config: DashboardConfig) -> dict:
-    return build_ops_status(
+    status = build_ops_status(
         config.local_root,
         config.remote_snapshot,
         base_record=config.base_record,
@@ -36,6 +37,107 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         allow_delete=config.allow_delete,
         writer_policy=config.writer_policy,
     )
+    status["dashboard"] = {
+        "devices": _device_overview(status),
+        "tools": _tool_overview(),
+    }
+    return status
+
+
+def _device_overview(status: dict) -> list[dict]:
+    sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
+    blocked = sync_plan.get("blocked")
+    local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
+    current_note = "同步正常，无待处理项" if status.get("health") == "green" else "需要查看待处理队列"
+    return [
+        {
+            "id": "mac",
+            "name": "Mac 本机",
+            "kind": "当前设备",
+            "health": status.get("health", "unknown"),
+            "skills": status.get("remote_snapshot", {}).get("total"),
+            "blocked": blocked,
+            "policy": status.get("writer_policy"),
+            "note": current_note,
+            "local_policy": local_overrides.get("skills", []),
+        },
+        {
+            "id": "oc-vps",
+            "name": "oc-vps / OpenClaw",
+            "kind": "已接入设备",
+            "health": "not_connected",
+            "skills": None,
+            "blocked": None,
+            "policy": "pull-only + local-only",
+            "note": "OpenClaw 已部署 sidecar；本机 dashboard v1 尚未拉取远端 peer 状态",
+            "local_policy": ["disk-cleanup", "lark-cli-adapter"],
+        },
+        {
+            "id": "win",
+            "name": "Windows",
+            "kind": "计划设备",
+            "health": "not_configured",
+            "skills": None,
+            "blocked": None,
+            "policy": "未接入",
+            "note": "等待安装 sidecar 后纳入同一面板",
+            "local_policy": [],
+        },
+    ]
+
+
+def _tool_overview() -> list[dict]:
+    home = Path.home()
+    roots = [
+        ("cc-switch", "cc-switch", [home / ".cc-switch" / "skills"], "主同步目录"),
+        ("skillshub", "skillshub", [home / ".skillshub"], "工具技能目录"),
+        ("codex", "Codex", [home / ".codex" / "skills", home / ".agents" / "skills"], "Codex 可发现目录"),
+        ("cursor", "Cursor", [home / ".cursor" / "skills-cursor"], "Cursor 技能目录"),
+        ("claude-code", "Claude Code", [home / ".claude" / "skills"], "Claude Code 技能目录"),
+    ]
+    tools = []
+    for tool_id, name, paths, role in roots:
+        installed_paths = [path for path in paths if path.exists()]
+        installed = bool(installed_paths)
+        count = 0
+        risk = {"ok": 0, "warning": 0, "error": 0}
+        if installed:
+            try:
+                for index, path in enumerate(installed_paths):
+                    data = scan_roots([f"{tool_id}-{index}={path}"]).to_dict()
+                    count += int(data.get("total", 0))
+                    by_risk = dict(data.get("by_risk", {}))
+                    for key in risk:
+                        risk[key] += int(by_risk.get(key, 0))
+            except Exception as exc:  # pragma: no cover - inventory should not break dashboard
+                tools.append(
+                    {
+                        "id": tool_id,
+                        "name": name,
+                        "path": ", ".join(str(path) for path in paths),
+                        "role": role,
+                        "installed": True,
+                        "state": "error",
+                        "skills": 0,
+                        "risk": {},
+                        "note": str(exc),
+                    }
+                )
+                continue
+        tools.append(
+            {
+                "id": tool_id,
+                "name": name,
+                "path": ", ".join(str(path) for path in paths),
+                "role": role,
+                "installed": installed,
+                "state": "active" if installed else "not_found",
+                "skills": count,
+                "risk": risk,
+                "note": "已检测到目录" if installed else "未检测到目录",
+            }
+        )
+    return tools
 
 
 def serve_dashboard(host: str, port: int, config: DashboardConfig) -> None:
@@ -203,6 +305,71 @@ DASHBOARD_HTML = r"""<!doctype html>
       grid-template-columns: minmax(0, 1fr) minmax(320px, .8fr);
       gap: 16px;
     }
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 18px 0 10px;
+    }
+    .section-title h2 { margin: 0; }
+    .section-help {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .device-card, .tool-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-width: 0;
+    }
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .card-name {
+      font-size: 16px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .card-kind {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .card-note {
+      color: var(--muted);
+      min-height: 38px;
+      overflow-wrap: anywhere;
+    }
+    .card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .mini-stat {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .mini-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .mini-value {
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
     h2 {
       font-size: 14px;
       margin: 0 0 10px;
@@ -274,6 +441,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       header { align-items: flex-start; flex-direction: column; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
+      .cards { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 560px) {
@@ -318,6 +486,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="cycles" class="metric-value">-</div>
       </div>
     </section>
+    <div class="section-title">
+      <h2>设备</h2>
+      <span class="section-help">区分 Mac、OpenClaw、Windows 的接入状态</span>
+    </div>
+    <section id="devices" class="cards"></section>
+    <div class="section-title">
+      <h2>工具</h2>
+      <span class="section-help">区分 cc-switch、skillshub、Codex、Cursor、Claude Code 的本机目录</span>
+    </div>
+    <section id="tools" class="cards"></section>
     <section class="grid">
       <div class="stack">
         <div class="panel">
@@ -358,6 +536,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       return String(value);
     };
     const row = (key, value) => `<div class="key">${key}</div><div class="value mono">${escapeHtml(pretty(value))}</div>`;
+    const pill = (label, kind) => `<span class="pill ${kind || ""}">${escapeHtml(text(label))}</span>`;
     const escapeHtml = (value) => String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -386,6 +565,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("remote-total").textContent = text(snapshot.total);
       $("cycles").textContent = text(daemon.cycles_run);
       $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      const dashboard = status.dashboard || {};
+      renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
+      renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
 
       const blockedItems = Array.isArray(blockedReport.items) ? blockedReport.items : [];
       $("blocked-empty").hidden = blockedItems.length > 0;
@@ -423,6 +605,53 @@ DASHBOARD_HTML = r"""<!doctype html>
         row("base_record", (status.base_record || {}).path),
         row("blocked_report", blockedReport.path),
       ].join("");
+    }
+
+    function deviceKind(health) {
+      if (health === "green") return "green";
+      if (health === "yellow") return "yellow";
+      if (health === "red") return "red";
+      return "";
+    }
+
+    function renderDevices(devices) {
+      $("devices").innerHTML = devices.map((device) => `
+        <article class="device-card">
+          <div class="card-head">
+            <div>
+              <div class="card-name">${escapeHtml(device.name)}</div>
+              <div class="card-kind">${escapeHtml(device.kind)}</div>
+            </div>
+            ${pill(device.health, deviceKind(device.health))}
+          </div>
+          <div class="card-note">${escapeHtml(device.note)}</div>
+          <div class="card-stats">
+            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(device.skills))}</div></div>
+            <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
+            <div class="mini-stat"><div class="mini-label">策略</div><div class="mini-value">${escapeHtml(text(device.policy))}</div></div>
+            <div class="mini-stat"><div class="mini-label">本机例外</div><div class="mini-value">${escapeHtml(pretty(device.local_policy || []))}</div></div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function renderTools(tools) {
+      $("tools").innerHTML = tools.map((tool) => `
+        <article class="tool-card">
+          <div class="card-head">
+            <div>
+              <div class="card-name">${escapeHtml(tool.name)}</div>
+              <div class="card-kind">${escapeHtml(tool.role)}</div>
+            </div>
+            ${pill(tool.installed ? "detected" : "not found", tool.installed ? "green" : "")}
+          </div>
+          <div class="card-note mono">${escapeHtml(tool.path)}</div>
+          <div class="card-stats">
+            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
+            <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>
+          </div>
+        </article>
+      `).join("");
     }
 
     async function refresh() {

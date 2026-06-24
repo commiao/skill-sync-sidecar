@@ -129,6 +129,13 @@ The dashboard listens on `127.0.0.1:8765` by default and serves:
 
 It is intentionally read-only in v0. It does not trigger sync, upload to WebDAV, apply packages, or modify local roots.
 
+Dashboard v1 separates status into:
+
+- Devices: current Mac, OpenClaw peer placeholder, and Windows placeholder.
+- Tools: cc-switch, skillshub, Codex, Cursor, and Claude Code local skill roots.
+- Queue: blocked items that require review.
+- Details: daemon, local-only/local-override policy, and artifact paths.
+
 `ops-status` reports `health=green|yellow|red`:
 
 - `green`: artifacts are readable and the latest plan has no blocked items.

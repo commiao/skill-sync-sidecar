@@ -274,8 +274,13 @@ class OpsStatusTest(unittest.TestCase):
 
             self.assertEqual(status["health"], "green")
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
+            self.assertIn("dashboard", status)
+            self.assertTrue(any(device["id"] == "mac" for device in status["dashboard"]["devices"]))
+            self.assertTrue(any(tool["id"] == "cc-switch" for tool in status["dashboard"]["tools"]))
             self.assertIn("/api/status", DASHBOARD_HTML)
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
+            self.assertIn("id=\"devices\"", DASHBOARD_HTML)
+            self.assertIn("id=\"tools\"", DASHBOARD_HTML)
 
     def test_dashboard_parser_accepts_ops_status_arguments(self):
         parser = build_parser()

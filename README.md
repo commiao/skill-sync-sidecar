@@ -7,7 +7,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `scan`: discover local `SKILL.md` packages and emit normalized records.
 - `status`: summarize counts, sources, risks, and duplicate skill ids.
 - `ops-status`: summarize daemon state, base record, remote snapshot, sync plan, and optional OpenClaw reconcile state.
-- `dashboard`: serve a read-only local web dashboard backed by `ops-status`.
+- `dashboard`: serve a read-only local web dashboard backed by `ops-status`, with device and tool inventory sections.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
