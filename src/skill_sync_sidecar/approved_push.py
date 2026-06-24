@@ -26,6 +26,7 @@ def build_approved_push_preview(
     skill_ids: Sequence[str],
     last_applied_record: Optional[Path] = None,
     allow_new: Optional[bool] = None,
+    allow_conflict_local_wins: bool = False,
 ) -> Dict[str, object]:
     report = _load_blocked_report(blocked_report_path)
     approved_ids = _normalize_skill_ids(skill_ids)
@@ -37,7 +38,7 @@ def build_approved_push_preview(
     report_by_id = _report_items_by_skill_id(report)
 
     approved_items = [
-        _approved_item(skill_id, report_by_id, plan_by_id)
+        _approved_item(skill_id, report_by_id, plan_by_id, allow_conflict_local_wins=allow_conflict_local_wins)
         for skill_id in approved_ids
     ]
     deferred_pushes = [
@@ -74,6 +75,7 @@ def build_approved_push_preview(
         "blocked_report": str(blocked_report_path.resolve()),
         "last_applied_record": str(last_applied_record.resolve()) if last_applied_record else None,
         "allow_new": effective_allow_new,
+        "allow_conflict_local_wins": allow_conflict_local_wins,
         "approved": len(approved_items),
         "approved_skill_ids": approved_ids,
         "deferred_pushes": deferred_pushes,
@@ -98,6 +100,7 @@ def execute_approved_push(
     remote_prefix: str = "",
     last_applied_record: Optional[Path] = None,
     allow_new: Optional[bool] = None,
+    allow_conflict_local_wins: bool = False,
     base_record_out: Optional[Path] = None,
     out_dir: Optional[Path] = None,
 ) -> Dict[str, object]:
@@ -108,6 +111,7 @@ def execute_approved_push(
         skill_ids,
         last_applied_record=last_applied_record,
         allow_new=allow_new,
+        allow_conflict_local_wins=allow_conflict_local_wins,
     )
     _assert_remote_matches_cache(remote, remote_prefix, remote_snapshot_dir)
 
@@ -146,6 +150,7 @@ def execute_approved_push(
         "last_applied_record": str(last_applied_record.resolve()) if last_applied_record else None,
         "remote_prefix": remote_prefix,
         "approved": preview["approved"],
+        "allow_conflict_local_wins": preview["allow_conflict_local_wins"],
         "approved_skill_ids": preview["approved_skill_ids"],
         "deferred_pushes": preview["deferred_pushes"],
         "uploaded_files": uploaded_files,
@@ -204,24 +209,37 @@ def _report_items_by_skill_id(report: Dict[str, object]) -> Dict[str, dict]:
     return result
 
 
-def _approved_item(skill_id: str, report_by_id: Dict[str, dict], plan_by_id: Dict[str, dict]) -> Dict[str, object]:
+def _approved_item(skill_id: str, report_by_id: Dict[str, dict], plan_by_id: Dict[str, dict], allow_conflict_local_wins: bool = False) -> Dict[str, object]:
     report_item = report_by_id.get(skill_id)
     if report_item is None:
         raise ApprovedPushError(f"skill was not present in blocked report: {skill_id}")
-    if report_item.get("category") != "writer_policy":
-        raise ApprovedPushError(f"skill is not blocked by writer policy: {skill_id}")
-    if report_item.get("status_action") not in {"push", "local_new"}:
-        raise ApprovedPushError(f"skill is not a local-to-remote push candidate: {skill_id}")
 
     current = plan_by_id.get(skill_id)
     if current is None:
         raise ApprovedPushError(f"skill is not present in the current sync plan: {skill_id}")
-    if current.get("plan_action") not in PUSH_ACTIONS or not current.get("allowed"):
-        raise ApprovedPushError(f"skill is not currently pushable under explicit approval: {skill_id}")
 
     for hash_key in ("base_hash", "local_hash", "remote_hash"):
         if current.get(hash_key) != report_item.get(hash_key):
             raise ApprovedPushError(f"skill changed since blocked report was generated: {skill_id} ({hash_key})")
+
+    if _is_approved_conflict_local_wins(report_item, current, allow_conflict_local_wins):
+        return {
+            "skill_id": skill_id,
+            "approved_action": "conflict_local_wins",
+            "status_action": current.get("status_action"),
+            "base_hash": current.get("base_hash"),
+            "local_hash": current.get("local_hash"),
+            "remote_hash": current.get("remote_hash"),
+            "blocked_reason": report_item.get("reason"),
+            "approval_reason": "explicit local-wins conflict resolution from blocked-report queue",
+        }
+
+    if report_item.get("category") != "writer_policy":
+        raise ApprovedPushError(f"skill is not blocked by writer policy: {skill_id}")
+    if report_item.get("status_action") not in {"push", "local_new"}:
+        raise ApprovedPushError(f"skill is not a local-to-remote push candidate: {skill_id}")
+    if current.get("plan_action") not in PUSH_ACTIONS or not current.get("allowed"):
+        raise ApprovedPushError(f"skill is not currently pushable under explicit approval: {skill_id}")
 
     return {
         "skill_id": skill_id,
@@ -233,6 +251,20 @@ def _approved_item(skill_id: str, report_by_id: Dict[str, dict], plan_by_id: Dic
         "blocked_reason": report_item.get("reason"),
         "approval_reason": "explicit approved push from blocked-report writer-policy queue",
     }
+
+
+def _is_approved_conflict_local_wins(report_item: Dict[str, object], current: Dict[str, object], allow_conflict_local_wins: bool) -> bool:
+    if not allow_conflict_local_wins:
+        return False
+    return (
+        report_item.get("category") == "conflict"
+        and report_item.get("status_action") == "conflict"
+        and current.get("status_action") == "conflict"
+        and current.get("plan_action") == "blocked"
+        and not current.get("allowed")
+        and bool(current.get("local_hash"))
+        and bool(current.get("remote_hash"))
+    )
 
 
 def _build_merged_snapshot(local_root: Path, remote_snapshot_dir: Path, approved_ids: Set[str], out_dir: Path, label: str) -> Dict[str, object]:

@@ -1237,6 +1237,67 @@ class ScannerTest(unittest.TestCase):
             with self.assertRaises(ApprovedPushError):
                 build_approved_push_preview(local_root, remote_snapshot, blocked_out / "blocked-report.json", ["demo"], record_path)
 
+    def test_approved_push_can_explicitly_publish_selected_conflict_local_wins(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            pulled_cache = base / "pulled-cache"
+            blocked_out = base / "blocked"
+            approval_out = base / "approved"
+            base_record_out = base / "state" / "base-record.json"
+            prefix = "snapshots/current"
+
+            self._write_skill(local_root / "alpha", "alpha", "Alpha", {"notes.txt": "local wins\n"})
+            self._write_skill(remote_source / "alpha", "alpha", "Alpha", {"notes.txt": "remote loses\n"})
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            report = build_blocked_report(local_root, remote_snapshot, blocked_out, None, writer_policy="pull-only")
+            self.assertEqual(report["summary"], {"conflict": 1})
+
+            with self.assertRaises(ApprovedPushError):
+                build_approved_push_preview(local_root, remote_snapshot, blocked_out / "blocked-report.json", ["alpha"])
+
+            preview = build_approved_push_preview(
+                local_root,
+                remote_snapshot,
+                blocked_out / "blocked-report.json",
+                ["alpha"],
+                allow_conflict_local_wins=True,
+            )
+            self.assertEqual(preview["items"][0]["approved_action"], "conflict_local_wins")
+
+            result = execute_approved_push(
+                local_root,
+                remote_snapshot,
+                blocked_out / "blocked-report.json",
+                ["alpha"],
+                remote,
+                remote_prefix=prefix,
+                allow_conflict_local_wins=True,
+                base_record_out=base_record_out,
+                out_dir=approval_out,
+            )
+
+            self.assertEqual(result["status"], "complete")
+            self.assertTrue(result["allow_conflict_local_wins"])
+            self.assertTrue(base_record_out.exists())
+
+            download_snapshot(remote, pulled_cache, prefix)
+            remote_hashes = {
+                skill["skill_id"]: skill["content_hash"]
+                for skill in __import__("json").loads((pulled_cache / "index.json").read_text(encoding="utf-8"))["skills"]
+            }
+            local_hashes = {skill.skill_id: skill.content_hash for skill in scan_roots([f"cc-switch={local_root}"]).skills}
+            self.assertEqual(remote_hashes["alpha"], local_hashes["alpha"])
+
+            status = build_sync_status(local_root, pulled_cache, base_record_out)
+            self.assertEqual(status["summary"], {"unchanged": 1})
+
     def test_sync_apply_push_refuses_stale_remote_cache(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
