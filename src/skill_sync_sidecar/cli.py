@@ -20,8 +20,10 @@ from .diff import diff_snapshot_dirs
 from .hub_import import (
     HubImportDiagnosisError,
     build_hub_import_diagnosis,
+    build_hub_import_preview_package,
     parse_hub_source_spec,
     render_hub_import_diagnosis_text,
+    render_hub_import_preview_text,
 )
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
@@ -111,6 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
     hub_import_diagnosis.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
     hub_import_diagnosis.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     hub_import_diagnosis.set_defaults(func=cmd_hub_import_diagnosis)
+
+    hub_import_preview = subcommands.add_parser("hub-import-preview", help="Write a dry-run skillshub import preview package.")
+    hub_import_preview.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
+    hub_import_preview.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
+    hub_import_preview.add_argument("--out", required=True, help="Output directory for preview.json and preview.md.")
+    hub_import_preview.add_argument("--max-diff-lines", type=int, default=160, help="Maximum SKILL.md diff lines per update action.")
+    hub_import_preview.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    hub_import_preview.set_defaults(func=cmd_hub_import_preview)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
@@ -493,6 +503,25 @@ def cmd_hub_import_diagnosis(args: argparse.Namespace) -> int:
         print(json.dumps(diagnosis, ensure_ascii=False, indent=2))
     else:
         print(render_hub_import_diagnosis_text(diagnosis))
+    return 0
+
+
+def cmd_hub_import_preview(args: argparse.Namespace) -> int:
+    try:
+        source_roots = [parse_hub_source_spec(value) for value in args.source_root] if args.source_root else None
+        package = build_hub_import_preview_package(
+            Path(args.hub_root),
+            source_roots=source_roots,
+            out_dir=Path(args.out),
+            max_diff_lines=max(1, args.max_diff_lines),
+        )
+    except (HubImportDiagnosisError, ValueError, OSError) as exc:
+        print(f"hub-import-preview failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(package, ensure_ascii=False, indent=2))
+    else:
+        print(render_hub_import_preview_text(package))
     return 0
 
 

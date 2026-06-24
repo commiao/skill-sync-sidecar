@@ -169,3 +169,19 @@ It also includes an `action_plan` in `dry_run` mode. The plan separates:
 
 The action plan is intentionally non-writing (`writes_files=false` and
 `safe_to_apply_automatically=false`) until an explicit apply flow exists.
+
+For an auditable package, write the same plan to disk:
+
+```text
+command=skill-sync hub-import-preview --out /tmp/skillshub-import-preview
+```
+
+The command writes:
+
+- `preview.json`: machine-readable dry-run package with non-skip actions,
+  source file hashes, target paths, and review flags.
+- `preview.md`: operator-readable summary with `SKILL.md` diffs for update
+  candidates.
+
+This preview package still does not write to `~/.skillshub`; it is the handoff
+artifact before an explicit apply command exists.

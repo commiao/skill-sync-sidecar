@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from skill_sync_sidecar.hub_import import build_hub_import_diagnosis, parse_hub_source_spec
+from skill_sync_sidecar.hub_import import build_hub_import_diagnosis, build_hub_import_preview_package, parse_hub_source_spec
 from skill_sync_sidecar.projection import ToolAdapter, build_tool_projection, parse_tool_adapter_spec
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -124,6 +124,33 @@ class ToolProjectionTest(unittest.TestCase):
                 self.assertEqual(action["action"], "review_duplicate_import")
                 self.assertTrue(action["requires_review"])
                 self.assertFalse(action["writes_files"])
+
+    def test_hub_import_preview_package_writes_auditable_dry_run_files(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            hub = root / "hub"
+            agents = root / "agents"
+            out = root / "preview"
+
+            self._write_skill(hub / "stale", "stale", "global", ["skillshub"], body="old")
+            self._write_skill(agents / "stale", "stale", "global", ["skillshub"], body="new")
+            self._write_skill(agents / "fresh", "fresh", "global", ["skillshub"], body="fresh")
+
+            package = build_hub_import_preview_package(hub, [("agents", agents)], out_dir=out)
+
+            self.assertEqual(package["mode"], "dry_run")
+            self.assertFalse(package["writes_files"])
+            self.assertTrue((out / "preview.json").exists())
+            self.assertTrue((out / "preview.md").exists())
+            self.assertEqual(package["action_summary"]["preview_import"], 1)
+            self.assertEqual(package["action_summary"]["review_update"], 1)
+            actions = {action["skill_id"]: action for action in package["actions"]}
+            self.assertEqual(actions["fresh"]["action"], "preview_import")
+            self.assertEqual(actions["stale"]["action"], "review_update")
+            self.assertTrue(actions["stale"]["skill_md_diff"]["ok"])
+            self.assertIn("-old", "\n".join(actions["stale"]["skill_md_diff"]["lines"]))
+            self.assertIn("+new", "\n".join(actions["stale"]["skill_md_diff"]["lines"]))
+            self.assertIn("Skillshub Import Preview", (out / "preview.md").read_text(encoding="utf-8"))
 
     def _write_skill(self, skill: Path, skill_id: str, scope: str, targets: list[str], body: str):
         skill.mkdir(parents=True, exist_ok=True)

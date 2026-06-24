@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import difflib
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -137,6 +140,93 @@ def render_hub_import_diagnosis_text(diagnosis: Dict[str, object], *, max_items:
     if len(items) > max_items:
         lines.append(f"... {len(items) - max_items} more")
     return "\n".join(lines)
+
+
+def build_hub_import_preview_package(
+    hub_root: Path = DEFAULT_HUB_ROOT,
+    source_roots: Optional[Sequence[Tuple[str, Path]]] = None,
+    *,
+    out_dir: Path,
+    max_diff_lines: int = 160,
+) -> Dict[str, object]:
+    diagnosis = build_hub_import_diagnosis(hub_root, source_roots=source_roots)
+    out_dir = out_dir.expanduser()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    actions = []
+    for action in diagnosis.get("action_plan", {}).get("actions", []):
+        if not isinstance(action, dict) or action.get("action") == "skip_existing":
+            continue
+        actions.append(_preview_action(action, max_diff_lines=max_diff_lines))
+
+    package = {
+        "record_type": "skill-sync-hub-import-preview",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "dry_run",
+        "writes_files": False,
+        "hub_root": diagnosis.get("hub_root"),
+        "source_roots": diagnosis.get("source_roots"),
+        "diagnosis_summary": diagnosis.get("summary"),
+        "action_summary": diagnosis.get("action_plan", {}).get("summary"),
+        "review_required": diagnosis.get("action_plan", {}).get("review_required"),
+        "safe_to_apply_automatically": False,
+        "actions": actions,
+        "skipped_existing": diagnosis.get("action_plan", {}).get("summary", {}).get("skip_existing", 0),
+    }
+
+    preview_json = out_dir / "preview.json"
+    preview_md = out_dir / "preview.md"
+    preview_json.write_text(json.dumps(package, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    preview_md.write_text(render_hub_import_preview_markdown(package), encoding="utf-8")
+    return {
+        **package,
+        "out_dir": str(out_dir),
+        "preview_json": str(preview_json),
+        "preview_md": str(preview_md),
+    }
+
+
+def render_hub_import_preview_text(package: Dict[str, object]) -> str:
+    action_summary = package.get("action_summary") if isinstance(package.get("action_summary"), dict) else {}
+    lines = [
+        f"out_dir: {package.get('out_dir')}",
+        f"preview_json: {package.get('preview_json')}",
+        f"preview_md: {package.get('preview_md')}",
+        "mode: dry_run",
+        "actions: preview_import={} review_update={} review_duplicate_import={} skipped_existing={}".format(
+            action_summary.get("preview_import", 0),
+            action_summary.get("review_update", 0),
+            action_summary.get("review_duplicate_import", 0),
+            package.get("skipped_existing", 0),
+        ),
+        f"review_required: {package.get('review_required')}",
+    ]
+    return "\n".join(lines)
+
+
+def render_hub_import_preview_markdown(package: Dict[str, object]) -> str:
+    action_summary = package.get("action_summary") if isinstance(package.get("action_summary"), dict) else {}
+    lines = [
+        "# Skillshub Import Preview",
+        "",
+        "- mode: `dry_run`",
+        "- writes_files: `false`",
+        f"- hub_root: `{package.get('hub_root')}`",
+        f"- preview_import: `{action_summary.get('preview_import', 0)}`",
+        f"- review_update: `{action_summary.get('review_update', 0)}`",
+        f"- review_duplicate_import: `{action_summary.get('review_duplicate_import', 0)}`",
+        f"- skipped_existing: `{package.get('skipped_existing', 0)}`",
+        "",
+        "## Actions",
+        "",
+    ]
+    actions = package.get("actions") if isinstance(package.get("actions"), list) else []
+    if not actions:
+        lines.append("No non-skip actions.")
+        return "\n".join(lines) + "\n"
+    for action in actions:
+        lines.extend(_render_preview_action_markdown(action))
+    return "\n".join(lines) + "\n"
 
 
 def _scan_root(source_id: str, root: Path) -> List[SkillRecord]:
@@ -330,6 +420,89 @@ def _action_sort_key(action: Dict[str, object]) -> Tuple[int, str, str, str]:
         str(action.get("skill_id")),
         str(action.get("source_path")),
     )
+
+
+def _preview_action(action: Dict[str, object], *, max_diff_lines: int) -> Dict[str, object]:
+    source_path = Path(str(action.get("source_path"))).expanduser()
+    source_record = _scan_preview_record(str(action.get("source") or "source"), source_path)
+    preview = {
+        **action,
+        "source_hash": source_record.content_hash if source_record else None,
+        "source_file_count": source_record.file_count if source_record else None,
+        "source_size_bytes": source_record.size_bytes if source_record else None,
+        "source_files": [file.__dict__ for file in source_record.files] if source_record else [],
+        "errors": [] if source_record else [f"cannot scan source skill at {source_path}"],
+    }
+    if action.get("action") == "review_update" and action.get("target_path"):
+        target_path = Path(str(action.get("target_path"))).expanduser()
+        hub_record = _scan_preview_record("hub", target_path)
+        preview.update(
+            {
+                "hub_hash": hub_record.content_hash if hub_record else None,
+                "hub_file_count": hub_record.file_count if hub_record else None,
+                "hub_size_bytes": hub_record.size_bytes if hub_record else None,
+                "hub_files": [file.__dict__ for file in hub_record.files] if hub_record else [],
+                "skill_md_diff": _diff_skill_md(target_path, source_path, max_lines=max_diff_lines),
+            }
+        )
+        if not hub_record:
+            preview.setdefault("errors", []).append(f"cannot scan hub skill at {target_path}")
+    return preview
+
+
+def _scan_preview_record(source: str, skill_dir: Path) -> Optional[SkillRecord]:
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        return None
+    try:
+        return scan_skill(source, skill_dir.resolve(), skill_md.resolve())
+    except OSError:
+        return None
+
+
+def _diff_skill_md(old_dir: Path, new_dir: Path, *, max_lines: int) -> Dict[str, object]:
+    old_file = old_dir / "SKILL.md"
+    new_file = new_dir / "SKILL.md"
+    try:
+        old_lines = old_file.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+        new_lines = new_file.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+    except OSError as exc:
+        return {"ok": False, "error": str(exc), "lines": [], "truncated": False}
+    diff_lines = list(
+        difflib.unified_diff(
+            old_lines,
+            new_lines,
+            fromfile=str(old_file),
+            tofile=str(new_file),
+            lineterm="",
+        )
+    )
+    truncated = len(diff_lines) > max_lines
+    if truncated:
+        diff_lines = diff_lines[:max_lines]
+    return {"ok": True, "lines": [line.rstrip("\n") for line in diff_lines], "truncated": truncated}
+
+
+def _render_preview_action_markdown(action: Dict[str, object]) -> List[str]:
+    lines = [
+        f"### {action.get('skill_id')} - {action.get('action_label')}",
+        "",
+        f"- action: `{action.get('action')}`",
+        f"- source: `{action.get('source')}`",
+        f"- source_path: `{action.get('source_path')}`",
+        f"- target_path: `{action.get('target_path')}`",
+        f"- requires_review: `{str(action.get('requires_review')).lower()}`",
+        f"- source_hash: `{action.get('source_hash')}`",
+        f"- source_files: `{action.get('source_file_count')}`",
+        f"- reason: {action.get('reason')}",
+        "",
+    ]
+    diff = action.get("skill_md_diff") if isinstance(action.get("skill_md_diff"), dict) else None
+    if diff and diff.get("lines"):
+        lines.extend(["```diff", *[str(line) for line in diff.get("lines", [])], "```", ""])
+        if diff.get("truncated"):
+            lines.extend(["Diff truncated.", ""])
+    return lines
 
 
 def _resolved_path(path: Path) -> str:
