@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENCLAW_SSH_TARGET="${OPENCLAW_SSH_TARGET:-root@100.79.177.102}"
 OPENCLAW_CONNECT_TIMEOUT="${OPENCLAW_CONNECT_TIMEOUT:-10}"
-OPENCLAW_RELEASE="${OPENCLAW_RELEASE:-2e4499f}"
+OPENCLAW_RELEASE="${OPENCLAW_RELEASE:-1a7c5f1}"
 OPENCLAW_PYTHON="${OPENCLAW_PYTHON:-/opt/skill-sync-sidecar/venv-0.1.3/bin/python}"
 OUT_FILE="${OPENCLAW_PEER_STATUS_OUT:-$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json}"
 LOG_PREFIX="${LOG_PREFIX:-skill-sync-openclaw-peer}"
