@@ -19,6 +19,7 @@ from .daemon import run_sync_daemon
 from .diff import diff_snapshot_dirs
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
+from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
 from .remote import RemoteError, build_upload_plan, download_snapshot, open_remote, upload_snapshot
 from .reconcile import ReconcileError, build_reconcile_report, load_inventory, write_reconcile_outputs
 from .scanner import scan_roots
@@ -83,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--port", type=int, default=8765, help="Dashboard listen port. Use 0 to allocate a free port.")
     dashboard.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
     dashboard.set_defaults(func=cmd_dashboard)
+
+    tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
+    tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
+    tool_projection.add_argument("--tool", action="append", default=[], help="Tool root as id=/path or id=/path1,/path2. Repeat for multiple tools.")
+    tool_projection.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    tool_projection.set_defaults(func=cmd_tool_projection)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
@@ -420,6 +427,36 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         peer_status_files=peer_status_files,
     )
     serve_dashboard(args.host, args.port, config)
+    return 0
+
+
+def cmd_tool_projection(args: argparse.Namespace) -> int:
+    try:
+        adapters = [parse_tool_adapter_spec(value) for value in args.tool] if args.tool else None
+        projection = build_tool_projection(Path(args.snapshot_dir), adapters=adapters)
+    except (ProjectionError, ValueError) as exc:
+        print(f"tool-projection failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(projection, ensure_ascii=False, indent=2))
+    else:
+        print(f"snapshot: {projection.get('snapshot_id')}")
+        print(f"canonical_total: {projection.get('canonical_total')}")
+        for tool in projection["tools"]:
+            summary = tool["summary"]
+            print(
+                "{}: installed={} targeted={} missing={} drift={} not_targeted={} unsupported_scope={} blocked_error={} extra_local={}".format(
+                    tool["name"],
+                    tool["installed_total"],
+                    tool["canonical_targeted"],
+                    summary.get("missing", 0),
+                    summary.get("drift", 0),
+                    summary.get("not_targeted", 0),
+                    summary.get("unsupported_scope", 0),
+                    summary.get("blocked_error", 0),
+                    len(tool["extra_local"]),
+                )
+            )
     return 0
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from .ops_status import build_ops_status
+from .projection import ProjectionError, build_tool_projection
 from .scanner import scan_roots
 
 
@@ -42,13 +43,15 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     devices = _device_overview(status, peers)
     blocked_items = _blocked_items(status, peers)
     operator = _operator_summary(status, devices, blocked_items)
+    projection = _safe_tool_projection(config.remote_snapshot)
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
-        "tools": _tool_overview(),
+        "tools": _merge_tool_projection(_tool_overview(), projection),
+        "tool_projection": projection,
     }
     return status
 
@@ -68,6 +71,38 @@ def _load_peer_status_files(peer_status_files: Dict[str, Path]) -> Dict[str, dic
         if isinstance(data, dict):
             peers[peer_id] = data
     return peers
+
+
+def _safe_tool_projection(snapshot_dir: Path) -> dict:
+    try:
+        return build_tool_projection(snapshot_dir)
+    except ProjectionError as exc:
+        return {"ok": False, "error": str(exc), "tools": []}
+
+
+def _merge_tool_projection(tools: list[dict], projection: dict) -> list[dict]:
+    projection_by_id = {
+        str(tool.get("id")): tool
+        for tool in projection.get("tools", [])
+        if isinstance(tool, dict)
+    }
+    merged = []
+    for tool in tools:
+        copied = dict(tool)
+        projected = projection_by_id.get(str(tool.get("id")))
+        if projected:
+            summary = projected.get("summary", {}) if isinstance(projected.get("summary"), dict) else {}
+            copied["projection"] = {
+                "canonical_targeted": projected.get("canonical_targeted"),
+                "missing": summary.get("missing", 0),
+                "drift": summary.get("drift", 0),
+                "unsupported_scope": summary.get("unsupported_scope", 0),
+                "not_targeted": summary.get("not_targeted", 0),
+                "blocked_error": summary.get("blocked_error", 0),
+                "extra_local": len(projected.get("extra_local", [])) if isinstance(projected.get("extra_local"), list) else 0,
+            }
+        merged.append(copied)
+    return merged
 
 
 def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> list[dict]:
@@ -357,6 +392,22 @@ def _handler_factory(status_provider: Callable[[], dict]):
                 self._send(204, "image/x-icon", b"")
                 return
             self._send(404, "text/plain; charset=utf-8", b"not found\n")
+
+        def do_HEAD(self) -> None:  # noqa: N802 - stdlib hook name
+            path = self.path.split("?", 1)[0]
+            if path in {"", "/"}:
+                self._send(200, "text/html; charset=utf-8", b"")
+                return
+            if path == "/api/status":
+                self._send(200, "application/json; charset=utf-8", b"")
+                return
+            if path == "/healthz":
+                self._send(200, "application/json; charset=utf-8", b"")
+                return
+            if path == "/favicon.ico":
+                self._send(204, "image/x-icon", b"")
+                return
+            self._send(404, "text/plain; charset=utf-8", b"")
 
         def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib hook signature
             return
@@ -883,9 +934,16 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="card-stats">
             <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
             <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>
+            <div class="mini-stat"><div class="mini-label">目标数</div><div class="mini-value">${escapeHtml(text((tool.projection || {}).canonical_targeted))}</div></div>
+            <div class="mini-stat"><div class="mini-label">缺失/漂移</div><div class="mini-value">${escapeHtml(projectionGap(tool.projection))}</div></div>
           </div>
         </article>
       `).join("");
+    }
+
+    function projectionGap(projection) {
+      if (!projection) return "-";
+      return `${text(projection.missing)} / ${text(projection.drift)}`;
     }
 
     function renderOperatorDevices(devices) {
