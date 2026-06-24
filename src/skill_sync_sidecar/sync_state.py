@@ -94,9 +94,6 @@ def _classify_skill_with_override(
         return item
     if not local or not remote:
         return item
-    if item.action == "conflict" and _hash(base) != _hash(remote):
-        return item
-
     local_path = local.get("path")
     if not local_path:
         return item

@@ -753,6 +753,57 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(plan["blocked"], 0)
             self.assertIn("OpenClaw runtime launcher", plan["items"][0]["reason"])
 
+    def test_sync_status_acknowledges_local_override_without_base_record(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+
+            self._write_skill(
+                local_root / "demo",
+                "demo",
+                "Demo skill",
+                {"bin/send.py": "#!/home/linuxbrew/.linuxbrew/bin/python3\nprint('send')\n"},
+            )
+            self._write_skill(
+                remote_source / "demo",
+                "demo",
+                "Demo skill",
+                {"bin/send.py": "#!/usr/bin/env python3\nprint('send')\n"},
+            )
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+
+            status_without_override = build_sync_status(local_root, remote_snapshot)
+            self.assertEqual(status_without_override["items"][0]["action"], "conflict")
+
+            (local_root / ".skill-sync-local-overrides.json").write_text(
+                __import__("json").dumps(
+                    {
+                        "version": 0,
+                        "skills": {
+                            "demo": {
+                                "ignore_paths": ["bin/send.py"],
+                                "reason": "OpenClaw runtime launcher uses Linuxbrew Python",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_sync_status(local_root, remote_snapshot)
+            item = status["items"][0]
+
+            self.assertEqual(status["summary"], {"local_override": 1})
+            self.assertEqual(item["action"], "local_override")
+            self.assertIsNone(item["base_hash"])
+            self.assertNotEqual(item["local_hash"], item["remote_hash"])
+
+            plan = build_sync_plan(status, writer_policy="pull-only")
+            self.assertEqual(plan["summary"], {"noop": 1})
+            self.assertEqual(plan["blocked"], 0)
+
     def test_sync_status_acknowledges_declared_local_only_skill(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
