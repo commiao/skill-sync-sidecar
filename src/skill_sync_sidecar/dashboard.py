@@ -41,9 +41,11 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     peers = _load_peer_status_files(config.peer_status_files or {})
     devices = _device_overview(status, peers)
     blocked_items = _blocked_items(status, peers)
+    operator = _operator_summary(status, devices, blocked_items)
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
+        "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
         "tools": _tool_overview(),
@@ -71,6 +73,7 @@ def _load_peer_status_files(peer_status_files: Dict[str, Path]) -> Dict[str, dic
 def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> list[dict]:
     peers = peers or {}
     sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
+    daemon = status.get("daemon_state") if isinstance(status.get("daemon_state"), dict) else {}
     blocked = sync_plan.get("blocked")
     local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
     current_note = "同步正常，无待处理项" if status.get("health") == "green" else "需要查看待处理队列"
@@ -92,7 +95,7 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
             "health": status.get("health", "unknown"),
             "skills": status.get("remote_snapshot", {}).get("total"),
             "blocked": blocked,
-            "policy": status.get("writer_policy"),
+            "policy": _policy_label(status.get("writer_policy"), daemon.get("writer_policy")),
             "note": current_note,
             "local_policy": local_overrides.get("skills", []),
         },
@@ -160,6 +163,12 @@ def _peer_device(
     }
 
 
+def _policy_label(preflight_policy: Optional[str], daemon_policy: Optional[str]) -> str:
+    if daemon_policy and preflight_policy and daemon_policy != preflight_policy:
+        return f"preflight {preflight_policy} / daemon {daemon_policy}"
+    return daemon_policy or preflight_policy or "-"
+
+
 def _aggregate_health(values: list[Optional[str]]) -> str:
     ranked = {"red": 3, "yellow": 2, "green": 1}
     worst = "green"
@@ -169,6 +178,70 @@ def _aggregate_health(values: list[Optional[str]]) -> str:
         if ranked.get(str(value), 0) > ranked.get(worst, 0):
             worst = str(value)
     return worst
+
+
+def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dict]) -> dict:
+    health = _aggregate_health([status.get("health")] + [device.get("health") for device in devices])
+    daemon = status.get("daemon_state") if isinstance(status.get("daemon_state"), dict) else {}
+    snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
+    mac = _find_device(devices, "mac")
+    openclaw = _find_device(devices, "oc-vps")
+    win = _find_device(devices, "win")
+    if health == "green":
+        next_action = "同步链路正常；继续观察自动周期，或接入 Windows。"
+    elif health == "yellow":
+        next_action = "先处理待审批队列；OpenClaw 本地改动需要 approved-push 后再上行。"
+    elif health == "red":
+        next_action = "先修复状态文件、WebDAV 快照或 sidecar 进程异常。"
+    else:
+        next_action = "状态未知；先刷新 dashboard 或查看 sidecar 日志。"
+    return {
+        "headline": _headline_for_health(health),
+        "next_action": next_action,
+        "sync_path": "Mac / OpenClaw <-> WebDAV -> 各工具目录",
+        "snapshot_id": snapshot.get("snapshot_id"),
+        "daemon": {
+            "status": daemon.get("daemon_status") or daemon.get("status"),
+            "target": daemon.get("target"),
+            "writer_policy": daemon.get("writer_policy"),
+            "interval_seconds": daemon.get("interval_seconds"),
+            "last_updated_at": daemon.get("updated_at"),
+            "cycles_run": daemon.get("cycles_run"),
+        },
+        "devices": {
+            "mac": _operator_device_line(mac),
+            "openclaw": _operator_device_line(openclaw),
+            "windows": _operator_device_line(win),
+        },
+        "blocked_count": len(blocked_items),
+    }
+
+
+def _find_device(devices: list[dict], device_id: str) -> dict:
+    for device in devices:
+        if device.get("id") == device_id:
+            return device
+    return {}
+
+
+def _headline_for_health(health: str) -> str:
+    if health == "green":
+        return "同步正常，无待处理项"
+    if health == "yellow":
+        return "存在待审批同步项"
+    if health == "red":
+        return "同步链路异常"
+    return "同步状态未知"
+
+
+def _operator_device_line(device: dict) -> str:
+    if not device:
+        return "未读取到状态"
+    skills = device.get("skills")
+    blocked = device.get("blocked")
+    policy = device.get("policy")
+    health = device.get("health")
+    return f"{health}; skills={skills if skills is not None else '-'}; blocked={blocked if blocked is not None else '-'}; policy={policy or '-'}"
 
 
 def _blocked_items(status: dict, peers: Dict[str, dict]) -> list[dict]:
@@ -280,6 +353,9 @@ def _handler_factory(status_provider: Callable[[], dict]):
             if path == "/healthz":
                 self._send(200, "application/json; charset=utf-8", b'{"ok":true}\n')
                 return
+            if path == "/favicon.ico":
+                self._send(204, "image/x-icon", b"")
+                return
             self._send(404, "text/plain; charset=utf-8", b"not found\n")
 
         def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib hook signature
@@ -359,6 +435,30 @@ DASHBOARD_HTML = r"""<!doctype html>
       cursor: pointer;
     }
     button:hover { border-color: #aeb7c6; }
+    .operator-band {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .operator-title {
+      font-size: 18px;
+      font-weight: 720;
+      margin-bottom: 6px;
+    }
+    .operator-text {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .device-lines {
+      display: grid;
+      gap: 8px;
+    }
+    .device-line {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 10px;
+    }
     .status-band {
       display: grid;
       grid-template-columns: minmax(220px, 1.2fr) repeat(4, minmax(120px, 1fr));
@@ -547,6 +647,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     @media (max-width: 860px) {
       header { align-items: flex-start; flex-direction: column; }
+      .operator-band { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .cards { grid-template-columns: 1fr; }
@@ -569,6 +670,17 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
   <main>
     <div id="error" class="error"></div>
+    <section class="operator-band">
+      <div class="panel">
+        <div id="operator-headline" class="operator-title">读取同步状态中</div>
+        <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
+      </div>
+      <div class="panel">
+        <h2>同步路径</h2>
+        <div id="operator-path" class="operator-text mono">-</div>
+        <div id="operator-snapshot" class="operator-text mono">-</div>
+      </div>
+    </section>
     <section class="status-band">
       <div id="health-card" class="panel health">
         <span class="dot"></span>
@@ -626,7 +738,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div class="panel">
           <h2>Peer Local Policy</h2>
-          <div id="overrides" class="kv"></div>
+        <div id="overrides" class="kv"></div>
+      </div>
+        <div class="panel">
+          <h2>设备摘要</h2>
+          <div id="operator-devices" class="device-lines"></div>
         </div>
         <div class="panel">
           <h2>Artifacts</h2>
@@ -661,10 +777,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     function render(status) {
       $("error").style.display = "none";
       const dashboard = status.dashboard || {};
+      const operator = dashboard.operator || {};
       const health = dashboard.health || status.health || "unknown";
       $("health-card").className = `panel health ${health}`;
       $("health").textContent = health;
-      $("next-action").textContent = nextAction({ ...status, health });
+      $("next-action").textContent = operator.next_action || nextAction({ ...status, health });
+      $("operator-headline").textContent = operator.headline || "同步状态未知";
+      $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
+      $("operator-path").textContent = operator.sync_path || "-";
+      $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
       const plan = status.sync_plan || {};
       const snapshot = status.remote_snapshot || {};
       const daemon = status.daemon_state || {};
@@ -698,7 +819,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("daemon").innerHTML = [
         row("status", daemon.daemon_status || daemon.status),
         row("target", daemon.target),
+        row("daemon_writer_policy", daemon.writer_policy),
         row("stop_on_blocked", daemon.stop_on_blocked),
+        row("interval_seconds", daemon.interval_seconds),
         row("updated_at", daemon.updated_at),
         row("last_cycle", daemon.last_cycle),
         row("state_file", daemon.path),
@@ -708,6 +831,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         row("total", localOverrides.total),
         row("skills", localOverrides.skills),
       ].join("");
+      renderOperatorDevices(operator.devices || {});
       $("artifacts").innerHTML = [
         row("local_root", status.local_root),
         row("snapshot", snapshot.snapshot_id),
@@ -761,6 +885,20 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>
           </div>
         </article>
+      `).join("");
+    }
+
+    function renderOperatorDevices(devices) {
+      const rows = [
+        ["Mac", devices.mac],
+        ["OpenClaw", devices.openclaw],
+        ["Windows", devices.windows],
+      ];
+      $("operator-devices").innerHTML = rows.map(([name, value]) => `
+        <div class="device-line">
+          <div class="key">${escapeHtml(name)}</div>
+          <div class="value mono">${escapeHtml(text(value))}</div>
+        </div>
       `).join("");
     }
 

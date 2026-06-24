@@ -31,6 +31,8 @@ class OpsStatusTest(unittest.TestCase):
                         "cycles_run": 3,
                         "current_base_record": str(base_record),
                         "target": "mixed-scope-root",
+                        "writer_policy": "push-pull",
+                        "interval_seconds": 300,
                         "stop_on_blocked": False,
                         "cycles": [
                             {
@@ -55,6 +57,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["base_record"]["applied_count"], 1)
             self.assertEqual(status["daemon_state"]["cycles_run"], 3)
             self.assertEqual(status["daemon_state"]["target"], "mixed-scope-root")
+            self.assertEqual(status["daemon_state"]["writer_policy"], "push-pull")
+            self.assertEqual(status["daemon_state"]["interval_seconds"], 300)
             self.assertFalse(status["daemon_state"]["stop_on_blocked"])
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertTrue(status["sync_plan"]["safe_to_apply"])
@@ -310,6 +314,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("dashboard", status)
             self.assertEqual(status["dashboard"]["health"], "yellow")
             self.assertEqual(status["dashboard"]["blocked"], 1)
+            self.assertEqual(status["dashboard"]["operator"]["headline"], "存在待审批同步项")
+            self.assertIn("approved-push", status["dashboard"]["operator"]["next_action"])
+            self.assertEqual(status["dashboard"]["operator"]["blocked_count"], 1)
+            self.assertIn("OpenClaw", status["dashboard"]["operator"]["sync_path"])
             self.assertEqual(status["dashboard"]["blocked_items"][0]["peer_id"], "oc-vps")
             self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "beijing-recruitment")
             self.assertEqual(devices["oc-vps"]["health"], "yellow")
@@ -321,6 +329,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"tools\"", DASHBOARD_HTML)
+            self.assertIn("id=\"operator-headline\"", DASHBOARD_HTML)
+            self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
 
     def test_dashboard_parser_accepts_ops_status_arguments(self):
         parser = build_parser()
