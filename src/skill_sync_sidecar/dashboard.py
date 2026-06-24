@@ -783,7 +783,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <h2>skillshub 导入诊断</h2>
       <div id="hub-import-summary" class="kv"></div>
       <table id="hub-import-table" hidden>
-        <thead><tr><th>Skill</th><th>Status</th><th>Source</th><th>Reason</th></tr></thead>
+        <thead><tr><th>Skill</th><th>判断</th><th>建议</th><th>来源</th></tr></thead>
         <tbody id="hub-import-body"></tbody>
       </table>
       <div id="hub-import-empty" class="empty">No external import candidates.</div>
@@ -966,23 +966,45 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderHubImport(hubImport) {
       const summary = hubImport.summary || {};
       $("hub-import-summary").innerHTML = [
-        row("hub_total", hubImport.hub_total),
-        row("source_total", hubImport.source_total),
-        row("already_in_hub", summary.already_in_hub || 0),
-        row("update_available", summary.update_available || 0),
-        row("importable", summary.importable || 0),
+        row("Hub 已有", hubImport.hub_total),
+        row("外部候选", hubImport.source_total),
+        row("可导入", summary.importable || 0),
+        row("可更新", summary.update_available || 0),
+        row("无需导入", summary.already_in_hub || 0),
       ].join("");
-      const items = Array.isArray(hubImport.items) ? hubImport.items.slice(0, 20) : [];
+      const items = hubImportPreviewItems(Array.isArray(hubImport.items) ? hubImport.items : []);
       $("hub-import-empty").hidden = items.length > 0;
       $("hub-import-table").hidden = items.length === 0;
       $("hub-import-body").innerHTML = items.map((item) => `
         <tr>
           <td class="mono">${escapeHtml(text(item.skill_id))}</td>
-          <td>${pill(item.status, item.status === "importable" ? "green" : item.status === "update_available" ? "yellow" : "")}</td>
-          <td class="mono">${escapeHtml(text(item.source))}</td>
-          <td>${escapeHtml(text(item.reason))}</td>
+          <td>${pill(item.status_label || item.status, hubStatusKind(item.status))}<div class="mini-label">${escapeHtml(text(item.reason_label))}</div></td>
+          <td>${escapeHtml(text(item.operator_action))}<div class="mini-label">${escapeHtml(text(item.status_description))}</div></td>
+          <td class="mono">${escapeHtml(text(item.source))}<div class="mini-label">${escapeHtml(duplicateSourceText(item))}</div></td>
         </tr>
       `).join("");
+    }
+
+    function hubImportPreviewItems(items) {
+      const order = ["importable", "update_available", "already_in_hub"];
+      const selected = [];
+      for (const status of order) {
+        selected.push(...items.filter((item) => item.status === status).slice(0, 8));
+      }
+      return selected;
+    }
+
+    function hubStatusKind(status) {
+      if (status === "importable") return "green";
+      if (status === "update_available") return "yellow";
+      if (status === "already_in_hub") return "";
+      return "";
+    }
+
+    function duplicateSourceText(item) {
+      const duplicateSources = Array.isArray(item.duplicate_sources) ? item.duplicate_sources : [];
+      if (!duplicateSources.length) return text(item.path);
+      return `${text(item.path)}; 同名来源 ${duplicateSources.length} 个`;
     }
 
     function projectionGap(projection) {

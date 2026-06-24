@@ -147,8 +147,12 @@ same skill IDs in external roots such as `~/.agents/skills`, while import then
 correctly refuses to create a duplicate under `~/.skillshub`.
 
 The dashboard also exposes this under `dashboard.hub_import` and renders a
-`skillshub 导入诊断` panel, so operators can distinguish:
+`skillshub 导入诊断` panel. The panel now uses operator-facing labels and
+prioritizes actionable rows first:
 
-- `already_in_hub`: same skill already exists in Hub.
-- `update_available`: same skill ID exists in Hub but the content hash differs.
-- `importable`: skill ID is not present in Hub.
+- `可导入`: skill ID is not present in Hub.
+- `可更新`: same skill ID exists in Hub but the content hash differs.
+- `已在 Hub / 无需导入`: same skill already exists in Hub.
+
+The CLI JSON keeps the raw `status` values for automation and also includes
+`status_label`, `operator_action`, and `reason_label` for UI or report rendering.

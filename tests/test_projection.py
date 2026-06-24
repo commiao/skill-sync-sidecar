@@ -82,7 +82,11 @@ class ToolProjectionTest(unittest.TestCase):
             self.assertEqual(items[("agents", "stale")]["status"], "update_available")
             self.assertEqual(items[("agents", "fresh")]["status"], "importable")
             self.assertEqual(items[("codex", "same")]["status"], "already_in_hub")
+            self.assertEqual(items[("agents", "same")]["status_label"], "已在 Hub")
+            self.assertEqual(items[("agents", "stale")]["operator_action"], "先看差异再更新")
+            self.assertEqual(items[("agents", "fresh")]["reason_label"], "Hub 中没有这个 skill ID。")
             self.assertIn("resolves", items[("codex", "same")]["reason"])
+            self.assertEqual(diagnosis["items"][0]["status"], "importable")
 
     def test_parse_hub_source_spec(self):
         source_id, path = parse_hub_source_spec("agents=~/skills")

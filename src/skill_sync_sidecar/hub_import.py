@@ -14,6 +14,31 @@ DEFAULT_SOURCE_ROOTS: Tuple[Tuple[str, Path], ...] = (
     ("cc-switch", Path.home() / ".cc-switch" / "skills"),
 )
 
+STATUS_METADATA: Dict[str, Dict[str, str]] = {
+    "already_in_hub": {
+        "label": "已在 Hub",
+        "operator_action": "无需导入",
+        "description": "Hub 已有相同 skill；导入会被拒绝是正常保护。",
+    },
+    "update_available": {
+        "label": "可更新",
+        "operator_action": "先看差异再更新",
+        "description": "Hub 中已有同名 skill，但外部来源内容不同。",
+    },
+    "importable": {
+        "label": "可导入",
+        "operator_action": "可纳入导入候选",
+        "description": "Hub 中还没有这个 skill ID。",
+    },
+}
+
+REASON_LABELS = {
+    "same_resolved_path": "来源目录实际指向 Hub 中已有 skill。",
+    "same_id_and_hash": "Hub 中已有相同 skill ID 和内容 hash。",
+    "same_id_different_hash": "Hub 中已有同名 skill，但内容 hash 不同。",
+    "missing_from_hub": "Hub 中没有这个 skill ID。",
+}
+
 
 class HubImportDiagnosisError(RuntimeError):
     pass
@@ -64,7 +89,8 @@ def build_hub_import_diagnosis(
         "source_roots": [{"id": source_id, "path": str(root.expanduser()), "exists": root.expanduser().exists()} for source_id, root in sources],
         "source_total": len(source_records),
         "summary": dict(sorted(summary.items())),
-        "items": sorted(items, key=lambda item: (str(item["status"]), str(item["source"]), str(item["skill_id"]), str(item["path"]))),
+        "status_metadata": STATUS_METADATA,
+        "items": sorted(items, key=_item_sort_key),
     }
 
 
@@ -76,7 +102,7 @@ def render_hub_import_diagnosis_text(diagnosis: Dict[str, object], *, max_items:
     ]
     summary = diagnosis.get("summary") if isinstance(diagnosis.get("summary"), dict) else {}
     lines.append(
-        "summary: already_in_hub={} update_available={} importable={}".format(
+        "summary: 已在 Hub={} 可更新={} 可导入={}".format(
             summary.get("already_in_hub", 0),
             summary.get("update_available", 0),
             summary.get("importable", 0),
@@ -88,11 +114,12 @@ def render_hub_import_diagnosis_text(diagnosis: Dict[str, object], *, max_items:
         lines.append(f"items (first {min(max_items, len(items))}/{len(items)}):")
     for item in items[:max_items]:
         lines.append(
-            "- {status}: {source}/{skill_id} -> {reason}".format(
-                status=item.get("status"),
+            "- {label}: {source}/{skill_id} -> {action}; {reason}".format(
+                label=item.get("status_label"),
                 source=item.get("source"),
                 skill_id=item.get("skill_id"),
-                reason=item.get("reason"),
+                action=item.get("operator_action"),
+                reason=item.get("reason_label"),
             )
         )
     if len(items) > max_items:
@@ -157,39 +184,65 @@ def _diagnose_source_record(
         "duplicate_sources": duplicate_sources,
     }
     if hub_same_path:
-        return {
+        return _with_status_metadata({
             **base,
             "status": "already_in_hub",
             "hub_path": str(hub_same_path.path),
             "hub_hash": hub_same_path.content_hash,
+            "reason_code": "same_resolved_path",
             "reason": "source path resolves to an existing Hub skill",
-        }
+        })
     if hub_matches:
         hub_hashes = sorted({item.content_hash for item in hub_matches})
         hub_paths = [str(item.path) for item in hub_matches]
         if record.content_hash in hub_hashes:
-            return {
+            return _with_status_metadata({
                 **base,
                 "status": "already_in_hub",
                 "hub_path": hub_paths[0],
                 "hub_hash": record.content_hash,
                 "hub_paths": hub_paths,
+                "reason_code": "same_id_and_hash",
                 "reason": "same skill_id and content_hash already exist in Hub",
-            }
-        return {
+            })
+        return _with_status_metadata({
             **base,
             "status": "update_available",
             "hub_path": hub_paths[0],
             "hub_hashes": hub_hashes,
             "hub_paths": hub_paths,
+            "reason_code": "same_id_different_hash",
             "reason": "same skill_id exists in Hub with a different content_hash",
-        }
-    return {
+        })
+    return _with_status_metadata({
         **base,
         "status": "importable",
         "hub_path": None,
+        "reason_code": "missing_from_hub",
         "reason": "skill_id does not exist in Hub",
+    })
+
+
+def _with_status_metadata(item: Dict[str, object]) -> Dict[str, object]:
+    metadata = STATUS_METADATA.get(str(item.get("status")), {})
+    reason_code = str(item.get("reason_code") or "")
+    return {
+        **item,
+        "status_label": metadata.get("label", str(item.get("status") or "")),
+        "operator_action": metadata.get("operator_action", "-"),
+        "status_description": metadata.get("description", ""),
+        "reason_label": REASON_LABELS.get(reason_code, str(item.get("reason") or "")),
     }
+
+
+def _item_sort_key(item: Dict[str, object]) -> Tuple[int, str, str, str]:
+    rank = {"importable": 0, "update_available": 1, "already_in_hub": 2}
+    return (
+        rank.get(str(item.get("status")), 9),
+        str(item.get("source")),
+        str(item.get("skill_id")),
+        str(item.get("path")),
+    )
 
 
 def _resolved_path(path: Path) -> str:
