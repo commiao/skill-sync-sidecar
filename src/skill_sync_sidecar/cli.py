@@ -17,6 +17,12 @@ from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, serve_dashboard
 from .daemon import run_sync_daemon
 from .diff import diff_snapshot_dirs
+from .hub_import import (
+    HubImportDiagnosisError,
+    build_hub_import_diagnosis,
+    parse_hub_source_spec,
+    render_hub_import_diagnosis_text,
+)
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
@@ -99,6 +105,12 @@ def build_parser() -> argparse.ArgumentParser:
     tool_projection.add_argument("--tool", action="append", default=[], help="Tool root as id=/path or id=/path1,/path2. Repeat for multiple tools.")
     tool_projection.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     tool_projection.set_defaults(func=cmd_tool_projection)
+
+    hub_import_diagnosis = subcommands.add_parser("hub-import-diagnosis", help="Explain why external skills can or cannot be imported into skillshub.")
+    hub_import_diagnosis.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
+    hub_import_diagnosis.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
+    hub_import_diagnosis.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    hub_import_diagnosis.set_defaults(func=cmd_hub_import_diagnosis)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
@@ -467,6 +479,20 @@ def cmd_tool_projection(args: argparse.Namespace) -> int:
                     len(tool["extra_local"]),
                 )
             )
+    return 0
+
+
+def cmd_hub_import_diagnosis(args: argparse.Namespace) -> int:
+    try:
+        source_roots = [parse_hub_source_spec(value) for value in args.source_root] if args.source_root else None
+        diagnosis = build_hub_import_diagnosis(Path(args.hub_root), source_roots=source_roots)
+    except (HubImportDiagnosisError, ValueError) as exc:
+        print(f"hub-import-diagnosis failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(diagnosis, ensure_ascii=False, indent=2))
+    else:
+        print(render_hub_import_diagnosis_text(diagnosis))
     return 0
 
 

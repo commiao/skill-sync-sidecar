@@ -117,3 +117,38 @@ dashboard_blocked=0
 mac_snapshot=approved-push-20260624T092058.434127Z
 openclaw_snapshot=approved-push-20260624T092058.434127Z
 ```
+
+## Skillshub Import Diagnosis
+
+The `skillshub` UI can report external skills as import candidates while the
+actual import path rejects them as already present in the Hub. The sidecar now
+has a read-only diagnosis command for that mismatch:
+
+```text
+command=skill-sync hub-import-diagnosis
+hub=/Users/mac/.skillshub
+hub_total=94
+source_total=162
+already_in_hub=125
+update_available=7
+importable=30
+```
+
+The `lark-*` series is not missing from Hub on this Mac. The diagnosis classifies
+those entries as:
+
+```text
+agents/lark-contact already_in_hub
+reason=same skill_id and content_hash already exist in Hub
+```
+
+So the root cause is a discovery/import semantic mismatch: discovery sees the
+same skill IDs in external roots such as `~/.agents/skills`, while import then
+correctly refuses to create a duplicate under `~/.skillshub`.
+
+The dashboard also exposes this under `dashboard.hub_import` and renders a
+`skillshub 导入诊断` panel, so operators can distinguish:
+
+- `already_in_hub`: same skill already exists in Hub.
+- `update_available`: same skill ID exists in Hub but the content hash differs.
+- `importable`: skill ID is not present in Hub.

@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
+from .hub_import import build_hub_import_diagnosis
 from .ops_status import build_ops_status
 from .projection import ProjectionError, build_tool_projection
 from .scanner import scan_roots
@@ -44,6 +45,7 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     blocked_items = _blocked_items(status, peers)
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(config.remote_snapshot)
+    hub_import = _safe_hub_import_diagnosis()
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
@@ -52,6 +54,7 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         "devices": devices,
         "tools": _merge_tool_projection(_tool_overview(), projection),
         "tool_projection": projection,
+        "hub_import": hub_import,
     }
     return status
 
@@ -78,6 +81,15 @@ def _safe_tool_projection(snapshot_dir: Path) -> dict:
         return build_tool_projection(snapshot_dir)
     except ProjectionError as exc:
         return {"ok": False, "error": str(exc), "tools": []}
+
+
+def _safe_hub_import_diagnosis() -> dict:
+    try:
+        data = build_hub_import_diagnosis()
+        data["ok"] = True
+        return data
+    except Exception as exc:  # pragma: no cover - diagnosis should not break dashboard
+        return {"ok": False, "error": str(exc), "summary": {}, "items": []}
 
 
 def _merge_tool_projection(tools: list[dict], projection: dict) -> list[dict]:
@@ -767,6 +779,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       <span class="section-help">区分 cc-switch、skillshub、Codex、Cursor、Claude Code 的本机目录</span>
     </div>
     <section id="tools" class="cards"></section>
+    <div class="panel">
+      <h2>skillshub 导入诊断</h2>
+      <div id="hub-import-summary" class="kv"></div>
+      <table id="hub-import-table" hidden>
+        <thead><tr><th>Skill</th><th>Status</th><th>Source</th><th>Reason</th></tr></thead>
+        <tbody id="hub-import-body"></tbody>
+      </table>
+      <div id="hub-import-empty" class="empty">No external import candidates.</div>
+    </div>
     <section class="grid">
       <div class="stack">
         <div class="panel">
@@ -848,6 +869,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
       renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
+      renderHubImport(dashboard.hub_import || {});
 
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
       $("blocked-empty").hidden = blockedItems.length > 0;
@@ -938,6 +960,28 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="mini-stat"><div class="mini-label">缺失/漂移</div><div class="mini-value">${escapeHtml(projectionGap(tool.projection))}</div></div>
           </div>
         </article>
+      `).join("");
+    }
+
+    function renderHubImport(hubImport) {
+      const summary = hubImport.summary || {};
+      $("hub-import-summary").innerHTML = [
+        row("hub_total", hubImport.hub_total),
+        row("source_total", hubImport.source_total),
+        row("already_in_hub", summary.already_in_hub || 0),
+        row("update_available", summary.update_available || 0),
+        row("importable", summary.importable || 0),
+      ].join("");
+      const items = Array.isArray(hubImport.items) ? hubImport.items.slice(0, 20) : [];
+      $("hub-import-empty").hidden = items.length > 0;
+      $("hub-import-table").hidden = items.length === 0;
+      $("hub-import-body").innerHTML = items.map((item) => `
+        <tr>
+          <td class="mono">${escapeHtml(text(item.skill_id))}</td>
+          <td>${pill(item.status, item.status === "importable" ? "green" : item.status === "update_available" ? "yellow" : "")}</td>
+          <td class="mono">${escapeHtml(text(item.source))}</td>
+          <td>${escapeHtml(text(item.reason))}</td>
+        </tr>
       `).join("");
     }
 
