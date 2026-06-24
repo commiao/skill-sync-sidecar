@@ -14,6 +14,7 @@ from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execu
 from .blocked_report import build_blocked_report
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .conflicts import ConflictPackageError, build_conflict_packages
+from .dashboard import DashboardConfig, serve_dashboard
 from .daemon import run_sync_daemon
 from .diff import diff_snapshot_dirs
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
@@ -66,6 +67,21 @@ def build_parser() -> argparse.ArgumentParser:
     ops_status.add_argument("--fail-on-blocked", action="store_true", help="Exit non-zero when the sync plan has blocked items.")
     ops_status.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     ops_status.set_defaults(func=cmd_ops_status)
+
+    dashboard = subcommands.add_parser("dashboard", help="Serve a read-only local status dashboard.")
+    dashboard.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
+    dashboard.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
+    dashboard.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
+    dashboard.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    dashboard.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
+    dashboard.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
+    dashboard.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
+    dashboard.add_argument("--allow-new", action="store_true", help="Evaluate the sync plan with new skills allowed.")
+    dashboard.add_argument("--allow-delete", action="store_true", help="Evaluate the sync plan with delete propagation allowed.")
+    add_writer_policy_arg(dashboard)
+    dashboard.add_argument("--host", default="127.0.0.1", help="Dashboard listen host.")
+    dashboard.add_argument("--port", type=int, default=8765, help="Dashboard listen port. Use 0 to allocate a free port.")
+    dashboard.set_defaults(func=cmd_dashboard)
 
     openclaw_gate = subcommands.add_parser("openclaw-gate", help="Evaluate a read-only OpenClaw reconcile report as a sync safety gate.")
     openclaw_source = openclaw_gate.add_mutually_exclusive_group()
@@ -380,6 +396,23 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
         return 2
     if args.fail_on_blocked and (blocked or openclaw_blocked):
         return 3
+    return 0
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    config = DashboardConfig(
+        local_root=Path(args.local_root),
+        remote_snapshot=Path(args.remote_snapshot),
+        base_record=Path(args.base_record) if args.base_record else None,
+        state_file=Path(args.state_file) if args.state_file else None,
+        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
+        openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
+        openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
+        allow_new=args.allow_new,
+        allow_delete=args.allow_delete,
+        writer_policy=args.writer_policy,
+    )
+    serve_dashboard(args.host, args.port, config)
     return 0
 
 

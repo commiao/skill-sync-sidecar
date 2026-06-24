@@ -7,6 +7,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `scan`: discover local `SKILL.md` packages and emit normalized records.
 - `status`: summarize counts, sources, risks, and duplicate skill ids.
 - `ops-status`: summarize daemon state, base record, remote snapshot, sync plan, and optional OpenClaw reconcile state.
+- `dashboard`: serve a read-only local web dashboard backed by `ops-status`.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
@@ -54,6 +55,7 @@ For release artifacts, use the wheel attached to the GitHub Release when availab
 python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
+python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
 python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 python3 -m skill_sync_sidecar scan --json

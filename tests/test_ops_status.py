@@ -3,6 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from skill_sync_sidecar.cli import build_parser
+from skill_sync_sidecar.dashboard import DASHBOARD_HTML, DashboardConfig, build_dashboard_status
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -249,6 +251,56 @@ class OpsStatusTest(unittest.TestCase):
         self.assertIn("openclaw_reconcile: safe_to_auto_apply=True", text)
         self.assertIn("openclaw_gate: ok=True", text)
         self.assertIn("overall_ok: True", text)
+
+    def test_dashboard_status_reuses_ops_status_model(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
+            self._write_base_record(base_record, index)
+
+            status = build_dashboard_status(
+                DashboardConfig(
+                    local_root=local_root,
+                    remote_snapshot=snapshot_dir,
+                    base_record=base_record,
+                    allow_new=True,
+                )
+            )
+
+            self.assertEqual(status["health"], "green")
+            self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
+            self.assertIn("/api/status", DASHBOARD_HTML)
+            self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
+
+    def test_dashboard_parser_accepts_ops_status_arguments(self):
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "dashboard",
+                "--local-root",
+                "/tmp/skills",
+                "--remote-snapshot",
+                "/tmp/snapshot",
+                "--writer-policy",
+                "pull-only",
+                "--allow-new",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "0",
+            ]
+        )
+
+        self.assertEqual(args.command, "dashboard")
+        self.assertEqual(args.writer_policy, "pull-only")
+        self.assertTrue(args.allow_new)
+        self.assertEqual(args.port, 0)
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

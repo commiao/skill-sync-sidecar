@@ -115,6 +115,20 @@ One-screen sidecar status:
 PYTHONPATH=src python3 -m skill_sync_sidecar ops-status --allow-new
 ```
 
+Read-only local dashboard:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only
+```
+
+The dashboard listens on `127.0.0.1:8765` by default and serves:
+
+- `/`: status UI.
+- `/api/status`: the same JSON model as `ops-status --json`.
+- `/healthz`: local process health.
+
+It is intentionally read-only in v0. It does not trigger sync, upload to WebDAV, apply packages, or modify local roots.
+
 `ops-status` reports `health=green|yellow|red`:
 
 - `green`: artifacts are readable and the latest plan has no blocked items.
