@@ -12,6 +12,7 @@ from .scanner import scan_roots, scan_skill
 
 
 DEFAULT_HUB_ROOT = Path.home() / ".skillshub"
+DEFAULT_CANONICAL_SNAPSHOT = Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
 DEFAULT_SOURCE_ROOTS: Tuple[Tuple[str, Path], ...] = (
     ("agents", Path.home() / ".agents" / "skills"),
     ("codex", Path.home() / ".codex" / "skills"),
@@ -34,6 +35,11 @@ STATUS_METADATA: Dict[str, Dict[str, str]] = {
         "operator_action": "可纳入导入候选",
         "description": "Hub 中还没有这个 skill ID。",
     },
+    "not_compatible": {
+        "label": "不适合 Hub",
+        "operator_action": "跳过",
+        "description": "该 skill 的 manifest scope/targets 不适合安装到 skillshub Hub。",
+    },
 }
 
 REASON_LABELS = {
@@ -41,6 +47,8 @@ REASON_LABELS = {
     "same_id_and_hash": "Hub 中已有相同 skill ID 和内容 hash。",
     "same_id_different_hash": "Hub 中已有同名 skill，但内容 hash 不同。",
     "missing_from_hub": "Hub 中没有这个 skill ID。",
+    "unsupported_scope": "项目级 skill 不安装到 skillshub 全局 Hub。",
+    "target_not_skillshub": "manifest targets 未声明 skillshub。",
 }
 
 
@@ -66,6 +74,7 @@ def parse_hub_source_spec(spec: str) -> Tuple[str, Path]:
 def build_hub_import_diagnosis(
     hub_root: Path = DEFAULT_HUB_ROOT,
     source_roots: Optional[Sequence[Tuple[str, Path]]] = None,
+    canonical_snapshot: Optional[Path] = DEFAULT_CANONICAL_SNAPSHOT,
 ) -> Dict[str, object]:
     hub_root = hub_root.expanduser()
     sources = list(source_roots or DEFAULT_SOURCE_ROOTS)
@@ -80,8 +89,9 @@ def build_hub_import_diagnosis(
         for record in hub_records
     }
     source_ids = _group_by_skill_id(source_records)
+    canonical_by_id = _canonical_metadata_by_skill_id(canonical_snapshot)
     items = [
-        _diagnose_source_record(record, hub_by_id, hub_by_resolved_path, source_ids)
+        _diagnose_source_record(record, hub_by_id, hub_by_resolved_path, source_ids, canonical_by_id.get(record.skill_id))
         for record in source_records
     ]
     summary: Dict[str, int] = {}
@@ -93,6 +103,8 @@ def build_hub_import_diagnosis(
         "record_type": "skill-sync-hub-import-diagnosis",
         "hub_root": str(hub_root),
         "hub_exists": hub_root.exists(),
+        "canonical_snapshot": str(canonical_snapshot.expanduser()) if canonical_snapshot else None,
+        "canonical_snapshot_loaded": bool(canonical_by_id),
         "hub_total": len(hub_records),
         "source_roots": [{"id": source_id, "path": str(root.expanduser()), "exists": root.expanduser().exists()} for source_id, root in sources],
         "source_total": len(source_records),
@@ -153,14 +165,15 @@ def build_hub_import_preview_package(
     *,
     out_dir: Path,
     max_diff_lines: int = 160,
+    canonical_snapshot: Optional[Path] = DEFAULT_CANONICAL_SNAPSHOT,
 ) -> Dict[str, object]:
-    diagnosis = build_hub_import_diagnosis(hub_root, source_roots=source_roots)
+    diagnosis = build_hub_import_diagnosis(hub_root, source_roots=source_roots, canonical_snapshot=canonical_snapshot)
     out_dir = out_dir.expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     actions = []
     for action in diagnosis.get("action_plan", {}).get("actions", []):
-        if not isinstance(action, dict) or action.get("action") == "skip_existing":
+        if not isinstance(action, dict) or action.get("action") in {"skip_existing", "skip_incompatible"}:
             continue
         actions.append(_preview_action(action, max_diff_lines=max_diff_lines))
 
@@ -339,6 +352,31 @@ def _scan_root(source_id: str, root: Path) -> List[SkillRecord]:
     return records
 
 
+def _canonical_metadata_by_skill_id(snapshot_dir: Optional[Path]) -> Dict[str, Dict[str, object]]:
+    if snapshot_dir is None:
+        return {}
+    index_path = snapshot_dir.expanduser() / "index.json"
+    if not index_path.exists():
+        return {}
+    try:
+        data = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    result: Dict[str, Dict[str, object]] = {}
+    for skill in data.get("skills", []):
+        if not isinstance(skill, dict):
+            continue
+        skill_id = str(skill.get("skill_id") or "").strip()
+        if not skill_id:
+            continue
+        result[skill_id] = {
+            "scope": str(skill.get("scope") or "global"),
+            "targets": [str(item) for item in skill.get("targets", []) if str(item).strip()],
+            "content_hash": str(skill.get("content_hash") or ""),
+        }
+    return result
+
+
 def _group_by_skill_id(records: Sequence[SkillRecord]) -> Dict[str, List[SkillRecord]]:
     grouped: Dict[str, List[SkillRecord]] = {}
     for record in records:
@@ -351,6 +389,7 @@ def _diagnose_source_record(
     hub_by_id: Dict[str, List[SkillRecord]],
     hub_by_resolved_path: Dict[str, SkillRecord],
     source_ids: Dict[str, List[SkillRecord]],
+    canonical: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     resolved_path = _resolved_path(record.path)
     hub_same_path = hub_by_resolved_path.get(resolved_path)
@@ -364,6 +403,7 @@ def _diagnose_source_record(
         for other in source_ids.get(record.skill_id, [])
         if other is not record
     ]
+    scope, targets, canonical_hash = _effective_skillshub_metadata(record, canonical)
     base = {
         "source": record.source,
         "skill_id": record.skill_id,
@@ -371,6 +411,10 @@ def _diagnose_source_record(
         "resolved_path": resolved_path,
         "content_hash": record.content_hash,
         "risk_level": record.risk_level,
+        "scope": scope,
+        "targets": targets,
+        "metadata_source": "canonical_snapshot" if canonical else "source_manifest",
+        "canonical_hash": canonical_hash,
         "duplicate_sources": duplicate_sources,
     }
     if hub_same_path:
@@ -395,6 +439,18 @@ def _diagnose_source_record(
                 "reason_code": "same_id_and_hash",
                 "reason": "same skill_id and content_hash already exist in Hub",
             })
+        incompatible_reason = _skillshub_incompatibility(scope, targets)
+        if incompatible_reason:
+            reason_code, reason = incompatible_reason
+            return _with_status_metadata({
+                **base,
+                "status": "not_compatible",
+                "hub_path": hub_paths[0],
+                "hub_hashes": hub_hashes,
+                "hub_paths": hub_paths,
+                "reason_code": reason_code,
+                "reason": reason,
+            })
         return _with_status_metadata({
             **base,
             "status": "update_available",
@@ -404,6 +460,16 @@ def _diagnose_source_record(
             "reason_code": "same_id_different_hash",
             "reason": "same skill_id exists in Hub with a different content_hash",
         })
+    incompatible_reason = _skillshub_incompatibility(scope, targets)
+    if incompatible_reason:
+        reason_code, reason = incompatible_reason
+        return _with_status_metadata({
+            **base,
+            "status": "not_compatible",
+            "hub_path": None,
+            "reason_code": reason_code,
+            "reason": reason,
+        })
     return _with_status_metadata({
         **base,
         "status": "importable",
@@ -411,6 +477,24 @@ def _diagnose_source_record(
         "reason_code": "missing_from_hub",
         "reason": "skill_id does not exist in Hub",
     })
+
+
+def _effective_skillshub_metadata(record: SkillRecord, canonical: Optional[Dict[str, object]]) -> Tuple[str, List[str], Optional[str]]:
+    if canonical:
+        scope = str(canonical.get("scope") or record.scope)
+        targets = [str(item) for item in canonical.get("targets", []) if str(item).strip()] or record.targets
+        canonical_hash = str(canonical.get("content_hash") or "") or None
+        return scope, targets, canonical_hash
+    return record.scope, record.targets, None
+
+
+def _skillshub_incompatibility(scope: str, targets: Sequence[str]) -> Optional[Tuple[str, str]]:
+    if scope != "global":
+        return ("unsupported_scope", f"scope={scope} is not installed into the skillshub global Hub")
+    targets = {target.strip().lower() for target in targets}
+    if "skillshub" not in targets:
+        return ("target_not_skillshub", "manifest targets do not include skillshub")
+    return None
 
 
 def _with_status_metadata(item: Dict[str, object]) -> Dict[str, object]:
@@ -480,6 +564,15 @@ def _build_action(item: Dict[str, object], hub_root: Path) -> Dict[str, object]:
             "requires_review": True,
             "reason": "Hub 中已有同名 skill 且内容不同；更新前必须查看差异并显式确认。",
         }
+    if status == "not_compatible":
+        return {
+            **base,
+            "action": "skip_incompatible",
+            "action_label": "跳过",
+            "target_path": item.get("hub_path") or str(hub_root / skill_id),
+            "requires_review": False,
+            "reason": str(item.get("reason_label") or "该 skill 不适合安装到 skillshub Hub。"),
+        }
     return {
         **base,
         "action": "skip_existing",
@@ -491,7 +584,7 @@ def _build_action(item: Dict[str, object], hub_root: Path) -> Dict[str, object]:
 
 
 def _item_sort_key(item: Dict[str, object]) -> Tuple[int, str, str, str]:
-    rank = {"importable": 0, "update_available": 1, "already_in_hub": 2}
+    rank = {"importable": 0, "update_available": 1, "not_compatible": 2, "already_in_hub": 3}
     return (
         rank.get(str(item.get("status")), 9),
         str(item.get("source")),
@@ -501,7 +594,7 @@ def _item_sort_key(item: Dict[str, object]) -> Tuple[int, str, str, str]:
 
 
 def _action_sort_key(action: Dict[str, object]) -> Tuple[int, str, str, str]:
-    rank = {"preview_import": 0, "review_duplicate_import": 1, "review_update": 2, "skip_existing": 3}
+    rank = {"preview_import": 0, "review_duplicate_import": 1, "review_update": 2, "skip_incompatible": 3, "skip_existing": 4}
     return (
         rank.get(str(action.get("action")), 9),
         str(action.get("source")),

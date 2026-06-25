@@ -157,6 +157,64 @@ class ToolProjectionTest(unittest.TestCase):
             self.assertIn("+new", "\n".join(actions["stale"]["skill_md_diff"]["lines"]))
             self.assertIn("Skillshub Import Preview", (out / "preview.md").read_text(encoding="utf-8"))
 
+    def test_hub_import_skips_skills_not_compatible_with_skillshub(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            hub = root / "hub"
+            agents = root / "agents"
+            out = root / "preview"
+
+            self._write_skill(agents / "global-hub", "global-hub", "global", ["skillshub"], body="hub")
+            self._write_skill(agents / "project-only", "project-only", "project", ["codex", "cursor"], body="project")
+            self._write_skill(agents / "global-codex", "global-codex", "global", ["codex"], body="codex")
+
+            diagnosis = build_hub_import_diagnosis(hub, [("agents", agents)])
+
+            self.assertEqual(diagnosis["summary"], {"importable": 1, "not_compatible": 2})
+            actions = {action["skill_id"]: action for action in diagnosis["action_plan"]["actions"]}
+            self.assertEqual(actions["global-hub"]["action"], "preview_import")
+            self.assertEqual(actions["project-only"]["action"], "skip_incompatible")
+            self.assertEqual(actions["global-codex"]["action"], "skip_incompatible")
+
+            package = build_hub_import_preview_package(hub, [("agents", agents)], out_dir=out)
+            self.assertEqual(package["action_summary"], {"preview_import": 1, "skip_incompatible": 2})
+            self.assertEqual([action["skill_id"] for action in package["actions"]], ["global-hub"])
+
+    def test_hub_import_uses_canonical_snapshot_when_source_manifest_is_missing(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            hub = root / "hub"
+            source = root / "source"
+            snapshot = root / "snapshot"
+
+            self._write_skill(source / "project-only", "project-only", "global", ["skillshub"], body="local")
+            (source / "project-only" / "manifest.json").unlink()
+            snapshot.mkdir(parents=True)
+            (snapshot / "index.json").write_text(
+                json.dumps(
+                    {
+                        "protocol_version": 0,
+                        "snapshot_id": "canonical",
+                        "skills": [
+                            {
+                                "skill_id": "project-only",
+                                "scope": "project",
+                                "targets": ["codex", "cursor"],
+                                "content_hash": "abc",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            diagnosis = build_hub_import_diagnosis(hub, [("source", source)], canonical_snapshot=snapshot)
+
+            self.assertEqual(diagnosis["summary"], {"not_compatible": 1})
+            action = diagnosis["action_plan"]["actions"][0]
+            self.assertEqual(action["skill_id"], "project-only")
+            self.assertEqual(action["action"], "skip_incompatible")
+
     def test_hub_import_apply_only_imports_new_preview_actions_with_yes(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

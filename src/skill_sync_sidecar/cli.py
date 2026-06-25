@@ -114,12 +114,14 @@ def build_parser() -> argparse.ArgumentParser:
     hub_import_diagnosis = subcommands.add_parser("hub-import-diagnosis", help="Explain why external skills can or cannot be imported into skillshub.")
     hub_import_diagnosis.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
     hub_import_diagnosis.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
+    hub_import_diagnosis.add_argument("--canonical-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
     hub_import_diagnosis.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     hub_import_diagnosis.set_defaults(func=cmd_hub_import_diagnosis)
 
     hub_import_preview = subcommands.add_parser("hub-import-preview", help="Write a dry-run skillshub import preview package.")
     hub_import_preview.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
     hub_import_preview.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
+    hub_import_preview.add_argument("--canonical-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
     hub_import_preview.add_argument("--out", required=True, help="Output directory for preview.json and preview.md.")
     hub_import_preview.add_argument("--max-diff-lines", type=int, default=160, help="Maximum SKILL.md diff lines per update action.")
     hub_import_preview.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
@@ -506,7 +508,11 @@ def cmd_tool_projection(args: argparse.Namespace) -> int:
 def cmd_hub_import_diagnosis(args: argparse.Namespace) -> int:
     try:
         source_roots = [parse_hub_source_spec(value) for value in args.source_root] if args.source_root else None
-        diagnosis = build_hub_import_diagnosis(Path(args.hub_root), source_roots=source_roots)
+        diagnosis = build_hub_import_diagnosis(
+            Path(args.hub_root),
+            source_roots=source_roots,
+            canonical_snapshot=Path(args.canonical_snapshot).expanduser() if args.canonical_snapshot else None,
+        )
     except (HubImportDiagnosisError, ValueError) as exc:
         print(f"hub-import-diagnosis failed: {exc}", file=sys.stderr)
         return 2
@@ -525,6 +531,7 @@ def cmd_hub_import_preview(args: argparse.Namespace) -> int:
             source_roots=source_roots,
             out_dir=Path(args.out),
             max_diff_lines=max(1, args.max_diff_lines),
+            canonical_snapshot=Path(args.canonical_snapshot).expanduser() if args.canonical_snapshot else None,
         )
     except (HubImportDiagnosisError, ValueError, OSError) as exc:
         print(f"hub-import-preview failed: {exc}", file=sys.stderr)
