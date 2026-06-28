@@ -211,6 +211,21 @@ For NAS/Linux, use:
 examples/systemd/skill-sync-gateway.service
 ```
 
+On Mac, install the gateway as a LaunchAgent:
+
+```bash
+scripts/install-gateway-launchd.sh
+curl -sS http://127.0.0.1:8877/healthz
+```
+
+The Mac gateway LaunchAgent defaults to:
+
+- URL: `http://127.0.0.1:8877`.
+- Label: `com.skill-sync-sidecar.gateway`.
+- Remote prefix: `skill-sync-sidecar-dev/current-mac`.
+- Runtime cache: `~/Library/Caches/skill-sync-sidecar/gateway/current`.
+- Logs: `~/Library/Logs/skill-sync-gateway.out.log` and `~/Library/Logs/skill-sync-gateway.err.log`.
+
 Gateway mode is deliberately read-only:
 
 - It downloads the remote `index.json` and skill archives into its own cache.
