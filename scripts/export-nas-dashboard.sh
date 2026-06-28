@@ -12,6 +12,8 @@ state_file="${SKILL_SYNC_STATE_FILE:-$app_dir/state.json}"
 peer_status="${SKILL_SYNC_OPENCLAW_PEER_STATUS:-$app_dir/peers/openclaw-status.json}"
 writer_policy="${SKILL_SYNC_WRITER_POLICY:-push-pull}"
 allow_new="${SKILL_SYNC_ALLOW_NEW:-1}"
+nas_webdav_http_base="${SKILL_SYNC_NAS_WEBDAV_HTTP_BASE:-http://100.123.208.32:5005/public-sync}"
+nas_static_http_base="${SKILL_SYNC_NAS_HTTP_BASE:-http://100.123.208.32}"
 
 case "$out_dir" in
   ""|"/"|"$HOME"|"$HOME/"|"$HOME/public-sync"|"$HOME/public-sync/")
@@ -66,6 +68,8 @@ PEER_STATUS="$peer_status" \
 WRITER_POLICY="$writer_policy" \
 ALLOW_NEW="$allow_new" \
 OUT_DIR="$tmp_dir" \
+NAS_WEBDAV_HTTP_BASE="$nas_webdav_http_base" \
+NAS_STATIC_HTTP_BASE="$nas_static_http_base" \
 "$python_bin" - <<'PY'
 import json
 import os
@@ -98,9 +102,12 @@ try:
     access = {
         "webdav_index_url": f"{base_url}/skill-sync-sidecar-dashboard/index.html",
         "webdav_status_url": f"{base_url}/skill-sync-sidecar-dashboard/status.json",
-        "http_index_url": "http://100.123.208.32/skill-sync-sidecar-dashboard/index.html",
+        "nas_webdav_http_index_url": f"{os.environ['NAS_WEBDAV_HTTP_BASE'].rstrip('/')}/skill-sync-sidecar-dashboard/index.html",
+        "nas_webdav_http_status_url": f"{os.environ['NAS_WEBDAV_HTTP_BASE'].rstrip('/')}/skill-sync-sidecar-dashboard/status.json",
+        "nas_static_http_index_url": f"{os.environ['NAS_STATIC_HTTP_BASE'].rstrip('/')}/skill-sync-sidecar-dashboard/index.html",
+        "nas_webdav_http_requires_auth": True,
         "http_static_mapping_required": True,
-        "note": "WebDAV URL requires the configured WebDAV account. HTTP URL works only after NAS static mapping is configured.",
+        "note": "WebDAV URLs require the configured WebDAV account. NAS static HTTP works only after Web Station or nginx maps the dashboard folder.",
     }
 except Exception as exc:
     access = {

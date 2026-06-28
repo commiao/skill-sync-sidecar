@@ -99,28 +99,37 @@ blocked=0
 snapshot=approved-push-20260628T090055.644720Z
 ```
 
+NAS WebDAV HTTP check:
+
+```text
+webdav_http_ok=true
+webdav_http_url=http://100.123.208.32:5005/public-sync/skill-sync-sidecar-dashboard/index.html
+```
+
+This is a working NAS/Tailscale access path, but it requires the configured WebDAV account.
+
 NAS HTTP check:
 
 ```text
 http_static_ok=false
 ```
 
-The NAS HTTP service currently returns a generic 544-byte nginx page for candidate paths such as `/skill-sync-sidecar-dashboard/index.html`, so the dashboard is confirmed present in WebDAV but not yet mapped as a static web directory. This is an exposure/configuration step on NAS, not a sync failure.
+The NAS port-80 HTTP service currently returns a generic 544-byte nginx page for candidate paths such as `/skill-sync-sidecar-dashboard/index.html`, so the dashboard is confirmed present in WebDAV but not yet mapped as an unauthenticated static web directory. This is an exposure/configuration step on NAS, not a sync failure.
 
-Current usable access path is the WebDAV URL recorded in:
+Current usable access paths are recorded in:
 
 ```text
 /Users/mac/public-sync/skill-sync-sidecar-dashboard/access.json
 ```
 
-That URL requires the configured WebDAV account. It does not contain credentials.
+Those URLs require the configured WebDAV account. The file does not contain credentials.
 
 ## Next Step
 
-Map the NAS-synced `skill-sync-sidecar-dashboard` directory into a Synology static site or web-accessible shared-folder route, then rerun:
+Optional: map the NAS-synced `skill-sync-sidecar-dashboard` directory into a Synology static site or web-accessible shared-folder route, then rerun:
 
 ```bash
 scripts/check-nas-dashboard-remote.sh
 ```
 
-When it reports `http_static_ok=true`, the next infrastructure step is Windows onboarding as a third peer.
+When it reports `http_static_ok=true`, the dashboard has an unauthenticated/static browser URL. The authenticated NAS WebDAV URL is already usable, so this does not block the next infrastructure step: Windows onboarding as a third peer.

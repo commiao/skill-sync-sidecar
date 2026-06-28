@@ -229,10 +229,14 @@ scripts/check-nas-dashboard-remote.sh
 Expected current states:
 
 - `webdav_ok=true`: the NAS/WebDAV store has `status.json`.
+- `webdav_http_ok=true`: NAS WebDAV HTTP is serving the actual `Skill Sync Observer` HTML through the Tailscale/LAN address. This path requires the configured WebDAV account.
 - `http_static_ok=true`: NAS HTTP is serving the actual `Skill Sync Observer` HTML.
 - `http_static_ok=false`: WebDAV sync is working, but the NAS web service has not mapped the dashboard folder yet. A plain HTTP `200` alone is not enough; Synology may return its default page for unknown paths.
 
-When `http_static_ok=false`, open the WebDAV URL from `access.json` instead. It requires the configured WebDAV account but serves the same static `index.html` and relative `status.json`.
+When `http_static_ok=false`, open either WebDAV URL from `access.json` instead. Both require the configured WebDAV account but serve the same static `index.html` and relative `status.json`:
+
+- `webdav_index_url`: public WebDAV endpoint, for off-LAN access.
+- `nas_webdav_http_index_url`: NAS/Tailscale WebDAV endpoint, for LAN or tailnet access.
 
 Use an alternate WebDAV/NAS path when needed:
 
