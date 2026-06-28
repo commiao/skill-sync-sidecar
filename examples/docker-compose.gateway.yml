@@ -27,6 +27,8 @@ services:
       - 0.0.0.0
       - --port
       - "8765"
+      - --remote-peer-status
+      - "${SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_MAC:-mac=skill-sync-sidecar-peer-status/mac.json}"
 
 volumes:
   skill-sync-gateway-cache:

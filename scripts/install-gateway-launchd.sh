@@ -9,6 +9,7 @@ port="${SKILL_SYNC_GATEWAY_PORT:-8877}"
 prefix="${SKILL_SYNC_GATEWAY_PREFIX:-skill-sync-sidecar-dev/current-mac}"
 cache_dir="${SKILL_SYNC_GATEWAY_CACHE_DIR:-$HOME/Library/Caches/skill-sync-sidecar/gateway/current}"
 refresh_interval_seconds="${SKILL_SYNC_GATEWAY_REFRESH_INTERVAL_SECONDS:-60}"
+remote_peer_status="${SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS:-mac=skill-sync-sidecar-peer-status/mac.json}"
 app_dir="$HOME/Library/Application Support/skill-sync-sidecar"
 peer_status="${SKILL_SYNC_OPENCLAW_PEER_STATUS:-$app_dir/peers/openclaw-status.json}"
 launch_agents_dir="$HOME/Library/LaunchAgents"
@@ -40,6 +41,7 @@ CACHE_DIR="$cache_dir" \
 REFRESH_INTERVAL_SECONDS="$refresh_interval_seconds" \
 PEER_STATUS="$peer_status" \
 HAS_PEER_STATUS="$([ -f "$peer_status" ] && echo 1 || echo 0)" \
+REMOTE_PEER_STATUS="$remote_peer_status" \
 LOGS_DIR="$logs_dir" \
 "$python_bin" - <<'PY'
 import os
@@ -65,6 +67,8 @@ program_args = [
 ]
 if os.environ["HAS_PEER_STATUS"] == "1":
     program_args.extend(["--peer-status", f"oc-vps={os.environ['PEER_STATUS']}"])
+if os.environ["REMOTE_PEER_STATUS"]:
+    program_args.extend(["--remote-peer-status", os.environ["REMOTE_PEER_STATUS"]])
 
 plist = {
     "Label": os.environ["LABEL"],
@@ -98,4 +102,5 @@ echo "url=http://$host:$port"
 echo "prefix=$prefix"
 echo "cache_dir=$cache_dir"
 echo "peer_status=$([ -f "$peer_status" ] && echo "$peer_status" || echo "not_configured")"
+echo "remote_peer_status=${remote_peer_status:-not_configured}"
 launchctl print "gui/$(id -u)/$label" | sed -n '1,35p'

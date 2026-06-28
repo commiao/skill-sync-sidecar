@@ -202,7 +202,8 @@ PYTHONPATH=src python3 -m skill_sync_sidecar gateway \
   --cache-dir /tmp/skill-sync-gateway-cache \
   --refresh-interval-seconds 60 \
   --host 127.0.0.1 \
-  --port 8877
+  --port 8877 \
+  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
 ```
 
 For NAS/Linux, use:
@@ -233,6 +234,7 @@ The Mac gateway LaunchAgent defaults to:
 - Remote prefix: `skill-sync-sidecar-dev/current-mac`.
 - Runtime cache: `~/Library/Caches/skill-sync-sidecar/gateway/current`.
 - Logs: `~/Library/Logs/skill-sync-gateway.out.log` and `~/Library/Logs/skill-sync-gateway.err.log`.
+- Remote peer status: `mac=skill-sync-sidecar-peer-status/mac.json`.
 
 Gateway mode is deliberately read-only:
 
@@ -242,7 +244,16 @@ Gateway mode is deliberately read-only:
 - It does not write into Mac, OpenClaw, Skillshub, Codex, Cursor, or Claude Code roots.
 - It can run on NAS, Mac, Linux, or Windows as long as it can reach the WebDAV endpoint.
 
-Use optional `--peer-status id=/path/status.json` flags when the gateway host also has mirrored peer status files. Without peer files, the gateway still shows the canonical snapshot and marks missing peers as not connected.
+Use optional `--remote-peer-status id=path/status.json` flags for shared/NAS gateways that should read peer status from WebDAV. Use `--peer-status id=/path/status.json` only when the gateway host also has mirrored local peer status files. Without peer status, the gateway still shows the canonical snapshot and marks missing peers as not connected.
+
+Publish Mac peer status to WebDAV:
+
+```bash
+scripts/publish-mac-peer-status.sh
+scripts/install-mac-peer-status-launchd.sh
+```
+
+The default published path is `skill-sync-sidecar-peer-status/mac.json`. This file is status-only; it does not contain WebDAV credentials and does not upload skill content.
 
 ### NAS static observer
 

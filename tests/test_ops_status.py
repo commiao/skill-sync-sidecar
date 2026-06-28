@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from skill_sync_sidecar.cli import build_parser, parse_peer_status_files
+from skill_sync_sidecar.cli import build_parser, parse_peer_status_files, parse_remote_peer_status_paths
 from skill_sync_sidecar.dashboard import (
     DASHBOARD_HTML,
     DashboardConfig,
@@ -422,7 +422,18 @@ class OpsStatusTest(unittest.TestCase):
             )
 
             cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
-            status = build_gateway_status(cache, {"oc-vps": peer_status})
+            status = build_gateway_status(
+                cache,
+                {"oc-vps": peer_status},
+                {
+                    "mac": {
+                        "health": "green",
+                        "writer_policy": "push-pull",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                    }
+                },
+            )
 
             self.assertEqual(status["mode"], "gateway")
             self.assertEqual(status["remote_snapshot"]["snapshot_id"], "snap-gateway")
@@ -433,6 +444,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertTrue((cache_dir / index["skills"][0]["archive"]).exists())
             devices = {device["id"]: device for device in status["dashboard"]["devices"]}
             self.assertEqual(devices["gateway"]["policy"], "read-only")
+            self.assertEqual(devices["mac"]["health"], "green")
             self.assertEqual(devices["oc-vps"]["health"], "green")
 
     def test_gateway_parser_accepts_remote_arguments(self):
@@ -455,6 +467,8 @@ class OpsStatusTest(unittest.TestCase):
                 "8766",
                 "--peer-status",
                 "oc-vps=/tmp/openclaw.json",
+                "--remote-peer-status",
+                "mac=skill-sync-sidecar-peer-status/mac.json",
             ]
         )
 
@@ -466,6 +480,64 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(args.host, "0.0.0.0")
         self.assertEqual(args.port, 8766)
         self.assertEqual(parse_peer_status_files(args.peer_status)["oc-vps"], Path("/tmp/openclaw.json"))
+        self.assertEqual(parse_remote_peer_status_paths(args.remote_peer_status)["mac"], "skill-sync-sidecar-peer-status/mac.json")
+
+        with self.assertRaises(ValueError):
+            parse_remote_peer_status_paths(["broken"])
+
+    def test_publish_peer_status_writes_remote_json(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "snapshot"
+            remote_dir = root / "remote"
+            base_record = root / "base-record.json"
+            state_file = root / "state.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-publish")
+            self._write_base_record(base_record, index)
+            state_file.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "daemon_status": "running",
+                        "updated_at": "2026-06-28T00:00:00Z",
+                        "cycles_run": 1,
+                        "target": "mixed-scope-root",
+                        "writer_policy": "push-pull",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "publish-peer-status",
+                    "--remote",
+                    f"file://{remote_dir}",
+                    "--peer-id",
+                    "mac",
+                    "--status-path",
+                    "skill-sync-sidecar-peer-status/mac.json",
+                    "--local-root",
+                    str(local_root),
+                    "--remote-snapshot",
+                    str(snapshot_dir),
+                    "--base-record",
+                    str(base_record),
+                    "--state-file",
+                    str(state_file),
+                    "--allow-new",
+                ]
+            )
+
+            self.assertEqual(args.func(args), 0)
+            payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "mac.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["record_type"], "skill-sync-peer-status")
+            self.assertEqual(payload["peer_id"], "mac")
+            self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

@@ -28,6 +28,7 @@ SKILL_SYNC_WEBDAV_URL=https://example.com/path/to/public-sync
 SKILL_SYNC_WEBDAV_USER=your-webdav-user
 SKILL_SYNC_WEBDAV_PASSWORD=your-webdav-password
 SKILL_SYNC_GATEWAY_PREFIX=skill-sync-sidecar-dev/current-mac
+SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_MAC=mac=skill-sync-sidecar-peer-status/mac.json
 ```
 
 The container listens on:
@@ -52,6 +53,27 @@ dashboard.health=green
 dashboard.blocked=0
 ```
 
+To show real device state instead of only the canonical snapshot, publish peer status JSON to WebDAV and let the gateway read it with `--remote-peer-status`.
+
+On Mac:
+
+```bash
+scripts/publish-mac-peer-status.sh
+scripts/install-mac-peer-status-launchd.sh
+```
+
+The default published path is:
+
+```text
+skill-sync-sidecar-peer-status/mac.json
+```
+
+The NAS compose file reads that path by default through:
+
+```text
+--remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
+```
+
 ## Docker CLI
 
 From the repository root:
@@ -74,7 +96,8 @@ docker run -d \
   --cache-dir /cache/current \
   --refresh-interval-seconds 60 \
   --host 0.0.0.0 \
-  --port 8765
+  --port 8765 \
+  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
 ```
 
 ## Local Docker Smoke

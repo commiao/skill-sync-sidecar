@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Optional, Sequence, Tuple
@@ -31,7 +32,7 @@ from .hub_import import (
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
-from .remote import RemoteError, build_upload_plan, download_snapshot, open_remote, upload_snapshot
+from .remote import RemoteError, build_upload_plan, download_snapshot, join_remote_path, open_remote, upload_snapshot
 from .reconcile import ReconcileError, build_reconcile_report, load_inventory, write_reconcile_outputs
 from .scanner import scan_roots
 from .snapshot import write_snapshot
@@ -89,6 +90,22 @@ def build_parser() -> argparse.ArgumentParser:
     ops_status.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     ops_status.set_defaults(func=cmd_ops_status)
 
+    publish_peer_status = subcommands.add_parser("publish-peer-status", help="Publish this device's ops status JSON to WebDAV for shared gateways.")
+    add_common_remote_args(publish_peer_status)
+    publish_peer_status.add_argument("--peer-id", required=True, help="Stable peer id, for example mac, oc-vps, or win.")
+    publish_peer_status.add_argument("--status-path", required=True, help="Remote JSON path, for example skill-sync-sidecar-peer-status/mac.json.")
+    publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
+    publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
+    publish_peer_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
+    publish_peer_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    publish_peer_status.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
+    publish_peer_status.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
+    publish_peer_status.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
+    publish_peer_status.add_argument("--allow-new", action="store_true", help="Evaluate the sync plan with new skills allowed.")
+    publish_peer_status.add_argument("--allow-delete", action="store_true", help="Evaluate the sync plan with delete propagation allowed.")
+    add_writer_policy_arg(publish_peer_status)
+    publish_peer_status.set_defaults(func=cmd_publish_peer_status)
+
     dashboard = subcommands.add_parser("dashboard", help="Serve a read-only local status dashboard.")
     dashboard.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
     dashboard.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
@@ -112,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     gateway.add_argument("--host", default="127.0.0.1", help="Gateway listen host.")
     gateway.add_argument("--port", type=int, default=8765, help="Gateway listen port. Use 0 to allocate a free port.")
     gateway.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
+    gateway.add_argument("--remote-peer-status", action="append", default=[], help="Peer status JSON on the same WebDAV remote as id=path/status.json. Repeat for multiple peers.")
     gateway.set_defaults(func=cmd_gateway)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
@@ -461,6 +479,60 @@ def cmd_ops_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_publish_peer_status(args: argparse.Namespace) -> int:
+    try:
+        remote = open_remote_from_args(args)
+    except (RemoteError, SystemExit) as exc:
+        print(f"publish-peer-status failed: {exc}", file=sys.stderr)
+        return 2
+
+    status = build_ops_status(
+        Path(args.local_root),
+        Path(args.remote_snapshot),
+        base_record=Path(args.base_record) if args.base_record else None,
+        state_file=Path(args.state_file) if args.state_file else None,
+        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
+        openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
+        openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
+        allow_new=args.allow_new,
+        allow_delete=args.allow_delete,
+        writer_policy=args.writer_policy,
+    )
+    payload = dict(status)
+    payload.update(
+        {
+            "record_type": "skill-sync-peer-status",
+            "peer_id": args.peer_id,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    remote_path = join_remote_path(args.prefix, args.status_path)
+    parent = str(Path(remote_path).parent).replace("\\", "/")
+    if parent and parent != ".":
+        remote.ensure_dir(parent)
+    remote.put_bytes(remote_path, (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+
+    result = {
+        "ok": True,
+        "record_type": "skill-sync-peer-status-publish-result",
+        "peer_id": args.peer_id,
+        "path": remote_path,
+        "health": payload.get("health"),
+        "snapshot_id": payload.get("remote_snapshot", {}).get("snapshot_id") if isinstance(payload.get("remote_snapshot"), dict) else None,
+        "blocked": payload.get("sync_plan", {}).get("blocked") if isinstance(payload.get("sync_plan"), dict) else None,
+    }
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print("peer_status_published=true")
+        print(f"peer_id={result['peer_id']}")
+        print(f"path={result['path']}")
+        print(f"health={result['health']}")
+        print(f"snapshot_id={result['snapshot_id']}")
+        print(f"blocked={result['blocked']}")
+    return 0
+
+
 def cmd_dashboard(args: argparse.Namespace) -> int:
     try:
         peer_status_files = parse_peer_status_files(args.peer_status)
@@ -487,6 +559,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
 def cmd_gateway(args: argparse.Namespace) -> int:
     try:
         peer_status_files = parse_peer_status_files(args.peer_status)
+        remote_peer_status_paths = parse_remote_peer_status_paths(args.remote_peer_status)
     except ValueError as exc:
         print(f"gateway failed: {exc}", file=sys.stderr)
         return 2
@@ -501,6 +574,7 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         cache_dir=Path(args.cache_dir),
         refresh_interval_seconds=args.refresh_interval_seconds,
         peer_status_files=peer_status_files,
+        remote_peer_status_paths=remote_peer_status_paths,
     )
     serve_gateway(args.host, args.port, config)
     return 0
@@ -602,6 +676,20 @@ def parse_peer_status_files(values: Sequence[str]) -> dict[str, Path]:
         if not peer_id or not raw_path:
             raise ValueError(f"--peer-status must be id=/path/status.json: {value}")
         result[peer_id] = Path(raw_path).expanduser()
+    return result
+
+
+def parse_remote_peer_status_paths(values: Sequence[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--remote-peer-status must be id=path/status.json: {value}")
+        peer_id, raw_path = value.split("=", 1)
+        peer_id = peer_id.strip()
+        raw_path = raw_path.strip().lstrip("/")
+        if not peer_id or not raw_path:
+            raise ValueError(f"--remote-peer-status must be id=path/status.json: {value}")
+        result[peer_id] = raw_path
     return result
 
 

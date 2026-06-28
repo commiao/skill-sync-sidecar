@@ -38,6 +38,7 @@ class GatewayConfig:
     cache_dir: Path
     refresh_interval_seconds: float = 60.0
     peer_status_files: Optional[Dict[str, Path]] = None
+    remote_peer_status_paths: Optional[Dict[str, str]] = None
     hub_import_work_dir: Optional[Path] = None
 
 
@@ -91,7 +92,11 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     return status
 
 
-def build_gateway_status(cache: RemoteSnapshotCache, peer_status_files: Optional[Dict[str, Path]] = None) -> dict:
+def build_gateway_status(
+    cache: RemoteSnapshotCache,
+    peer_status_files: Optional[Dict[str, Path]] = None,
+    remote_peer_status: Optional[Dict[str, dict]] = None,
+) -> dict:
     snapshot_dir = cache.snapshot_dir()
     index_path = snapshot_dir / "index.json"
     index = json.loads(index_path.read_text(encoding="utf-8"))
@@ -103,7 +108,8 @@ def build_gateway_status(cache: RemoteSnapshotCache, peer_status_files: Optional
         "total": index.get("total", len(index.get("skills", []))),
         "protocol_version": index.get("protocol_version"),
     }
-    peers = _load_peer_status_files(peer_status_files or {})
+    peers = dict(remote_peer_status or {})
+    peers.update(_load_peer_status_files(peer_status_files or {}))
     status = {
         "ok": True,
         "health": "green",
@@ -205,6 +211,31 @@ def _load_peer_status_files(peer_status_files: Dict[str, Path]) -> Dict[str, dic
             continue
         if isinstance(data, dict):
             peers[peer_id] = data
+    return peers
+
+
+def _load_remote_peer_status(remote: Remote, remote_peer_status_paths: Dict[str, str]) -> Dict[str, dict]:
+    peers = {}
+    for peer_id, path in remote_peer_status_paths.items():
+        try:
+            data = json.loads(remote.get_bytes(path).decode("utf-8"))
+        except Exception as exc:
+            peers[peer_id] = {
+                "id": peer_id,
+                "peer_id": peer_id,
+                "health": "red",
+                "error": str(exc),
+                "status_source": "webdav",
+                "status_path": path,
+            }
+            continue
+        if isinstance(data, dict):
+            copied = dict(data)
+            copied.setdefault("id", peer_id)
+            copied.setdefault("peer_id", peer_id)
+            copied["status_source"] = "webdav"
+            copied["status_path"] = path
+            peers[peer_id] = copied
     return peers
 
 
@@ -572,7 +603,8 @@ def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
 
     def status_provider() -> dict:
         try:
-            return build_gateway_status(cache, config.peer_status_files)
+            remote_peers = _load_remote_peer_status(config.remote, config.remote_peer_status_paths or {})
+            return build_gateway_status(cache, config.peer_status_files, remote_peers)
         except (RemoteError, OSError, json.JSONDecodeError) as exc:
             return {
                 "ok": False,
@@ -1003,6 +1035,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   </style>
 </head>
 <body>
+  <a href="http://100.123.208.32:17172/portal" style="display:inline-block;margin:.6rem 0;font-size:13px;color:var(--muted,#647084);text-decoration:none">← 报表门户</a>
   <header>
     <h1>Skill Sync Sidecar</h1>
     <div class="toolbar">
