@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill Sync Observer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --line: #d9dee7;
+      --text: #1f2937;
+      --muted: #637083;
+      --green: #16794c;
+      --yellow: #9a6700;
+      --red: #b42318;
+      --blue: #175cd3;
+      --chip: #eef2f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 18px 24px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 24px auto 40px;
+      display: grid;
+      gap: 18px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .section-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 96px;
+    }
+    .metric .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .metric .value {
+      font-size: 24px;
+      font-weight: 760;
+      overflow-wrap: anywhere;
+    }
+    .metric .note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      overflow-wrap: anywhere;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: #fbfcfe;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--chip);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex: none;
+    }
+    .green { color: var(--green); }
+    .green .dot { background: var(--green); }
+    .yellow { color: var(--yellow); }
+    .yellow .dot { background: var(--yellow); }
+    .red { color: var(--red); }
+    .red .dot { background: var(--red); }
+    .not_configured, .not_connected, .unknown { color: var(--muted); }
+    .not_configured .dot, .not_connected .dot, .unknown .dot { background: var(--muted); }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      background: var(--chip);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .empty {
+      padding: 20px 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .footer {
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 860px) {
+      header { padding: 16px; }
+      main { width: calc(100% - 20px); margin-top: 14px; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      th:nth-child(4), td:nth-child(4) { display: none; }
+    }
+    @media (max-width: 560px) {
+      .summary { grid-template-columns: 1fr; }
+      th:nth-child(3), td:nth-child(3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Skill Sync Observer</h1>
+      <div class="mono" id="snapshot">loading</div>
+    </div>
+    <div id="overall" class="status unknown"><span class="dot"></span>loading</div>
+  </header>
+
+  <main>
+    <div class="summary">
+      <div class="metric">
+        <div class="label">设备</div>
+        <div class="value" id="deviceCount">-</div>
+        <div class="note">Mac / OpenClaw / Windows</div>
+      </div>
+      <div class="metric">
+        <div class="label">待处理</div>
+        <div class="value" id="blockedCount">-</div>
+        <div class="note">blocked queue</div>
+      </div>
+      <div class="metric">
+        <div class="label">本机计划</div>
+        <div class="value" id="localPlan">-</div>
+        <div class="note">Mac sync plan</div>
+      </div>
+      <div class="metric">
+        <div class="label">更新时间</div>
+        <div class="value" id="updatedAt">-</div>
+        <div class="note">status.json mtime</div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-head">
+        <h2>设备</h2>
+        <span class="mono" id="deviceNote"></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>设备</th>
+            <th>状态</th>
+            <th>Skills</th>
+            <th>策略</th>
+            <th>本地策略</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody id="devices"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>待处理队列</h2>
+        <span class="mono">read-only</span>
+      </div>
+      <div id="queue"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>工具投影</h2>
+        <span class="mono">cc-switch / skillshub / codex / cursor / claude</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>工具</th>
+            <th>状态</th>
+            <th>Skills</th>
+            <th>缺失</th>
+            <th>漂移</th>
+            <th>路径</th>
+          </tr>
+        </thead>
+        <tbody id="tools"></tbody>
+      </table>
+    </section>
+
+    <div class="footer">
+      <span>NAS read-only observer. No writes, no sync actions.</span>
+      <span id="exportedAt" class="mono"></span>
+    </div>
+  </main>
+
+  <script>
+    const statusClass = value => ["green", "yellow", "red", "not_configured", "not_connected"].includes(value) ? value : "unknown";
+    const text = value => value === null || value === undefined || value === "" ? "-" : String(value);
+    const esc = value => text(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const statusPill = value => `<span class="status ${statusClass(value)}"><span class="dot"></span>${esc(value)}</span>`;
+    const chips = values => Array.isArray(values) && values.length ? `<div class="chips">${values.map(v => `<span class="chip">${esc(v)}</span>`).join("")}</div>` : "-";
+
+    function planSummary(summary) {
+      if (!summary || typeof summary !== "object") return "-";
+      return Object.entries(summary).map(([k, v]) => `${k}:${v}`).join(" ");
+    }
+
+    function render(data) {
+      const dash = data.dashboard || {};
+      const devices = dash.devices || [];
+      const tools = dash.tools || [];
+      const queue = dash.blocked_items || [];
+      const remote = data.remote_snapshot || {};
+      const localPlan = data.sync_plan || {};
+
+      document.getElementById("overall").outerHTML = statusPill(dash.health || data.health);
+      document.getElementById("snapshot").textContent = remote.snapshot_id || "snapshot unavailable";
+      document.getElementById("deviceCount").textContent = devices.length;
+      document.getElementById("blockedCount").textContent = dash.blocked ?? localPlan.blocked ?? "-";
+      document.getElementById("localPlan").textContent = planSummary(localPlan.summary);
+      document.getElementById("updatedAt").textContent = data.exported_at ? new Date(data.exported_at).toLocaleString() : "-";
+      document.getElementById("exportedAt").textContent = data.exported_at || "";
+      document.getElementById("deviceNote").textContent = dash.operator?.next_action || "";
+
+      document.getElementById("devices").innerHTML = devices.map(device => `
+        <tr>
+          <td><strong>${esc(device.name || device.id)}</strong><div class="mono">${esc(device.id)}</div></td>
+          <td>${statusPill(device.health)}<div class="mono">blocked=${esc(device.blocked)}</div></td>
+          <td>${esc(device.skills)}</td>
+          <td>${esc(device.policy)}</td>
+          <td>${chips(device.local_policy)}</td>
+          <td>${esc(device.note)}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("queue").innerHTML = queue.length ? `
+        <table>
+          <thead>
+            <tr><th>设备 / Skill</th><th>动作</th><th>原因</th><th>建议</th></tr>
+          </thead>
+          <tbody>
+            ${queue.map(item => `
+              <tr>
+                <td><strong>${esc(item.peer_name || item.peer_id)}</strong><div class="mono">${esc(item.skill_id)}</div></td>
+                <td>${esc(item.status_action || item.plan_action)}</td>
+                <td>${esc(item.reason)}</td>
+                <td>${esc(item.recommendation)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      ` : '<div class="empty">暂无待处理项。</div>';
+
+      document.getElementById("tools").innerHTML = tools.map(tool => {
+        const p = tool.projection || {};
+        const state = tool.state === "active" ? "green" : tool.state === "error" ? "red" : "not_configured";
+        return `
+          <tr>
+            <td><strong>${esc(tool.name)}</strong><div class="mono">${esc(tool.id)}</div></td>
+            <td>${statusPill(state)}</td>
+            <td>${esc(tool.skills)}</td>
+            <td>${esc(p.missing)}</td>
+            <td>${esc(p.drift)}</td>
+            <td class="mono">${esc(tool.path)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    fetch("status.json", { cache: "no-store" })
+      .then(res => {
+        if (!res.ok) throw new Error(`status.json ${res.status}`);
+        return res.json();
+      })
+      .then(render)
+      .catch(err => {
+        document.getElementById("overall").outerHTML = statusPill("red");
+        document.getElementById("snapshot").textContent = err.message;
+        document.getElementById("queue").innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+      });
+  </script>
+</body>
+</html>

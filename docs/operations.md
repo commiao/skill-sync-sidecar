@@ -157,6 +157,90 @@ PYTHONPATH=src python3 -m skill_sync_sidecar dashboard \
   --peer-status "oc-vps=$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json"
 ```
 
+To make the Mac dashboard itself a long-running LaunchAgent, install:
+
+```bash
+scripts/install-dashboard-launchd.sh
+```
+
+The dashboard LaunchAgent defaults to:
+
+- URL: `http://127.0.0.1:8765`.
+- Label: `com.skill-sync-sidecar.dashboard`.
+- Local root: `~/.cc-switch/skills`.
+- Remote snapshot: `~/public-sync/skill-sync-sidecar-dev/current-mac`.
+- Base record: `~/Library/Application Support/skill-sync-sidecar/base-record.json`.
+- Peer status: `~/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json`.
+- Logs: `~/Library/Logs/skill-sync-dashboard.out.log` and `~/Library/Logs/skill-sync-dashboard.err.log`.
+
+Recommended Mac observer setup:
+
+```bash
+scripts/install-openclaw-peer-status-launchd.sh
+scripts/install-dashboard-launchd.sh
+curl -sS http://127.0.0.1:8765/healthz
+```
+
+Use environment overrides when needed:
+
+```bash
+SKILL_SYNC_DASHBOARD_PORT=8876 \
+SKILL_SYNC_REMOTE_SNAPSHOT="$HOME/public-sync/skill-sync-sidecar-dev/current-mac" \
+  scripts/install-dashboard-launchd.sh
+```
+
+For a future NAS-hosted dashboard, keep Mac and OpenClaw as status producers and move only the read-only UI to the NAS. Do not make the NAS write into tool roots. The NAS service should read mirrored `ops-status --json` files from each device and expose the same dashboard model over the LAN/Tailscale.
+
+### NAS static observer
+
+The first NAS integration is a static read-only observer. Mac exports a dashboard bundle into the WebDAV-synced folder, and NAS only serves or displays those files:
+
+```bash
+scripts/export-nas-dashboard.sh
+```
+
+Defaults:
+
+- Output: `~/public-sync/skill-sync-sidecar-dashboard`.
+- HTML: `~/public-sync/skill-sync-sidecar-dashboard/index.html`.
+- Full status JSON: `~/public-sync/skill-sync-sidecar-dashboard/status.json`.
+- Split JSON: `devices.json`, `blocked-items.json`, `tools.json`.
+- Access hints: `access.json`.
+
+Install the exporter as a LaunchAgent:
+
+```bash
+scripts/install-nas-dashboard-export-launchd.sh
+```
+
+The exporter defaults to a 300-second interval and writes logs to:
+
+- `~/Library/Logs/skill-sync-nas-dashboard-export.out.log`
+- `~/Library/Logs/skill-sync-nas-dashboard-export.err.log`
+
+This mode is deliberately read-only. It does not run `sync-cycle`, does not upload skill archives, and does not write into Mac, OpenClaw, Skillshub, Codex, Cursor, or Claude Code roots. It only serializes the same dashboard model already visible at `http://127.0.0.1:8765/api/status`.
+
+Check whether the bundle has reached the remote WebDAV store and whether NAS HTTP is serving the real dashboard:
+
+```bash
+scripts/check-nas-dashboard-remote.sh
+```
+
+Expected current states:
+
+- `webdav_ok=true`: the NAS/WebDAV store has `status.json`.
+- `http_static_ok=true`: NAS HTTP is serving the actual `Skill Sync Observer` HTML.
+- `http_static_ok=false`: WebDAV sync is working, but the NAS web service has not mapped the dashboard folder yet. A plain HTTP `200` alone is not enough; Synology may return its default page for unknown paths.
+
+When `http_static_ok=false`, open the WebDAV URL from `access.json` instead. It requires the configured WebDAV account but serves the same static `index.html` and relative `status.json`.
+
+Use an alternate WebDAV/NAS path when needed:
+
+```bash
+SKILL_SYNC_NAS_DASHBOARD_OUT="$HOME/public-sync/ops/skill-sync-dashboard" \
+  scripts/install-nas-dashboard-export-launchd.sh
+```
+
 The LaunchAgent defaults to a 300-second refresh interval. It writes:
 
 - Peer file: `~/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json`.
