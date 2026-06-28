@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,6 +11,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple
 from .hub_import import build_hub_import_diagnosis, build_hub_import_preview_package, execute_hub_import_apply
 from .ops_status import build_ops_status
 from .projection import ProjectionError, build_tool_projection
+from .remote import Remote, RemoteError, download_snapshot
 from .scanner import scan_roots
 
 
@@ -27,6 +29,34 @@ class DashboardConfig:
     writer_policy: str = "push-pull"
     peer_status_files: Optional[Dict[str, Path]] = None
     hub_import_work_dir: Optional[Path] = None
+
+
+@dataclass(frozen=True)
+class GatewayConfig:
+    remote: Remote
+    remote_prefix: str
+    cache_dir: Path
+    refresh_interval_seconds: float = 60.0
+    peer_status_files: Optional[Dict[str, Path]] = None
+    hub_import_work_dir: Optional[Path] = None
+
+
+class RemoteSnapshotCache:
+    def __init__(self, remote: Remote, prefix: str, cache_dir: Path, refresh_interval_seconds: float):
+        self.remote = remote
+        self.prefix = prefix
+        self.cache_dir = cache_dir.expanduser()
+        self.refresh_interval_seconds = max(0.0, refresh_interval_seconds)
+        self._last_refresh = 0.0
+
+    def snapshot_dir(self) -> Path:
+        index_path = self.cache_dir / "index.json"
+        now = time.monotonic()
+        stale = now - self._last_refresh >= self.refresh_interval_seconds
+        if stale or not index_path.exists():
+            download_snapshot(self.remote, self.cache_dir, self.prefix)
+            self._last_refresh = now
+        return self.cache_dir
 
 
 def build_dashboard_status(config: DashboardConfig) -> dict:
@@ -47,6 +77,73 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     blocked_items = _blocked_items(status, peers)
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(config.remote_snapshot)
+    hub_import = _safe_hub_import_diagnosis()
+    status["dashboard"] = {
+        "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
+        "blocked": len(blocked_items),
+        "operator": operator,
+        "blocked_items": blocked_items,
+        "devices": devices,
+        "tools": _merge_tool_projection(_tool_overview(), projection),
+        "tool_projection": projection,
+        "hub_import": hub_import,
+    }
+    return status
+
+
+def build_gateway_status(cache: RemoteSnapshotCache, peer_status_files: Optional[Dict[str, Path]] = None) -> dict:
+    snapshot_dir = cache.snapshot_dir()
+    index_path = snapshot_dir / "index.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    snapshot = {
+        "ok": True,
+        "path": str(snapshot_dir),
+        "snapshot_id": index.get("snapshot_id"),
+        "created_at": index.get("created_at"),
+        "total": index.get("total", len(index.get("skills", []))),
+        "protocol_version": index.get("protocol_version"),
+    }
+    peers = _load_peer_status_files(peer_status_files or {})
+    status = {
+        "ok": True,
+        "health": "green",
+        "mode": "gateway",
+        "local_root": None,
+        "remote_snapshot": snapshot,
+        "base_record": None,
+        "daemon_state": {
+            "ok": True,
+            "status": "gateway",
+            "daemon_status": "running",
+            "target": "webdav-observer",
+            "writer_policy": "read-only",
+            "interval_seconds": cache.refresh_interval_seconds,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "blocked_report": None,
+        "sync_plan": {
+            "ok": True,
+            "writer_policy": "read-only",
+            "total": snapshot["total"],
+            "summary": {"observed": snapshot["total"]},
+            "allowed": 0,
+            "blocked": 0,
+            "safe_to_apply": False,
+            "status_summary": {"observed": snapshot["total"]},
+            "local_overrides": {"total": 0, "skills": []},
+            "has_conflicts": False,
+        },
+        "openclaw_reconcile": None,
+        "openclaw_gate": {"ok": True, "available": False, "reason": "gateway mode does not run OpenClaw reconcile"},
+        "allow_new": False,
+        "allow_delete": False,
+        "writer_policy": "read-only",
+        "error_count": 0,
+    }
+    devices = _gateway_device_overview(snapshot, peers)
+    blocked_items = _blocked_items(status, peers)
+    operator = _operator_summary(status, devices, blocked_items)
+    projection = _safe_tool_projection(snapshot_dir)
     hub_import = _safe_hub_import_diagnosis()
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
@@ -190,6 +287,53 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
             "local_policy": local_overrides.get("skills", []),
         },
         openclaw_device,
+        {
+            "id": "win",
+            "name": "Windows",
+            "kind": "计划设备",
+            "health": "not_configured",
+            "skills": None,
+            "blocked": None,
+            "policy": "未接入",
+            "note": "等待安装 sidecar 后纳入同一面板",
+            "local_policy": [],
+        },
+    ]
+
+
+def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dict]:
+    mac = peers.get("mac")
+    openclaw = peers.get("oc-vps") or peers.get("openclaw")
+    return [
+        {
+            "id": "gateway",
+            "name": "Gateway / NAS",
+            "kind": "观察台",
+            "health": "green",
+            "skills": snapshot.get("total"),
+            "blocked": 0,
+            "policy": "read-only",
+            "note": "直接读取 WebDAV canonical snapshot，不依赖 Mac 静态导出",
+            "local_policy": [],
+        },
+        _peer_device(
+            "mac",
+            "Mac 本机",
+            "已接入设备",
+            mac,
+            fallback_policy="push-pull",
+            fallback_note="gateway 尚未读取到 Mac peer status；canonical snapshot 仍可观察",
+            fallback_local_policy=[],
+        ),
+        _peer_device(
+            "oc-vps",
+            "oc-vps / OpenClaw",
+            "已接入设备",
+            openclaw,
+            fallback_policy="pull-only + local-only",
+            fallback_note="gateway 尚未读取到 OpenClaw peer status；canonical snapshot 仍可观察",
+            fallback_local_policy=["disk-cleanup", "lark-cli-adapter"],
+        ),
         {
             "id": "win",
             "name": "Windows",
@@ -417,6 +561,45 @@ def serve_dashboard(host: str, port: int, config: DashboardConfig) -> None:
     handler = _handler_factory(status_provider, preview_provider)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"skill-sync dashboard: http://{host}:{server.server_port}", flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+
+
+def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
+    cache = RemoteSnapshotCache(config.remote, config.remote_prefix, config.cache_dir, config.refresh_interval_seconds)
+
+    def status_provider() -> dict:
+        try:
+            return build_gateway_status(cache, config.peer_status_files)
+        except (RemoteError, OSError, json.JSONDecodeError) as exc:
+            return {
+                "ok": False,
+                "health": "red",
+                "mode": "gateway",
+                "error": str(exc),
+                "dashboard": {
+                    "health": "red",
+                    "blocked": 0,
+                    "operator": {
+                        "headline": "同步链路异常",
+                        "next_action": "先检查 WebDAV 连接、认证或 gateway 缓存目录。",
+                        "sync_path": "WebDAV -> Gateway",
+                        "snapshot_id": None,
+                        "devices": {},
+                        "blocked_count": 0,
+                    },
+                    "blocked_items": [],
+                    "devices": [],
+                    "tools": [],
+                },
+            }
+
+    preview_provider = lambda: build_hub_import_preview_response(config.hub_import_work_dir)
+    handler = _handler_factory(status_provider, preview_provider)
+    server = ThreadingHTTPServer((host, port), handler)
+    print(f"skill-sync gateway: http://{host}:{server.server_port}", flush=True)
     try:
         server.serve_forever()
     finally:

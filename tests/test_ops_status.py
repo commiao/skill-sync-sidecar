@@ -4,7 +4,15 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skill_sync_sidecar.cli import build_parser, parse_peer_status_files
-from skill_sync_sidecar.dashboard import DASHBOARD_HTML, DashboardConfig, build_dashboard_status, build_hub_import_preview_response
+from skill_sync_sidecar.dashboard import (
+    DASHBOARD_HTML,
+    DashboardConfig,
+    RemoteSnapshotCache,
+    build_dashboard_status,
+    build_gateway_status,
+    build_hub_import_preview_response,
+)
+from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -390,6 +398,74 @@ class OpsStatusTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_peer_status_files(["broken"])
+
+    def test_gateway_status_reads_remote_snapshot_without_static_export(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+            peer_status = root / "openclaw-status.json"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-gateway")
+            peer_status.write_text(
+                json.dumps(
+                    {
+                        "health": "green",
+                        "writer_policy": "pull-only",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "pull-only", "blocked": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(cache, {"oc-vps": peer_status})
+
+            self.assertEqual(status["mode"], "gateway")
+            self.assertEqual(status["remote_snapshot"]["snapshot_id"], "snap-gateway")
+            self.assertEqual(status["remote_snapshot"]["total"], index["total"])
+            self.assertEqual(status["writer_policy"], "read-only")
+            self.assertEqual(status["sync_plan"]["summary"], {"observed": 1})
+            self.assertTrue((cache_dir / "index.json").exists())
+            self.assertTrue((cache_dir / index["skills"][0]["archive"]).exists())
+            devices = {device["id"]: device for device in status["dashboard"]["devices"]}
+            self.assertEqual(devices["gateway"]["policy"], "read-only")
+            self.assertEqual(devices["oc-vps"]["health"], "green")
+
+    def test_gateway_parser_accepts_remote_arguments(self):
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "gateway",
+                "--remote",
+                "file:///tmp/snapshot",
+                "--prefix",
+                "current",
+                "--cache-dir",
+                "/tmp/cache",
+                "--refresh-interval-seconds",
+                "5",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8766",
+                "--peer-status",
+                "oc-vps=/tmp/openclaw.json",
+            ]
+        )
+
+        self.assertEqual(args.command, "gateway")
+        self.assertEqual(args.remote, "file:///tmp/snapshot")
+        self.assertEqual(args.prefix, "current")
+        self.assertEqual(args.cache_dir, "/tmp/cache")
+        self.assertEqual(args.refresh_interval_seconds, 5)
+        self.assertEqual(args.host, "0.0.0.0")
+        self.assertEqual(args.port, 8766)
+        self.assertEqual(parse_peer_status_files(args.peer_status)["oc-vps"], Path("/tmp/openclaw.json"))
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

@@ -189,11 +189,41 @@ SKILL_SYNC_REMOTE_SNAPSHOT="$HOME/public-sync/skill-sync-sidecar-dev/current-mac
   scripts/install-dashboard-launchd.sh
 ```
 
-For a future NAS-hosted dashboard, keep Mac and OpenClaw as status producers and move only the read-only UI to the NAS. Do not make the NAS write into tool roots. The NAS service should read mirrored `ops-status --json` files from each device and expose the same dashboard model over the LAN/Tailscale.
+### Gateway observer
+
+The preferred shared observer is `gateway`. It serves the same dashboard UI, but reads the canonical WebDAV snapshot directly at request time and keeps only a runtime cache. It does not depend on Mac exporting static files under `~/public-sync`.
+
+Run locally for smoke testing:
+
+```bash
+PYTHONPATH=src python3 -m skill_sync_sidecar gateway \
+  --cc-switch-webdav \
+  --prefix skill-sync-sidecar-dev/current-mac \
+  --cache-dir /tmp/skill-sync-gateway-cache \
+  --refresh-interval-seconds 60 \
+  --host 127.0.0.1 \
+  --port 8877
+```
+
+For NAS/Linux, use:
+
+```text
+examples/systemd/skill-sync-gateway.service
+```
+
+Gateway mode is deliberately read-only:
+
+- It downloads the remote `index.json` and skill archives into its own cache.
+- It does not run `sync-cycle`.
+- It does not upload skills.
+- It does not write into Mac, OpenClaw, Skillshub, Codex, Cursor, or Claude Code roots.
+- It can run on NAS, Mac, Linux, or Windows as long as it can reach the WebDAV endpoint.
+
+Use optional `--peer-status id=/path/status.json` flags when the gateway host also has mirrored peer status files. Without peer files, the gateway still shows the canonical snapshot and marks missing peers as not connected.
 
 ### NAS static observer
 
-The first NAS integration is a static read-only observer. Mac exports a dashboard bundle into the WebDAV-synced folder, and NAS only serves or displays those files:
+The static observer is a fallback/transition mode. Mac exports a dashboard bundle into the WebDAV-synced folder, and NAS only serves or displays those files:
 
 ```bash
 scripts/export-nas-dashboard.sh
@@ -219,6 +249,8 @@ The exporter defaults to a 300-second interval and writes logs to:
 - `~/Library/Logs/skill-sync-nas-dashboard-export.err.log`
 
 This mode is deliberately read-only. It does not run `sync-cycle`, does not upload skill archives, and does not write into Mac, OpenClaw, Skillshub, Codex, Cursor, or Claude Code roots. It only serializes the same dashboard model already visible at `http://127.0.0.1:8765/api/status`.
+
+Prefer `gateway` for shared/NAS deployments. Keep static export only when the host cannot run Python or cannot reach WebDAV directly.
 
 Check whether the bundle has reached the remote WebDAV store and whether NAS HTTP is serving the real dashboard:
 

@@ -1,0 +1,22 @@
+[Unit]
+Description=Skill Sync Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/PATH/TO/skill-sync-sidecar
+Environment=PYTHONPATH=/PATH/TO/skill-sync-sidecar/src
+ExecStart=/usr/bin/python3 -m skill_sync_sidecar gateway \
+  --cc-switch-webdav \
+  --prefix skill-sync-sidecar-dev/current-mac \
+  --cache-dir /home/YOUR_USER/.cache/skill-sync-sidecar/gateway/current \
+  --refresh-interval-seconds 60 \
+  --host 0.0.0.0 \
+  --port 8765
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -14,7 +14,7 @@ from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execu
 from .blocked_report import build_blocked_report
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .conflicts import ConflictPackageError, build_conflict_packages
-from .dashboard import DashboardConfig, serve_dashboard
+from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
 from .diff import diff_snapshot_dirs
 from .hub_import import (
@@ -104,6 +104,15 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--port", type=int, default=8765, help="Dashboard listen port. Use 0 to allocate a free port.")
     dashboard.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
     dashboard.set_defaults(func=cmd_dashboard)
+
+    gateway = subcommands.add_parser("gateway", help="Serve a read-only dashboard by reading WebDAV directly.")
+    add_common_remote_args(gateway)
+    gateway.add_argument("--cache-dir", default="~/.cache/skill-sync-sidecar/gateway/current", help="Local runtime cache for the downloaded remote snapshot.")
+    gateway.add_argument("--refresh-interval-seconds", type=float, default=60.0, help="Minimum seconds between WebDAV snapshot refreshes.")
+    gateway.add_argument("--host", default="127.0.0.1", help="Gateway listen host.")
+    gateway.add_argument("--port", type=int, default=8765, help="Gateway listen port. Use 0 to allocate a free port.")
+    gateway.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
+    gateway.set_defaults(func=cmd_gateway)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
     tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
@@ -472,6 +481,28 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         peer_status_files=peer_status_files,
     )
     serve_dashboard(args.host, args.port, config)
+    return 0
+
+
+def cmd_gateway(args: argparse.Namespace) -> int:
+    try:
+        peer_status_files = parse_peer_status_files(args.peer_status)
+    except ValueError as exc:
+        print(f"gateway failed: {exc}", file=sys.stderr)
+        return 2
+    try:
+        remote = open_remote_from_args(args)
+    except (RemoteError, SystemExit) as exc:
+        print(f"gateway failed: {exc}", file=sys.stderr)
+        return 2
+    config = GatewayConfig(
+        remote=remote,
+        remote_prefix=args.prefix,
+        cache_dir=Path(args.cache_dir),
+        refresh_interval_seconds=args.refresh_interval_seconds,
+        peer_status_files=peer_status_files,
+    )
+    serve_gateway(args.host, args.port, config)
     return 0
 
 
