@@ -8,6 +8,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `status`: summarize counts, sources, risks, and duplicate skill ids.
 - `ops-status`: summarize daemon state, base record, remote snapshot, sync plan, and optional OpenClaw reconcile state.
 - `dashboard`: serve a read-only local web dashboard backed by `ops-status`, with device and tool inventory sections.
+- `gateway`: serve the same dashboard from WebDAV directly, for NAS or always-on observer hosts.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
@@ -56,6 +57,7 @@ python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
 python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only --peer-status oc-vps=./openclaw-status.json
+python3 -m skill_sync_sidecar gateway --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --host 127.0.0.1 --port 8877
 scripts/refresh-openclaw-peer-status.sh
 scripts/install-openclaw-peer-status-launchd.sh
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
@@ -119,6 +121,7 @@ Skill packages can be global or project-scoped:
 
 See [docs/manifest-v0.md](docs/manifest-v0.md) for the canonical metadata contract.
 See [docs/operations.md](docs/operations.md) for WebDAV smoke tests, daemon rollout, and launchd/systemd templates.
+See [docs/nas-gateway-deployment.md](docs/nas-gateway-deployment.md) for the NAS/Docker gateway deployment path.
 See [docs/acceptance-report.md](docs/acceptance-report.md) for the current MVP validation evidence and safety boundary.
 See [docs/release.md](docs/release.md) for the package smoke test and release checklist.
 

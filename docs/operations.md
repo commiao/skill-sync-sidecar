@@ -211,6 +211,14 @@ For NAS/Linux, use:
 examples/systemd/skill-sync-gateway.service
 ```
 
+For Synology Container Manager or Docker, use:
+
+```text
+Dockerfile
+examples/docker-compose.gateway.yml
+docs/nas-gateway-deployment.md
+```
+
 On Mac, install the gateway as a LaunchAgent:
 
 ```bash

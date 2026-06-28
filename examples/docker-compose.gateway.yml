@@ -1,0 +1,32 @@
+services:
+  skill-sync-gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: skill-sync-sidecar:local
+    container_name: skill-sync-gateway
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      SKILL_SYNC_WEBDAV_USER: "${SKILL_SYNC_WEBDAV_USER:?set SKILL_SYNC_WEBDAV_USER}"
+      SKILL_SYNC_WEBDAV_PASSWORD: "${SKILL_SYNC_WEBDAV_PASSWORD:?set SKILL_SYNC_WEBDAV_PASSWORD}"
+    volumes:
+      - skill-sync-gateway-cache:/cache
+    command:
+      - gateway
+      - --remote
+      - "${SKILL_SYNC_WEBDAV_URL:?set SKILL_SYNC_WEBDAV_URL}"
+      - --prefix
+      - "${SKILL_SYNC_GATEWAY_PREFIX:-skill-sync-sidecar-dev/current-mac}"
+      - --cache-dir
+      - /cache/current
+      - --refresh-interval-seconds
+      - "${SKILL_SYNC_GATEWAY_REFRESH_INTERVAL_SECONDS:-60}"
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+
+volumes:
+  skill-sync-gateway-cache:
