@@ -102,3 +102,13 @@ http://127.0.0.1:8877
 ```
 
 This validates the gateway behavior, but NAS remains the preferred always-on host.
+
+## Current NAS Deployment
+
+NAS deployment was completed on 2026-06-28:
+
+```text
+http://100.123.208.32:8765
+```
+
+See [nas-gateway-rollout-20260628.md](nas-gateway-rollout-20260628.md) for the root cause, deployment command, and validation record.
