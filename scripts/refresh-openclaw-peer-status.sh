@@ -29,13 +29,19 @@ ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SS
 if ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SSH_TARGET" \
   "PYTHONPATH=/opt/skill-sync-sidecar/releases/${OPENCLAW_RELEASE}/src ${OPENCLAW_PYTHON} -" > "$tools_file" <<'PY'
 import json
+from pathlib import Path
+
 from skill_sync_sidecar.tool_status import build_device_status, build_device_tool_status, build_peer_capabilities
+
+tool_roots = [
+    ("openclaw", "OpenClaw", [Path("/home/admin/clawd/skills")], "OpenClaw 实际使用目录"),
+]
 
 payload = {
     "peer_status_version": 1,
     "device": build_device_status("oc-vps"),
     "capabilities": build_peer_capabilities(),
-    "tools": build_device_tool_status(),
+    "tools": build_device_tool_status(tool_roots),
 }
 print(json.dumps(payload, ensure_ascii=False))
 PY
