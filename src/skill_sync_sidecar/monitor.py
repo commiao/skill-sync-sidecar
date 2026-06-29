@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.request import Request, urlopen
 
@@ -16,6 +18,114 @@ def fetch_summary(url: str, timeout_seconds: float = 20.0) -> JsonDict:
     if not isinstance(data, dict):
         raise ValueError("summary endpoint did not return a JSON object")
     return data
+
+
+def build_fetch_error_report(exc: Exception) -> JsonDict:
+    return {
+        "ok": False,
+        "record_type": "skill-sync-monitor-report",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "health": "red",
+        "dashboard_health": "unknown",
+        "blocked": None,
+        "snapshot_id": None,
+        "canonical_total": None,
+        "alerts": [
+            {
+                "code": "summary_fetch_failed",
+                "message": f"Could not read dashboard summary: {exc}",
+                "action": "Check the gateway URL, network path, and container logs.",
+            }
+        ],
+        "warnings": [],
+        "info": [],
+    }
+
+
+def monitor_once(
+    url: str,
+    *,
+    timeout_seconds: float = 20.0,
+    stale_after_seconds: int = 30 * 60,
+    min_canonical_total: int = 1,
+) -> JsonDict:
+    try:
+        summary = fetch_summary(url, timeout_seconds=timeout_seconds)
+    except Exception as exc:
+        return build_fetch_error_report(exc)
+    return build_monitor_report(
+        summary,
+        stale_after_seconds=stale_after_seconds,
+        min_canonical_total=min_canonical_total,
+    )
+
+
+def write_monitor_report(report: JsonDict, out_dir: Path) -> JsonDict:
+    out_dir = out_dir.expanduser()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "last-report.json"
+    text_path = out_dir / "last-report.txt"
+    events_path = out_dir / "events.jsonl"
+    json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    text_path.write_text(render_monitor_report(report) + "\n", encoding="utf-8")
+    event = {
+        "checked_at": report.get("checked_at"),
+        "health": report.get("health"),
+        "dashboard_health": report.get("dashboard_health"),
+        "snapshot_id": report.get("snapshot_id"),
+        "blocked": report.get("blocked"),
+        "alerts": len(report.get("alerts") or []),
+        "warnings": len(report.get("warnings") or []),
+    }
+    with events_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    return {
+        "out_dir": str(out_dir),
+        "json": str(json_path),
+        "text": str(text_path),
+        "events": str(events_path),
+    }
+
+
+def run_monitor_loop(
+    url: str,
+    out_dir: Path,
+    *,
+    interval_seconds: float = 300.0,
+    timeout_seconds: float = 20.0,
+    stale_after_seconds: int = 30 * 60,
+    min_canonical_total: int = 1,
+    max_iterations: Optional[int] = None,
+    print_status: bool = True,
+) -> JsonDict:
+    iterations = 0
+    last_report: JsonDict = {}
+    while True:
+        report = monitor_once(
+            url,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            min_canonical_total=min_canonical_total,
+        )
+        paths = write_monitor_report(report, out_dir)
+        report["paths"] = paths
+        last_report = report
+        iterations += 1
+        if print_status:
+            print(
+                "monitor_iteration={} health={} alerts={} warnings={} snapshot={} out={}".format(
+                    iterations,
+                    report.get("health"),
+                    len(report.get("alerts") or []),
+                    len(report.get("warnings") or []),
+                    report.get("snapshot_id"),
+                    paths.get("json"),
+                ),
+                flush=True,
+            )
+        if max_iterations is not None and iterations >= max_iterations:
+            return last_report
+        time.sleep(max(1.0, interval_seconds))
 
 
 def build_monitor_report(

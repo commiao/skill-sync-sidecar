@@ -1,10 +1,12 @@
 import json
 from contextlib import redirect_stdout
 from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from skill_sync_sidecar.cli import build_parser
-from skill_sync_sidecar.monitor import build_monitor_report, render_monitor_report
+from skill_sync_sidecar.monitor import build_monitor_report, render_monitor_report, run_monitor_loop, write_monitor_report
 
 
 class MonitorSummaryTest(unittest.TestCase):
@@ -76,6 +78,54 @@ class MonitorSummaryTest(unittest.TestCase):
         args = parser.parse_args(["monitor-summary", "--url", "http://127.0.0.1:1/missing", "--timeout-seconds", "0.01", "--fail-on-alert"])
         with redirect_stdout(StringIO()):
             self.assertEqual(args.func(args), 3)
+
+    def test_write_monitor_report_creates_operator_artifacts(self):
+        with TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            report = build_monitor_report(_summary())
+
+            paths = write_monitor_report(report, out_dir)
+
+            self.assertTrue(Path(paths["json"]).exists())
+            self.assertTrue(Path(paths["text"]).exists())
+            self.assertTrue(Path(paths["events"]).exists())
+            self.assertEqual(json.loads(Path(paths["json"]).read_text(encoding="utf-8"))["health"], "green")
+            self.assertIn("Skill Sync Monitor", Path(paths["text"]).read_text(encoding="utf-8"))
+            self.assertEqual(len(Path(paths["events"]).read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_monitor_loop_one_shot_writes_fetch_failure_report(self):
+        with TemporaryDirectory() as tmp:
+            report = run_monitor_loop(
+                "http://127.0.0.1:1/missing",
+                Path(tmp),
+                timeout_seconds=0.01,
+                max_iterations=1,
+                print_status=False,
+            )
+
+            self.assertEqual(report["health"], "red")
+            self.assertEqual(report["alerts"][0]["code"], "summary_fetch_failed")
+            self.assertTrue((Path(tmp) / "last-report.json").exists())
+
+    def test_monitor_loop_parser_accepts_runtime_arguments(self):
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "monitor-loop",
+                "--url",
+                "http://127.0.0.1:1/missing",
+                "--out-dir",
+                "/tmp/monitor",
+                "--interval-seconds",
+                "10",
+                "--timeout-seconds",
+                "1",
+            ]
+        )
+
+        self.assertEqual(args.command, "monitor-loop")
+        self.assertEqual(args.interval_seconds, 10)
+        self.assertEqual(args.timeout_seconds, 1)
 
 
 def _summary(health: str = "green", blocked: int = 0) -> dict:

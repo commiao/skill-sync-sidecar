@@ -71,6 +71,22 @@ on non-green dashboard health, blocked sync items, stale Mac/OpenClaw peer
 status, snapshot drift, missing device tool reports, and abnormal canonical
 snapshot totals.
 
+In Docker Compose, `skill-sync-monitor` runs the same check on an interval and
+writes:
+
+```text
+/cache/monitor/last-report.json
+/cache/monitor/last-report.txt
+/cache/monitor/events.jsonl
+```
+
+Inspect it on NAS with:
+
+```bash
+docker exec skill-sync-monitor cat /cache/monitor/last-report.txt
+docker logs --tail 50 skill-sync-monitor
+```
+
 To show real device state instead of only the canonical snapshot, publish peer status JSON to WebDAV and let the gateway read it with `--remote-peer-status`.
 
 Peer status v1 separates responsibilities:
