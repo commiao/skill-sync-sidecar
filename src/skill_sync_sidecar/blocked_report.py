@@ -20,9 +20,7 @@ def build_blocked_report(
 ) -> Dict[str, object]:
     status = build_sync_status(local_root, remote_snapshot_dir, last_applied_record)
     plan = build_sync_plan(status, allow_new=allow_new, allow_delete=allow_delete, writer_policy=writer_policy)
-    blocked_items = [dict(item) for item in plan.get("items", []) if not item.get("allowed")]
-
-    enriched = [_enrich_item(item, writer_policy) for item in blocked_items]
+    enriched = enrich_blocked_items(plan, writer_policy)
     summary: Dict[str, int] = {}
     for item in enriched:
         category = str(item["category"])
@@ -46,6 +44,11 @@ def build_blocked_report(
     (out_dir / "blocked-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (out_dir / "blocked-report.md").write_text(_render_markdown(report), encoding="utf-8")
     return report
+
+
+def enrich_blocked_items(plan: Dict[str, object], writer_policy: str) -> list[Dict[str, object]]:
+    blocked_items = [dict(item) for item in plan.get("items", []) if not item.get("allowed")]
+    return [_enrich_item(item, writer_policy) for item in blocked_items]
 
 
 def _enrich_item(item: Dict[str, object], writer_policy: str) -> Dict[str, object]:

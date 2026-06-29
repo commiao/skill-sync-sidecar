@@ -225,6 +225,7 @@ def build_dashboard_summary(status: dict) -> dict:
             "summary": sync_plan.get("summary"),
             "allowed": sync_plan.get("allowed"),
             "blocked": sync_plan.get("blocked"),
+            "blocked_items": sync_plan.get("blocked_items", []),
             "safe_to_apply": sync_plan.get("safe_to_apply"),
             "status_summary": sync_plan.get("status_summary"),
             "local_overrides": sync_plan.get("local_overrides"),
@@ -739,6 +740,11 @@ def _blocked_items(status: dict, peers: Dict[str, dict]) -> list[dict]:
 def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[dict]:
     report = status.get("blocked_report") if isinstance(status.get("blocked_report"), dict) else {}
     raw_items = report.get("items") if isinstance(report.get("items"), list) else []
+    sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
+    plan_items = sync_plan.get("blocked_items") if isinstance(sync_plan.get("blocked_items"), list) else []
+    expected_total = sync_plan.get("blocked")
+    if plan_items and len(raw_items) != expected_total:
+        raw_items = plan_items
     items = []
     for item in raw_items:
         if not isinstance(item, dict):
@@ -746,6 +752,7 @@ def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[di
         copied = dict(item)
         copied["peer_id"] = peer_id
         copied["peer_name"] = peer_name
+        copied.setdefault("source", "live_sync_plan" if raw_items is plan_items else "blocked_report")
         items.append(copied)
     return items
 

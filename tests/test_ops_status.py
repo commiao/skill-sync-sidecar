@@ -306,6 +306,31 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-cli-ops")
             self.assertEqual(payload["sync_plan"]["summary"], {"noop": 1})
 
+    def test_ops_status_exposes_live_blocked_plan_items(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Base skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-live-blocked")
+            self._write_base_record(base_record, index)
+            self._write_skill(local_root / "demo", "Demo", "Local change")
+
+            status = build_ops_status(
+                local_root,
+                snapshot_dir,
+                base_record=base_record,
+                writer_policy="pull-only",
+            )
+
+            self.assertEqual(status["health"], "yellow")
+            self.assertEqual(status["sync_plan"]["blocked"], 1)
+            self.assertEqual(status["sync_plan"]["blocked_items"][0]["skill_id"], "demo")
+            self.assertEqual(status["sync_plan"]["blocked_items"][0]["category"], "writer_policy")
+            self.assertIn("approved push", status["sync_plan"]["blocked_items"][0]["recommendation"])
+
     def test_dashboard_status_reuses_ops_status_model(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -388,6 +413,59 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
             self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
             self.assertIn("id=\"hub-import-preview-button\"", DASHBOARD_HTML)
+
+    def test_dashboard_uses_live_blocked_items_when_report_is_stale(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+            peer_status = root / "openclaw-status.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
+            self._write_base_record(base_record, index)
+            peer_status.write_text(
+                json.dumps(
+                    {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "yellow",
+                        "writer_policy": "pull-only",
+                        "remote_snapshot": {"total": 96},
+                        "sync_plan": {
+                            "writer_policy": "pull-only",
+                            "blocked": 1,
+                            "blocked_items": [
+                                {
+                                    "skill_id": "hebei-recruitment",
+                                    "status_action": "push",
+                                    "plan_action": "blocked",
+                                    "allowed": False,
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push",
+                                    "recommendation": "Review before approved-push.",
+                                }
+                            ],
+                        },
+                        "blocked_report": {"total": 0, "summary": {}, "items": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_dashboard_status(
+                DashboardConfig(
+                    local_root=local_root,
+                    remote_snapshot=snapshot_dir,
+                    base_record=base_record,
+                    allow_new=True,
+                    peer_status_files={"oc-vps": peer_status},
+                )
+            )
+
+            self.assertEqual(status["dashboard"]["blocked"], 1)
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "hebei-recruitment")
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["source"], "live_sync_plan")
 
     def test_dashboard_hub_import_preview_response_is_non_writing_dry_run(self):
         with TemporaryDirectory() as tmp:

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from .blocked_report import enrich_blocked_items
 from .openclaw_gate import build_openclaw_gate
 from .sync_plan import build_sync_plan
 from .sync_state import SyncStateError, build_sync_status
@@ -231,6 +232,7 @@ def _sync_plan_summary(
         "summary": plan["summary"],
         "allowed": plan["allowed"],
         "blocked": plan["blocked"],
+        "blocked_items": enrich_blocked_items(plan, writer_policy),
         "safe_to_apply": plan["safe_to_apply"],
         "status_summary": status["summary"],
         "local_overrides": status.get("local_overrides"),
