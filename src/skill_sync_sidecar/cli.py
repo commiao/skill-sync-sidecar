@@ -94,6 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_remote_args(publish_peer_status)
     publish_peer_status.add_argument("--peer-id", required=True, help="Stable peer id, for example mac, oc-vps, or win.")
     publish_peer_status.add_argument("--status-path", required=True, help="Remote JSON path, for example skill-sync-sidecar-peer-status/mac.json.")
+    publish_peer_status.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
     publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
     publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     publish_peer_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
@@ -451,18 +452,28 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_ops_status(args: argparse.Namespace) -> int:
-    status = build_ops_status(
-        Path(args.local_root),
-        Path(args.remote_snapshot),
-        base_record=Path(args.base_record) if args.base_record else None,
-        state_file=Path(args.state_file) if args.state_file else None,
-        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
-        openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
-        openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
-        allow_new=args.allow_new,
-        allow_delete=args.allow_delete,
-        writer_policy=args.writer_policy,
-    )
+    if args.status_file:
+        try:
+            status = json.loads(Path(args.status_file).expanduser().read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"publish-peer-status failed: {exc}", file=sys.stderr)
+            return 2
+        if not isinstance(status, dict):
+            print("publish-peer-status failed: --status-file must contain a JSON object", file=sys.stderr)
+            return 2
+    else:
+        status = build_ops_status(
+            Path(args.local_root),
+            Path(args.remote_snapshot),
+            base_record=Path(args.base_record) if args.base_record else None,
+            state_file=Path(args.state_file) if args.state_file else None,
+            blocked_report=Path(args.blocked_report) if args.blocked_report else None,
+            openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
+            openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
+            allow_new=args.allow_new,
+            allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
+        )
     if args.json:
         print(json.dumps(status, ensure_ascii=False, indent=2))
     else:
@@ -486,18 +497,28 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         print(f"publish-peer-status failed: {exc}", file=sys.stderr)
         return 2
 
-    status = build_ops_status(
-        Path(args.local_root),
-        Path(args.remote_snapshot),
-        base_record=Path(args.base_record) if args.base_record else None,
-        state_file=Path(args.state_file) if args.state_file else None,
-        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
-        openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
-        openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
-        allow_new=args.allow_new,
-        allow_delete=args.allow_delete,
-        writer_policy=args.writer_policy,
-    )
+    if args.status_file:
+        try:
+            status = json.loads(Path(args.status_file).expanduser().read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"publish-peer-status failed: {exc}", file=sys.stderr)
+            return 2
+        if not isinstance(status, dict):
+            print("publish-peer-status failed: --status-file must contain a JSON object", file=sys.stderr)
+            return 2
+    else:
+        status = build_ops_status(
+            Path(args.local_root),
+            Path(args.remote_snapshot),
+            base_record=Path(args.base_record) if args.base_record else None,
+            state_file=Path(args.state_file) if args.state_file else None,
+            blocked_report=Path(args.blocked_report) if args.blocked_report else None,
+            openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
+            openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
+            allow_new=args.allow_new,
+            allow_delete=args.allow_delete,
+            writer_policy=args.writer_policy,
+        )
     payload = dict(status)
     payload.update(
         {

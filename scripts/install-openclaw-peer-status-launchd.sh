@@ -29,7 +29,7 @@ out_file = os.environ["OUT_FILE"]
 plist = {
     "Label": label,
     "ProgramArguments": [
-        str(repo_root / "scripts" / "refresh-openclaw-peer-status.sh"),
+        str(repo_root / "scripts" / "publish-openclaw-peer-status.sh"),
     ],
     "EnvironmentVariables": {
         "OPENCLAW_PEER_STATUS_OUT": out_file,
@@ -47,7 +47,7 @@ with tmp.open("wb") as fh:
 tmp.replace(target)
 PY
 
-chmod +x "$repo_root/scripts/refresh-openclaw-peer-status.sh"
+chmod +x "$repo_root/scripts/refresh-openclaw-peer-status.sh" "$repo_root/scripts/publish-openclaw-peer-status.sh"
 plutil -lint "$plist_path"
 launchctl bootout "gui/$(id -u)" "$plist_path" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$plist_path"

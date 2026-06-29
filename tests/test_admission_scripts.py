@@ -122,11 +122,14 @@ class AdmissionScriptsTest(unittest.TestCase):
     def test_openclaw_peer_status_refresh_scripts_are_read_only(self):
         repo_root = Path(__file__).resolve().parents[1]
         refresh = repo_root / "scripts" / "refresh-openclaw-peer-status.sh"
+        publish = repo_root / "scripts" / "publish-openclaw-peer-status.sh"
         installer = repo_root / "scripts" / "install-openclaw-peer-status-launchd.sh"
         refresh_text = refresh.read_text(encoding="utf-8")
+        publish_text = publish.read_text(encoding="utf-8")
         installer_text = installer.read_text(encoding="utf-8")
 
         subprocess.check_call(["bash", "-n", str(refresh)])
+        subprocess.check_call(["bash", "-n", str(publish)])
         subprocess.check_call(["bash", "-n", str(installer)])
 
         self.assertIn("ssh", refresh_text)
@@ -139,7 +142,13 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("sync-cycle", refresh_text)
         self.assertNotIn("systemctl", refresh_text)
 
-        self.assertIn("refresh-openclaw-peer-status.sh", installer_text)
+        self.assertIn("refresh-openclaw-peer-status.sh", publish_text)
+        self.assertIn("publish-peer-status", publish_text)
+        self.assertIn("--status-file", publish_text)
+        self.assertNotIn("sync-apply", publish_text)
+        self.assertNotIn("sync-cycle", publish_text)
+
+        self.assertIn("publish-openclaw-peer-status.sh", installer_text)
         self.assertIn("StartInterval", installer_text)
         self.assertIn("com.skill-sync-sidecar.openclaw-peer-status", installer_text)
         self.assertIn("launchctl bootstrap", installer_text)

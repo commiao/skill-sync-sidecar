@@ -203,7 +203,8 @@ PYTHONPATH=src python3 -m skill_sync_sidecar gateway \
   --refresh-interval-seconds 60 \
   --host 127.0.0.1 \
   --port 8877 \
-  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
+  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json \
+  --remote-peer-status oc-vps=skill-sync-sidecar-peer-status/oc-vps.json
 ```
 
 For NAS/Linux, use:
@@ -246,14 +247,16 @@ Gateway mode is deliberately read-only:
 
 Use optional `--remote-peer-status id=path/status.json` flags for shared/NAS gateways that should read peer status from WebDAV. Use `--peer-status id=/path/status.json` only when the gateway host also has mirrored local peer status files. Without peer status, the gateway still shows the canonical snapshot and marks missing peers as not connected.
 
-Publish Mac peer status to WebDAV:
+Publish peer status to WebDAV:
 
 ```bash
 scripts/publish-mac-peer-status.sh
 scripts/install-mac-peer-status-launchd.sh
+scripts/publish-openclaw-peer-status.sh
+scripts/install-openclaw-peer-status-launchd.sh
 ```
 
-The default published path is `skill-sync-sidecar-peer-status/mac.json`. This file is status-only; it does not contain WebDAV credentials and does not upload skill content.
+The default published paths are `skill-sync-sidecar-peer-status/mac.json` and `skill-sync-sidecar-peer-status/oc-vps.json`. These files are status-only; they do not contain WebDAV credentials and do not upload skill content. OpenClaw status is fetched read-only over SSH by Mac, then Mac publishes the status JSON to WebDAV, so WebDAV credentials do not need to be installed on OpenClaw.
 
 ### NAS static observer
 

@@ -539,6 +539,43 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["peer_id"], "mac")
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
 
+    def test_publish_peer_status_can_publish_existing_peer_file(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            remote_dir = root / "remote"
+            status_file = root / "openclaw-status.json"
+            status_file.write_text(
+                json.dumps(
+                    {
+                        "health": "green",
+                        "remote_snapshot": {"snapshot_id": "snap-openclaw", "total": 94},
+                        "sync_plan": {"writer_policy": "pull-only", "blocked": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "publish-peer-status",
+                    "--remote",
+                    f"file://{remote_dir}",
+                    "--peer-id",
+                    "oc-vps",
+                    "--status-path",
+                    "skill-sync-sidecar-peer-status/oc-vps.json",
+                    "--status-file",
+                    str(status_file),
+                ]
+            )
+
+            self.assertEqual(args.func(args), 0)
+            payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "oc-vps.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["record_type"], "skill-sync-peer-status")
+            self.assertEqual(payload["peer_id"], "oc-vps")
+            self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-openclaw")
+
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)
         (skill / "SKILL.md").write_text(

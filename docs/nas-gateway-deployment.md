@@ -29,6 +29,7 @@ SKILL_SYNC_WEBDAV_USER=your-webdav-user
 SKILL_SYNC_WEBDAV_PASSWORD=your-webdav-password
 SKILL_SYNC_GATEWAY_PREFIX=skill-sync-sidecar-dev/current-mac
 SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_MAC=mac=skill-sync-sidecar-peer-status/mac.json
+SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_OPENCLAW=oc-vps=skill-sync-sidecar-peer-status/oc-vps.json
 ```
 
 The container listens on:
@@ -60,18 +61,22 @@ On Mac:
 ```bash
 scripts/publish-mac-peer-status.sh
 scripts/install-mac-peer-status-launchd.sh
+scripts/publish-openclaw-peer-status.sh
+scripts/install-openclaw-peer-status-launchd.sh
 ```
 
-The default published path is:
+The default published paths are:
 
 ```text
 skill-sync-sidecar-peer-status/mac.json
+skill-sync-sidecar-peer-status/oc-vps.json
 ```
 
-The NAS compose file reads that path by default through:
+The NAS compose file reads those paths by default through:
 
 ```text
 --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
+--remote-peer-status oc-vps=skill-sync-sidecar-peer-status/oc-vps.json
 ```
 
 ## Docker CLI
@@ -97,7 +102,8 @@ docker run -d \
   --refresh-interval-seconds 60 \
   --host 0.0.0.0 \
   --port 8765 \
-  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json
+  --remote-peer-status mac=skill-sync-sidecar-peer-status/mac.json \
+  --remote-peer-status oc-vps=skill-sync-sidecar-peer-status/oc-vps.json
 ```
 
 ## Local Docker Smoke
