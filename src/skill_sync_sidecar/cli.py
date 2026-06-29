@@ -453,28 +453,18 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_ops_status(args: argparse.Namespace) -> int:
-    if args.status_file:
-        try:
-            status = json.loads(Path(args.status_file).expanduser().read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"publish-peer-status failed: {exc}", file=sys.stderr)
-            return 2
-        if not isinstance(status, dict):
-            print("publish-peer-status failed: --status-file must contain a JSON object", file=sys.stderr)
-            return 2
-    else:
-        status = build_ops_status(
-            Path(args.local_root),
-            Path(args.remote_snapshot),
-            base_record=Path(args.base_record) if args.base_record else None,
-            state_file=Path(args.state_file) if args.state_file else None,
-            blocked_report=Path(args.blocked_report) if args.blocked_report else None,
-            openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
-            openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
-            allow_new=args.allow_new,
-            allow_delete=args.allow_delete,
-            writer_policy=args.writer_policy,
-        )
+    status = build_ops_status(
+        Path(args.local_root),
+        Path(args.remote_snapshot),
+        base_record=Path(args.base_record) if args.base_record else None,
+        state_file=Path(args.state_file) if args.state_file else None,
+        blocked_report=Path(args.blocked_report) if args.blocked_report else None,
+        openclaw_reconcile_report=Path(args.openclaw_reconcile_report) if args.openclaw_reconcile_report else None,
+        openclaw_reconcile_root=Path(args.openclaw_reconcile_root) if args.openclaw_reconcile_root else None,
+        allow_new=args.allow_new,
+        allow_delete=args.allow_delete,
+        writer_policy=args.writer_policy,
+    )
     if args.json:
         print(json.dumps(status, ensure_ascii=False, indent=2))
     else:

@@ -1,5 +1,7 @@
 import json
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -268,6 +270,40 @@ class OpsStatusTest(unittest.TestCase):
         self.assertIn("openclaw_reconcile: safe_to_auto_apply=True", text)
         self.assertIn("openclaw_gate: ok=True", text)
         self.assertIn("overall_ok: True", text)
+
+    def test_ops_status_parser_command_emits_json(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-cli-ops")
+            self._write_base_record(base_record, index)
+
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "ops-status",
+                    "--local-root",
+                    str(local_root),
+                    "--remote-snapshot",
+                    str(snapshot_dir),
+                    "--base-record",
+                    str(base_record),
+                    "--json",
+                ]
+            )
+            output = StringIO()
+
+            with redirect_stdout(output):
+                result = args.func(args)
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(result, 0)
+            self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-cli-ops")
+            self.assertEqual(payload["sync_plan"]["summary"], {"noop": 1})
 
     def test_dashboard_status_reuses_ops_status_model(self):
         with TemporaryDirectory() as tmp:
