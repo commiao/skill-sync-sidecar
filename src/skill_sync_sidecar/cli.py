@@ -29,6 +29,7 @@ from .hub_import import (
     render_hub_import_diagnosis_text,
     render_hub_import_preview_text,
 )
+from .monitor import build_monitor_report, fetch_summary, render_monitor_report
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
@@ -133,6 +134,15 @@ def build_parser() -> argparse.ArgumentParser:
     gateway.add_argument("--peer-status", action="append", default=[], help="Peer status JSON as id=/path/status.json. Repeat for multiple peers.")
     gateway.add_argument("--remote-peer-status", action="append", default=[], help="Peer status JSON on the same WebDAV remote as id=path/status.json. Repeat for multiple peers.")
     gateway.set_defaults(func=cmd_gateway)
+
+    monitor_summary = subcommands.add_parser("monitor-summary", help="Check a dashboard /api/summary endpoint and print operator actions.")
+    monitor_summary.add_argument("--url", default="http://100.123.208.32:8765/api/summary", help="Dashboard summary endpoint URL.")
+    monitor_summary.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
+    monitor_summary.add_argument("--stale-after-seconds", type=int, default=30 * 60, help="Mark active devices stale after this many seconds.")
+    monitor_summary.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
+    monitor_summary.add_argument("--fail-on-alert", action="store_true", help="Exit 3 when alerts are present.")
+    monitor_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    monitor_summary.set_defaults(func=cmd_monitor_summary)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
     tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
@@ -603,6 +613,42 @@ def cmd_gateway(args: argparse.Namespace) -> int:
     )
     serve_gateway(args.host, args.port, config)
     return 0
+
+
+def cmd_monitor_summary(args: argparse.Namespace) -> int:
+    try:
+        summary = fetch_summary(args.url, timeout_seconds=args.timeout_seconds)
+        report = build_monitor_report(
+            summary,
+            stale_after_seconds=args.stale_after_seconds,
+            min_canonical_total=args.min_canonical_total,
+        )
+    except Exception as exc:
+        report = {
+            "ok": False,
+            "record_type": "skill-sync-monitor-report",
+            "health": "red",
+            "dashboard_health": "unknown",
+            "blocked": None,
+            "snapshot_id": None,
+            "canonical_total": None,
+            "alerts": [
+                {
+                    "code": "summary_fetch_failed",
+                    "message": f"Could not read dashboard summary: {exc}",
+                    "action": "Check the gateway URL, network path, and container logs.",
+                }
+            ],
+            "warnings": [],
+            "info": [],
+        }
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(render_monitor_report(report))
+    if args.fail_on_alert and report.get("alerts"):
+        return 3
+    return 0 if report.get("record_type") == "skill-sync-monitor-report" else 2
 
 
 def cmd_tool_projection(args: argparse.Namespace) -> int:

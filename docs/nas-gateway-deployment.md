@@ -59,6 +59,18 @@ dashboard.health=green
 dashboard.blocked=0
 ```
 
+Operator monitor:
+
+```bash
+scripts/monitor-nas-summary.sh
+SKILL_SYNC_MONITOR_FAIL_ON_ALERT=1 scripts/monitor-nas-summary.sh
+```
+
+The monitor reads `/api/summary` and turns it into an operator report. It alerts
+on non-green dashboard health, blocked sync items, stale Mac/OpenClaw peer
+status, snapshot drift, missing device tool reports, and abnormal canonical
+snapshot totals.
+
 To show real device state instead of only the canonical snapshot, publish peer status JSON to WebDAV and let the gateway read it with `--remote-peer-status`.
 
 Peer status v1 separates responsibilities:

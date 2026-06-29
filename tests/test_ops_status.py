@@ -573,6 +573,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(devices["gateway"]["policy"], "read-only")
             self.assertEqual(devices["mac"]["health"], "green")
             self.assertEqual(devices["oc-vps"]["health"], "green")
+            self.assertEqual(devices["gateway"]["snapshot_id"], "snap-gateway")
             self.assertEqual(devices["mac"]["freshness"]["state"], "fresh")
             self.assertEqual(devices["oc-vps"]["freshness"]["state"], "fresh")
             self.assertIsNotNone(devices["gateway"]["last_seen_at"])
