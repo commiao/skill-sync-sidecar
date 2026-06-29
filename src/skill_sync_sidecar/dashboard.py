@@ -167,6 +167,123 @@ def build_gateway_status(
     return status
 
 
+def build_dashboard_summary(status: dict) -> dict:
+    """Return the compact status shape used by the browser dashboard."""
+    dashboard = status.get("dashboard") if isinstance(status.get("dashboard"), dict) else {}
+    sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
+    remote_snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
+    daemon_state = status.get("daemon_state") if isinstance(status.get("daemon_state"), dict) else {}
+    blocked_report = status.get("blocked_report") if isinstance(status.get("blocked_report"), dict) else {}
+    base_record = status.get("base_record") if isinstance(status.get("base_record"), dict) else {}
+    return {
+        "ok": status.get("ok"),
+        "health": status.get("health"),
+        "mode": status.get("mode"),
+        "local_root": status.get("local_root"),
+        "writer_policy": status.get("writer_policy"),
+        "allow_new": status.get("allow_new"),
+        "allow_delete": status.get("allow_delete"),
+        "error_count": status.get("error_count"),
+        "error": status.get("error"),
+        "remote_snapshot": {
+            "ok": remote_snapshot.get("ok"),
+            "path": remote_snapshot.get("path"),
+            "snapshot_id": remote_snapshot.get("snapshot_id"),
+            "created_at": remote_snapshot.get("created_at"),
+            "total": remote_snapshot.get("total"),
+            "protocol_version": remote_snapshot.get("protocol_version"),
+        },
+        "base_record": {
+            "ok": base_record.get("ok"),
+            "path": base_record.get("path"),
+            "snapshot_id": base_record.get("snapshot_id"),
+            "applied_count": base_record.get("applied_count"),
+        } if base_record else None,
+        "daemon_state": {
+            "ok": daemon_state.get("ok"),
+            "status": daemon_state.get("status"),
+            "daemon_status": daemon_state.get("daemon_status"),
+            "target": daemon_state.get("target"),
+            "writer_policy": daemon_state.get("writer_policy"),
+            "interval_seconds": daemon_state.get("interval_seconds"),
+            "stop_on_blocked": daemon_state.get("stop_on_blocked"),
+            "updated_at": daemon_state.get("updated_at"),
+            "cycles_run": daemon_state.get("cycles_run"),
+            "last_cycle": daemon_state.get("last_cycle"),
+            "path": daemon_state.get("path"),
+        },
+        "blocked_report": {
+            "ok": blocked_report.get("ok"),
+            "path": blocked_report.get("path"),
+            "total": blocked_report.get("total"),
+            "summary": blocked_report.get("summary"),
+        } if blocked_report else None,
+        "sync_plan": {
+            "ok": sync_plan.get("ok"),
+            "writer_policy": sync_plan.get("writer_policy"),
+            "total": sync_plan.get("total"),
+            "summary": sync_plan.get("summary"),
+            "allowed": sync_plan.get("allowed"),
+            "blocked": sync_plan.get("blocked"),
+            "safe_to_apply": sync_plan.get("safe_to_apply"),
+            "status_summary": sync_plan.get("status_summary"),
+            "local_overrides": sync_plan.get("local_overrides"),
+            "has_conflicts": sync_plan.get("has_conflicts"),
+        },
+        "dashboard": {
+            "health": dashboard.get("health"),
+            "blocked": dashboard.get("blocked"),
+            "operator": dashboard.get("operator"),
+            "blocked_items": dashboard.get("blocked_items", []),
+            "devices": dashboard.get("devices", []),
+            "tools": dashboard.get("tools", []),
+            "device_tools": dashboard.get("device_tools", []),
+            "hub_import": _compact_hub_import(dashboard.get("hub_import")),
+        },
+    }
+
+
+def _compact_hub_import(hub_import: object) -> dict:
+    if not isinstance(hub_import, dict):
+        return {}
+    action_plan = hub_import.get("action_plan") if isinstance(hub_import.get("action_plan"), dict) else {}
+    return {
+        "ok": hub_import.get("ok"),
+        "error": hub_import.get("error"),
+        "hub_total": hub_import.get("hub_total"),
+        "source_total": hub_import.get("source_total"),
+        "summary": hub_import.get("summary", {}),
+        "action_plan": {
+            "mode": action_plan.get("mode"),
+            "safe_to_apply_automatically": action_plan.get("safe_to_apply_automatically"),
+            "summary": action_plan.get("summary", {}),
+            "review_required": action_plan.get("review_required"),
+        },
+        "items": _compact_hub_import_items(hub_import.get("items")),
+    }
+
+
+def _compact_hub_import_items(items: object, *, per_status_limit: int = 12) -> list[dict]:
+    if not isinstance(items, list):
+        return []
+    statuses = ["importable", "update_available", "already_in_hub", "not_compatible"]
+    selected: list[dict] = []
+    seen: set[int] = set()
+    for status in statuses:
+        count = 0
+        for index, item in enumerate(items):
+            if count >= per_status_limit:
+                break
+            if index in seen or not isinstance(item, dict) or item.get("status") != status:
+                continue
+            selected.append(item)
+            seen.add(index)
+            count += 1
+    if not selected:
+        selected = [item for item in items[:per_status_limit] if isinstance(item, dict)]
+    return selected
+
+
 def build_hub_import_preview_response(
     work_dir: Optional[Path] = None,
     *,
@@ -757,6 +874,15 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
                     body = json.dumps({"ok": False, "health": "red", "error": str(exc)}, ensure_ascii=False).encode("utf-8")
                     self._send(500, "application/json; charset=utf-8", body)
                 return
+            if path == "/api/summary":
+                try:
+                    payload = build_dashboard_summary(status_provider())
+                    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                    self._send(200, "application/json; charset=utf-8", body)
+                except Exception as exc:  # pragma: no cover - defensive server boundary
+                    body = json.dumps({"ok": False, "health": "red", "error": str(exc)}, ensure_ascii=False).encode("utf-8")
+                    self._send(500, "application/json; charset=utf-8", body)
+                return
             if path == "/healthz":
                 self._send(200, "application/json; charset=utf-8", b'{"ok":true}\n')
                 return
@@ -787,7 +913,7 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
             if path in {"", "/"}:
                 self._send(200, "text/html; charset=utf-8", b"")
                 return
-            if path == "/api/status":
+            if path in {"/api/status", "/api/summary"}:
                 self._send(200, "application/json; charset=utf-8", b"")
                 return
             if path == "/healthz":
@@ -1628,7 +1754,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     async function refresh() {
       try {
-        const response = await fetch("/api/status", { cache: "no-store" });
+        const response = await fetch("/api/summary", { cache: "no-store" });
         const status = await response.json();
         if (!response.ok) throw new Error(status.error || `HTTP ${response.status}`);
         render(status);

@@ -32,7 +32,8 @@ examples/systemd/skill-sync-gateway.service
 
 ## Validation
 
-The gateway successfully pulled the real WebDAV snapshot into its own cache and served `/api/status`:
+The gateway successfully pulled the real WebDAV snapshot into its own cache and served `/api/status`.
+The browser dashboard should prefer `/api/summary` for routine refreshes; `/api/status` is the complete diagnostic endpoint.
 
 ```text
 ok=True

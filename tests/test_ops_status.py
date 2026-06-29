@@ -12,6 +12,7 @@ from skill_sync_sidecar.dashboard import (
     DashboardConfig,
     RemoteSnapshotCache,
     build_dashboard_status,
+    build_dashboard_summary,
     build_gateway_status,
     build_hub_import_preview_response,
 )
@@ -374,7 +375,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIsNotNone(devices["oc-vps"]["last_seen_at"])
             self.assertIn("freshness=", status["dashboard"]["operator"]["devices"]["openclaw"])
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in status["dashboard"]["tools"]))
-            self.assertIn("/api/status", DASHBOARD_HTML)
+            self.assertIn("/api/summary", DASHBOARD_HTML)
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"tools\"", DASHBOARD_HTML)
@@ -556,6 +557,57 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(device_tools["mac"]["tools"][0]["id"], "codex")
             self.assertEqual(device_tools["mac"]["tools"][0]["state"], "detected")
             self.assertFalse(device_tools["oc-vps"]["reported"])
+
+    def test_dashboard_summary_keeps_ui_data_without_heavy_projection(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-summary")
+
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "mac": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "green",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                        "tools": [{"id": "cc-switch", "name": "cc-switch", "state": "detected", "skills": 1}],
+                    }
+                },
+            )
+            status["dashboard"]["hub_import"] = {
+                "ok": True,
+                "hub_total": 30,
+                "source_total": 60,
+                "summary": {"already_in_hub": 80},
+                "action_plan": {
+                    "mode": "dry_run",
+                    "safe_to_apply_automatically": False,
+                    "summary": {"skip_existing": 80},
+                    "review_required": 0,
+                    "actions": [{"skill_id": f"skill-{i}", "action": "skip_existing"} for i in range(80)],
+                },
+                "items": [{"skill_id": f"hub-{i}", "status": "already_in_hub"} for i in range(80)],
+            }
+
+            summary = build_dashboard_summary(status)
+
+            self.assertEqual(summary["remote_snapshot"]["snapshot_id"], "snap-summary")
+            self.assertEqual(summary["dashboard"]["operator"]["snapshot_id"], "snap-summary")
+            self.assertIn("tools", summary["dashboard"])
+            self.assertIn("device_tools", summary["dashboard"])
+            self.assertNotIn("tool_projection", summary["dashboard"])
+            self.assertNotIn("items", summary["sync_plan"])
+            self.assertNotIn("actions", summary["dashboard"]["hub_import"]["action_plan"])
+            self.assertLess(len(summary["dashboard"]["hub_import"]["items"]), 80)
+            self.assertEqual(summary["dashboard"]["hub_import"]["items"][0]["skill_id"], "hub-0")
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()

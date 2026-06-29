@@ -42,8 +42,13 @@ Health check:
 
 ```bash
 curl -sS http://<nas-ip>:8765/healthz
+curl -sS http://<nas-ip>:8765/api/summary
 curl -sS http://<nas-ip>:8765/api/status
 ```
+
+The browser dashboard refreshes from `/api/summary`, which keeps only the fields
+needed for the UI and avoids returning the full projection/debug payload on every
+poll. Use `/api/status` when you need the complete diagnostic JSON.
 
 Expected healthy fields:
 
