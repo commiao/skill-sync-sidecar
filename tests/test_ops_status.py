@@ -459,6 +459,12 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(devices["mac"]["freshness"]["state"], "fresh")
             self.assertEqual(devices["oc-vps"]["freshness"]["state"], "fresh")
             self.assertIsNotNone(devices["gateway"]["last_seen_at"])
+            tools = {tool["id"]: tool for tool in status["dashboard"]["tools"]}
+            self.assertEqual(tools["cc-switch"]["state"], "observer")
+            self.assertIsNone(tools["cc-switch"]["installed"])
+            self.assertEqual(tools["cc-switch"]["role"], "远端投影")
+            self.assertNotEqual(tools["cc-switch"]["state"], "not_found")
+            self.assertIn("不扫描 NAS", tools["cc-switch"]["note"])
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()

@@ -157,7 +157,7 @@ def build_gateway_status(
         "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
-        "tools": _merge_tool_projection(_tool_overview(), projection),
+        "tools": _gateway_tool_overview(projection),
         "tool_projection": projection,
         "hub_import": hub_import,
     }
@@ -336,6 +336,37 @@ def _merge_tool_projection(tools: list[dict], projection: dict) -> list[dict]:
             }
         merged.append(copied)
     return merged
+
+
+def _gateway_tool_overview(projection: dict) -> list[dict]:
+    tools = []
+    for projected in projection.get("tools", []):
+        if not isinstance(projected, dict):
+            continue
+        summary = projected.get("summary", {}) if isinstance(projected.get("summary"), dict) else {}
+        tools.append(
+            {
+                "id": projected.get("id"),
+                "name": projected.get("name") or projected.get("id"),
+                "path": ", ".join(str(root) for root in projected.get("roots", []) if root),
+                "role": "远端投影",
+                "installed": None,
+                "state": "observer",
+                "skills": projected.get("canonical_targeted"),
+                "risk": {},
+                "note": "Gateway 只观察 WebDAV canonical snapshot；不扫描 NAS 容器内的工具目录。",
+                "projection": {
+                    "canonical_targeted": projected.get("canonical_targeted"),
+                    "missing": None,
+                    "drift": None,
+                    "unsupported_scope": summary.get("unsupported_scope", 0),
+                    "not_targeted": summary.get("not_targeted", 0),
+                    "blocked_error": summary.get("blocked_error", 0),
+                    "extra_local": None,
+                },
+            }
+        )
+    return tools
 
 
 def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> list[dict]:
@@ -1392,7 +1423,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="card-name">${escapeHtml(tool.name)}</div>
               <div class="card-kind">${escapeHtml(tool.role)}</div>
             </div>
-            ${pill(tool.installed ? "detected" : "not found", tool.installed ? "green" : "")}
+            ${toolStatePill(tool)}
           </div>
           <div class="card-note mono">${escapeHtml(tool.path)}</div>
           <div class="card-stats">
@@ -1403,6 +1434,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </article>
       `).join("");
+    }
+
+    function toolStatePill(tool) {
+      if (tool.state === "observer") return pill("observed", "green");
+      if (tool.state === "error") return pill("error", "red");
+      if (tool.installed === true) return pill("detected", "green");
+      if (tool.installed === false) return pill("not found", "");
+      return pill(text(tool.state || "unknown"), "");
     }
 
     function renderHubImport(hubImport) {
