@@ -156,6 +156,23 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("com.skill-sync-sidecar.openclaw-peer-status", installer_text)
         self.assertIn("launchctl bootstrap", installer_text)
 
+    def test_ops_watch_is_observation_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "ops-watch.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+
+        self.assertIn("monitor-summary", text)
+        self.assertIn("launchctl print", text)
+        self.assertIn("skill-sync-mac-peer-status.out.log", text)
+        self.assertIn("skill-sync-openclaw-peer-status.out.log", text)
+        self.assertNotIn("approved-push", text)
+        self.assertNotIn("sync-cycle", text)
+        self.assertNotIn("sync-apply", text)
+        self.assertNotIn("launchctl bootstrap", text)
+        self.assertNotIn("launchctl kickstart", text)
+
 
 if __name__ == "__main__":
     unittest.main()
