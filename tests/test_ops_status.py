@@ -342,9 +342,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"tools\"", DASHBOARD_HTML)
+            self.assertIn("id=\"device-tools\"", DASHBOARD_HTML)
             self.assertIn("id=\"operator-headline\"", DASHBOARD_HTML)
             self.assertIn("更新于", DASHBOARD_HTML)
             self.assertIn("新鲜度", DASHBOARD_HTML)
+            self.assertIn("renderDeviceTools", DASHBOARD_HTML)
             self.assertIn("freshnessPill", DASHBOARD_HTML)
             self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
             self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
@@ -465,6 +467,59 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(tools["cc-switch"]["role"], "远端投影")
             self.assertNotEqual(tools["cc-switch"]["state"], "not_found")
             self.assertIn("不扫描 NAS", tools["cc-switch"]["note"])
+            device_tools = {group["device_id"]: group for group in status["dashboard"]["device_tools"]}
+            self.assertIn("mac", device_tools)
+            self.assertIn("oc-vps", device_tools)
+            self.assertFalse(device_tools["mac"]["reported"])
+            self.assertEqual(device_tools["mac"]["tools"][0]["state"], "unknown")
+            self.assertEqual(device_tools["oc-vps"]["tools"][0]["state"], "unknown")
+
+    def test_gateway_status_groups_reported_device_tools(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-gateway-tools")
+
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "mac": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "green",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                        "tools": [
+                            {
+                                "id": "codex",
+                                "name": "Codex",
+                                "roots": ["/tmp/codex"],
+                                "path": "/tmp/codex",
+                                "role": "Codex 可发现目录",
+                                "installed": True,
+                                "state": "detected",
+                                "skills": 3,
+                                "risk": {"ok": 3, "warning": 0, "error": 0},
+                                "measured_at": "2026-06-28T00:00:00Z",
+                                "note": "已检测到目录",
+                            }
+                        ],
+                    }
+                },
+            )
+
+            device_tools = {group["device_id"]: group for group in status["dashboard"]["device_tools"]}
+
+            self.assertTrue(device_tools["mac"]["reported"])
+            self.assertEqual(device_tools["mac"]["peer_status_version"], 1)
+            self.assertEqual(device_tools["mac"]["tools"][0]["id"], "codex")
+            self.assertEqual(device_tools["mac"]["tools"][0]["state"], "detected")
+            self.assertFalse(device_tools["oc-vps"]["reported"])
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()
@@ -555,7 +610,12 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(args.func(args), 0)
             payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "mac.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["record_type"], "skill-sync-peer-status")
+            self.assertEqual(payload["peer_status_version"], 1)
             self.assertEqual(payload["peer_id"], "mac")
+            self.assertEqual(payload["device"]["id"], "mac")
+            self.assertTrue(payload["capabilities"]["tool_status"])
+            self.assertIsInstance(payload["tools"], list)
+            self.assertTrue(any(tool["id"] == "cc-switch" for tool in payload["tools"]))
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
@@ -594,6 +654,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["record_type"], "skill-sync-peer-status")
             self.assertEqual(payload["peer_id"], "oc-vps")
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-openclaw")
+            self.assertNotIn("tools", payload)
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

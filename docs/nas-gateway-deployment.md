@@ -56,6 +56,14 @@ dashboard.blocked=0
 
 To show real device state instead of only the canonical snapshot, publish peer status JSON to WebDAV and let the gateway read it with `--remote-peer-status`.
 
+Peer status v1 separates responsibilities:
+
+- Device Agent scans actual local tool roots and publishes `tools[]`.
+- Gateway only reads WebDAV and aggregates status.
+- Dashboard shows `dashboard.tools` as canonical projection and `dashboard.device_tools` as per-device measured state.
+
+See [peer-status-v1.md](peer-status-v1.md) for the JSON contract.
+
 On Mac:
 
 ```bash

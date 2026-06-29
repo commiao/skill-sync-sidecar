@@ -42,6 +42,7 @@ from .sync_cycle import run_sync_cycle
 from .sync_plan import WRITER_POLICIES, build_sync_plan
 from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
+from .tool_status import build_device_status, build_device_tool_status, build_peer_capabilities
 
 
 APPLY_TARGETS = [
@@ -520,6 +521,15 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
             writer_policy=args.writer_policy,
         )
     payload = dict(status)
+    if not args.status_file:
+        payload.update(
+            {
+                "peer_status_version": 1,
+                "device": build_device_status(args.peer_id),
+                "capabilities": build_peer_capabilities(),
+                "tools": build_device_tool_status(),
+            }
+        )
     payload.update(
         {
             "record_type": "skill-sync-peer-status",
@@ -541,6 +551,8 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         "health": payload.get("health"),
         "snapshot_id": payload.get("remote_snapshot", {}).get("snapshot_id") if isinstance(payload.get("remote_snapshot"), dict) else None,
         "blocked": payload.get("sync_plan", {}).get("blocked") if isinstance(payload.get("sync_plan"), dict) else None,
+        "peer_status_version": payload.get("peer_status_version"),
+        "tools": len(payload.get("tools", [])) if isinstance(payload.get("tools"), list) else None,
     }
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -551,6 +563,8 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         print(f"health={result['health']}")
         print(f"snapshot_id={result['snapshot_id']}")
         print(f"blocked={result['blocked']}")
+        print(f"peer_status_version={result['peer_status_version']}")
+        print(f"tools={result['tools']}")
     return 0
 
 

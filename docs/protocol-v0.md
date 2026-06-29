@@ -118,6 +118,12 @@ WebDAV is treated as object storage. Clients should use atomic-ish writes where 
 
 When WebDAV servers do not provide strong atomic operations, clients must prefer append-only revision objects and treat `latest.json` as a pointer that can be retried.
 
+## Peer Status
+
+Peer devices publish operational status documents to WebDAV for read-only gateways. Peer status v1 adds device metadata, capability flags, and per-device `tools[]` measurements so the Gateway does not infer Mac/OpenClaw/Windows tool installs from the NAS container.
+
+See `docs/peer-status-v1.md` for the current peer status contract. Gateway compatibility rules keep older peer files readable; missing `tools[]` is rendered as unknown instead of `not_found`.
+
 ## MVP Commands
 
 ```bash

@@ -12,7 +12,7 @@ from .hub_import import build_hub_import_diagnosis, build_hub_import_preview_pac
 from .ops_status import build_ops_status
 from .projection import ProjectionError, build_tool_projection
 from .remote import Remote, RemoteError, download_snapshot
-from .scanner import scan_roots
+from .tool_status import build_device_tool_status
 
 
 @dataclass(frozen=True)
@@ -79,13 +79,15 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(config.remote_snapshot)
     hub_import = _safe_hub_import_diagnosis()
+    local_tools = build_device_tool_status()
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
-        "tools": _merge_tool_projection(_tool_overview(), projection),
+        "tools": _merge_tool_projection(local_tools, projection),
+        "device_tools": _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers}),
         "tool_projection": projection,
         "hub_import": hub_import,
     }
@@ -158,6 +160,7 @@ def build_gateway_status(
         "blocked_items": blocked_items,
         "devices": devices,
         "tools": _gateway_tool_overview(projection),
+        "device_tools": _device_tool_overview(devices, peers),
         "tool_projection": projection,
         "hub_import": hub_import,
     }
@@ -630,58 +633,57 @@ def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[di
     return items
 
 
-def _tool_overview() -> list[dict]:
-    home = Path.home()
-    roots = [
-        ("cc-switch", "cc-switch", [home / ".cc-switch" / "skills"], "主同步目录"),
-        ("skillshub", "skillshub", [home / ".skillshub"], "工具技能目录"),
-        ("codex", "Codex", [home / ".codex" / "skills", home / ".agents" / "skills"], "Codex 可发现目录"),
-        ("cursor", "Cursor", [home / ".cursor" / "skills-cursor"], "Cursor 技能目录"),
-        ("claude-code", "Claude Code", [home / ".claude" / "skills"], "Claude Code 技能目录"),
-    ]
-    tools = []
-    for tool_id, name, paths, role in roots:
-        installed_paths = [path for path in paths if path.exists()]
-        installed = bool(installed_paths)
-        count = 0
-        risk = {"ok": 0, "warning": 0, "error": 0}
-        if installed:
-            try:
-                for index, path in enumerate(installed_paths):
-                    data = scan_roots([f"{tool_id}-{index}={path}"]).to_dict()
-                    count += int(data.get("total", 0))
-                    by_risk = dict(data.get("by_risk", {}))
-                    for key in risk:
-                        risk[key] += int(by_risk.get(key, 0))
-            except Exception as exc:  # pragma: no cover - inventory should not break dashboard
-                tools.append(
-                    {
-                        "id": tool_id,
-                        "name": name,
-                        "path": ", ".join(str(path) for path in paths),
-                        "role": role,
-                        "installed": True,
-                        "state": "error",
-                        "skills": 0,
-                        "risk": {},
-                        "note": str(exc),
-                    }
-                )
-                continue
-        tools.append(
+def _device_tool_overview(devices: list[dict], peers: Dict[str, dict]) -> list[dict]:
+    groups = []
+    for device in devices:
+        device_id = str(device.get("id") or "")
+        if device_id == "gateway":
+            continue
+        peer = peers.get(device_id)
+        if not peer and device_id == "oc-vps":
+            peer = peers.get("openclaw")
+        tools = peer.get("tools") if isinstance(peer, dict) and isinstance(peer.get("tools"), list) else None
+        reported = tools is not None
+        last_seen_at = _status_last_seen_at(peer) if isinstance(peer, dict) else device.get("last_seen_at")
+        groups.append(
             {
-                "id": tool_id,
-                "name": name,
-                "path": ", ".join(str(path) for path in paths),
-                "role": role,
-                "installed": installed,
-                "state": "active" if installed else "not_found",
-                "skills": count,
-                "risk": risk,
-                "note": "已检测到目录" if installed else "未检测到目录",
+                "device_id": device_id,
+                "device_name": device.get("name") or device_id,
+                "health": device.get("health"),
+                "reported": reported,
+                "peer_status_version": peer.get("peer_status_version") if isinstance(peer, dict) else None,
+                "last_seen_at": last_seen_at,
+                "freshness": _freshness_info(last_seen_at),
+                "note": "设备 Agent 已上报工具实测状态" if reported else _missing_tool_status_note(device, peer),
+                "tools": tools if reported else [_unknown_tool_status(device, peer)],
             }
         )
-    return tools
+    return groups
+
+
+def _missing_tool_status_note(device: dict, peer: Optional[dict]) -> str:
+    if not peer:
+        return "尚未读取到该设备的 peer status。"
+    if device.get("health") in {"not_configured", "not_connected"}:
+        return "设备尚未接入 sidecar Agent。"
+    return "该设备的 peer status 仍是旧格式，尚未上报 tools[]。"
+
+
+def _unknown_tool_status(device: dict, peer: Optional[dict]) -> dict:
+    state = "unsupported" if device.get("health") in {"not_configured", "not_connected"} else "unknown"
+    return {
+        "id": "tool-status",
+        "name": "工具实测",
+        "roots": [],
+        "path": "",
+        "role": "设备实测",
+        "installed": None,
+        "state": state,
+        "skills": None,
+        "risk": {},
+        "measured_at": _status_last_seen_at(peer) if isinstance(peer, dict) else None,
+        "note": _missing_tool_status_note(device, peer),
+    }
 
 
 def serve_dashboard(host: str, port: int, config: DashboardConfig) -> None:
@@ -723,6 +725,7 @@ def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
                     "blocked_items": [],
                     "devices": [],
                     "tools": [],
+                    "device_tools": [],
                 },
             }
 
@@ -988,6 +991,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 14px;
       min-width: 0;
     }
+    .device-tool-group {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+      min-width: 0;
+    }
+    .device-tool-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .device-tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
     .card-head {
       display: flex;
       justify-content: space-between;
@@ -1154,6 +1177,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .cards { grid-template-columns: 1fr; }
+      .device-tool-grid { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -1219,9 +1243,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="devices" class="cards"></section>
     <div class="section-title">
       <h2>工具</h2>
-      <span class="section-help">区分 cc-switch、skillshub、Codex、Cursor、Claude Code 的本机目录</span>
+      <span class="section-help">WebDAV canonical snapshot 对各工具的目标覆盖，不代表某台设备已安装</span>
     </div>
     <section id="tools" class="cards"></section>
+    <div class="section-title">
+      <h2>设备工具实测</h2>
+      <span class="section-help">由每台设备 Agent 上报，区分 Mac、OpenClaw、Windows 的真实工具目录</span>
+    </div>
+    <section id="device-tools"></section>
     <div class="panel">
       <div class="panel-head">
         <h2>skillshub 导入诊断</h2>
@@ -1322,6 +1351,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
       renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
+      renderDeviceTools(Array.isArray(dashboard.device_tools) ? dashboard.device_tools : []);
       renderHubImport(dashboard.hub_import || {});
 
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
@@ -1436,10 +1466,45 @@ DASHBOARD_HTML = r"""<!doctype html>
       `).join("");
     }
 
+    function renderDeviceTools(groups) {
+      $("device-tools").innerHTML = groups.map((group) => `
+        <article class="device-tool-group">
+          <div class="device-tool-head">
+            <div>
+              <div class="card-name">${escapeHtml(text(group.device_name))}</div>
+              <div class="card-kind">${escapeHtml(text(group.note))}</div>
+            </div>
+            <div>${freshnessPill(group.freshness)}</div>
+          </div>
+          <div class="device-tool-grid">
+            ${(Array.isArray(group.tools) ? group.tools : []).map((tool) => `
+              <article class="tool-card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-name">${escapeHtml(text(tool.name))}</div>
+                    <div class="card-kind">${escapeHtml(text(tool.role))}</div>
+                  </div>
+                  ${toolStatePill(tool)}
+                </div>
+                <div class="card-note mono">${escapeHtml(text(tool.path || (Array.isArray(tool.roots) ? tool.roots.join(", ") : "")))}</div>
+                <div class="card-stats">
+                  <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
+                  <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>
+                  <div class="mini-stat"><div class="mini-label">实测时间</div><div class="mini-value subtle">${escapeHtml(formatDateTime(tool.measured_at))}</div></div>
+                  <div class="mini-stat"><div class="mini-label">说明</div><div class="mini-value subtle">${escapeHtml(text(tool.note))}</div></div>
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        </article>
+      `).join("");
+    }
+
     function toolStatePill(tool) {
       if (tool.state === "observer") return pill("observed", "green");
       if (tool.state === "error") return pill("error", "red");
-      if (tool.installed === true) return pill("detected", "green");
+      if (tool.state === "detected" || tool.installed === true) return pill("detected", "green");
+      if (tool.state === "unsupported") return pill("unsupported", "");
       if (tool.installed === false) return pill("not found", "");
       return pill(text(tool.state || "unknown"), "");
     }
