@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -282,6 +283,7 @@ class OpsStatusTest(unittest.TestCase):
             peer_status.write_text(
                 json.dumps(
                     {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
                         "health": "yellow",
                         "writer_policy": "pull-only",
                         "remote_snapshot": {"total": 95},
@@ -332,12 +334,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(devices["oc-vps"]["blocked"], 1)
             self.assertEqual(devices["oc-vps"]["skills"], 95)
             self.assertEqual(devices["oc-vps"]["local_policy"], ["disk-cleanup", "lark-cli-adapter"])
+            self.assertEqual(devices["oc-vps"]["freshness"]["state"], "fresh")
+            self.assertIsNotNone(devices["oc-vps"]["last_seen_at"])
+            self.assertIn("freshness=", status["dashboard"]["operator"]["devices"]["openclaw"])
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in status["dashboard"]["tools"]))
             self.assertIn("/api/status", DASHBOARD_HTML)
             self.assertIn("Skill Sync Sidecar", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"tools\"", DASHBOARD_HTML)
             self.assertIn("id=\"operator-headline\"", DASHBOARD_HTML)
+            self.assertIn("更新于", DASHBOARD_HTML)
+            self.assertIn("新鲜度", DASHBOARD_HTML)
+            self.assertIn("freshnessPill", DASHBOARD_HTML)
             self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
             self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
             self.assertIn("id=\"hub-import-preview-button\"", DASHBOARD_HTML)
@@ -412,6 +420,7 @@ class OpsStatusTest(unittest.TestCase):
             peer_status.write_text(
                 json.dumps(
                     {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
                         "health": "green",
                         "writer_policy": "pull-only",
                         "remote_snapshot": {"total": 1},
@@ -427,6 +436,7 @@ class OpsStatusTest(unittest.TestCase):
                 {"oc-vps": peer_status},
                 {
                     "mac": {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
                         "health": "green",
                         "writer_policy": "push-pull",
                         "remote_snapshot": {"total": 1},
@@ -446,6 +456,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(devices["gateway"]["policy"], "read-only")
             self.assertEqual(devices["mac"]["health"], "green")
             self.assertEqual(devices["oc-vps"]["health"], "green")
+            self.assertEqual(devices["mac"]["freshness"]["state"], "fresh")
+            self.assertEqual(devices["oc-vps"]["freshness"]["state"], "fresh")
+            self.assertIsNotNone(devices["gateway"]["last_seen_at"])
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()

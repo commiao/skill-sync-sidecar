@@ -263,6 +263,56 @@ def _timestamp_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
 
 
+def _freshness_info(last_seen_at: Optional[str]) -> dict:
+    if not last_seen_at:
+        return {"state": "unknown", "label": "未知", "age_seconds": None}
+    parsed = _parse_datetime(last_seen_at)
+    if not parsed:
+        return {"state": "unknown", "label": "时间不可解析", "age_seconds": None}
+    age_seconds = max(0, int((datetime.now(timezone.utc) - parsed).total_seconds()))
+    if age_seconds < 10 * 60:
+        state = "fresh"
+    elif age_seconds < 30 * 60:
+        state = "aging"
+    else:
+        state = "stale"
+    return {"state": state, "label": _age_label(age_seconds), "age_seconds": age_seconds}
+
+
+def _parse_datetime(value: str) -> Optional[datetime]:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _age_label(age_seconds: int) -> str:
+    if age_seconds < 60:
+        return "刚刚"
+    if age_seconds < 3600:
+        return f"{age_seconds // 60} 分钟前"
+    if age_seconds < 86400:
+        return f"{age_seconds // 3600} 小时前"
+    return f"{age_seconds // 86400} 天前"
+
+
+def _status_last_seen_at(status: dict) -> Optional[str]:
+    daemon = status.get("daemon_state") if isinstance(status.get("daemon_state"), dict) else {}
+    snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
+    for value in (
+        status.get("published_at"),
+        daemon.get("updated_at"),
+        snapshot.get("created_at"),
+        status.get("updated_at"),
+    ):
+        if value:
+            return str(value)
+    return None
+
+
 def _merge_tool_projection(tools: list[dict], projection: dict) -> list[dict]:
     projection_by_id = {
         str(tool.get("id")): tool
@@ -295,6 +345,7 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
     blocked = sync_plan.get("blocked")
     local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
     current_note = "同步正常，无待处理项" if status.get("health") == "green" else "需要查看待处理队列"
+    last_seen_at = _status_last_seen_at(status)
     openclaw = peers.get("oc-vps") or peers.get("openclaw")
     openclaw_device = _peer_device(
         "oc-vps",
@@ -316,6 +367,8 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
             "policy": _policy_label(status.get("writer_policy"), daemon.get("writer_policy")),
             "note": current_note,
             "local_policy": local_overrides.get("skills", []),
+            "last_seen_at": last_seen_at,
+            "freshness": _freshness_info(last_seen_at),
         },
         openclaw_device,
         {
@@ -328,6 +381,8 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
             "policy": "未接入",
             "note": "等待安装 sidecar 后纳入同一面板",
             "local_policy": [],
+            "last_seen_at": None,
+            "freshness": _freshness_info(None),
         },
     ]
 
@@ -335,6 +390,7 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
 def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dict]:
     mac = peers.get("mac")
     openclaw = peers.get("oc-vps") or peers.get("openclaw")
+    gateway_last_seen_at = datetime.now(timezone.utc).isoformat()
     return [
         {
             "id": "gateway",
@@ -346,6 +402,8 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
             "policy": "read-only",
             "note": "直接读取 WebDAV canonical snapshot，不依赖 Mac 静态导出",
             "local_policy": [],
+            "last_seen_at": gateway_last_seen_at,
+            "freshness": _freshness_info(gateway_last_seen_at),
         },
         _peer_device(
             "mac",
@@ -375,6 +433,8 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
             "policy": "未接入",
             "note": "等待安装 sidecar 后纳入同一面板",
             "local_policy": [],
+            "last_seen_at": None,
+            "freshness": _freshness_info(None),
         },
     ]
 
@@ -399,12 +459,15 @@ def _peer_device(
             "policy": fallback_policy,
             "note": fallback_note,
             "local_policy": fallback_local_policy,
+            "last_seen_at": None,
+            "freshness": _freshness_info(None),
         }
     sync_plan = status.get("sync_plan") if isinstance(status.get("sync_plan"), dict) else {}
     remote_snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
     local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
     health = status.get("health", "unknown")
     blocked = sync_plan.get("blocked")
+    last_seen_at = _status_last_seen_at(status)
     if status.get("error"):
         note = f"读取 peer status 失败：{status.get('error')}"
     elif health == "green":
@@ -425,6 +488,8 @@ def _peer_device(
         "policy": sync_plan.get("writer_policy") or status.get("writer_policy") or fallback_policy,
         "note": note,
         "local_policy": local_overrides.get("skills", []),
+        "last_seen_at": last_seen_at,
+        "freshness": _freshness_info(last_seen_at),
     }
 
 
@@ -506,7 +571,9 @@ def _operator_device_line(device: dict) -> str:
     blocked = device.get("blocked")
     policy = device.get("policy")
     health = device.get("health")
-    return f"{health}; skills={skills if skills is not None else '-'}; blocked={blocked if blocked is not None else '-'}; policy={policy or '-'}"
+    freshness = device.get("freshness") if isinstance(device.get("freshness"), dict) else {}
+    freshness_label = freshness.get("label") or "-"
+    return f"{health}; skills={skills if skills is not None else '-'}; blocked={blocked if blocked is not None else '-'}; policy={policy or '-'}; freshness={freshness_label}"
 
 
 def _blocked_items(status: dict, peers: Dict[str, dict]) -> list[dict]:
@@ -930,6 +997,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 700;
       overflow-wrap: anywhere;
     }
+    .mini-value.subtle {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .freshness {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      border-radius: 999px;
+      padding: 2px 7px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      background: #f6f8fb;
+      overflow-wrap: anywhere;
+    }
+    .freshness.fresh {
+      color: #247a4a;
+      background: #e8f6ee;
+      border-color: #bfe5cc;
+    }
+    .freshness.aging {
+      color: #8a5b00;
+      background: #fff7dd;
+      border-color: #f1d58a;
+    }
+    .freshness.stale {
+      color: #9b2c2c;
+      background: #fdecec;
+      border-color: #f5c2c2;
+    }
     h2 {
       font-size: 14px;
       margin: 0 0 10px;
@@ -1259,9 +1359,29 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
             <div class="mini-stat"><div class="mini-label">策略</div><div class="mini-value">${escapeHtml(text(device.policy))}</div></div>
             <div class="mini-stat"><div class="mini-label">本机例外</div><div class="mini-value">${escapeHtml(pretty(device.local_policy || []))}</div></div>
+            <div class="mini-stat"><div class="mini-label">更新于</div><div class="mini-value subtle">${escapeHtml(formatDateTime(device.last_seen_at))}</div></div>
+            <div class="mini-stat"><div class="mini-label">新鲜度</div><div class="mini-value">${freshnessPill(device.freshness)}</div></div>
           </div>
         </article>
       `).join("");
+    }
+
+    function freshnessPill(freshness) {
+      const state = freshness && freshness.state ? freshness.state : "unknown";
+      const label = freshness && freshness.label ? freshness.label : "未知";
+      return `<span class="freshness ${freshnessClass(state)}">${escapeHtml(label)}</span>`;
+    }
+
+    function freshnessClass(state) {
+      if (state === "fresh" || state === "aging" || state === "stale") return state;
+      return "";
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return text(value);
+      return date.toLocaleString();
     }
 
     function renderTools(tools) {
