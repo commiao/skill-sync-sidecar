@@ -17,15 +17,20 @@ Make the local skill-sync dashboard and OpenClaw peer status refresh independent
 - Writer policy: `push-pull`
 - Interval: 300 seconds
 
-### OpenClaw Peer Status Refresh
+### OpenClaw Peer Status Refresh (Legacy)
 
 - Label: `com.skill-sync-sidecar.openclaw-peer-status`
-- State: loaded
+- State: disabled on 2026-06-30
 - Interval: 300 seconds
 - Output: `/Users/mac/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json`
 - Logs:
   - `/Users/mac/Library/Logs/skill-sync-openclaw-peer-status.out.log`
   - `/Users/mac/Library/Logs/skill-sync-openclaw-peer-status.err.log`
+
+This Mac-side SSH refresher was used before OpenClaw could publish its own
+`peer-status v1`. It is now superseded by the OpenClaw systemd timer documented
+in `docs/openclaw-peer-status-systemd.md`; keep this LaunchAgent disabled to
+avoid two writers updating `skill-sync-sidecar-peer-status/oc-vps.json`.
 
 ### Dashboard
 
@@ -97,7 +102,7 @@ Mac `ops-status`:
 - The dashboard is read-only. It does not trigger sync, upload to WebDAV, or apply packages.
 - OpenClaw remains `pull-only`; explicit `approved-push` is still required for reviewed OpenClaw-originated changes.
 - OpenClaw-private skills such as `disk-cleanup` remain local policy items and are not published to the shared WebDAV snapshot.
-- Older stderr log lines may contain historical SSH timeouts from before NAS/OpenClaw connectivity stabilized; current peer refresh writes are succeeding.
+- Older stderr log lines may contain historical SSH timeouts from before NAS/OpenClaw connectivity stabilized. New OpenClaw status should come from `openclaw-skill-sync-peer-status.timer` on OpenClaw, not from this Mac job.
 
 ## Next Step
 

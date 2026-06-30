@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Skill Sync OpenClaw Peer Status Publisher
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=300
+Unit=openclaw-skill-sync-peer-status.service
+
+[Install]
+WantedBy=timers.target

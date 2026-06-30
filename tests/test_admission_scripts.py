@@ -125,13 +125,21 @@ class AdmissionScriptsTest(unittest.TestCase):
         refresh = repo_root / "scripts" / "refresh-openclaw-peer-status.sh"
         publish = repo_root / "scripts" / "publish-openclaw-peer-status.sh"
         installer = repo_root / "scripts" / "install-openclaw-peer-status-launchd.sh"
+        local_publish = repo_root / "scripts" / "publish-openclaw-local-peer-status.sh"
+        systemd_installer = repo_root / "scripts" / "install-openclaw-peer-status-systemd.sh"
         refresh_text = refresh.read_text(encoding="utf-8")
         publish_text = publish.read_text(encoding="utf-8")
         installer_text = installer.read_text(encoding="utf-8")
+        local_publish_text = local_publish.read_text(encoding="utf-8")
+        systemd_installer_text = systemd_installer.read_text(encoding="utf-8")
 
         subprocess.check_call(["bash", "-n", str(refresh)])
         subprocess.check_call(["bash", "-n", str(publish)])
         subprocess.check_call(["bash", "-n", str(installer)])
+        subprocess.check_call(["bash", "-n", str(local_publish)])
+        subprocess.check_call(["bash", "-n", str(systemd_installer)])
+        systemd_help = subprocess.check_output(["bash", str(systemd_installer), "--help"], text=True)
+        systemd_dry_run = subprocess.check_output(["bash", str(systemd_installer), "--dry-run"], text=True)
 
         self.assertIn("ssh", refresh_text)
         self.assertIn("ops-status", refresh_text)
@@ -157,6 +165,30 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("StartInterval", installer_text)
         self.assertIn("com.skill-sync-sidecar.openclaw-peer-status", installer_text)
         self.assertIn("launchctl bootstrap", installer_text)
+
+        self.assertIn("ops-status", local_publish_text)
+        self.assertIn("--writer-policy pull-only", local_publish_text)
+        self.assertIn("/home/admin/clawd/skills", local_publish_text)
+        self.assertIn("OpenClaw 实际使用目录", local_publish_text)
+        self.assertIn("publish-peer-status", local_publish_text)
+        self.assertIn("--status-file", local_publish_text)
+        self.assertNotIn("ssh", local_publish_text)
+        self.assertNotIn("sync-apply", local_publish_text)
+        self.assertNotIn("sync-cycle", local_publish_text)
+        self.assertNotIn("systemctl", local_publish_text)
+
+        self.assertIn('mode="--dry-run"', systemd_installer_text)
+        self.assertIn("openclaw-skill-sync-peer-status.service", systemd_installer_text)
+        self.assertIn("openclaw-skill-sync-peer-status.timer", systemd_installer_text)
+        self.assertIn("publish-openclaw-local-peer-status.sh", systemd_installer_text)
+        self.assertIn("systemctl enable --now openclaw-skill-sync-peer-status.timer", systemd_installer_text)
+        self.assertIn("status openclaw-skill-sync-peer-status.service | sed -n '1,30p' || true", systemd_installer_text)
+        self.assertNotIn("openclaw-skill-sync-sidecar-pullonly.service", systemd_installer_text)
+        self.assertNotIn("openclaw-skill-sync-sidecar-dryrun.service", systemd_installer_text)
+        self.assertNotIn("openclaw-gateway", systemd_installer_text)
+        self.assertIn("peer-status publisher", systemd_help)
+        self.assertIn("openclaw_peer_status_systemd_mode=dry-run", systemd_dry_run)
+        self.assertIn("OnUnitActiveSec=300", systemd_dry_run)
 
     def test_ops_watch_is_observation_only(self):
         repo_root = Path(__file__).resolve().parents[1]

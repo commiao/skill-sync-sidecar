@@ -1,0 +1,12 @@
+[Unit]
+Description=Skill Sync OpenClaw Peer Status Publisher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=admin
+Environment=HOME=/home/admin
+Environment=PYTHONPATH=/opt/skill-sync-sidecar/releases/peer-status-v1/src
+Environment=OPENCLAW_PYTHON=/opt/skill-sync-sidecar/venv-0.1.3/bin/python
+ExecStart=/opt/skill-sync-sidecar/releases/peer-status-v1/scripts/publish-openclaw-local-peer-status.sh
