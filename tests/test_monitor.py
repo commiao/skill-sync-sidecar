@@ -36,12 +36,32 @@ class MonitorSummaryTest(unittest.TestCase):
 
         report = build_monitor_report(summary)
 
-        self.assertFalse(report["ok"])
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["health"], "yellow")
         self.assertEqual(report["blocked"], 1)
-        self.assertTrue(any(item["code"] == "blocked_item" for item in report["alerts"]))
+        self.assertTrue(any(item["code"] == "blocked_item" for item in report["warnings"]))
         text = render_monitor_report(report)
         self.assertIn("hebei-recruitment", text)
         self.assertIn("approved-push", text)
+
+    def test_monitor_report_keeps_conflicts_as_alerts(self):
+        summary = _summary(health="yellow", blocked=1)
+        summary["dashboard"]["blocked_items"] = [
+            {
+                "peer_id": "mac",
+                "peer_name": "Mac 本机",
+                "skill_id": "demo-conflict",
+                "status_action": "conflict",
+                "category": "conflict",
+                "reason": "conflict or unknown state requires manual resolution",
+            }
+        ]
+
+        report = build_monitor_report(summary)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["health"], "red")
+        self.assertTrue(any(item["code"] == "blocked_item" for item in report["alerts"]))
 
     def test_monitor_report_detects_stale_and_snapshot_mismatch(self):
         summary = _summary()

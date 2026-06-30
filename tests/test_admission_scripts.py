@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -172,6 +173,58 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("sync-apply", text)
         self.assertNotIn("launchctl bootstrap", text)
         self.assertNotIn("launchctl kickstart", text)
+
+    def test_blocked_queue_script_is_read_only_and_renders_items(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "blocked-queue.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        self.assertIn("/api/summary", text)
+        self.assertIn("blocked_items", text)
+        self.assertNotIn("approved-push --yes", text)
+        self.assertNotIn("sync-cycle", text)
+        self.assertNotIn("sync-apply", text)
+
+        with TemporaryDirectory() as tmp:
+            summary = Path(tmp) / "summary.json"
+            summary.write_text(
+                json.dumps(
+                    {
+                        "health": "yellow",
+                        "remote_snapshot": {"snapshot_id": "snap-queue", "total": 96},
+                        "dashboard": {
+                            "health": "yellow",
+                            "blocked_items": [
+                                {
+                                    "peer_name": "oc-vps / OpenClaw",
+                                    "skill_id": "hebei-recruitment",
+                                    "status_action": "push",
+                                    "plan_action": "blocked",
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push",
+                                    "base_hash": "base",
+                                    "local_hash": "local",
+                                    "remote_hash": "remote",
+                                    "recommendation": "Review before approved-push.",
+                                    "source": "blocked_report",
+                                }
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            output = subprocess.check_output(
+                ["bash", str(script)],
+                env={**os.environ, "SKILL_SYNC_BLOCKED_QUEUE_SUMMARY_FILE": str(summary)},
+                text=True,
+            )
+
+        self.assertIn("blocked: 1", output)
+        self.assertIn("hebei-recruitment", output)
+        self.assertIn("local_hash: local", output)
 
 
 if __name__ == "__main__":

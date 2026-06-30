@@ -1359,7 +1359,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
       <div class="metric">
-        <div class="metric-label">Blocked</div>
+        <div class="metric-label">待审批</div>
         <div id="blocked" class="metric-value">-</div>
       </div>
       <div class="metric">
@@ -1412,8 +1412,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="grid">
       <div class="stack">
         <div class="panel">
-          <h2>Blocked Queue</h2>
-          <div id="blocked-empty" class="empty">No blocked items.</div>
+          <h2>待审批队列</h2>
+          <div id="blocked-empty" class="empty">No pending approval items.</div>
           <table id="blocked-table" hidden>
             <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Reason</th></tr></thead>
             <tbody id="blocked-body"></tbody>

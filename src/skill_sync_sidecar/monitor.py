@@ -145,19 +145,25 @@ def build_monitor_report(
     info: list[JsonDict] = []
 
     health = dashboard.get("health") or summary.get("health") or "unknown"
-    if health != "green":
-        alerts.append(_issue("dashboard_health", "Dashboard health is not green.", health=str(health), action="Open the blocked queue and device status sections."))
+    if health == "red":
+        alerts.append(_issue("dashboard_health", "Dashboard health is red.", health=str(health), action="Open the blocked queue and device status sections."))
+    elif health == "yellow":
+        warnings.append(_issue("dashboard_health", "Dashboard has pending review work.", health=str(health), action="Open the blocked queue; approved local changes may need explicit approved-push."))
+    elif health != "green":
+        warnings.append(_issue("dashboard_health", "Dashboard health is not green.", health=str(health), action="Refresh dashboard status and inspect device sections."))
 
     blocked_count = _int_or_zero(dashboard.get("blocked"))
     if blocked_count:
-        alerts.append(_issue("blocked_queue", f"{blocked_count} blocked sync item(s) need review.", count=blocked_count, action="Review each blocked item and run approved-push/pull or mark the skill private."))
+        warnings.append(_issue("blocked_queue", f"{blocked_count} sync item(s) are waiting for explicit review.", count=blocked_count, action="Review each item and run approved-push/pull only after the producing work has settled."))
     for item in blocked_items:
         if not isinstance(item, dict):
             continue
-        alerts.append(
+        severity = _blocked_item_severity(item)
+        target = warnings if severity == "warning" else alerts
+        target.append(
             _issue(
                 "blocked_item",
-                f"{item.get('peer_name') or item.get('peer_id') or 'unknown device'} / {item.get('skill_id')} is blocked.",
+                f"{item.get('peer_name') or item.get('peer_id') or 'unknown device'} / {item.get('skill_id')} is waiting for review.",
                 peer_id=item.get("peer_id"),
                 skill_id=item.get("skill_id"),
                 status_action=item.get("status_action"),
@@ -196,11 +202,12 @@ def build_monitor_report(
     if not alerts and not warnings:
         info.append(_issue("all_clear", "Skill Sync is green; no operator action required."))
 
+    report_health = "red" if alerts else "yellow" if warnings else "green"
     return {
         "ok": not alerts,
         "record_type": "skill-sync-monitor-report",
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "health": "green" if not alerts else "red",
+        "health": report_health,
         "dashboard_health": health,
         "blocked": blocked_count,
         "snapshot_id": canonical_snapshot,
@@ -239,8 +246,12 @@ def render_monitor_report(report: JsonDict) -> str:
 def _inspect_device(device: JsonDict, canonical_snapshot: Optional[str], stale_after_seconds: int, alerts: list[JsonDict], warnings: list[JsonDict]) -> None:
     device_id = str(device.get("id") or "")
     health = device.get("health")
-    if health not in {"green", "not_configured"}:
+    if health == "red":
         alerts.append(_issue("device_health", f"{device.get('name') or device_id} health is {health}.", device_id=device_id, action="Check peer-status publisher and sidecar logs for that device."))
+    elif health == "yellow":
+        warnings.append(_issue("device_health", f"{device.get('name') or device_id} has pending review work.", device_id=device_id, action="Check blocked queue; this usually means pull-only is protecting a local change."))
+    elif health not in {"green", "not_configured"}:
+        warnings.append(_issue("device_health", f"{device.get('name') or device_id} health is {health}.", device_id=device_id, action="Check peer-status publisher and sidecar logs for that device."))
     freshness = device.get("freshness") if isinstance(device.get("freshness"), dict) else {}
     age_seconds = freshness.get("age_seconds")
     stale = freshness.get("state") == "stale" or (isinstance(age_seconds, int) and age_seconds > stale_after_seconds)
@@ -274,6 +285,13 @@ def _action_for_blocked_item(item: JsonDict) -> str:
     if category == "new_skill_review":
         return "Review the new skill metadata, targets, and safety before allowing it."
     return "Inspect the item and choose explicit approve, defer, or private override."
+
+
+def _blocked_item_severity(item: JsonDict) -> str:
+    category = item.get("category")
+    if category in {"conflict", "delete_review"}:
+        return "alert"
+    return "warning"
 
 
 def _issue(code: str, message: str, **details: object) -> JsonDict:
