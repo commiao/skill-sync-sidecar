@@ -21,7 +21,6 @@ ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SS
     --remote-snapshot /opt/skill-sync-sidecar/cache/current-mac-pullonly \
     --base-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
     --state-file /opt/skill-sync-sidecar/state/openclaw-daemon-pullonly-state.json \
-    --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
     --allow-new \
     --writer-policy pull-only \
     --json" > "$tmp_file"

@@ -142,6 +142,7 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("build_device_tool_status", refresh_text)
         self.assertIn("publishing legacy ops status", refresh_text)
         self.assertIn("peer status JSON does not contain health", refresh_text)
+        self.assertNotIn("--blocked-report", refresh_text)
         self.assertNotIn("sync-apply", refresh_text)
         self.assertNotIn("sync-cycle", refresh_text)
         self.assertNotIn("systemctl", refresh_text)
