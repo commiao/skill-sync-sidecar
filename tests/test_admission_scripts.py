@@ -226,6 +226,40 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("hebei-recruitment", output)
         self.assertIn("local_hash: local", output)
 
+    def test_openclaw_approved_push_batch_is_dry_run_first(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-approved-push-batch.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+        self.assertIn('mode="--dry-run"', text)
+        self.assertIn("--yes", help_text)
+        self.assertIn("approved-push", text)
+        self.assertIn("sync-cycle", text)
+        self.assertIn("pull-cache", text)
+        self.assertIn("--writer-policy", text)
+        self.assertIn("pull-only", text)
+        self.assertIn("--allow-new", text)
+        self.assertIn("SKILL_ID", help_text)
+        self.assertNotIn("systemctl", text)
+        self.assertNotIn("launchctl", text)
+
+    def test_approved_push_runbook_documents_safe_flow(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        runbook = repo_root / "docs" / "approved-push-runbook.md"
+        text = runbook.read_text(encoding="utf-8")
+
+        self.assertIn("pull-only", text)
+        self.assertIn("scripts/openclaw-approved-push-batch.sh", text)
+        self.assertIn("--yes", text)
+        self.assertIn("scripts/publish-openclaw-peer-status.sh", text)
+        self.assertIn("scripts/publish-mac-peer-status.sh", text)
+        self.assertIn("monitor-summary", text)
+        self.assertIn("blocked: 0", text)
+        self.assertIn("Do not switch OpenClaw to `push-pull`", text)
+
 
 if __name__ == "__main__":
     unittest.main()
