@@ -87,6 +87,33 @@ docker exec skill-sync-monitor cat /cache/monitor/last-report.txt
 docker logs --tail 50 skill-sync-monitor
 ```
 
+Day-2 operator checks from the Mac repo:
+
+```bash
+scripts/blocked-queue.sh
+scripts/ops-watch.sh
+```
+
+`blocked-queue.sh` is the fastest "do I need to act?" view. It reads the NAS
+gateway summary and prints the blocked approval queue with the relevant local,
+remote, and base hashes when present.
+
+`ops-watch.sh` is the wider read-only view. It checks the NAS monitor summary,
+Mac launchd peer-status job, OpenClaw peer-status job, and recent local logs.
+It does not run `approved-push` or mutate any skill tree.
+
+When OpenClaw is yellow only because reviewed local skill changes are waiting
+behind the pull-only writer policy, use the explicit approval runbook:
+
+```bash
+scripts/openclaw-approved-push-batch.sh skill-id-1 skill-id-2
+scripts/openclaw-approved-push-batch.sh --yes skill-id-1 skill-id-2
+```
+
+Keep the first command as dry-run review. Use `--yes` only after the producer
+work has settled and the queue hashes still match. See
+[approved-push-runbook.md](approved-push-runbook.md) for the full checklist.
+
 To show real device state instead of only the canonical snapshot, publish peer status JSON to WebDAV and let the gateway read it with `--remote-peer-status`.
 
 Peer status v1 separates responsibilities:
