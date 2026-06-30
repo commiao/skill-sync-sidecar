@@ -53,6 +53,35 @@ Expected:
 - `oc-vps / OpenClaw` freshness remains fresh without the Mac SSH refresh job
 - Dashboard `device_tools` shows `openclaw` with root `/home/admin/clawd/skills`
 
+## 2026-06-30 Rollout Evidence
+
+Commit deployed: `8fad400 Add OpenClaw local peer-status publisher`.
+
+OpenClaw runtime:
+
+- Release path: `/opt/skill-sync-sidecar/releases/peer-status-v1`
+- Python: `/opt/skill-sync-sidecar/venv-0.1.3/bin/python`
+- Timer: `openclaw-skill-sync-peer-status.timer`
+- Existing services preserved:
+  - `openclaw-skill-sync-sidecar-pullonly.service`
+  - `openclaw-skill-sync-sidecar-dryrun.service`
+
+Final validated snapshot:
+
+- Snapshot: `approved-push-20260630T155739.385071Z`
+- Canonical total: `99`
+- NAS dashboard health: `green`
+- Blocked queue: `0`
+- Mac peer: `health=green`, `skills=99`, `blocked=0`, `tools=5`
+- OpenClaw peer: `health=green`, `skills=99`, `blocked=0`
+- OpenClaw self-published peer status path: `skill-sync-sidecar-peer-status/oc-vps.json`
+
+Important interpretation:
+
+- The OpenClaw peer status is now written by OpenClaw itself, not by the legacy Mac SSH proxy job.
+- `openclaw-skill-sync-peer-status.service` is a systemd oneshot. `ActiveState=inactive` after a run is expected when `Result=success` and `ExecMainStatus=0`.
+- `disk-cleanup` remains an OpenClaw local-only private skill and must not be treated as canonical shared content.
+
 ## Rollback
 
 The publisher is independent of the sync daemon and OpenClaw gateway. To disable only this publisher:
