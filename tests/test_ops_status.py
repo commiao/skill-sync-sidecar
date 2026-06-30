@@ -412,6 +412,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("freshnessPill", DASHBOARD_HTML)
             self.assertIn("daemon_writer_policy", DASHBOARD_HTML)
             self.assertIn("待审批队列", DASHBOARD_HTML)
+            self.assertIn("Recommendation", DASHBOARD_HTML)
+            self.assertIn("shortHash", DASHBOARD_HTML)
             self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
             self.assertIn("id=\"hub-import-preview-button\"", DASHBOARD_HTML)
 

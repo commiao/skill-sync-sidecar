@@ -1415,7 +1415,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <h2>待审批队列</h2>
           <div id="blocked-empty" class="empty">No pending approval items.</div>
           <table id="blocked-table" hidden>
-            <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Reason</th></tr></thead>
+            <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Hashes</th><th>Recommendation</th></tr></thead>
             <tbody id="blocked-body"></tbody>
           </table>
         </div>
@@ -1499,9 +1499,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("blocked-body").innerHTML = blockedItems.map((item) => `
         <tr>
           <td class="mono">${escapeHtml(text(item.peer_name || item.peer_id))} / ${escapeHtml(text(item.skill_id))}</td>
-          <td>${escapeHtml(text(item.status_action))}</td>
-          <td>${escapeHtml(text(item.category))}</td>
-          <td>${escapeHtml(text(item.reason))}</td>
+          <td>${escapeHtml(text(item.status_action))}<div class="mini-label">${escapeHtml(text(item.plan_action))}</div></td>
+          <td>${escapeHtml(text(item.category))}<div class="mini-label">${escapeHtml(text(item.source))}</div></td>
+          <td class="mono">
+            <div>base ${shortHash(item.base_hash)}</div>
+            <div>local ${shortHash(item.local_hash)}</div>
+            <div>remote ${shortHash(item.remote_hash)}</div>
+          </td>
+          <td>${escapeHtml(text(item.recommendation || item.reason))}<div class="mini-label">${escapeHtml(text(item.reason))}</div></td>
         </tr>
       `).join("");
 
@@ -1749,6 +1754,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     function projectionGap(projection) {
       if (!projection) return "-";
       return `${text(projection.missing)} / ${text(projection.drift)}`;
+    }
+
+    function shortHash(value) {
+      if (!value) return "-";
+      const raw = String(value);
+      if (raw.length <= 12) return escapeHtml(raw);
+      return `<span title="${escapeHtml(raw)}">${escapeHtml(raw.slice(0, 12))}</span>`;
     }
 
     function renderOperatorDevices(devices) {
