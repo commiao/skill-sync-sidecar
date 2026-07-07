@@ -50,6 +50,18 @@ The browser dashboard refreshes from `/api/summary`, which keeps only the fields
 needed for the UI and avoids returning the full projection/debug payload on every
 poll. Use `/api/status` when you need the complete diagnostic JSON.
 
+`/healthz` is intentionally lightweight: it reports process health and summary
+cache metadata without reading WebDAV. Docker health checks should use
+`/healthz`, not `/api/summary`.
+
+`/api/summary` is stale-safe. It has a short refresh budget and returns the last
+successful summary when the live WebDAV/peer-status aggregation is slow. Check
+`summary_cache.state`:
+
+- `fresh`: live or recently refreshed data.
+- `stale`: returned from the last successful cache while a refresh is in flight.
+- `miss`: no successful cache exists yet; inspect WebDAV and gateway logs.
+
 Expected healthy fields:
 
 ```text
@@ -57,6 +69,7 @@ mode=gateway
 health=green
 dashboard.health=green
 dashboard.blocked=0
+summary_cache.state=fresh
 ```
 
 Operator monitor:

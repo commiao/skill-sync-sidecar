@@ -1,4 +1,5 @@
 import json
+import time
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from io import StringIO
@@ -10,6 +11,7 @@ from skill_sync_sidecar.cli import build_parser, parse_peer_status_files, parse_
 from skill_sync_sidecar.dashboard import (
     DASHBOARD_HTML,
     DashboardConfig,
+    DashboardSummaryCache,
     RemoteSnapshotCache,
     build_dashboard_status,
     build_dashboard_summary,
@@ -690,6 +692,49 @@ class OpsStatusTest(unittest.TestCase):
             self.assertNotIn("actions", summary["dashboard"]["hub_import"]["action_plan"])
             self.assertLess(len(summary["dashboard"]["hub_import"]["items"]), 80)
             self.assertEqual(summary["dashboard"]["hub_import"]["items"][0]["skill_id"], "hub-0")
+
+    def test_dashboard_summary_cache_returns_503_without_seed_when_provider_times_out(self):
+        def slow_provider():
+            time.sleep(0.2)
+            return {"ok": True, "health": "green", "dashboard": {"health": "green"}}
+
+        cache = DashboardSummaryCache(slow_provider, timeout_seconds=0.01, stale_after_seconds=0)
+
+        status_code, payload = cache.get_summary()
+
+        self.assertEqual(status_code, 503)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["health"], "red")
+        self.assertEqual(payload["summary_cache"]["state"], "miss")
+        self.assertIn("timed out", payload["summary_cache"]["last_error"])
+
+    def test_dashboard_summary_cache_serves_stale_payload_when_refresh_times_out(self):
+        mode = {"slow": False}
+
+        def provider():
+            if mode["slow"]:
+                time.sleep(0.2)
+            return {
+                "ok": True,
+                "health": "green",
+                "remote_snapshot": {"snapshot_id": "snap-cache", "total": 1},
+                "daemon_state": {},
+                "sync_plan": {},
+                "dashboard": {"health": "green", "blocked": 0, "operator": {"snapshot_id": "snap-cache"}},
+            }
+
+        cache = DashboardSummaryCache(provider, timeout_seconds=0.01, stale_after_seconds=0)
+        first_status, first_payload = cache.get_summary()
+        mode["slow"] = True
+
+        second_status, second_payload = cache.get_summary()
+
+        self.assertEqual(first_status, 200)
+        self.assertEqual(first_payload["summary_cache"]["state"], "fresh")
+        self.assertEqual(second_status, 200)
+        self.assertEqual(second_payload["summary_cache"]["state"], "stale")
+        self.assertEqual(second_payload["remote_snapshot"]["snapshot_id"], "snap-cache")
+        self.assertTrue(second_payload["summary_cache"]["refresh_in_flight"])
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()

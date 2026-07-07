@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import copy
 import json
+import os
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,6 +62,153 @@ class RemoteSnapshotCache:
             download_snapshot(self.remote, self.cache_dir, self.prefix)
             self._last_refresh = now
         return self.cache_dir
+
+
+class DashboardSummaryCache:
+    """Fast, stale-safe cache for the browser summary endpoint."""
+
+    def __init__(
+        self,
+        status_provider: Callable[[], dict],
+        *,
+        timeout_seconds: float = 2.0,
+        stale_after_seconds: float = 120.0,
+    ):
+        self.status_provider = status_provider
+        self.timeout_seconds = max(0.05, timeout_seconds)
+        self.stale_after_seconds = max(0.0, stale_after_seconds)
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="skill-sync-summary")
+        self._lock = threading.Lock()
+        self._payload: Optional[dict] = None
+        self._updated_monotonic: Optional[float] = None
+        self._updated_at: Optional[str] = None
+        self._last_error: Optional[str] = None
+        self._last_attempt_at: Optional[str] = None
+        self._inflight: Optional[Future] = None
+
+    def get_summary(self) -> tuple[int, dict]:
+        now = time.monotonic()
+        with self._lock:
+            self._consume_finished_locked()
+            if self._payload is not None:
+                age = self._age_seconds(now)
+                state = "fresh" if age is not None and age < self.stale_after_seconds else "stale"
+                if state == "stale":
+                    self._ensure_refresh_locked()
+                return 200, self._payload_with_metadata(state, age)
+            future = self._ensure_refresh_locked()
+
+        try:
+            payload = future.result(timeout=self.timeout_seconds)
+        except TimeoutError:
+            with self._lock:
+                self._last_error = f"summary refresh timed out after {self.timeout_seconds:g}s"
+            return 503, self._miss_payload("summary refresh timed out")
+        except Exception as exc:  # pragma: no cover - defensive cache boundary
+            with self._lock:
+                self._last_error = str(exc)
+                if self._inflight is future:
+                    self._inflight = None
+            return 500, self._miss_payload(str(exc))
+
+        with self._lock:
+            self._store_locked(payload)
+            if self._inflight is future:
+                self._inflight = None
+            return 200, self._payload_with_metadata("fresh", 0.0)
+
+    def healthz(self) -> dict:
+        now = time.monotonic()
+        with self._lock:
+            self._consume_finished_locked()
+            age = self._age_seconds(now)
+            state = "empty" if self._payload is None else "fresh" if age is not None and age < self.stale_after_seconds else "stale"
+            return {
+                "state": state,
+                "generated_at": self._updated_at,
+                "age_seconds": age,
+                "stale_after_seconds": self.stale_after_seconds,
+                "timeout_seconds": self.timeout_seconds,
+                "refresh_in_flight": self._inflight is not None,
+                "last_attempt_at": self._last_attempt_at,
+                "last_error": self._last_error,
+            }
+
+    def _refresh(self) -> dict:
+        return build_dashboard_summary(self.status_provider())
+
+    def _ensure_refresh_locked(self) -> Future:
+        if self._inflight is None or self._inflight.done():
+            self._last_attempt_at = datetime.now(timezone.utc).isoformat()
+            self._inflight = self._executor.submit(self._refresh)
+        return self._inflight
+
+    def _consume_finished_locked(self) -> None:
+        if self._inflight is None or not self._inflight.done():
+            return
+        future = self._inflight
+        self._inflight = None
+        try:
+            self._store_locked(future.result())
+        except Exception as exc:  # pragma: no cover - defensive cache boundary
+            self._last_error = str(exc)
+
+    def _store_locked(self, payload: dict) -> None:
+        self._payload = copy.deepcopy(payload)
+        self._updated_monotonic = time.monotonic()
+        self._updated_at = datetime.now(timezone.utc).isoformat()
+        self._last_error = None
+
+    def _age_seconds(self, now: float) -> Optional[float]:
+        if self._updated_monotonic is None:
+            return None
+        return round(max(0.0, now - self._updated_monotonic), 3)
+
+    def _payload_with_metadata(self, state: str, age_seconds: Optional[float]) -> dict:
+        payload = copy.deepcopy(self._payload or {})
+        metadata = {
+            "state": state,
+            "generated_at": self._updated_at,
+            "age_seconds": age_seconds,
+            "stale_after_seconds": self.stale_after_seconds,
+            "timeout_seconds": self.timeout_seconds,
+            "refresh_in_flight": self._inflight is not None,
+            "last_attempt_at": self._last_attempt_at,
+            "last_error": self._last_error,
+        }
+        payload["summary_cache"] = metadata
+        dashboard = payload.get("dashboard")
+        if isinstance(dashboard, dict):
+            dashboard["summary_cache"] = metadata
+        return payload
+
+    def _miss_payload(self, error: str) -> dict:
+        metadata = self.healthz()
+        metadata["state"] = "miss"
+        metadata["last_error"] = error
+        return {
+            "ok": False,
+            "health": "red",
+            "error": error,
+            "summary_cache": metadata,
+            "dashboard": {
+                "health": "red",
+                "blocked": 0,
+                "operator": {
+                    "headline": "状态聚合超时",
+                    "next_action": "检查 WebDAV、peer-status 或 gateway 日志；没有可用缓存时 summary 会返回 503。",
+                    "sync_path": "Gateway summary cache",
+                    "snapshot_id": None,
+                    "devices": {},
+                    "blocked_count": 0,
+                },
+                "blocked_items": [],
+                "devices": [],
+                "tools": [],
+                "device_tools": [],
+                "summary_cache": metadata,
+            },
+        }
 
 
 def build_dashboard_status(config: DashboardConfig) -> dict:
@@ -869,7 +1020,23 @@ def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
         server.server_close()
 
 
+def _float_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_provider: Optional[Callable[[], dict]] = None):
+    summary_cache = DashboardSummaryCache(
+        status_provider,
+        timeout_seconds=_float_env("SKILL_SYNC_SUMMARY_TIMEOUT_SECONDS", 2.0),
+        stale_after_seconds=_float_env("SKILL_SYNC_SUMMARY_STALE_AFTER_SECONDS", 120.0),
+    )
+
     class DashboardHandler(BaseHTTPRequestHandler):
         server_version = "SkillSyncDashboard/0"
 
@@ -888,16 +1055,19 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
                     self._send(500, "application/json; charset=utf-8", body)
                 return
             if path == "/api/summary":
-                try:
-                    payload = build_dashboard_summary(status_provider())
-                    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-                    self._send(200, "application/json; charset=utf-8", body)
-                except Exception as exc:  # pragma: no cover - defensive server boundary
-                    body = json.dumps({"ok": False, "health": "red", "error": str(exc)}, ensure_ascii=False).encode("utf-8")
-                    self._send(500, "application/json; charset=utf-8", body)
+                status_code, payload = summary_cache.get_summary()
+                body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                self._send(status_code, "application/json; charset=utf-8", body)
                 return
             if path == "/healthz":
-                self._send(200, "application/json; charset=utf-8", b'{"ok":true}\n')
+                payload = {
+                    "ok": True,
+                    "service": "skill-sync-dashboard",
+                    "version": "0",
+                    "time": datetime.now(timezone.utc).isoformat(),
+                    "summary_cache": summary_cache.healthz(),
+                }
+                self._send(200, "application/json; charset=utf-8", json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
                 return
             if path == "/favicon.ico":
                 self._send(204, "image/x-icon", b"")

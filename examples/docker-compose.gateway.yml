@@ -6,6 +6,12 @@ services:
     image: skill-sync-sidecar:local
     container_name: skill-sync-gateway
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     ports:
       - "8765:8765"
     environment:

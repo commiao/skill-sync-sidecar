@@ -139,6 +139,7 @@ def build_monitor_report(
     devices = dashboard.get("devices") if isinstance(dashboard.get("devices"), list) else []
     device_tools = dashboard.get("device_tools") if isinstance(dashboard.get("device_tools"), list) else []
     blocked_items = dashboard.get("blocked_items") if isinstance(dashboard.get("blocked_items"), list) else []
+    summary_cache = summary.get("summary_cache") if isinstance(summary.get("summary_cache"), dict) else {}
 
     alerts: list[JsonDict] = []
     warnings: list[JsonDict] = []
@@ -151,6 +152,29 @@ def build_monitor_report(
         warnings.append(_issue("dashboard_health", "Dashboard has pending review work.", health=str(health), action="Open the blocked queue; approved local changes may need explicit approved-push."))
     elif health != "green":
         warnings.append(_issue("dashboard_health", "Dashboard health is not green.", health=str(health), action="Refresh dashboard status and inspect device sections."))
+
+    cache_state = summary_cache.get("state")
+    if cache_state in {"miss", "empty"}:
+        alerts.append(
+            _issue(
+                "summary_cache",
+                "Dashboard summary cache has no usable successful payload.",
+                state=cache_state,
+                last_error=summary_cache.get("last_error"),
+                action="Check gateway logs and WebDAV connectivity; /healthz should remain fast while /api/summary recovers.",
+            )
+        )
+    elif cache_state == "stale":
+        warnings.append(
+            _issue(
+                "summary_cache",
+                "Dashboard summary is serving stale cached data.",
+                state=cache_state,
+                age_seconds=summary_cache.get("age_seconds"),
+                last_error=summary_cache.get("last_error"),
+                action="Inspect gateway refresh latency and WebDAV/peer-status reads.",
+            )
+        )
 
     blocked_count = _int_or_zero(dashboard.get("blocked"))
     if blocked_count:

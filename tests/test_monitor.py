@@ -83,6 +83,26 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["warnings"][0]["code"], "device_tools_missing")
 
+    def test_monitor_report_warns_on_stale_summary_cache(self):
+        summary = _summary()
+        summary["summary_cache"] = {"state": "stale", "age_seconds": 900, "last_error": "timed out"}
+
+        report = build_monitor_report(summary)
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["health"], "yellow")
+        self.assertTrue(any(item["code"] == "summary_cache" for item in report["warnings"]))
+
+    def test_monitor_report_alerts_when_summary_cache_has_no_payload(self):
+        summary = _summary(health="red")
+        summary["summary_cache"] = {"state": "miss", "last_error": "summary refresh timed out"}
+
+        report = build_monitor_report(summary)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["health"], "red")
+        self.assertTrue(any(item["code"] == "summary_cache" for item in report["alerts"]))
+
     def test_monitor_summary_parser_and_fetch_failure_output(self):
         parser = build_parser()
         args = parser.parse_args(["monitor-summary", "--url", "http://127.0.0.1:1/missing", "--timeout-seconds", "0.01", "--json"])
