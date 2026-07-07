@@ -1203,8 +1203,47 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 720;
       margin-bottom: 6px;
     }
+    .operator-verdict {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 2px 9px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      background: #fafbfc;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .operator-verdict.green { border-color: #b8d8c8; color: var(--green); background: #f1faf5; }
+    .operator-verdict.yellow { border-color: #e8d29c; color: var(--yellow); background: #fff8e6; }
+    .operator-verdict.red { border-color: #efb8b8; color: var(--red); background: #fff1f1; }
     .operator-text {
       color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .operator-brief {
+      display: grid;
+      gap: 6px;
+      margin: 10px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .brief-line {
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr);
+      gap: 10px;
+    }
+    .brief-label {
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .brief-value {
+      color: var(--ink);
       overflow-wrap: anywhere;
     }
     .device-lines {
@@ -1511,6 +1550,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="operator-band">
       <div class="panel">
         <div id="operator-headline" class="operator-title">读取同步状态中</div>
+        <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
+        <div id="operator-brief" class="operator-brief"></div>
         <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
       </div>
       <div class="panel">
@@ -1646,17 +1687,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       const dashboard = status.dashboard || {};
       const operator = dashboard.operator || {};
       const health = dashboard.health || status.health || "unknown";
-      $("health-card").className = `panel health ${health}`;
-      $("health").textContent = health;
-      $("next-action").textContent = operator.next_action || nextAction({ ...status, health });
-      $("operator-headline").textContent = operator.headline || "同步状态未知";
-      $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
-      $("operator-path").textContent = operator.sync_path || "-";
-      $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
       const plan = status.sync_plan || {};
       const snapshot = status.remote_snapshot || {};
       const daemon = status.daemon_state || {};
       const blockedReport = status.blocked_report || {};
+      $("health-card").className = `panel health ${health}`;
+      $("health").textContent = health;
+      $("next-action").textContent = operator.next_action || nextAction({ ...status, health });
+      $("operator-headline").textContent = operator.headline || "同步状态未知";
+      $("operator-verdict").textContent = operatorVerdict(health);
+      $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
+      renderOperatorBrief(dashboard, snapshot);
+      $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
+      $("operator-path").textContent = operator.sync_path || "-";
+      $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
       $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
       $("allowed").textContent = text(plan.allowed);
       $("remote-total").textContent = text(snapshot.total);
@@ -1721,6 +1765,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (health === "yellow") return "yellow";
       if (health === "red") return "red";
       return "";
+    }
+
+    function operatorVerdict(health) {
+      if (health === "green") return "GREEN - NO ACTION";
+      if (health === "yellow") return "YELLOW - REVIEW NEEDED";
+      if (health === "red") return "RED - ACTION REQUIRED";
+      return "UNKNOWN";
+    }
+
+    function renderOperatorBrief(dashboard, snapshot) {
+      const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
+      const planned = Array.isArray(dashboard.planned_devices) ? dashboard.planned_devices : [];
+      const active = devices
+        .filter((device) => ["gateway", "mac", "oc-vps", "openclaw"].includes(device.id))
+        .map((device) => `${text(device.id)}=${text(device.health)}/${text(device.skills)}/${text((device.freshness || {}).label)}`);
+      const deferred = planned
+        .map((device) => `${text(device.id)}=${text(device.policy || device.health)}`);
+      $("operator-brief").innerHTML = [
+        briefLine("snapshot", `${text(snapshot.snapshot_id)} total=${text(snapshot.total)} blocked=${text(dashboard.blocked)}`),
+        briefLine("devices", active.length ? active.join("; ") : "-"),
+        briefLine("deferred", deferred.length ? deferred.join("; ") : "-"),
+      ].join("");
+    }
+
+    function briefLine(label, value) {
+      return `
+        <div class="brief-line">
+          <div class="brief-label">${escapeHtml(label)}</div>
+          <div class="brief-value mono">${escapeHtml(value)}</div>
+        </div>
+      `;
     }
 
     function renderDevices(devices) {
