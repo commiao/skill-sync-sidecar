@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from skill_sync_sidecar.cli import build_parser
-from skill_sync_sidecar.monitor import build_monitor_report, render_monitor_report, run_monitor_loop, write_monitor_report
+from skill_sync_sidecar.monitor import build_monitor_report, render_monitor_brief, render_monitor_report, run_monitor_loop, write_monitor_report
 
 
 class MonitorSummaryTest(unittest.TestCase):
@@ -18,7 +18,10 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertEqual(report["alerts"], [])
         self.assertEqual(report["warnings"], [])
         self.assertEqual(report["info"][0]["code"], "all_clear")
+        self.assertEqual(report["next_action"], "同步链路正常；继续观察 Mac / OpenClaw 自动周期。")
         self.assertIn("no operator action", render_monitor_report(report))
+        self.assertIn("Skill Sync: GREEN - NO ACTION", render_monitor_brief(report))
+        self.assertIn("deferred: win=本阶段跳过", render_monitor_brief(report))
 
     def test_monitor_report_lists_blocked_items_with_actions(self):
         summary = _summary(health="yellow", blocked=1)
@@ -43,6 +46,9 @@ class MonitorSummaryTest(unittest.TestCase):
         text = render_monitor_report(report)
         self.assertIn("hebei-recruitment", text)
         self.assertIn("approved-push", text)
+        brief = render_monitor_brief(report)
+        self.assertIn("Skill Sync: YELLOW - REVIEW NEEDED", brief)
+        self.assertIn("top_issue: [dashboard_health]", brief)
 
     def test_monitor_report_keeps_conflicts_as_alerts(self):
         summary = _summary(health="yellow", blocked=1)
@@ -93,6 +99,16 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertEqual(report["health"], "yellow")
         self.assertTrue(any(item["code"] == "summary_cache" for item in report["warnings"]))
 
+    def test_monitor_report_ignores_short_stale_cache_without_error(self):
+        summary = _summary()
+        summary["summary_cache"] = {"state": "stale", "age_seconds": 900, "last_error": None}
+
+        report = build_monitor_report(summary, stale_after_seconds=1800)
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["health"], "green")
+        self.assertEqual(report["warnings"], [])
+
     def test_monitor_report_alerts_when_summary_cache_has_no_payload(self):
         summary = _summary(health="red")
         summary["summary_cache"] = {"state": "miss", "last_error": "summary refresh timed out"}
@@ -118,6 +134,17 @@ class MonitorSummaryTest(unittest.TestCase):
         args = parser.parse_args(["monitor-summary", "--url", "http://127.0.0.1:1/missing", "--timeout-seconds", "0.01", "--fail-on-alert"])
         with redirect_stdout(StringIO()):
             self.assertEqual(args.func(args), 3)
+
+    def test_monitor_summary_parser_supports_brief_output(self):
+        parser = build_parser()
+        args = parser.parse_args(["monitor-summary", "--url", "http://127.0.0.1:1/missing", "--timeout-seconds", "0.01", "--brief"])
+        output = StringIO()
+
+        with redirect_stdout(output):
+            result = args.func(args)
+
+        self.assertEqual(result, 0)
+        self.assertIn("Skill Sync: RED - ACTION REQUIRED", output.getvalue())
 
     def test_write_monitor_report_creates_operator_artifacts(self):
         with TemporaryDirectory() as tmp:
@@ -176,12 +203,18 @@ def _summary(health: str = "green", blocked: int = 0) -> dict:
         "dashboard": {
             "health": health,
             "blocked": blocked,
+            "operator": {
+                "headline": "同步正常，无待处理项",
+                "next_action": "同步链路正常；继续观察 Mac / OpenClaw 自动周期。",
+            },
             "blocked_items": [],
             "devices": [
                 {"id": "gateway", "name": "Gateway / NAS", "health": "green", "skills": 96, "blocked": 0, "snapshot_id": snapshot_id, "freshness": {"state": "fresh", "label": "刚刚", "age_seconds": 1}},
                 {"id": "mac", "name": "Mac 本机", "health": "green", "skills": 96, "blocked": 0, "snapshot_id": snapshot_id, "freshness": {"state": "fresh", "label": "刚刚", "age_seconds": 1}},
                 {"id": "oc-vps", "name": "oc-vps / OpenClaw", "health": "green", "skills": 96, "blocked": 0, "snapshot_id": snapshot_id, "freshness": {"state": "fresh", "label": "刚刚", "age_seconds": 1}},
-                {"id": "win", "name": "Windows", "health": "not_configured", "skills": None, "blocked": None, "snapshot_id": None, "freshness": {"state": "unknown", "label": "未知", "age_seconds": None}},
+            ],
+            "planned_devices": [
+                {"id": "win", "name": "Windows", "health": "not_configured", "skills": None, "blocked": None, "policy": "本阶段跳过", "snapshot_id": None, "freshness": {"state": "unknown", "label": "未知", "age_seconds": None}},
             ],
             "device_tools": [
                 {"device_id": "mac", "device_name": "Mac 本机", "reported": True, "tools": [{"id": "cc-switch", "state": "detected", "skills": 96}]},

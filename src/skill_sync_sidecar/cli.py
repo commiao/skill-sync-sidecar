@@ -29,7 +29,7 @@ from .hub_import import (
     render_hub_import_diagnosis_text,
     render_hub_import_preview_text,
 )
-from .monitor import monitor_once, render_monitor_report, run_monitor_loop
+from .monitor import monitor_once, render_monitor_brief, render_monitor_report, run_monitor_loop
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
@@ -141,6 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_summary.add_argument("--stale-after-seconds", type=int, default=30 * 60, help="Mark active devices stale after this many seconds.")
     monitor_summary.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
     monitor_summary.add_argument("--fail-on-alert", action="store_true", help="Exit 3 when alerts are present.")
+    monitor_summary.add_argument("--brief", action="store_true", help="Print a concise operator decision instead of the full monitor report.")
     monitor_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     monitor_summary.set_defaults(func=cmd_monitor_summary)
 
@@ -635,6 +636,8 @@ def cmd_monitor_summary(args: argparse.Namespace) -> int:
     )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif args.brief:
+        print(render_monitor_brief(report))
     else:
         print(render_monitor_report(report))
     if args.fail_on_alert and report.get("alerts"):

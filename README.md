@@ -58,6 +58,7 @@ python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
 python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only --peer-status oc-vps=./openclaw-status.json
 python3 -m skill_sync_sidecar gateway --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --host 127.0.0.1 --port 8877
+python3 -m skill_sync_sidecar monitor-summary --brief
 scripts/refresh-openclaw-peer-status.sh
 scripts/install-openclaw-peer-status-launchd.sh
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked

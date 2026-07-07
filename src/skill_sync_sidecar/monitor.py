@@ -135,8 +135,10 @@ def build_monitor_report(
     min_canonical_total: int = 1,
 ) -> JsonDict:
     dashboard = summary.get("dashboard") if isinstance(summary.get("dashboard"), dict) else {}
+    operator = dashboard.get("operator") if isinstance(dashboard.get("operator"), dict) else {}
     remote_snapshot = summary.get("remote_snapshot") if isinstance(summary.get("remote_snapshot"), dict) else {}
     devices = dashboard.get("devices") if isinstance(dashboard.get("devices"), list) else []
+    planned_devices = dashboard.get("planned_devices") if isinstance(dashboard.get("planned_devices"), list) else []
     device_tools = dashboard.get("device_tools") if isinstance(dashboard.get("device_tools"), list) else []
     blocked_items = dashboard.get("blocked_items") if isinstance(dashboard.get("blocked_items"), list) else []
     summary_cache = summary.get("summary_cache") if isinstance(summary.get("summary_cache"), dict) else {}
@@ -165,16 +167,19 @@ def build_monitor_report(
             )
         )
     elif cache_state == "stale":
-        warnings.append(
-            _issue(
-                "summary_cache",
-                "Dashboard summary is serving stale cached data.",
-                state=cache_state,
-                age_seconds=summary_cache.get("age_seconds"),
-                last_error=summary_cache.get("last_error"),
-                action="Inspect gateway refresh latency and WebDAV/peer-status reads.",
+        cache_age = summary_cache.get("age_seconds")
+        cache_too_old = isinstance(cache_age, (int, float)) and cache_age > stale_after_seconds
+        if cache_too_old or summary_cache.get("last_error"):
+            warnings.append(
+                _issue(
+                    "summary_cache",
+                    "Dashboard summary is serving stale cached data.",
+                    state=cache_state,
+                    age_seconds=cache_age,
+                    last_error=summary_cache.get("last_error"),
+                    action="Inspect gateway refresh latency and WebDAV/peer-status reads.",
+                )
             )
-        )
 
     blocked_count = _int_or_zero(dashboard.get("blocked"))
     if blocked_count:
@@ -233,9 +238,13 @@ def build_monitor_report(
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "health": report_health,
         "dashboard_health": health,
+        "headline": operator.get("headline"),
+        "next_action": operator.get("next_action") or _default_next_action(alerts, warnings),
         "blocked": blocked_count,
         "snapshot_id": canonical_snapshot,
         "canonical_total": canonical_total,
+        "devices": [_device_brief(device) for device in devices if isinstance(device, dict)],
+        "deferred_devices": [_device_brief(device) for device in planned_devices if isinstance(device, dict)],
         "alerts": alerts,
         "warnings": warnings,
         "info": info,
@@ -264,6 +273,43 @@ def render_monitor_report(report: JsonDict) -> str:
             for key in ("device_id", "peer_id", "skill_id", "status_action", "category", "reason", "recommendation", "action"):
                 if item.get(key):
                     lines.append(f"  {key}: {item.get(key)}")
+    return "\n".join(lines)
+
+
+def render_monitor_brief(report: JsonDict) -> str:
+    health = str(report.get("health") or "unknown").upper()
+    alerts = len(report.get("alerts") or [])
+    warnings = len(report.get("warnings") or [])
+    if alerts:
+        verdict = "ACTION REQUIRED"
+    elif warnings:
+        verdict = "REVIEW NEEDED"
+    else:
+        verdict = "NO ACTION"
+
+    lines = [
+        f"Skill Sync: {health} - {verdict}",
+        f"snapshot: {report.get('snapshot_id')} total={report.get('canonical_total')} blocked={report.get('blocked')}",
+    ]
+
+    devices = report.get("devices") if isinstance(report.get("devices"), list) else []
+    active_devices = [device for device in devices if isinstance(device, dict) and device.get("id") in {"gateway", "mac", "oc-vps", "openclaw"}]
+    if active_devices:
+        lines.append("devices: " + "; ".join(_format_device_brief(device) for device in active_devices))
+
+    deferred_devices = report.get("deferred_devices") if isinstance(report.get("deferred_devices"), list) else []
+    if deferred_devices:
+        lines.append("deferred: " + "; ".join(_format_deferred_device(device) for device in deferred_devices if isinstance(device, dict)))
+
+    if alerts or warnings:
+        issue = (report.get("alerts") or report.get("warnings") or [None])[0]
+        if isinstance(issue, dict):
+            lines.append(f"top_issue: [{issue.get('code')}] {issue.get('message')}")
+            if issue.get("action"):
+                lines.append(f"next: {issue.get('action')}")
+    else:
+        lines.append(f"next: {report.get('next_action') or 'Continue observing Mac / OpenClaw automatic cycles.'}")
+
     return "\n".join(lines)
 
 
@@ -329,3 +375,44 @@ def _int_or_zero(value: object) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _default_next_action(alerts: list[JsonDict], warnings: list[JsonDict]) -> str:
+    issue = (alerts or warnings or [None])[0]
+    if isinstance(issue, dict) and issue.get("action"):
+        return str(issue["action"])
+    if alerts:
+        return "Inspect alerts before applying or publishing any skill changes."
+    if warnings:
+        return "Review warnings; continue only after the queue is understood."
+    return "Continue observing Mac / OpenClaw automatic cycles."
+
+
+def _device_brief(device: JsonDict) -> JsonDict:
+    freshness = device.get("freshness") if isinstance(device.get("freshness"), dict) else {}
+    return {
+        "id": device.get("id"),
+        "name": device.get("name"),
+        "health": device.get("health"),
+        "skills": device.get("skills"),
+        "blocked": device.get("blocked"),
+        "policy": device.get("policy"),
+        "snapshot_id": device.get("snapshot_id"),
+        "freshness": freshness.get("label"),
+    }
+
+
+def _format_device_brief(device: JsonDict) -> str:
+    parts = [str(device.get("id") or "unknown"), str(device.get("health") or "unknown")]
+    if device.get("skills") is not None:
+        parts.append(f"skills={device.get('skills')}")
+    if device.get("blocked") is not None:
+        parts.append(f"blocked={device.get('blocked')}")
+    if device.get("freshness"):
+        parts.append(f"fresh={device.get('freshness')}")
+    return "/".join(parts)
+
+
+def _format_deferred_device(device: JsonDict) -> str:
+    policy = device.get("policy") or device.get("health") or "deferred"
+    return f"{device.get('id') or 'unknown'}={policy}"

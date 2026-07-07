@@ -150,12 +150,13 @@ curl -sS http://100.123.208.32:8765/api/summary
 Operator summary from the repo:
 
 ```bash
+scripts/operator-status.sh
 scripts/monitor-nas-summary.sh
 scripts/blocked-queue.sh
 scripts/ops-watch.sh
 ```
 
-`/healthz` checks process health and cache freshness. `/api/summary` is the operator source of truth for device health, blocked queue, and planned devices.
+`operator-status.sh` is the shortest "do I need to do anything right now?" view. `/healthz` checks process health and cache freshness. `/api/summary` is the operator source of truth for device health, blocked queue, and planned devices.
 
 ## Recovery Checklist
 
@@ -164,6 +165,7 @@ Use this order when the dashboard is yellow or stale:
 1. Read the NAS summary first:
 
    ```bash
+   scripts/operator-status.sh
    scripts/monitor-nas-summary.sh
    scripts/blocked-queue.sh
    ```

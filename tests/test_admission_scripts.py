@@ -207,6 +207,21 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("launchctl bootstrap", text)
         self.assertNotIn("launchctl kickstart", text)
 
+    def test_operator_status_is_brief_and_read_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "operator-status.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+
+        self.assertIn("monitor-summary", text)
+        self.assertIn("--brief", text)
+        self.assertIn("/api/summary", text)
+        self.assertNotIn("approved-push", text)
+        self.assertNotIn("sync-cycle", text)
+        self.assertNotIn("sync-apply", text)
+        self.assertNotIn("push --yes", text)
+
     def test_blocked_queue_script_is_read_only_and_renders_items(self):
         repo_root = Path(__file__).resolve().parents[1]
         script = repo_root / "scripts" / "blocked-queue.sh"

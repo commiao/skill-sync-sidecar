@@ -103,9 +103,14 @@ docker logs --tail 50 skill-sync-monitor
 Day-2 operator checks from the Mac repo:
 
 ```bash
+scripts/operator-status.sh
 scripts/blocked-queue.sh
 scripts/ops-watch.sh
 ```
+
+`operator-status.sh` is the quickest operator decision view. It prints the
+overall health, snapshot, active device freshness, deferred devices such as
+Windows, and the next action in a few lines.
 
 `blocked-queue.sh` is the fastest "do I need to act?" view. It reads the NAS
 gateway summary and prints the blocked approval queue with the relevant local,
