@@ -134,6 +134,7 @@ Peer status v1 separates responsibilities:
 - Device Agent scans actual local tool roots and publishes `tools[]`.
 - Gateway only reads WebDAV and aggregates status.
 - Dashboard shows `dashboard.tools` as canonical projection and `dashboard.device_tools` as per-device measured state.
+- Devices that are not in the current rollout, such as Windows during the Mac/OpenClaw phase, appear under `dashboard.planned_devices` instead of the main device health list.
 
 See [peer-status-v1.md](peer-status-v1.md) for the JSON contract.
 

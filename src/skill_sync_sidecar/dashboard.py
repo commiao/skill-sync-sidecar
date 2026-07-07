@@ -231,12 +231,14 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     projection = _safe_tool_projection(config.remote_snapshot)
     hub_import = _safe_hub_import_diagnosis()
     local_tools = build_device_tool_status()
+    planned_devices = _planned_device_overview()
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
+        "planned_devices": planned_devices,
         "tools": _merge_tool_projection(local_tools, projection),
         "device_tools": _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers}),
         "tool_projection": projection,
@@ -304,12 +306,14 @@ def build_gateway_status(
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(snapshot_dir)
     hub_import = _safe_hub_import_diagnosis()
+    planned_devices = _planned_device_overview()
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
         "devices": devices,
+        "planned_devices": planned_devices,
         "tools": _gateway_tool_overview(projection),
         "device_tools": _device_tool_overview(devices, peers),
         "tool_projection": projection,
@@ -388,6 +392,7 @@ def build_dashboard_summary(status: dict) -> dict:
             "operator": dashboard.get("operator"),
             "blocked_items": dashboard.get("blocked_items", []),
             "devices": dashboard.get("devices", []),
+            "planned_devices": dashboard.get("planned_devices", []),
             "tools": dashboard.get("tools", []),
             "device_tools": dashboard.get("device_tools", []),
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
@@ -675,20 +680,6 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
             "freshness": _freshness_info(last_seen_at),
         },
         openclaw_device,
-        {
-            "id": "win",
-            "name": "Windows",
-            "kind": "计划设备",
-            "health": "not_configured",
-            "skills": None,
-            "snapshot_id": None,
-            "blocked": None,
-            "policy": "未接入",
-            "note": "等待安装 sidecar 后纳入同一面板",
-            "local_policy": [],
-            "last_seen_at": None,
-            "freshness": _freshness_info(None),
-        },
     ]
 
 
@@ -729,16 +720,21 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
             fallback_note="gateway 尚未读取到 OpenClaw peer status；canonical snapshot 仍可观察",
             fallback_local_policy=["disk-cleanup", "lark-cli-adapter"],
         ),
+    ]
+
+
+def _planned_device_overview() -> list[dict]:
+    return [
         {
             "id": "win",
             "name": "Windows",
-            "kind": "计划设备",
+            "kind": "后续接入",
             "health": "not_configured",
             "skills": None,
             "snapshot_id": None,
             "blocked": None,
-            "policy": "未接入",
-            "note": "等待安装 sidecar 后纳入同一面板",
+            "policy": "本阶段跳过",
+            "note": "已从当前验收范围移出；后续需要三端同步时再安装 Agent。",
             "local_policy": [],
             "last_seen_at": None,
             "freshness": _freshness_info(None),
@@ -825,9 +821,8 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
     mac = _find_device(devices, "mac")
     openclaw = _find_device(devices, "oc-vps")
-    win = _find_device(devices, "win")
     if health == "green":
-        next_action = "同步链路正常；继续观察自动周期，或接入 Windows。"
+        next_action = "同步链路正常；继续观察 Mac / OpenClaw 自动周期。"
     elif health == "yellow":
         next_action = "先处理待审批队列；OpenClaw 本地改动需要 approved-push 后再上行。"
     elif health == "red":
@@ -850,8 +845,8 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
         "devices": {
             "mac": _operator_device_line(mac),
             "openclaw": _operator_device_line(openclaw),
-            "windows": _operator_device_line(win),
         },
+        "deferred_devices": {"windows": "本阶段跳过，后续需要三端同步时再接入。"},
         "blocked_count": len(blocked_items),
     }
 
@@ -1300,6 +1295,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 14px;
       min-width: 0;
     }
+    .planned-card {
+      border-style: dashed;
+      background: #fbfcfe;
+    }
     .device-tool-group {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -1547,9 +1546,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     </section>
     <div class="section-title">
       <h2>设备</h2>
-      <span class="section-help">区分 Mac、OpenClaw、Windows 的接入状态</span>
+      <span class="section-help">当前接入链路：Mac、OpenClaw、Gateway</span>
     </div>
     <section id="devices" class="cards"></section>
+    <div id="planned-devices-title" class="section-title">
+      <h2>后续接入</h2>
+      <span class="section-help">本阶段不作为验收门槛</span>
+    </div>
+    <section id="planned-devices" class="cards"></section>
     <div class="section-title">
       <h2>工具</h2>
       <span class="section-help">WebDAV canonical snapshot 对各工具的目标覆盖，不代表某台设备已安装</span>
@@ -1557,7 +1561,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="tools" class="cards"></section>
     <div class="section-title">
       <h2>设备工具实测</h2>
-      <span class="section-help">由每台设备 Agent 上报，区分 Mac、OpenClaw、Windows 的真实工具目录</span>
+      <span class="section-help">由每台已接入设备 Agent 上报真实工具目录</span>
     </div>
     <section id="device-tools"></section>
     <div class="panel">
@@ -1659,6 +1663,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("cycles").textContent = text(daemon.cycles_run);
       $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
       renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
+      renderPlannedDevices(Array.isArray(dashboard.planned_devices) ? dashboard.planned_devices : []);
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
       renderDeviceTools(Array.isArray(dashboard.device_tools) ? dashboard.device_tools : []);
       renderHubImport(dashboard.hub_import || {});
@@ -1737,6 +1742,23 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="mini-stat"><div class="mini-label">更新于</div><div class="mini-value subtle">${escapeHtml(formatDateTime(device.last_seen_at))}</div></div>
             <div class="mini-stat"><div class="mini-label">新鲜度</div><div class="mini-value">${freshnessPill(device.freshness)}</div></div>
           </div>
+        </article>
+      `).join("");
+    }
+
+    function renderPlannedDevices(devices) {
+      $("planned-devices-title").hidden = devices.length === 0;
+      $("planned-devices").hidden = devices.length === 0;
+      $("planned-devices").innerHTML = devices.map((device) => `
+        <article class="device-card planned-card">
+          <div class="card-head">
+            <div>
+              <div class="card-name">${escapeHtml(device.name)}</div>
+              <div class="card-kind">${escapeHtml(device.kind)}</div>
+            </div>
+            ${pill(device.policy || device.health, "")}
+          </div>
+          <div class="card-note">${escapeHtml(device.note)}</div>
         </article>
       `).join("");
     }
@@ -1937,7 +1959,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       const rows = [
         ["Mac", devices.mac],
         ["OpenClaw", devices.openclaw],
-        ["Windows", devices.windows],
       ];
       $("operator-devices").innerHTML = rows.map(([name, value]) => `
         <div class="device-line">

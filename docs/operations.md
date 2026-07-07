@@ -131,7 +131,8 @@ It is intentionally read-only in v0. It does not trigger sync, upload to WebDAV,
 
 Dashboard v1 separates status into:
 
-- Devices: current Mac, OpenClaw peer placeholder, and Windows placeholder.
+- Devices: current Mac / Gateway and OpenClaw peer status.
+- Planned devices: Windows is listed as deferred when it is not part of the current rollout.
 - Tools: cc-switch, skillshub, Codex, Cursor, and Claude Code local skill roots.
 - Queue: blocked items that require review.
 - Details: daemon, local-only/local-override policy, and artifact paths.
