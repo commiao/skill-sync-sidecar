@@ -7,6 +7,7 @@ OPENCLAW_CONNECT_TIMEOUT="${OPENCLAW_CONNECT_TIMEOUT:-10}"
 OPENCLAW_RELEASE="${OPENCLAW_RELEASE:-peer-status-v1}"
 OPENCLAW_PYTHON="${OPENCLAW_PYTHON:-/opt/skill-sync-sidecar/venv-0.1.3/bin/python}"
 OPENCLAW_PEER_ID="${OPENCLAW_PEER_ID:-oc-vps}"
+SKILL_SYNC_PREFIX="${SKILL_SYNC_PREFIX:-skill-sync-sidecar-dev/current-mac}"
 OUT_FILE="${OPENCLAW_PEER_STATUS_OUT:-$HOME/Library/Application Support/skill-sync-sidecar/peers/openclaw-status.json}"
 LOG_PREFIX="${LOG_PREFIX:-skill-sync-openclaw-peer}"
 
@@ -14,6 +15,13 @@ mkdir -p "$(dirname "$OUT_FILE")"
 tmp_file="$(mktemp "${OUT_FILE}.tmp.XXXXXX")"
 tools_file="$(mktemp "${OUT_FILE}.tools.XXXXXX")"
 trap 'rm -f "$tmp_file" "$tools_file"' EXIT
+
+ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SSH_TARGET" \
+  "sudo -iu admin env PYTHONPATH=/opt/skill-sync-sidecar/releases/${OPENCLAW_RELEASE}/src ${OPENCLAW_PYTHON} -m skill_sync_sidecar pull-cache \
+    --cc-switch-webdav \
+    --prefix ${SKILL_SYNC_PREFIX} \
+    --out /opt/skill-sync-sidecar/cache/current-mac-pullonly \
+    --json >/dev/null"
 
 ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SSH_TARGET" \
   "PYTHONPATH=/opt/skill-sync-sidecar/releases/${OPENCLAW_RELEASE}/src ${OPENCLAW_PYTHON} -m skill_sync_sidecar ops-status \

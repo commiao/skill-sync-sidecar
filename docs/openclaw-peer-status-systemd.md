@@ -6,6 +6,7 @@ This is a read-only status publisher:
 
 - Reads `/home/admin/clawd/skills`.
 - Reads the existing pull-only cache/base/state under `/opt/skill-sync-sidecar`.
+- Refreshes the pull-only WebDAV cache before publishing, so `snapshot_id` does not lag after an approved push.
 - Writes `/opt/skill-sync-sidecar/state/openclaw-peer-status.json`.
 - Publishes `skill-sync-sidecar-peer-status/oc-vps.json` to WebDAV.
 - Does not run `sync-cycle`, `sync-apply`, or `approved-push`.

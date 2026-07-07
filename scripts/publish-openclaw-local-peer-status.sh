@@ -10,12 +10,19 @@ REMOTE_SNAPSHOT="${OPENCLAW_REMOTE_SNAPSHOT:-/opt/skill-sync-sidecar/cache/curre
 BASE_RECORD="${OPENCLAW_BASE_RECORD:-/opt/skill-sync-sidecar/state/openclaw-base-record.json}"
 STATE_FILE="${OPENCLAW_STATE_FILE:-/opt/skill-sync-sidecar/state/openclaw-daemon-pullonly-state.json}"
 STATUS_FILE="${OPENCLAW_PEER_STATUS_FILE:-/opt/skill-sync-sidecar/state/openclaw-peer-status.json}"
+SKILL_SYNC_PREFIX="${SKILL_SYNC_PREFIX:-skill-sync-sidecar-dev/current-mac}"
 LOG_PREFIX="${LOG_PREFIX:-skill-sync-openclaw-local-peer}"
 
 mkdir -p "$(dirname "$STATUS_FILE")"
 tmp_file="$(mktemp "${STATUS_FILE}.tmp.XXXXXX")"
 tools_file="$(mktemp "${STATUS_FILE}.tools.XXXXXX")"
 trap 'rm -f "$tmp_file" "$tools_file"' EXIT
+
+PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar pull-cache \
+  --cc-switch-webdav \
+  --prefix "$SKILL_SYNC_PREFIX" \
+  --out "$REMOTE_SNAPSHOT" \
+  --json >/dev/null
 
 PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar ops-status \
   --local-root "$LOCAL_ROOT" \
