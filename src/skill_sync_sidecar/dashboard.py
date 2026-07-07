@@ -821,8 +821,11 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     snapshot = status.get("remote_snapshot") if isinstance(status.get("remote_snapshot"), dict) else {}
     mac = _find_device(devices, "mac")
     openclaw = _find_device(devices, "oc-vps")
+    top_issue = _operator_top_issue(blocked_items)
     if health == "green":
         next_action = "同步链路正常；继续观察 Mac / OpenClaw 自动周期。"
+    elif health == "yellow" and top_issue:
+        next_action = top_issue["action"]
     elif health == "yellow":
         next_action = "先处理待审批队列；OpenClaw 本地改动需要 approved-push 后再上行。"
     elif health == "red":
@@ -848,7 +851,50 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
         },
         "deferred_devices": {"windows": "本阶段跳过，后续需要三端同步时再接入。"},
         "blocked_count": len(blocked_items),
+        "top_issue": top_issue,
     }
+
+
+def _operator_top_issue(blocked_items: list[dict]) -> Optional[dict]:
+    if not blocked_items:
+        return None
+    item = blocked_items[0]
+    peer_id = item.get("peer_id")
+    peer_name = item.get("peer_name")
+    skill_id = item.get("skill_id")
+    status_action = item.get("status_action")
+    category = item.get("category")
+    return {
+        "peer_id": peer_id,
+        "peer_name": peer_name,
+        "skill_id": skill_id,
+        "status_action": status_action,
+        "category": category,
+        "source": item.get("source"),
+        "reason": item.get("reason"),
+        "recommendation": item.get("recommendation"),
+        "action": _operator_issue_action(peer_id, peer_name, skill_id, status_action, category),
+    }
+
+
+def _operator_issue_action(
+    peer_id: Optional[str],
+    peer_name: Optional[str],
+    skill_id: Optional[str],
+    status_action: Optional[str],
+    category: Optional[str],
+) -> str:
+    target = _operator_issue_target(peer_id, peer_name, skill_id)
+    if category == "conflict":
+        return f"先处理 {target} 冲突；生成 conflict package 后人工合并。"
+    if category == "writer_policy" and status_action in {"push", "push_new"}:
+        return f"先处理 {target}；确认后运行 approved-push。"
+    return f"先处理 {target}；查看待审批队列。"
+
+
+def _operator_issue_target(peer_id: Optional[str], peer_name: Optional[str], skill_id: Optional[str]) -> str:
+    peer = peer_name or peer_id or "unknown-peer"
+    return f"{peer} / {skill_id or 'unknown-skill'}"
 
 
 def _find_device(devices: list[dict], device_id: str) -> dict:
@@ -1775,6 +1821,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderOperatorBrief(dashboard, snapshot) {
+      const operator = dashboard.operator || {};
       const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
       const planned = Array.isArray(dashboard.planned_devices) ? dashboard.planned_devices : [];
       const active = devices
@@ -1782,11 +1829,24 @@ DASHBOARD_HTML = r"""<!doctype html>
         .map((device) => `${text(device.id)}=${text(device.health)}/${text(device.skills)}/${text((device.freshness || {}).label)}`);
       const deferred = planned
         .map((device) => `${text(device.id)}=${text(device.policy || device.health)}`);
-      $("operator-brief").innerHTML = [
+      const issue = operator.top_issue || (Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items[0] : null);
+      const lines = [
         briefLine("snapshot", `${text(snapshot.snapshot_id)} total=${text(snapshot.total)} blocked=${text(dashboard.blocked)}`),
         briefLine("devices", active.length ? active.join("; ") : "-"),
         briefLine("deferred", deferred.length ? deferred.join("; ") : "-"),
-      ].join("");
+      ];
+      if (issue) {
+        lines.push(briefLine("issue", topIssueText(issue)));
+      }
+      $("operator-brief").innerHTML = lines.join("");
+    }
+
+    function topIssueText(issue) {
+      const peer = issue.peer_name || issue.peer_id || "unknown-peer";
+      const skill = issue.skill_id || "unknown-skill";
+      const action = issue.status_action || issue.plan_action || "-";
+      const category = issue.category || "-";
+      return `${peer} / ${skill} ${action} ${category}`;
     }
 
     function briefLine(label, value) {
