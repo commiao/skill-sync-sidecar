@@ -2,6 +2,9 @@
 
 This guide covers the safe path from smoke test to supervised daemon mode.
 
+For day-2 Mac/OpenClaw Agent operation, recovery, and count interpretation, see
+[agent-day2-runbook.md](agent-day2-runbook.md).
+
 ## Safety Defaults
 
 - Use a dedicated dev prefix until production policy is agreed.

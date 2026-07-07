@@ -122,6 +122,7 @@ Skill packages can be global or project-scoped:
 See [docs/manifest-v0.md](docs/manifest-v0.md) for the canonical metadata contract.
 See [docs/operations.md](docs/operations.md) for WebDAV smoke tests, daemon rollout, and launchd/systemd templates.
 See [docs/nas-gateway-deployment.md](docs/nas-gateway-deployment.md) for the NAS/Docker gateway deployment path.
+See [docs/agent-day2-runbook.md](docs/agent-day2-runbook.md) for Mac/OpenClaw Agent operation, recovery, and count interpretation.
 See [docs/acceptance-report.md](docs/acceptance-report.md) for the current MVP validation evidence and safety boundary.
 See [docs/release.md](docs/release.md) for the package smoke test and release checklist.
 

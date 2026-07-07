@@ -2,6 +2,9 @@
 
 Purpose: let OpenClaw publish its own `peer-status v1` to WebDAV instead of relying on a Mac-side SSH refresh job.
 
+For the full Mac/OpenClaw/NAS day-2 recovery checklist, see
+[agent-day2-runbook.md](agent-day2-runbook.md).
+
 This is a read-only status publisher:
 
 - Reads `/home/admin/clawd/skills`.

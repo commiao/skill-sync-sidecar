@@ -137,6 +137,7 @@ Peer status v1 separates responsibilities:
 - Devices that are not in the current rollout, such as Windows during the Mac/OpenClaw phase, appear under `dashboard.planned_devices` instead of the main device health list.
 
 See [peer-status-v1.md](peer-status-v1.md) for the JSON contract.
+See [agent-day2-runbook.md](agent-day2-runbook.md) for the operator recovery path and how to interpret canonical projection counts versus device-measured tool counts.
 
 On Mac:
 
