@@ -873,7 +873,9 @@ def _operator_top_issue(blocked_items: list[dict]) -> Optional[dict]:
         "source": item.get("source"),
         "reason": item.get("reason"),
         "recommendation": item.get("recommendation"),
-        "action": _operator_issue_action(peer_id, peer_name, skill_id, status_action, category),
+        "action": item.get("operator_action")
+        or _operator_issue_action(peer_id, peer_name, skill_id, status_action, category),
+        "command": item.get("operator_command"),
     }
 
 
@@ -951,8 +953,42 @@ def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[di
         copied["peer_id"] = peer_id
         copied["peer_name"] = peer_name
         copied.setdefault("source", "live_sync_plan" if raw_items is plan_items else "blocked_report")
+        copied.setdefault("operator_action", _blocked_item_operator_action(copied))
+        command = _blocked_item_operator_command(copied)
+        if command:
+            copied.setdefault("operator_command", command)
         items.append(copied)
     return items
+
+
+def _blocked_item_operator_action(item: dict) -> str:
+    peer_id = item.get("peer_id")
+    peer_name = item.get("peer_name")
+    skill_id = item.get("skill_id")
+    status_action = item.get("status_action")
+    category = item.get("category")
+    if category == "conflict":
+        return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
+    if category == "writer_policy" and status_action in {"push", "push_new"}:
+        if peer_id in {"oc-vps", "openclaw"}:
+            return f"先在 Mac 运行 OpenClaw approved-push dry-run 审核 {skill_id or 'unknown-skill'}，确认后再 --yes 发布。"
+        return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
+    if category == "delete":
+        return f"先人工确认 {skill_id or 'unknown-skill'} 是否应删除；未确认前不要自动 apply。"
+    return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
+
+
+def _blocked_item_operator_command(item: dict) -> Optional[str]:
+    skill_id = item.get("skill_id")
+    if not skill_id:
+        return None
+    if item.get("category") == "writer_policy" and item.get("status_action") in {"push", "push_new"}:
+        if item.get("peer_id") in {"oc-vps", "openclaw"}:
+            return f"scripts/openclaw-approved-push-batch.sh {skill_id}"
+        return f"skill-sync approved-push --skill-id {skill_id} --dry-run"
+    if item.get("category") == "conflict":
+        return "skill-sync conflict-package --skill-id " + str(skill_id)
+    return None
 
 
 def _device_tool_overview(devices: list[dict], peers: Dict[str, dict]) -> list[dict]:
@@ -1535,6 +1571,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     .panel-head h2 { margin: 0; }
     .key { color: var(--muted); }
     .value { overflow-wrap: anywhere; }
+    .action-cell {
+      display: grid;
+      gap: 4px;
+      min-width: 180px;
+    }
+    .action-primary {
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+    .action-command {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -1676,7 +1725,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <h2>待审批队列</h2>
           <div id="blocked-empty" class="empty">No pending approval items.</div>
           <table id="blocked-table" hidden>
-            <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Hashes</th><th>Recommendation</th></tr></thead>
+            <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Hashes</th><th>Recommendation / Next step</th></tr></thead>
             <tbody id="blocked-body"></tbody>
           </table>
         </div>
@@ -1771,7 +1820,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div>local ${shortHash(item.local_hash)}</div>
             <div>remote ${shortHash(item.remote_hash)}</div>
           </td>
-          <td>${escapeHtml(text(item.recommendation || item.reason))}<div class="mini-label">${escapeHtml(text(item.reason))}</div></td>
+          <td>${blockedItemAction(item)}</td>
         </tr>
       `).join("");
 
@@ -1847,6 +1896,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       const action = issue.status_action || issue.plan_action || "-";
       const category = issue.category || "-";
       return `${peer} / ${skill} ${action} ${category}`;
+    }
+
+    function blockedItemAction(item) {
+      const action = item.operator_action || item.recommendation || item.reason || "-";
+      const command = item.operator_command || "";
+      const reason = item.reason || item.recommendation || "";
+      return `
+        <div class="action-cell">
+          <div class="action-primary">${escapeHtml(text(action))}</div>
+          ${command ? `<div class="action-command mono">${escapeHtml(command)}</div>` : ""}
+          ${reason ? `<div class="mini-label">${escapeHtml(reason)}</div>` : ""}
+        </div>
+      `;
     }
 
     function briefLine(label, value) {

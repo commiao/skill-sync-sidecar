@@ -394,11 +394,21 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["peer_id"], "oc-vps")
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["skill_id"], "beijing-recruitment")
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["category"], "writer_policy")
+            self.assertIn("dry-run", status["dashboard"]["operator"]["top_issue"]["action"])
+            self.assertEqual(
+                status["dashboard"]["operator"]["top_issue"]["command"],
+                "scripts/openclaw-approved-push-batch.sh beijing-recruitment",
+            )
             self.assertIn("beijing-recruitment", status["dashboard"]["operator"]["next_action"])
             self.assertIn("approved-push", status["dashboard"]["operator"]["next_action"])
             self.assertIn("OpenClaw", status["dashboard"]["operator"]["sync_path"])
             self.assertEqual(status["dashboard"]["blocked_items"][0]["peer_id"], "oc-vps")
             self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "beijing-recruitment")
+            self.assertIn("dry-run", status["dashboard"]["blocked_items"][0]["operator_action"])
+            self.assertEqual(
+                status["dashboard"]["blocked_items"][0]["operator_command"],
+                "scripts/openclaw-approved-push-batch.sh beijing-recruitment",
+            )
             self.assertEqual(devices["oc-vps"]["health"], "yellow")
             self.assertEqual(devices["oc-vps"]["blocked"], 1)
             self.assertEqual(devices["oc-vps"]["skills"], 95)
@@ -423,6 +433,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"operator-brief\"", DASHBOARD_HTML)
             self.assertIn("renderOperatorBrief", DASHBOARD_HTML)
             self.assertIn("topIssueText", DASHBOARD_HTML)
+            self.assertIn("blockedItemAction", DASHBOARD_HTML)
+            self.assertIn("Recommendation / Next step", DASHBOARD_HTML)
+            self.assertIn("action-cell", DASHBOARD_HTML)
             self.assertIn("briefLine(\"issue\"", DASHBOARD_HTML)
             self.assertIn("GREEN - NO ACTION", DASHBOARD_HTML)
             self.assertIn("更新于", DASHBOARD_HTML)
