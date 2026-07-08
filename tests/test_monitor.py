@@ -25,6 +25,16 @@ class MonitorSummaryTest(unittest.TestCase):
 
     def test_monitor_report_lists_blocked_items_with_actions(self):
         summary = _summary(health="yellow", blocked=1)
+        summary["dashboard"]["operator"]["top_issue"] = {
+            "peer_id": "oc-vps",
+            "peer_name": "oc-vps / OpenClaw",
+            "skill_id": "hebei-recruitment",
+            "status_action": "push",
+            "category": "writer_policy",
+            "reason": "writer policy pull-only blocks push",
+            "action": "先在 Mac 运行 OpenClaw approved-push dry-run 审核 hebei-recruitment，确认后再 --yes 发布。",
+            "command": "scripts/openclaw-approved-push-batch.sh hebei-recruitment",
+        }
         summary["dashboard"]["blocked_items"] = [
             {
                 "peer_id": "oc-vps",
@@ -42,13 +52,16 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["health"], "yellow")
         self.assertEqual(report["blocked"], 1)
+        self.assertEqual(report["warnings"][0]["code"], "operator_top_issue")
+        self.assertEqual(report["warnings"][0]["command"], "scripts/openclaw-approved-push-batch.sh hebei-recruitment")
         self.assertTrue(any(item["code"] == "blocked_item" for item in report["warnings"]))
         text = render_monitor_report(report)
         self.assertIn("hebei-recruitment", text)
         self.assertIn("approved-push", text)
         brief = render_monitor_brief(report)
         self.assertIn("Skill Sync: YELLOW - REVIEW NEEDED", brief)
-        self.assertIn("top_issue: [dashboard_health]", brief)
+        self.assertIn("top_issue: [operator_top_issue]", brief)
+        self.assertIn("command: scripts/openclaw-approved-push-batch.sh hebei-recruitment", brief)
 
     def test_monitor_report_keeps_conflicts_as_alerts(self):
         summary = _summary(health="yellow", blocked=1)

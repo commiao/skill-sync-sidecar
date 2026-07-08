@@ -148,9 +148,13 @@ def build_monitor_report(
     info: list[JsonDict] = []
 
     health = dashboard.get("health") or summary.get("health") or "unknown"
-    if health == "red":
+    operator_issue = _issue_for_operator_top_issue(operator.get("top_issue"))
+    if operator_issue:
+        target = alerts if _operator_issue_is_alert(operator_issue) else warnings
+        target.append(operator_issue)
+    if health == "red" and not operator_issue:
         alerts.append(_issue("dashboard_health", "Dashboard health is red.", health=str(health), action="Open the blocked queue and device status sections."))
-    elif health == "yellow":
+    elif health == "yellow" and not operator_issue:
         warnings.append(_issue("dashboard_health", "Dashboard has pending review work.", health=str(health), action="Open the blocked queue; approved local changes may need explicit approved-push."))
     elif health != "green":
         warnings.append(_issue("dashboard_health", "Dashboard health is not green.", health=str(health), action="Refresh dashboard status and inspect device sections."))
@@ -270,7 +274,7 @@ def render_monitor_report(report: JsonDict) -> str:
             if not isinstance(item, dict):
                 continue
             lines.append(f"- [{item.get('code')}] {item.get('message')}")
-            for key in ("device_id", "peer_id", "skill_id", "status_action", "category", "reason", "recommendation", "action"):
+            for key in ("device_id", "peer_id", "skill_id", "status_action", "category", "reason", "recommendation", "action", "command"):
                 if item.get(key):
                     lines.append(f"  {key}: {item.get(key)}")
     return "\n".join(lines)
@@ -305,6 +309,8 @@ def render_monitor_brief(report: JsonDict) -> str:
         issue = (report.get("alerts") or report.get("warnings") or [None])[0]
         if isinstance(issue, dict):
             lines.append(f"top_issue: [{issue.get('code')}] {issue.get('message')}")
+            if issue.get("command"):
+                lines.append(f"command: {issue.get('command')}")
             if issue.get("action"):
                 lines.append(f"next: {issue.get('action')}")
     else:
@@ -355,6 +361,31 @@ def _action_for_blocked_item(item: JsonDict) -> str:
     if category == "new_skill_review":
         return "Review the new skill metadata, targets, and safety before allowing it."
     return "Inspect the item and choose explicit approve, defer, or private override."
+
+
+def _issue_for_operator_top_issue(top_issue: object) -> Optional[JsonDict]:
+    if not isinstance(top_issue, dict):
+        return None
+    peer = top_issue.get("peer_name") or top_issue.get("peer_id") or "unknown device"
+    skill_id = top_issue.get("skill_id") or "unknown skill"
+    status_action = top_issue.get("status_action")
+    category = top_issue.get("category")
+    return _issue(
+        "operator_top_issue",
+        f"{peer} / {skill_id} needs review.",
+        peer_id=top_issue.get("peer_id"),
+        skill_id=skill_id,
+        status_action=status_action,
+        category=category,
+        reason=top_issue.get("reason"),
+        recommendation=top_issue.get("recommendation"),
+        action=top_issue.get("action"),
+        command=top_issue.get("command"),
+    )
+
+
+def _operator_issue_is_alert(issue: JsonDict) -> bool:
+    return issue.get("category") in {"conflict", "delete_review"}
 
 
 def _blocked_item_severity(item: JsonDict) -> str:
