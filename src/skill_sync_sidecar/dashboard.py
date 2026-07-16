@@ -1553,6 +1553,36 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #f3f5f8;
     }
     button:hover { border-color: #aeb7c6; }
+    .status-strip {
+      display: grid;
+      grid-template-columns: 1.2fr repeat(4, minmax(100px, .7fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .status-chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff;
+      min-width: 0;
+    }
+    .status-chip.primary {
+      border-color: #e8d29c;
+      background: #fffdf7;
+    }
+    .status-chip-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .status-chip-value {
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 820;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
     .operator-band {
       display: grid;
       grid-template-columns: minmax(320px, 1.35fr) minmax(240px, .65fr);
@@ -2323,6 +2353,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 860px) {
       header { align-items: flex-start; flex-direction: column; }
       .operator-band { grid-template-columns: 1fr; }
+      .status-strip { grid-template-columns: 1fr 1fr; }
       .decision-console { grid-template-columns: 1fr; }
       .decision-boundary { grid-column: auto; }
       .scope-list { grid-template-columns: 1fr; }
@@ -2340,6 +2371,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
+      .status-strip { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
@@ -2357,11 +2389,33 @@ DASHBOARD_HTML = r"""<!doctype html>
     </div>
     <div class="toolbar">
       <span id="updated">Loading</span>
-      <button id="refresh" type="button" title="Refresh status">Refresh</button>
+      <button id="refresh" type="button" title="刷新状态">刷新</button>
     </div>
   </header>
   <main>
     <div id="error" class="error"></div>
+    <section class="status-strip" aria-label="同步状态摘要">
+      <div class="status-chip primary">
+        <div class="status-chip-label">当前状态</div>
+        <div id="strip-health" class="status-chip-value">读取中</div>
+      </div>
+      <div class="status-chip">
+        <div class="status-chip-label">待审批</div>
+        <div id="strip-blocked" class="status-chip-value">-</div>
+      </div>
+      <div class="status-chip">
+        <div class="status-chip-label">本机 skill</div>
+        <div id="strip-local" class="status-chip-value">-</div>
+      </div>
+      <div class="status-chip">
+        <div class="status-chip-label">中央 skill</div>
+        <div id="strip-central" class="status-chip-value">-</div>
+      </div>
+      <div class="status-chip">
+        <div class="status-chip-label">设备</div>
+        <div id="strip-devices" class="status-chip-value">-</div>
+      </div>
+    </section>
     <section class="decision-console">
       <div id="operator-panel" class="panel decision-status">
         <div class="section-label">当前结论</div>
@@ -2626,6 +2680,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
       renderOperatorBrief(dashboard, snapshot);
       renderActionGuide(operator.action_guide || {});
+      renderStatusStrip(dashboard, health);
       renderWorkbench(dashboard);
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-path").textContent = "本机可以扫描和预检；中央仓库只接收确认后的推送；OpenClaw 等其他设备默认只读观察。";
@@ -2702,6 +2757,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (health === "yellow") return "需要审核";
       if (health === "red") return "需要处理";
       return "未知";
+    }
+
+    function renderStatusStrip(dashboard, health) {
+      const local = dashboard.local_workspace || {};
+      const central = dashboard.central_repository || {};
+      const map = dashboard.device_map || {};
+      const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
+      $("strip-health").textContent = operatorVerdict(health);
+      $("strip-blocked").textContent = text(dashboard.blocked);
+      $("strip-local").textContent = text(local.total_skills);
+      $("strip-central").textContent = text(central.total_skills);
+      $("strip-devices").textContent = text(deviceCount);
     }
 
     function statusLabel(value) {
