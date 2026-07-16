@@ -456,6 +456,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"operator-panel\"", DASHBOARD_HTML)
             self.assertIn("当前结论", DASHBOARD_HTML)
             self.assertIn("下一步", DASHBOARD_HTML)
+            self.assertIn("执行细节", DASHBOARD_HTML)
+            self.assertIn("guide-details", DASHBOARD_HTML)
             self.assertIn("id=\"review-queue-panel\"", DASHBOARD_HTML)
             self.assertIn("待审批清单", DASHBOARD_HTML)
             self.assertIn("需要你判断", DASHBOARD_HTML)

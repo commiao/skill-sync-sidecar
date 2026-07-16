@@ -933,12 +933,13 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         }
     if health == "yellow" and openclaw_push_items:
         skill_ids = _operator_skill_ids(openclaw_push_items)
+        skill_hint = f"（{'、'.join(skill_ids)}）" if len(skill_ids) <= 2 else "（见下方列表）"
         dry_run = _approved_push_batch_command(skill_ids)
         publish = _approved_push_batch_command(skill_ids, yes=True)
         return {
             "state": "yellow",
             "title": "现在需要人工审核",
-            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更（{', '.join(skill_ids)}），sidecar 已阻止自动上传；先运行 approved-push dry-run 审核，避免误覆盖 WebDAV。",
+            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动上传；先 approved-push dry-run 审核，确认安全后再推送到中央仓库。",
             "steps": [
                 {
                     "title": "先检查，不上传",
@@ -2028,6 +2029,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
+    .guide-details {
+      margin-top: 10px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .guide-details > summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 750;
+    }
     .guide-step {
       display: grid;
       grid-template-columns: 24px minmax(0, 1fr);
@@ -2438,7 +2450,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div id="action-guide-summary" class="guide-summary"></div>
         <div id="action-guide-skills" class="guide-skills"></div>
-        <ol id="action-guide-steps" class="guide-steps"></ol>
         <div id="action-guide-note" class="guide-note"></div>
         <div id="executor-panel" class="executor-panel" hidden>
           <div class="panel-head">
@@ -2453,6 +2464,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
           <pre id="executor-output" class="executor-output mono"></pre>
         </div>
+        <details class="guide-details">
+          <summary>执行细节</summary>
+          <ol id="action-guide-steps" class="guide-steps"></ol>
+        </details>
       </section>
       <div class="panel decision-boundary">
         <h2>权限边界</h2>
