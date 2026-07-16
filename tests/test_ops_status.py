@@ -489,6 +489,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("reviewActionText", DASHBOARD_HTML)
             self.assertIn("查看 dry-run 命令", DASHBOARD_HTML)
             self.assertIn("review-more", DASHBOARD_HTML)
+            self.assertIn("items.slice(0, 4)", DASHBOARD_HTML)
+            self.assertIn(".review-item > div:nth-child(2)", DASHBOARD_HTML)
             self.assertIn("完整明细见下方高级诊断", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)

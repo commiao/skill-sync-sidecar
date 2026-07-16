@@ -2541,6 +2541,33 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-strip .status-chip:nth-child(5) {
         display: none;
       }
+      .review-queue-summary {
+        font-size: 12px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+      }
+      .review-list {
+        gap: 4px;
+      }
+      .review-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 8px 10px;
+      }
+      .review-source,
+      .review-action {
+        display: none;
+      }
+      .review-item > div:nth-child(2) {
+        grid-column: 1 / -1;
+      }
+      .review-command {
+        margin-top: 0;
+      }
+      .review-more {
+        padding: 7px 10px;
+        font-size: 12px;
+      }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
@@ -3094,7 +3121,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"} 有 ${items.length} 个变更等待确认。先 dry-run，看清楚再决定是否推送到中央仓库。`;
-      const visibleItems = items.slice(0, 3);
+      const visibleItems = items.slice(0, 4);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
         const command = item.operator_command || "";
