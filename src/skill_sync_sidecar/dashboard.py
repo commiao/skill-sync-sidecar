@@ -2120,7 +2120,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workbench-grid {
       display: grid;
-      grid-template-columns: minmax(360px, 1.35fr) minmax(230px, .72fr) minmax(260px, .88fr);
+      grid-template-columns: minmax(340px, 1.2fr) minmax(280px, .9fr) minmax(260px, .9fr);
       gap: 12px;
       margin: 12px 0 0;
     }
@@ -2266,11 +2266,18 @@ DASHBOARD_HTML = r"""<!doctype html>
     .device-map-item .card-head {
       margin-bottom: 6px;
     }
+    .device-map-item .card-name {
+      font-size: 14px;
+    }
+    .device-map-item .card-kind {
+      display: none;
+    }
     .device-map-meta {
       display: grid;
-      gap: 4px;
+      gap: 2px;
       color: var(--muted);
       font-size: 12px;
+      line-height: 1.35;
     }
     .readonly-kicker {
       color: var(--muted);
