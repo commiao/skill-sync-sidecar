@@ -1496,6 +1496,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--ink);
       font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    .portal-link {
+      display: inline-block;
+      margin: 10px 24px 0;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
     header {
       display: flex;
       align-items: center;
@@ -1580,6 +1587,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    #operator-path {
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    #operator-snapshot {
+      margin-top: 8px;
+      color: var(--muted);
+    }
     .operator-brief {
       display: none;
       gap: 6px;
@@ -1624,6 +1640,23 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .operator-band .panel:first-child {
       border-left: 4px solid #d8a300;
+    }
+    .scope-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .scope-line {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .scope-line strong {
+      color: var(--ink);
+      font-size: 12px;
     }
     .metric-label {
       color: var(--muted);
@@ -1867,7 +1900,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     .action-guide.red { border-color: #efb8b8; background: #fffafa; }
     .guide-summary {
       color: var(--ink);
-      font-weight: 650;
+      font-weight: 700;
+      font-size: 16px;
       margin-bottom: 8px;
       overflow-wrap: anywhere;
     }
@@ -1886,14 +1920,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 0;
       margin: 12px 0 0;
       display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
     .guide-step {
       display: grid;
-      grid-template-columns: 28px minmax(0, 1fr);
+      grid-template-columns: 24px minmax(0, 1fr);
       gap: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--line);
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
     }
     .step-index {
       width: 24px;
@@ -1915,6 +1952,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     .step-detail {
       color: var(--muted);
       overflow-wrap: anywhere;
+    }
+    .command-detail {
+      margin-top: 8px;
+    }
+    .command-detail summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
     }
     .command-row {
       display: grid;
@@ -1969,9 +2015,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workbench-grid {
       display: grid;
-      grid-template-columns: minmax(280px, 1.15fr) minmax(260px, 0.85fr);
+      grid-template-columns: minmax(360px, 1.45fr) minmax(260px, .75fr);
       gap: 12px;
       margin-bottom: 16px;
+    }
+    .local-workspace-panel {
+      border-left: 4px solid var(--blue);
+      background: #fbfdff;
+    }
+    .workspace-eyebrow {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
     }
     .workbench-full {
       grid-column: 1 / -1;
@@ -2003,22 +2059,58 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #fff;
       border-color: var(--ink);
     }
-    .workspace-tools {
+    .workspace-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
+      margin: 12px 0;
+    }
+    .workspace-metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: #fff;
+      min-width: 0;
+    }
+    .workspace-metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+    .workspace-metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+    .workspace-tools {
+      display: grid;
+      gap: 6px;
       margin-top: 10px;
     }
     .workspace-tool {
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 9px;
+      border-radius: 6px;
+      padding: 8px 10px;
       min-width: 0;
       background: #fff;
     }
+    .workspace-tool-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .workspace-tool-name {
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .workspace-tool-count {
+      font-weight: 800;
+    }
     .device-map-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
     }
     .device-map-item {
@@ -2027,6 +2119,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 10px;
       background: #fff;
       min-width: 0;
+    }
+    .device-map-meta {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .readonly-kicker {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
     }
     .boundary-note {
       color: var(--muted);
@@ -2108,7 +2212,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
-      .workspace-tools { grid-template-columns: 1fr 1fr; }
+      .guide-steps { grid-template-columns: 1fr; }
+      .workspace-metrics { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -2118,13 +2223,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
       .command-row { grid-template-columns: 1fr; }
-      .workspace-tools { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <a href="http://100.123.208.32:17172/portal" style="display:inline-block;margin:.6rem 0;font-size:13px;color:var(--muted,#647084);text-decoration:none">← 报表门户</a>
+  <a class="portal-link" href="http://100.123.208.32:17172/portal">← 报表门户</a>
   <header>
     <div class="brand">
       <h1>Skill 同步工作台</h1>
@@ -2148,6 +2252,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         <h2>权限边界</h2>
         <div id="operator-path" class="operator-text mono">-</div>
         <div id="operator-snapshot" class="operator-text mono">-</div>
+        <div class="scope-list">
+          <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
+          <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
+          <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
+        </div>
       </div>
     </section>
     <section id="action-guide" class="action-guide panel" hidden>
@@ -2174,12 +2283,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <section class="workbench-grid">
-      <div class="panel">
+      <div class="panel local-workspace-panel">
+        <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
         <div class="workspace-title">
           <h2>本地 Skill 工作区</h2>
           <span id="local-workspace-pill" class="pill">checking</span>
         </div>
         <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+        <div class="workspace-metrics">
+          <div class="workspace-metric">
+            <div id="local-workspace-total" class="workspace-metric-value">-</div>
+            <div class="workspace-metric-label">本机 skill</div>
+          </div>
+          <div class="workspace-metric">
+            <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
+            <div class="workspace-metric-label">本机待处理</div>
+          </div>
+          <div class="workspace-metric">
+            <div id="local-workspace-source" class="workspace-metric-value">-</div>
+            <div class="workspace-metric-label">数据来源</div>
+          </div>
+        </div>
         <div class="workspace-actions">
           <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
           <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
@@ -2189,6 +2313,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="local-workspace-boundary" class="boundary-note"></div>
       </div>
       <div class="panel">
+        <div class="readonly-kicker">只读状态 · 不直接编辑</div>
         <div class="workspace-title">
           <h2>中央仓库</h2>
           <span id="central-repository-pill" class="pill">readonly</span>
@@ -2198,6 +2323,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="central-repository-boundary" class="boundary-note"></div>
       </div>
       <div class="panel workbench-full">
+        <div class="readonly-kicker">设备实测 · 只读观察</div>
         <div class="workspace-title">
           <h2>设备地图</h2>
           <span class="pill">read-only</span>
@@ -2359,8 +2485,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderActionGuide(operator.action_guide || {});
       renderWorkbench(dashboard);
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
-      $("operator-path").textContent = operator.sync_path || "-";
-      $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
+      $("operator-path").textContent = "本机可以扫描和预检；中央仓库只接收确认后的推送；OpenClaw 等其他设备默认只读观察。";
+      $("operator-snapshot").textContent = `当前中央版本：${text(operator.snapshot_id)}`;
       $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
       $("allowed").textContent = text(plan.allowed);
       $("remote-total").textContent = text(snapshot.total);
@@ -2428,10 +2554,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function operatorVerdict(health) {
-      if (health === "green") return "GREEN - NO ACTION";
-      if (health === "yellow") return "YELLOW - REVIEW NEEDED";
-      if (health === "red") return "RED - ACTION REQUIRED";
-      return "UNKNOWN";
+      if (health === "green") return "正常";
+      if (health === "yellow") return "需要审核";
+      if (health === "red") return "需要处理";
+      return "未知";
     }
 
     function renderOperatorBrief(dashboard, snapshot) {
@@ -2502,10 +2628,13 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="step-title">${escapeHtml(text(step.title))}</div>
               <div class="step-detail">${escapeHtml(text(step.detail))}</div>
               ${command ? `
-                <div class="command-row">
-                  <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
-                  <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
-                </div>
+                <details class="command-detail">
+                  <summary>查看命令</summary>
+                  <div class="command-row">
+                    <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
+                    <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
+                  </div>
+                </details>
               ` : ""}
             </div>
           </li>
@@ -2666,22 +2795,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       const live = localWorkspaceFromExecutor || {};
       const tools = Array.isArray(live.tools) ? live.tools : (Array.isArray(workspace.tools) ? workspace.tools : []);
       const total = live.total_skills ?? workspace.total_skills;
+      const blocked = live.blocked ?? workspace.blocked;
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `本机可操作区：${text(workspace.device_name || live.device_name || "Mac 本机")}，skill 总数 ${text(total)}，blocked=${text(workspace.blocked)}。${text(workspace.remote_blocked_note)}`;
+      $("local-workspace-summary").textContent = `这里是唯一可直接操作的区域。扫描、预检、发布都只针对 ${text(workspace.device_name || live.device_name || "Mac 本机")}；其他设备不会被远程改动。`;
+      $("local-workspace-total").textContent = text(total);
+      $("local-workspace-blocked").textContent = text(blocked);
+      $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
       $("local-workspace-tools").innerHTML = tools.map((tool) => `
         <div class="workspace-tool">
-          <div class="card-head">
-            <div>
-              <div class="card-name">${escapeHtml(text(tool.name))}</div>
-              <div class="card-kind">${escapeHtml(text(tool.role || tool.state))}</div>
-            </div>
+          <div class="workspace-tool-row">
+            <div class="workspace-tool-name">${escapeHtml(text(tool.name))}</div>
+            <div class="workspace-tool-count">${escapeHtml(text(tool.skills))}</div>
             ${toolStatePill(tool)}
-          </div>
-          <div class="mini-label mono">${escapeHtml(text(tool.path))}</div>
-          <div class="card-stats">
-            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
-            <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk || {}))}</div></div>
           </div>
         </div>
       `).join("");
@@ -2712,12 +2838,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             ${pill(device.health || device.operation_scope, deviceKind(device.health))}
           </div>
-          <div class="card-note">${escapeHtml(text(device.note))}</div>
-          <div class="card-stats">
-            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(device.skills))}</div></div>
-            <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
-            <div class="mini-stat"><div class="mini-label">权限</div><div class="mini-value">${escapeHtml(text(device.operation_scope))}</div></div>
-            <div class="mini-stat"><div class="mini-label">新鲜度</div><div class="mini-value">${freshnessPill(device.freshness)}</div></div>
+          <div class="device-map-meta">
+            <div>技能 ${escapeHtml(text(device.skills))} · 待处理 ${escapeHtml(text(device.blocked))}</div>
+            <div>权限 ${escapeHtml(text(device.operation_scope))} · ${freshnessPill(device.freshness)}</div>
           </div>
         </div>
       `).join("");
