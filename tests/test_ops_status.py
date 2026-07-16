@@ -452,7 +452,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"strip-health\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-blocked\"", DASHBOARD_HTML)
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
+            self.assertIn("scope-switchboard", DASHBOARD_HTML)
+            self.assertIn("Skill 同步分区", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-local-count\"", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-central-count\"", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-device-count\"", DASHBOARD_HTML)
+            self.assertIn("renderScopeSwitchboard", DASHBOARD_HTML)
+            self.assertIn("授权发现本机目录", DASHBOARD_HTML)
             self.assertIn("decision-console", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
+                DASHBOARD_HTML.index("<section class=\"decision-console\""),
+            )
             self.assertIn("id=\"operator-panel\"", DASHBOARD_HTML)
             self.assertIn("当前结论", DASHBOARD_HTML)
             self.assertIn("下一步", DASHBOARD_HTML)

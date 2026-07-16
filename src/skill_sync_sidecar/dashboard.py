@@ -1592,6 +1592,56 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 12px;
       margin-bottom: 12px;
     }
+    .scope-switchboard {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.2fr) minmax(240px, .9fr) minmax(240px, .9fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .scope-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px 16px;
+      min-width: 0;
+    }
+    .scope-card.local {
+      border-left: 4px solid var(--blue);
+      background: #fafdff;
+    }
+    .scope-card.readonly {
+      background: #fbfcfe;
+    }
+    .scope-card h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .scope-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .scope-card-count {
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 820;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .scope-card-note {
+      color: var(--muted);
+      min-height: 38px;
+      overflow-wrap: anywhere;
+    }
+    .scope-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
     .decision-console {
       display: grid;
       grid-template-columns: minmax(280px, .75fr) minmax(420px, 1.25fr);
@@ -2437,6 +2487,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       header { align-items: flex-start; flex-direction: column; }
       .operator-band { grid-template-columns: 1fr; }
       .status-strip { grid-template-columns: 1fr 1fr; }
+      .scope-switchboard { grid-template-columns: 1fr; }
       .decision-console { grid-template-columns: 1fr; }
       .decision-boundary { grid-column: auto; }
       .scope-list { grid-template-columns: 1fr; }
@@ -2455,6 +2506,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 560px) {
       main { padding: 14px; }
       .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .scope-card { padding: 12px; }
+      .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
       .status-chip.primary { grid-column: 1 / -1; }
       .status-band { grid-template-columns: 1fr; }
@@ -2508,6 +2561,36 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="status-chip">
         <div class="status-chip-label">设备</div>
         <div id="strip-devices" class="status-chip-value">-</div>
+      </div>
+    </section>
+    <section class="scope-switchboard" aria-label="Skill 同步分区">
+      <div class="scope-card local">
+        <div class="scope-card-head">
+          <h2>本机 Skill 工作区</h2>
+          <span class="pill green">可操作</span>
+        </div>
+        <div id="scope-local-count" class="scope-card-count">-</div>
+        <div id="scope-local-note" class="scope-card-note">只扫描和处理当前浏览器所在设备。</div>
+        <div class="scope-card-actions">
+          <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+          <button type="button" onclick="runExecutorAction('dry_run')">预检待推送</button>
+        </div>
+      </div>
+      <div class="scope-card readonly">
+        <div class="scope-card-head">
+          <h2>中央仓库</h2>
+          <span class="pill">read-only</span>
+        </div>
+        <div id="scope-central-count" class="scope-card-count">-</div>
+        <div id="scope-central-note" class="scope-card-note">WebDAV canonical snapshot，只接受显式 approved push。</div>
+      </div>
+      <div class="scope-card readonly">
+        <div class="scope-card-head">
+          <h2>其他设备</h2>
+          <span class="pill">read-only</span>
+        </div>
+        <div id="scope-device-count" class="scope-card-count">-</div>
+        <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
       </div>
     </section>
     <section class="decision-console">
@@ -2784,6 +2867,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderOperatorBrief(dashboard, snapshot);
       renderActionGuide(operator.action_guide || {});
       renderStatusStrip(dashboard, health);
+      renderScopeSwitchboard(dashboard);
       renderWorkbench(dashboard);
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-path").textContent = "本机可操作；中央只接收显式推送；其他设备只读。";
@@ -2872,6 +2956,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
+    }
+
+    function renderScopeSwitchboard(dashboard) {
+      const local = dashboard.local_workspace || {};
+      const central = dashboard.central_repository || {};
+      const map = dashboard.device_map || {};
+      const items = Array.isArray(map.items) ? map.items : [];
+      $("scope-local-count").textContent = `${text(local.total_skills)} 个本机 skill`;
+      $("scope-central-count").textContent = `${text(central.total_skills)} 个中央 skill`;
+      $("scope-device-count").textContent = `${text(items.length)} 台设备`;
+      $("scope-local-note").textContent = "授权发现本机目录是管理本机 skill 的必要能力；扫描、预检、推送都只针对当前设备。";
+      $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要显式审批。`;
+      $("scope-device-note").textContent = "其他设备只展示各自 Agent 上报的实测状态，Gateway 不远程改设备。";
     }
 
     function statusLabel(value) {
