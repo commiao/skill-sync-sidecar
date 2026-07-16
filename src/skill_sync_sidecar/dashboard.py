@@ -2422,12 +2422,20 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
-      .status-strip { grid-template-columns: 1fr; }
+      .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .status-chip { padding: 8px 10px; }
+      .status-chip.primary { grid-column: 1 / -1; }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
       .command-row { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr; }
+      .decision-boundary > summary {
+        grid-template-columns: 1fr auto;
+      }
+      .decision-boundary > summary .boundary-title {
+        grid-column: 1 / -1;
+      }
     }
   </style>
 </head>
@@ -2743,7 +2751,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderStatusStrip(dashboard, health);
       renderWorkbench(dashboard);
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
-      $("operator-path").textContent = "本机可以扫描和预检；中央仓库只接收确认后的推送；OpenClaw 等其他设备默认只读观察。";
+      $("operator-path").textContent = "本机可操作；中央只接收显式推送；其他设备只读。";
       $("operator-snapshot").textContent = `当前中央版本：${text(operator.snapshot_id)}`;
       $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
       $("allowed").textContent = text(plan.allowed);
