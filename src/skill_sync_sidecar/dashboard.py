@@ -1601,7 +1601,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       border-left: 4px solid var(--muted);
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
     }
     .decision-status.green { border-left-color: var(--green); background: #fbfffd; }
     .decision-status.yellow { border-left-color: #d8a300; background: #fff; }
@@ -2422,17 +2422,60 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="strip-devices" class="status-chip-value">-</div>
       </div>
     </section>
+    <section class="decision-console">
+      <div id="operator-panel" class="panel decision-status">
+        <div class="section-label">当前结论</div>
+        <div id="operator-headline" class="operator-title">读取同步状态中</div>
+        <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
+        <div id="operator-brief" class="operator-brief"></div>
+        <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
+      </div>
+      <section id="action-guide" class="action-guide panel decision-next" hidden>
+        <div class="section-label">下一步</div>
+        <div class="panel-head">
+          <h2 id="action-guide-title">现在怎么做</h2>
+          <span id="action-guide-state" class="pill">unknown</span>
+        </div>
+        <div id="action-guide-summary" class="guide-summary"></div>
+        <div id="action-guide-skills" class="guide-skills"></div>
+        <ol id="action-guide-steps" class="guide-steps"></ol>
+        <div id="action-guide-note" class="guide-note"></div>
+        <div id="executor-panel" class="executor-panel" hidden>
+          <div class="panel-head">
+            <h2>本机执行器</h2>
+            <span id="executor-pill" class="pill">checking</span>
+          </div>
+          <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
+          <div class="executor-actions">
+            <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
+            <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
+            <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+          </div>
+          <pre id="executor-output" class="executor-output mono"></pre>
+        </div>
+      </section>
+      <div class="panel decision-boundary">
+        <h2>权限边界</h2>
+        <div id="operator-path" class="operator-text mono">-</div>
+        <div id="operator-snapshot" class="operator-text mono">-</div>
+        <div class="scope-list">
+          <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
+          <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
+          <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
+        </div>
+      </div>
+    </section>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
-          <strong id="workspace-overview-title">本机 Skill 工作区</strong>
+          <strong id="workspace-overview-title">本机操作区</strong>
           <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
         </span>
         <span class="pill green">本机优先</span>
       </div>
       <section class="workbench-grid">
         <div class="panel local-workspace-panel">
-          <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
+          <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
           <div class="workspace-title">
             <h2>本地 Skill 工作区</h2>
             <span id="local-workspace-pill" class="pill">checking</span>
@@ -2481,49 +2524,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="device-map" class="device-map-grid"></div>
         </div>
       </section>
-    </section>
-    <section class="decision-console">
-      <div id="operator-panel" class="panel decision-status">
-        <div class="section-label">当前结论</div>
-        <div id="operator-headline" class="operator-title">读取同步状态中</div>
-        <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
-        <div id="operator-brief" class="operator-brief"></div>
-        <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
-      </div>
-      <section id="action-guide" class="action-guide panel decision-next" hidden>
-        <div class="section-label">下一步</div>
-        <div class="panel-head">
-          <h2 id="action-guide-title">现在怎么做</h2>
-          <span id="action-guide-state" class="pill">unknown</span>
-        </div>
-        <div id="action-guide-summary" class="guide-summary"></div>
-        <div id="action-guide-skills" class="guide-skills"></div>
-        <ol id="action-guide-steps" class="guide-steps"></ol>
-        <div id="action-guide-note" class="guide-note"></div>
-        <div id="executor-panel" class="executor-panel" hidden>
-          <div class="panel-head">
-            <h2>本机执行器</h2>
-            <span id="executor-pill" class="pill">checking</span>
-          </div>
-          <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
-          <div class="executor-actions">
-            <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-            <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
-            <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
-          </div>
-          <pre id="executor-output" class="executor-output mono"></pre>
-        </div>
-      </section>
-      <div class="panel decision-boundary">
-        <h2>权限边界</h2>
-        <div id="operator-path" class="operator-text mono">-</div>
-        <div id="operator-snapshot" class="operator-text mono">-</div>
-        <div class="scope-list">
-          <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
-          <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
-          <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
-        </div>
-      </div>
     </section>
     <section id="review-queue-panel" class="review-queue panel" hidden>
       <div class="panel-head">
