@@ -1559,8 +1559,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 12px;
       margin-bottom: 12px;
     }
+    .decision-console {
+      display: grid;
+      grid-template-columns: minmax(280px, .75fr) minmax(420px, 1.25fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .decision-status {
+      border-left: 4px solid var(--muted);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .decision-status.green { border-left-color: var(--green); background: #fbfffd; }
+    .decision-status.yellow { border-left-color: #d8a300; background: #fffdf7; }
+    .decision-status.red { border-left-color: var(--red); background: #fffafa; }
+    .decision-next {
+      margin-bottom: 0;
+    }
+    .decision-boundary {
+      grid-column: 1 / -1;
+      padding: 12px 16px;
+      background: #fbfcfe;
+    }
+    .section-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
     .operator-title {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 720;
       margin-bottom: 8px;
     }
@@ -1638,17 +1667,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 16px;
       min-width: 0;
     }
-    .operator-band .panel:first-child {
-      border-left: 4px solid #d8a300;
-    }
     .scope-list {
       display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
       margin-top: 10px;
     }
     .scope-line {
       display: grid;
-      grid-template-columns: 72px minmax(0, 1fr);
+      grid-template-columns: 44px minmax(0, 1fr);
       gap: 10px;
       align-items: start;
       color: var(--muted);
@@ -1920,7 +1947,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 0;
       margin: 12px 0 0;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
     .guide-step {
@@ -2206,6 +2233,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 860px) {
       header { align-items: flex-start; flex-direction: column; }
       .operator-band { grid-template-columns: 1fr; }
+      .decision-console { grid-template-columns: 1fr; }
+      .decision-boundary { grid-column: auto; }
+      .scope-list { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .workbench-grid { grid-template-columns: 1fr; }
@@ -2241,14 +2271,39 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
   <main>
     <div id="error" class="error"></div>
-    <section class="operator-band">
-      <div class="panel">
+    <section class="decision-console">
+      <div id="operator-panel" class="panel decision-status">
+        <div class="section-label">当前结论</div>
         <div id="operator-headline" class="operator-title">读取同步状态中</div>
         <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
         <div id="operator-brief" class="operator-brief"></div>
         <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
       </div>
-      <div class="panel">
+      <section id="action-guide" class="action-guide panel decision-next" hidden>
+        <div class="section-label">下一步</div>
+        <div class="panel-head">
+          <h2 id="action-guide-title">现在怎么做</h2>
+          <span id="action-guide-state" class="pill">unknown</span>
+        </div>
+        <div id="action-guide-summary" class="guide-summary"></div>
+        <div id="action-guide-skills" class="guide-skills"></div>
+        <ol id="action-guide-steps" class="guide-steps"></ol>
+        <div id="action-guide-note" class="guide-note"></div>
+        <div id="executor-panel" class="executor-panel" hidden>
+          <div class="panel-head">
+            <h2>本机执行器</h2>
+            <span id="executor-pill" class="pill">checking</span>
+          </div>
+          <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
+          <div class="executor-actions">
+            <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
+            <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
+            <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+          </div>
+          <pre id="executor-output" class="executor-output mono"></pre>
+        </div>
+      </section>
+      <div class="panel decision-boundary">
         <h2>权限边界</h2>
         <div id="operator-path" class="operator-text mono">-</div>
         <div id="operator-snapshot" class="operator-text mono">-</div>
@@ -2257,29 +2312,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
           <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
         </div>
-      </div>
-    </section>
-    <section id="action-guide" class="action-guide panel" hidden>
-      <div class="panel-head">
-        <h2 id="action-guide-title">现在怎么做</h2>
-        <span id="action-guide-state" class="pill">unknown</span>
-      </div>
-      <div id="action-guide-summary" class="guide-summary"></div>
-      <div id="action-guide-skills" class="guide-skills"></div>
-      <ol id="action-guide-steps" class="guide-steps"></ol>
-      <div id="action-guide-note" class="guide-note"></div>
-      <div id="executor-panel" class="executor-panel" hidden>
-        <div class="panel-head">
-          <h2>本机执行器</h2>
-          <span id="executor-pill" class="pill">checking</span>
-        </div>
-        <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
-        <div class="executor-actions">
-          <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-          <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
-          <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
-        </div>
-        <pre id="executor-output" class="executor-output mono"></pre>
       </div>
     </section>
     <section class="workbench-grid">
@@ -2459,10 +2491,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .replaceAll('"', "&quot;");
 
     function nextAction(status) {
-      if (status.health === "green") return "No review-required sync work.";
-      if (status.health === "yellow") return "Review blocked queue or OpenClaw gate before publishing.";
-      if (status.health === "red") return "Fix unreadable artifacts or status errors.";
-      return "Status unavailable.";
+      if (status.health === "green") return "当前没有需要审核的同步项。";
+      if (status.health === "yellow") return "先处理待审批队列，再决定是否发布到中央仓库。";
+      if (status.health === "red") return "先修复状态文件、WebDAV 或 sidecar 进程异常。";
+      return "状态暂不可读。";
     }
 
     function render(status) {
@@ -2479,6 +2511,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("health").textContent = health;
       $("next-action").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-headline").textContent = operator.headline || "同步状态未知";
+      $("operator-panel").className = `panel decision-status ${deviceKind(health)}`;
       $("operator-verdict").textContent = operatorVerdict(health);
       $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
       renderOperatorBrief(dashboard, snapshot);
@@ -2560,6 +2593,25 @@ DASHBOARD_HTML = r"""<!doctype html>
       return "未知";
     }
 
+    function statusLabel(value) {
+      if (value === "green") return "正常";
+      if (value === "yellow") return "需要审核";
+      if (value === "red") return "需要处理";
+      if (value === "local") return "本机可操作";
+      if (value === "read_only") return "只读";
+      if (value === "remote_read_only") return "远端只读";
+      if (value === "planned") return "待接入";
+      return text(value || "未知");
+    }
+
+    function scopeLabel(value) {
+      if (value === "local") return "本机可操作";
+      if (value === "read_only") return "只读聚合";
+      if (value === "remote_read_only") return "远端只读";
+      if (value === "planned") return "待接入";
+      return text(value || "未知");
+    }
+
     function renderOperatorBrief(dashboard, snapshot) {
       const operator = dashboard.operator || {};
       const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
@@ -2610,9 +2662,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       panel.hidden = false;
       const state = guide.state || "unknown";
-      panel.className = `action-guide panel ${deviceKind(state)}`;
+      panel.className = `action-guide panel decision-next ${deviceKind(state)}`;
       $("action-guide-title").textContent = guide.title || "现在怎么做";
-      $("action-guide-state").outerHTML = pill(state, deviceKind(state)).replace("<span", "<span id=\"action-guide-state\"");
+      $("action-guide-state").outerHTML = pill(statusLabel(state), deviceKind(state)).replace("<span", "<span id=\"action-guide-state\"");
       $("action-guide-summary").textContent = guide.summary || "";
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
       currentGuideSkills = skills;
@@ -2815,13 +2867,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderCentralRepository(repo) {
-      $("central-repository-pill").outerHTML = pill(repo.role || "WebDAV", "green").replace("<span", "<span id=\"central-repository-pill\"");
-      $("central-repository-summary").textContent = `共享事实源：${text(repo.snapshot_id)}，收录 ${text(repo.total_skills)} 个 skill，待审批 ${text(repo.blocked)}。`;
+      $("central-repository-pill").outerHTML = pill("WebDAV 快照", "green").replace("<span", "<span id=\"central-repository-pill\"");
+      $("central-repository-summary").textContent = `共享事实源收录 ${text(repo.total_skills)} 个 skill；当前 ${text(repo.blocked)} 个变更需要显式审批。`;
       $("central-repository-kv").innerHTML = [
-        row("snapshot", repo.snapshot_id),
-        row("created_at", repo.created_at),
-        row("protocol", repo.protocol_version),
-        row("targeted_projection", repo.targeted_projection_total),
+        row("中央版本", repo.snapshot_id),
+        row("更新时间", repo.created_at),
+        row("协议版本", repo.protocol_version),
+        row("目标覆盖", repo.targeted_projection_total),
       ].join("");
       $("central-repository-boundary").textContent = repo.boundary || "中央仓库只接受显式 approved push。";
     }
@@ -2836,11 +2888,11 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="card-name">${escapeHtml(text(device.name))}</div>
               <div class="card-kind">${escapeHtml(text(device.capability))}</div>
             </div>
-            ${pill(device.health || device.operation_scope, deviceKind(device.health))}
+            ${pill(statusLabel(device.health || device.operation_scope), deviceKind(device.health))}
           </div>
           <div class="device-map-meta">
             <div>技能 ${escapeHtml(text(device.skills))} · 待处理 ${escapeHtml(text(device.blocked))}</div>
-            <div>权限 ${escapeHtml(text(device.operation_scope))} · ${freshnessPill(device.freshness)}</div>
+            <div>权限 ${escapeHtml(scopeLabel(device.operation_scope))} · ${freshnessPill(device.freshness)}</div>
           </div>
         </div>
       `).join("");
@@ -2989,11 +3041,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function toolStatePill(tool) {
-      if (tool.state === "observer") return pill("observed", "green");
-      if (tool.state === "error") return pill("error", "red");
-      if (tool.state === "detected" || tool.installed === true) return pill("detected", "green");
-      if (tool.state === "unsupported") return pill("unsupported", "");
-      if (tool.installed === false) return pill("not found", "");
+      if (tool.state === "observer") return pill("已上报", "green");
+      if (tool.state === "error") return pill("异常", "red");
+      if (tool.state === "detected" || tool.installed === true) return pill("已发现", "green");
+      if (tool.state === "unsupported") return pill("暂不支持", "");
+      if (tool.installed === false) return pill("未发现", "");
       return pill(text(tool.state || "unknown"), "");
     }
 
