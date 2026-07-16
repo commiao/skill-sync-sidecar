@@ -2089,7 +2089,52 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: grid;
       grid-template-columns: minmax(360px, 1.45fr) minmax(260px, .75fr);
       gap: 12px;
+      margin: 12px 0 0;
+    }
+    .workspace-overview {
       margin-bottom: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .workspace-overview > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 760;
+    }
+    .workspace-overview > summary::-webkit-details-marker {
+      display: none;
+    }
+    .workspace-overview > summary::after {
+      content: "展开";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .workspace-overview[open] > summary {
+      border-bottom: 1px solid var(--line);
+      background: #fafbfd;
+    }
+    .workspace-overview[open] > summary::after {
+      content: "收起";
+    }
+    .overview-title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .overview-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
     }
     .local-workspace-panel {
       border-left: 4px solid var(--blue);
@@ -2371,56 +2416,64 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="review-queue-summary" class="review-queue-summary"></div>
       <div id="review-queue" class="review-list"></div>
     </section>
-    <section class="workbench-grid">
-      <div class="panel local-workspace-panel">
-        <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
-        <div class="workspace-title">
-          <h2>本地 Skill 工作区</h2>
-          <span id="local-workspace-pill" class="pill">checking</span>
-        </div>
-        <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
-        <div class="workspace-metrics">
-          <div class="workspace-metric">
-            <div id="local-workspace-total" class="workspace-metric-value">-</div>
-            <div class="workspace-metric-label">本机 skill</div>
+    <details class="workspace-overview">
+      <summary>
+        <span class="overview-title">
+          <span>本地 / 中央 / 设备概览</span>
+          <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
+        </span>
+      </summary>
+      <section class="workbench-grid">
+        <div class="panel local-workspace-panel">
+          <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
+          <div class="workspace-title">
+            <h2>本地 Skill 工作区</h2>
+            <span id="local-workspace-pill" class="pill">checking</span>
           </div>
-          <div class="workspace-metric">
-            <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
-            <div class="workspace-metric-label">本机待处理</div>
+          <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+          <div class="workspace-metrics">
+            <div class="workspace-metric">
+              <div id="local-workspace-total" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机 skill</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机待处理</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-source" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">数据来源</div>
+            </div>
           </div>
-          <div class="workspace-metric">
-            <div id="local-workspace-source" class="workspace-metric-value">-</div>
-            <div class="workspace-metric-label">数据来源</div>
+          <div class="workspace-actions">
+            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
           </div>
+          <div id="local-workspace-tools" class="workspace-tools"></div>
+          <div id="local-workspace-boundary" class="boundary-note"></div>
         </div>
-        <div class="workspace-actions">
-          <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-          <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+        <div class="panel">
+          <div class="readonly-kicker">只读状态 · 不直接编辑</div>
+          <div class="workspace-title">
+            <h2>中央仓库</h2>
+            <span id="central-repository-pill" class="pill">readonly</span>
+          </div>
+          <div id="central-repository-summary" class="workspace-subtitle"></div>
+          <div id="central-repository-kv" class="kv"></div>
+          <div id="central-repository-boundary" class="boundary-note"></div>
         </div>
-        <div id="local-workspace-tools" class="workspace-tools"></div>
-        <div id="local-workspace-boundary" class="boundary-note"></div>
-      </div>
-      <div class="panel">
-        <div class="readonly-kicker">只读状态 · 不直接编辑</div>
-        <div class="workspace-title">
-          <h2>中央仓库</h2>
-          <span id="central-repository-pill" class="pill">readonly</span>
+        <div class="panel workbench-full">
+          <div class="readonly-kicker">设备实测 · 只读观察</div>
+          <div class="workspace-title">
+            <h2>设备地图</h2>
+            <span class="pill">read-only</span>
+          </div>
+          <div id="device-map-summary" class="workspace-subtitle"></div>
+          <div id="device-map" class="device-map-grid"></div>
         </div>
-        <div id="central-repository-summary" class="workspace-subtitle"></div>
-        <div id="central-repository-kv" class="kv"></div>
-        <div id="central-repository-boundary" class="boundary-note"></div>
-      </div>
-      <div class="panel workbench-full">
-        <div class="readonly-kicker">设备实测 · 只读观察</div>
-        <div class="workspace-title">
-          <h2>设备地图</h2>
-          <span class="pill">read-only</span>
-        </div>
-        <div id="device-map-summary" class="workspace-subtitle"></div>
-        <div id="device-map" class="device-map-grid"></div>
-      </div>
-    </section>
+      </section>
+    </details>
     <details class="advanced-diagnostics">
       <summary>高级诊断：状态、设备、工具、队列明细</summary>
       <div class="advanced-body">
@@ -2948,9 +3001,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderLocalWorkspace(dashboard.local_workspace || {});
       renderCentralRepository(dashboard.central_repository || {});
       renderDeviceMap(dashboard.device_map || {});
+      renderWorkspaceOverviewSummary(dashboard);
       if (!executorAvailable) {
         checkExecutor();
       }
+    }
+
+    function renderWorkspaceOverviewSummary(dashboard) {
+      const local = dashboard.local_workspace || {};
+      const central = dashboard.central_repository || {};
+      const map = dashboard.device_map || {};
+      const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
+      $("workspace-overview-summary").textContent = `本机 ${text(local.total_skills)} · 中央 ${text(central.total_skills)} · 设备 ${text(deviceCount)}；展开查看背景状态`;
     }
 
     function renderLocalWorkspace(workspace) {
