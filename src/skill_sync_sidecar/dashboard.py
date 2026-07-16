@@ -1478,11 +1478,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f7fa;
+      --bg: #f7f9fc;
       --panel: #ffffff;
       --ink: #172033;
       --muted: #667085;
-      --line: #d7dde7;
+      --line: #dde4ee;
       --green: #147d50;
       --yellow: #9a6700;
       --red: #c63232;
@@ -1498,7 +1498,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .portal-link {
       display: inline-block;
-      margin: 10px 24px 0;
+      margin: 10px 24px 0 max(24px, calc((100vw - 1120px) / 2 + 24px));
       font-size: 13px;
       color: var(--muted);
       text-decoration: none;
@@ -1508,7 +1508,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 14px 24px;
+      padding: 14px max(24px, calc((100vw - 1120px) / 2 + 24px));
       border-bottom: 1px solid var(--line);
       background: #fff;
     }
@@ -1529,7 +1529,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     main {
       max-width: 1120px;
       margin: 0 auto;
-      padding: 18px 24px 32px;
+      padding: 16px 24px 32px;
     }
     .toolbar {
       display: flex;
@@ -1543,8 +1543,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #fff;
       color: var(--ink);
       border-radius: 6px;
-      padding: 7px 11px;
+      padding: 7px 12px;
       font: inherit;
+      font-weight: 650;
       cursor: pointer;
     }
     button:disabled {
@@ -1556,7 +1557,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .status-strip {
       display: grid;
       grid-template-columns: 1.2fr repeat(4, minmax(100px, .7fr));
-      gap: 8px;
+      gap: 10px;
       margin-bottom: 12px;
     }
     .status-chip {
@@ -1567,8 +1568,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-width: 0;
     }
     .status-chip.primary {
-      border-color: #e8d29c;
-      background: #fffdf7;
+      border-left: 4px solid #d8a300;
+      padding-left: 10px;
+      background: #fff;
     }
     .status-chip-label {
       color: var(--muted);
@@ -1602,7 +1604,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       justify-content: center;
     }
     .decision-status.green { border-left-color: var(--green); background: #fbfffd; }
-    .decision-status.yellow { border-left-color: #d8a300; background: #fffdf7; }
+    .decision-status.yellow { border-left-color: #d8a300; background: #fff; }
     .decision-status.red { border-left-color: var(--red); background: #fffafa; }
     .decision-next {
       margin-bottom: 0;
@@ -1610,7 +1612,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .decision-boundary {
       grid-column: 1 / -1;
       padding: 12px 16px;
-      background: #fbfcfe;
+      background: #fff;
     }
     .section-label {
       color: var(--muted);
@@ -1951,6 +1953,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .review-queue {
       margin-bottom: 12px;
+      border-left: 4px solid #d8a300;
     }
     .review-queue-summary {
       color: var(--muted);
@@ -1959,7 +1962,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .review-list {
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
     .review-item {
       display: grid;
@@ -1969,7 +1972,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px 12px;
-      background: #fff;
+      background: #fbfcfe;
       min-width: 0;
     }
     .review-skill {
@@ -1998,7 +2001,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-bottom: 12px;
     }
     .action-guide.green { border-color: #b8d8c8; background: #fbfffd; }
-    .action-guide.yellow { border-color: #e8d29c; background: #fffdf7; }
+    .action-guide.yellow { border-color: #e8d29c; background: #fff; }
     .action-guide.red { border-color: #efb8b8; background: #fffafa; }
     .guide-summary {
       color: var(--ink);
@@ -2032,7 +2035,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fff;
+      background: #fbfcfe;
     }
     .step-index {
       width: 24px;
@@ -2122,43 +2125,29 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 12px 0 0;
     }
     .workspace-overview {
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
       overflow: hidden;
     }
-    .workspace-overview > summary {
-      cursor: pointer;
-      list-style: none;
-      padding: 13px 16px;
+    .workspace-overview-head {
+      padding: 14px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      font-weight: 760;
-    }
-    .workspace-overview > summary::-webkit-details-marker {
-      display: none;
-    }
-    .workspace-overview > summary::after {
-      content: "展开";
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      flex: 0 0 auto;
-    }
-    .workspace-overview[open] > summary {
       border-bottom: 1px solid var(--line);
-      background: #fafbfd;
-    }
-    .workspace-overview[open] > summary::after {
-      content: "收起";
+      background: #fbfcfe;
     }
     .overview-title {
       display: grid;
       gap: 2px;
       min-width: 0;
+    }
+    .overview-title strong {
+      font-size: 15px;
+      font-weight: 820;
     }
     .overview-subtitle {
       color: var(--muted);
@@ -2168,7 +2157,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .local-workspace-panel {
       border-left: 4px solid var(--blue);
-      background: #fbfdff;
+      background: #fafdff;
     }
     .workspace-eyebrow {
       color: var(--blue);
@@ -2205,6 +2194,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: var(--ink);
       color: #fff;
       border-color: var(--ink);
+    }
+    .local-action-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin: -4px 0 10px;
+      overflow-wrap: anywhere;
     }
     .workspace-metrics {
       display: grid;
@@ -2416,6 +2411,66 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="strip-devices" class="status-chip-value">-</div>
       </div>
     </section>
+    <section class="workspace-overview" aria-labelledby="workspace-overview-title">
+      <div class="workspace-overview-head">
+        <span class="overview-title">
+          <strong id="workspace-overview-title">本机 Skill 工作区</strong>
+          <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
+        </span>
+        <span class="pill green">本机优先</span>
+      </div>
+      <section class="workbench-grid">
+        <div class="panel local-workspace-panel">
+          <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
+          <div class="workspace-title">
+            <h2>本地 Skill 工作区</h2>
+            <span id="local-workspace-pill" class="pill">checking</span>
+          </div>
+          <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+          <div class="workspace-metrics">
+            <div class="workspace-metric">
+              <div id="local-workspace-total" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机 skill</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机待处理</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-source" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">数据来源</div>
+            </div>
+          </div>
+          <div class="workspace-actions">
+            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+          </div>
+          <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
+          <div id="local-workspace-tools" class="workspace-tools"></div>
+          <div id="local-workspace-boundary" class="boundary-note"></div>
+        </div>
+        <div class="panel">
+          <div class="readonly-kicker">只读状态 · 不直接编辑</div>
+          <div class="workspace-title">
+            <h2>中央仓库</h2>
+            <span id="central-repository-pill" class="pill">readonly</span>
+          </div>
+          <div id="central-repository-summary" class="workspace-subtitle"></div>
+          <div id="central-repository-kv" class="kv"></div>
+          <div id="central-repository-boundary" class="boundary-note"></div>
+        </div>
+        <div class="panel workbench-full">
+          <div class="readonly-kicker">设备实测 · 只读观察</div>
+          <div class="workspace-title">
+            <h2>设备地图</h2>
+            <span class="pill">read-only</span>
+          </div>
+          <div id="device-map-summary" class="workspace-subtitle"></div>
+          <div id="device-map" class="device-map-grid"></div>
+        </div>
+      </section>
+    </section>
     <section class="decision-console">
       <div id="operator-panel" class="panel decision-status">
         <div class="section-label">当前结论</div>
@@ -2470,64 +2525,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="review-queue-summary" class="review-queue-summary"></div>
       <div id="review-queue" class="review-list"></div>
     </section>
-    <details class="workspace-overview">
-      <summary>
-        <span class="overview-title">
-          <span>本地 / 中央 / 设备概览</span>
-          <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
-        </span>
-      </summary>
-      <section class="workbench-grid">
-        <div class="panel local-workspace-panel">
-          <div class="workspace-eyebrow">主操作区 · 只影响当前设备</div>
-          <div class="workspace-title">
-            <h2>本地 Skill 工作区</h2>
-            <span id="local-workspace-pill" class="pill">checking</span>
-          </div>
-          <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
-          <div class="workspace-metrics">
-            <div class="workspace-metric">
-              <div id="local-workspace-total" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机 skill</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机待处理</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-source" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">数据来源</div>
-            </div>
-          </div>
-          <div class="workspace-actions">
-            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
-          </div>
-          <div id="local-workspace-tools" class="workspace-tools"></div>
-          <div id="local-workspace-boundary" class="boundary-note"></div>
-        </div>
-        <div class="panel">
-          <div class="readonly-kicker">只读状态 · 不直接编辑</div>
-          <div class="workspace-title">
-            <h2>中央仓库</h2>
-            <span id="central-repository-pill" class="pill">readonly</span>
-          </div>
-          <div id="central-repository-summary" class="workspace-subtitle"></div>
-          <div id="central-repository-kv" class="kv"></div>
-          <div id="central-repository-boundary" class="boundary-note"></div>
-        </div>
-        <div class="panel workbench-full">
-          <div class="readonly-kicker">设备实测 · 只读观察</div>
-          <div class="workspace-title">
-            <h2>设备地图</h2>
-            <span class="pill">read-only</span>
-          </div>
-          <div id="device-map-summary" class="workspace-subtitle"></div>
-          <div id="device-map" class="device-map-grid"></div>
-        </div>
-      </section>
-    </details>
     <details class="advanced-diagnostics">
       <summary>高级诊断：状态、设备、工具、队列明细</summary>
       <div class="advanced-body">
@@ -2991,6 +2988,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setExecutorStatus(label, detail, kind) {
       $("executor-pill").outerHTML = pill(label, kind).replace("<span", "<span id=\"executor-pill\"");
       $("executor-status").textContent = detail;
+      const localNote = $("local-workspace-action-note");
+      if (localNote) localNote.textContent = detail;
     }
 
     function setExecutorButtons(available) {
@@ -3079,7 +3078,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `本机 ${text(local.total_skills)} · 中央 ${text(central.total_skills)} · 设备 ${text(deviceCount)}；展开查看背景状态`;
+      $("workspace-overview-summary").textContent = `本机可扫描和预检；中央 ${text(central.total_skills)} 个 skill；${text(deviceCount)} 台设备只读上报`;
     }
 
     function renderLocalWorkspace(workspace) {
