@@ -1998,6 +1998,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: grid;
       gap: 6px;
     }
+    .review-more {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--muted);
+      background: #fff;
+      font-weight: 700;
+    }
     .review-item {
       display: grid;
       grid-template-columns: minmax(180px, .9fr) minmax(0, 1.4fr) auto;
@@ -2486,7 +2494,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="strip-health" class="status-chip-value">读取中</div>
       </div>
       <div class="status-chip">
-        <div class="status-chip-label">待审批</div>
+        <div class="status-chip-label">待你处理</div>
         <div id="strip-blocked" class="status-chip-value">-</div>
       </div>
       <div class="status-chip">
@@ -2552,19 +2560,30 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </details>
     </section>
+    <section id="review-queue-panel" class="review-queue panel" hidden>
+      <div class="panel-head">
+        <div>
+          <div class="section-label">需要你判断</div>
+          <h2>待审批清单</h2>
+        </div>
+        <span id="review-queue-count" class="pill">0</span>
+      </div>
+      <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-queue" class="review-list"></div>
+    </section>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
-          <strong id="workspace-overview-title">本机操作区</strong>
+          <strong id="workspace-overview-title">Skill 管理工作台</strong>
           <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
         </span>
-        <span class="pill green">本机优先</span>
+        <span class="pill green">只操作本机</span>
       </div>
       <section class="workbench-grid">
         <div class="panel local-workspace-panel">
           <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
           <div class="workspace-title">
-            <h2>本地 Skill 工作区</h2>
+            <h2>本机 Skill 工作区</h2>
             <span id="local-workspace-pill" class="pill">checking</span>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
@@ -2594,7 +2613,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="panel">
           <div class="readonly-kicker">只读状态 · 不直接编辑</div>
           <div class="workspace-title">
-            <h2>中央仓库</h2>
+            <h2>中央仓库状态</h2>
             <span id="central-repository-pill" class="pill">readonly</span>
           </div>
           <div id="central-repository-summary" class="workspace-subtitle"></div>
@@ -2604,24 +2623,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="panel workbench-full">
           <div class="readonly-kicker">设备实测 · 只读观察</div>
           <div class="workspace-title">
-            <h2>设备地图</h2>
+            <h2>其他设备状态</h2>
             <span class="pill">read-only</span>
           </div>
           <div id="device-map-summary" class="workspace-subtitle"></div>
           <div id="device-map" class="device-map-grid"></div>
         </div>
       </section>
-    </section>
-    <section id="review-queue-panel" class="review-queue panel" hidden>
-      <div class="panel-head">
-        <div>
-          <div class="section-label">需要你判断</div>
-          <h2>待审批清单</h2>
-        </div>
-        <span id="review-queue-count" class="pill">0</span>
-      </div>
-      <div id="review-queue-summary" class="review-queue-summary"></div>
-      <div id="review-queue" class="review-list"></div>
     </section>
     <details class="advanced-diagnostics">
       <summary>高级诊断：状态、设备、工具、队列明细</summary>
@@ -2937,7 +2945,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"} 有 ${items.length} 个变更等待确认。先 dry-run，看清楚再决定是否推送到中央仓库。`;
-      $("review-queue").innerHTML = items.map((item) => {
+      const visibleItems = items.slice(0, 3);
+      const hiddenCount = items.length - visibleItems.length;
+      const rows = visibleItems.map((item) => {
         const command = item.operator_command || "";
         return `
           <div class="review-item">
@@ -2961,6 +2971,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         `;
       }).join("");
+      const more = hiddenCount > 0
+        ? `<div class="review-more">还有 ${hiddenCount} 项，完整明细见下方高级诊断。</div>`
+        : "";
+      $("review-queue").innerHTML = `${rows}${more}`;
     }
 
     function reviewActionText(item) {
@@ -3187,7 +3201,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `本机可扫描和预检；中央 ${text(central.total_skills)} 个 skill；${text(deviceCount)} 台设备只读上报`;
+      $("workspace-overview-summary").textContent = `左侧管理本机 skill；中央 ${text(central.total_skills)} 个 skill 只读展示；${text(deviceCount)} 台设备只读上报`;
     }
 
     function renderLocalWorkspace(workspace) {
