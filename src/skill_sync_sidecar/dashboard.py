@@ -1612,8 +1612,41 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .decision-boundary {
       grid-column: 1 / -1;
-      padding: 12px 16px;
+      padding: 0;
       background: #fff;
+    }
+    .decision-boundary > summary {
+      cursor: pointer;
+      list-style: none;
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+    }
+    .decision-boundary > summary::-webkit-details-marker {
+      display: none;
+    }
+    .decision-boundary > summary::after {
+      content: "展开";
+      justify-self: end;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      grid-column: 3;
+    }
+    .decision-boundary[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .decision-boundary[open] > summary::after {
+      content: "收起";
+    }
+    .boundary-title {
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .boundary-body {
+      padding: 10px 14px 12px;
     }
     .section-label {
       color: var(--muted);
@@ -2469,16 +2502,20 @@ DASHBOARD_HTML = r"""<!doctype html>
           <ol id="action-guide-steps" class="guide-steps"></ol>
         </details>
       </section>
-      <div class="panel decision-boundary">
-        <h2>权限边界</h2>
-        <div id="operator-path" class="operator-text mono">-</div>
-        <div id="operator-snapshot" class="operator-text mono">-</div>
-        <div class="scope-list">
-          <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
-          <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
-          <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
+      <details class="panel decision-boundary">
+        <summary>
+          <span class="boundary-title">安全边界</span>
+          <span id="operator-path" class="operator-text">-</span>
+        </summary>
+        <div class="boundary-body">
+          <div id="operator-snapshot" class="operator-text mono">-</div>
+          <div class="scope-list">
+            <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
+            <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
+            <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
+          </div>
         </div>
-      </div>
+      </details>
     </section>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
