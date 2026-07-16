@@ -2431,10 +2431,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       .command-row { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr; }
       .decision-boundary > summary {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
       }
       .decision-boundary > summary .boundary-title {
-        grid-column: 1 / -1;
+        grid-column: auto;
+      }
+      #operator-path {
+        display: none;
       }
     }
   </style>
