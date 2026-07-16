@@ -452,6 +452,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"local-workspace-tools\"", DASHBOARD_HTML)
             self.assertIn("id=\"central-repository-kv\"", DASHBOARD_HTML)
             self.assertIn("id=\"device-map\"", DASHBOARD_HTML)
+            self.assertIn("<details class=\"advanced-diagnostics\">", DASHBOARD_HTML)
+            self.assertIn("高级诊断：状态、设备、工具、队列明细", DASHBOARD_HTML)
             self.assertIn("refreshLocalWorkspace", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"planned-devices\"", DASHBOARD_HTML)

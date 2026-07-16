@@ -1478,29 +1478,30 @@ DASHBOARD_HTML = r"""<!doctype html>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8fa;
+      --bg: #f5f7fa;
       --panel: #ffffff;
-      --ink: #1d2433;
-      --muted: #647084;
-      --line: #d8dde6;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d7dde7;
       --green: #147d50;
       --yellow: #9a6700;
       --red: #c63232;
       --blue: #2557a7;
+      --soft: #eef2f7;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       background: var(--bg);
       color: var(--ink);
-      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 18px 24px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--line);
       background: #fff;
     }
@@ -1511,9 +1512,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       letter-spacing: 0;
     }
     main {
-      max-width: 1180px;
+      max-width: 1120px;
       margin: 0 auto;
-      padding: 20px 24px 32px;
+      padding: 18px 24px 32px;
     }
     .toolbar {
       display: flex;
@@ -1539,14 +1540,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     button:hover { border-color: #aeb7c6; }
     .operator-band {
       display: grid;
-      grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+      grid-template-columns: minmax(320px, 1.35fr) minmax(240px, .65fr);
       gap: 12px;
-      margin-bottom: 18px;
+      margin-bottom: 12px;
     }
     .operator-title {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 720;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .operator-verdict {
       display: inline-flex;
@@ -1572,7 +1573,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
     }
     .operator-brief {
-      display: grid;
+      display: none;
       gap: 6px;
       margin: 10px 0;
       color: var(--muted);
@@ -1610,8 +1611,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 14px;
+      padding: 16px;
       min-width: 0;
+    }
+    .operator-band .panel:first-child {
+      border-left: 4px solid #d8a300;
     }
     .metric-label {
       color: var(--muted);
@@ -1848,7 +1852,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
     }
     .action-guide {
-      margin-bottom: 18px;
+      margin-bottom: 12px;
     }
     .action-guide.green { border-color: #b8d8c8; background: #fbfffd; }
     .action-guide.yellow { border-color: #e8d29c; background: #fffdf7; }
@@ -1959,7 +1963,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: grid;
       grid-template-columns: minmax(280px, 1.15fr) minmax(260px, 0.85fr);
       gap: 12px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
     .workbench-full {
       grid-column: 1 / -1;
@@ -1973,6 +1977,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workspace-title h2 {
       margin: 0;
+      font-size: 15px;
     }
     .workspace-subtitle {
       color: var(--muted);
@@ -1992,7 +1997,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workspace-tools {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
       margin-top: 10px;
     }
@@ -2021,6 +2026,41 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding-top: 9px;
       margin-top: 10px;
       overflow-wrap: anywhere;
+    }
+    .advanced-diagnostics {
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .advanced-diagnostics > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 13px 16px;
+      font-weight: 720;
+      color: var(--ink);
+      background: #fafbfd;
+      border-bottom: 1px solid transparent;
+    }
+    .advanced-diagnostics[open] > summary {
+      border-bottom-color: var(--line);
+    }
+    .advanced-diagnostics > summary::-webkit-details-marker {
+      display: none;
+    }
+    .advanced-diagnostics > summary::after {
+      content: "展开";
+      float: right;
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 12px;
+    }
+    .advanced-diagnostics[open] > summary::after {
+      content: "收起";
+    }
+    .advanced-body {
+      padding: 16px;
     }
     .pill {
       display: inline-flex;
@@ -2060,6 +2100,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
+      .workspace-tools { grid-template-columns: 1fr 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -2154,6 +2195,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="device-map" class="device-map-grid"></div>
       </div>
     </section>
+    <details class="advanced-diagnostics">
+      <summary>高级诊断：状态、设备、工具、队列明细</summary>
+      <div class="advanced-body">
     <section class="status-band">
       <div id="health-card" class="panel health">
         <span class="dot"></span>
@@ -2252,6 +2296,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
+      </div>
+    </details>
   </main>
   <script>
     const $ = (id) => document.getElementById(id);
