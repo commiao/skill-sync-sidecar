@@ -460,6 +460,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("boundary-title", DASHBOARD_HTML)
             self.assertIn("执行细节", DASHBOARD_HTML)
             self.assertIn("guide-details", DASHBOARD_HTML)
+            self.assertIn("renderSkillChips", DASHBOARD_HTML)
+            self.assertIn("skill-chip-row", DASHBOARD_HTML)
             self.assertIn("id=\"review-queue-panel\"", DASHBOARD_HTML)
             self.assertIn("待审批清单", DASHBOARD_HTML)
             self.assertIn("需要你判断", DASHBOARD_HTML)

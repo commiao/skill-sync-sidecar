@@ -2054,6 +2054,30 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 8px 0 12px;
       overflow-wrap: anywhere;
     }
+    .skill-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .skill-chip {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #f7f9fc;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .skill-more {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
     .guide-steps {
       list-style: none;
       padding: 0;
@@ -2970,7 +2994,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
       currentGuideSkills = skills;
       lastDryRunSafe = false;
-      $("action-guide-skills").textContent = skills.length ? `涉及 skill：${skills.join("、")}` : "";
+      $("action-guide-skills").innerHTML = renderSkillChips(skills);
       const steps = Array.isArray(guide.steps) ? guide.steps : [];
       $("action-guide-steps").innerHTML = steps.map((step, index) => {
         const command = step.command || "";
@@ -2995,6 +3019,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       }).join("");
       $("action-guide-note").textContent = guide.note || "";
       renderExecutorPanel(guide);
+    }
+
+    function renderSkillChips(skills) {
+      if (!Array.isArray(skills) || skills.length === 0) return "";
+      const visible = skills.slice(0, 3);
+      const hidden = skills.length - visible.length;
+      const chips = visible
+        .map((skill) => `<span class="skill-chip">${escapeHtml(text(skill))}</span>`)
+        .join("");
+      const more = hidden > 0 ? `<span class="skill-more">另 ${hidden} 个，见待审批清单</span>` : "";
+      return `<div class="skill-chip-row" aria-label="涉及 skill">${chips}${more}</div>`;
     }
 
     async function copyCommand(button) {
