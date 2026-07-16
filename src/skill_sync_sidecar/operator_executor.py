@@ -10,6 +10,8 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Optional, Sequence
 
+from .tool_status import build_device_tool_status
+
 
 SKILL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -123,6 +125,29 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         "repo_root": str(repo),
                         "allow_publish": allow_publish,
                         "time": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                return
+            if path == "/api/local-workspace":
+                tools = build_device_tool_status()
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "device_id": "mac",
+                        "device_name": "Mac 本机",
+                        "scope": "local",
+                        "authority": "本机 executor 只读取本机 skill 目录；默认只允许 dry-run，不默认发布。",
+                        "allow_publish": allow_publish,
+                        "measured_at": datetime.now(timezone.utc).isoformat(),
+                        "tools": tools,
+                        "total_skills": sum(int(tool.get("skills") or 0) for tool in tools),
+                        "operations": {
+                            "scan_local": True,
+                            "dry_run": True,
+                            "publish_to_central": allow_publish,
+                            "operate_other_devices": False,
+                        },
                     },
                 )
                 return

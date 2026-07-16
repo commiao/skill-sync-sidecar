@@ -232,6 +232,8 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     hub_import = _safe_hub_import_diagnosis()
     local_tools = build_device_tool_status()
     planned_devices = _planned_device_overview()
+    device_tools = _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers})
+    tool_projection = _merge_tool_projection(local_tools, projection)
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
@@ -239,10 +241,13 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         "blocked_items": blocked_items,
         "devices": devices,
         "planned_devices": planned_devices,
-        "tools": _merge_tool_projection(local_tools, projection),
-        "device_tools": _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers}),
+        "tools": tool_projection,
+        "device_tools": device_tools,
         "tool_projection": projection,
         "hub_import": hub_import,
+        "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
+        "central_repository": _central_repository_model(status, snapshot=status.get("remote_snapshot"), tools=tool_projection, blocked_items=blocked_items),
+        "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
     }
     return status
 
@@ -307,6 +312,8 @@ def build_gateway_status(
     projection = _safe_tool_projection(snapshot_dir)
     hub_import = _safe_hub_import_diagnosis()
     planned_devices = _planned_device_overview()
+    tools = _gateway_tool_overview(projection)
+    device_tools = _device_tool_overview(devices, peers)
     status["dashboard"] = {
         "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
         "blocked": len(blocked_items),
@@ -314,10 +321,13 @@ def build_gateway_status(
         "blocked_items": blocked_items,
         "devices": devices,
         "planned_devices": planned_devices,
-        "tools": _gateway_tool_overview(projection),
-        "device_tools": _device_tool_overview(devices, peers),
+        "tools": tools,
+        "device_tools": device_tools,
         "tool_projection": projection,
         "hub_import": hub_import,
+        "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
+        "central_repository": _central_repository_model(status, snapshot=snapshot, tools=tools, blocked_items=blocked_items),
+        "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
     }
     return status
 
@@ -395,6 +405,9 @@ def build_dashboard_summary(status: dict) -> dict:
             "planned_devices": dashboard.get("planned_devices", []),
             "tools": dashboard.get("tools", []),
             "device_tools": dashboard.get("device_tools", []),
+            "local_workspace": dashboard.get("local_workspace", {}),
+            "central_repository": dashboard.get("central_repository", {}),
+            "device_map": dashboard.get("device_map", {}),
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
         },
     }
@@ -1037,6 +1050,116 @@ def _is_openclaw_writer_policy_push(item: dict) -> bool:
         return True
     reason = str(item.get("reason") or "")
     return "push" in reason
+
+
+def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocked_items: list[dict]) -> dict:
+    mac = _find_device(devices, "mac")
+    mac_tools = _find_device_tool_group(device_tools, "mac")
+    tools = mac_tools.get("tools") if isinstance(mac_tools.get("tools"), list) else []
+    mac_blocked = [item for item in blocked_items if item.get("peer_id") == "mac"]
+    remote_blocked = [item for item in blocked_items if item.get("peer_id") != "mac"]
+    reported = bool(mac_tools.get("reported"))
+    return {
+        "title": "本地 Skill 工作区",
+        "scope": "local",
+        "device_id": "mac",
+        "device_name": mac.get("name") or "Mac 本机",
+        "health": mac.get("health") or "unknown",
+        "reported": reported,
+        "freshness": mac_tools.get("freshness") or mac.get("freshness") or _freshness_info(None),
+        "tools": tools,
+        "total_skills": sum(int(tool.get("skills") or 0) for tool in tools if isinstance(tool, dict)),
+        "blocked": len(mac_blocked),
+        "operations": {
+            "scan_local": True,
+            "dry_run": True,
+            "publish_to_central": len(mac_blocked) > 0,
+            "operate_other_devices": False,
+        },
+        "primary_action": "连接本机执行器后可实时扫描本机 skill，并对本机变更做 dry-run。",
+        "boundary": "这里默认只操作浏览器所在 Mac；其他设备只读展示，除非该设备自己的 Agent 暴露受控操作。",
+        "remote_blocked_note": f"当前另有 {len(remote_blocked)} 个非本机待审批项，放在设备地图里处理。",
+    }
+
+
+def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: list[dict], blocked_items: list[dict]) -> dict:
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    projection_total = sum(int((tool.get("projection") or {}).get("canonical_targeted") or 0) for tool in tools if isinstance(tool, dict))
+    return {
+        "title": "中央仓库",
+        "scope": "central",
+        "role": "WebDAV canonical snapshot",
+        "health": "green" if snapshot.get("snapshot_id") else "unknown",
+        "snapshot_id": snapshot.get("snapshot_id"),
+        "created_at": snapshot.get("created_at"),
+        "total_skills": snapshot.get("total"),
+        "protocol_version": snapshot.get("protocol_version"),
+        "targeted_projection_total": projection_total,
+        "blocked": len(blocked_items),
+        "operations": {
+            "read_snapshot": True,
+            "accept_approved_push": True,
+            "direct_edit": False,
+            "operate_devices": False,
+        },
+        "boundary": "中央仓库是共享事实源；面板只展示它的状态，写入只能来自本机或设备 Agent 的显式 approved push。",
+    }
+
+
+def _device_map_model(devices: list[dict], planned_devices: list[dict], device_tools: list[dict], blocked_items: list[dict]) -> dict:
+    device_tool_by_id = {str(group.get("device_id")): group for group in device_tools if isinstance(group, dict)}
+    items = []
+    for device in devices + planned_devices:
+        device_id = str(device.get("id") or "")
+        if not device_id:
+            continue
+        group = device_tool_by_id.get(device_id, {})
+        blocked = [item for item in blocked_items if item.get("peer_id") == device_id or (device_id == "oc-vps" and item.get("peer_id") == "openclaw")]
+        if device_id == "mac":
+            capability = "本机可操作"
+            operation_scope = "local"
+        elif device_id == "gateway":
+            capability = "只读聚合"
+            operation_scope = "read_only"
+        elif device_id in {"oc-vps", "openclaw"}:
+            capability = "远端只读观察"
+            operation_scope = "remote_read_only"
+        elif device_id == "win":
+            capability = "未接入"
+            operation_scope = "planned"
+        else:
+            capability = "只读观察"
+            operation_scope = "remote_read_only"
+        items.append(
+            {
+                "id": device_id,
+                "name": device.get("name") or device_id,
+                "kind": device.get("kind"),
+                "health": device.get("health"),
+                "skills": device.get("skills"),
+                "blocked": len(blocked) if blocked else device.get("blocked"),
+                "policy": device.get("policy"),
+                "freshness": group.get("freshness") or device.get("freshness") or _freshness_info(None),
+                "reported": group.get("reported", False),
+                "tool_count": len(group.get("tools") or []) if isinstance(group.get("tools"), list) else 0,
+                "capability": capability,
+                "operation_scope": operation_scope,
+                "note": device.get("note"),
+            }
+        )
+    return {
+        "title": "设备地图",
+        "scope": "devices",
+        "items": items,
+        "boundary": "设备地图用于观察其他设备真实状态；默认不跨设备执行写操作。",
+    }
+
+
+def _find_device_tool_group(device_tools: list[dict], device_id: str) -> dict:
+    for group in device_tools:
+        if group.get("device_id") == device_id:
+            return group
+    return {}
 
 
 def _find_device(devices: list[dict], device_id: str) -> dict:
@@ -1832,6 +1955,73 @@ DASHBOARD_HTML = r"""<!doctype html>
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    .workbench-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.15fr) minmax(260px, 0.85fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .workbench-full {
+      grid-column: 1 / -1;
+    }
+    .workspace-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .workspace-title h2 {
+      margin: 0;
+    }
+    .workspace-subtitle {
+      color: var(--muted);
+      margin-bottom: 10px;
+      overflow-wrap: anywhere;
+    }
+    .workspace-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .workspace-actions button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .workspace-tools {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .workspace-tool {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      min-width: 0;
+      background: #fff;
+    }
+    .device-map-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .device-map-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      min-width: 0;
+    }
+    .boundary-note {
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 9px;
+      margin-top: 10px;
+      overflow-wrap: anywhere;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -1866,8 +2056,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .operator-band { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
+      .workbench-grid { grid-template-columns: 1fr; }
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
+      .device-map-grid { grid-template-columns: 1fr 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -1877,6 +2069,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
       .command-row { grid-template-columns: 1fr; }
+      .workspace-tools { grid-template-columns: 1fr; }
+      .device-map-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1925,6 +2119,39 @@ DASHBOARD_HTML = r"""<!doctype html>
           <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
         </div>
         <pre id="executor-output" class="executor-output mono"></pre>
+      </div>
+    </section>
+    <section class="workbench-grid">
+      <div class="panel">
+        <div class="workspace-title">
+          <h2>本地 Skill 工作区</h2>
+          <span id="local-workspace-pill" class="pill">checking</span>
+        </div>
+        <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+        <div class="workspace-actions">
+          <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+          <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+          <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+        </div>
+        <div id="local-workspace-tools" class="workspace-tools"></div>
+        <div id="local-workspace-boundary" class="boundary-note"></div>
+      </div>
+      <div class="panel">
+        <div class="workspace-title">
+          <h2>中央仓库</h2>
+          <span id="central-repository-pill" class="pill">readonly</span>
+        </div>
+        <div id="central-repository-summary" class="workspace-subtitle"></div>
+        <div id="central-repository-kv" class="kv"></div>
+        <div id="central-repository-boundary" class="boundary-note"></div>
+      </div>
+      <div class="panel workbench-full">
+        <div class="workspace-title">
+          <h2>设备地图</h2>
+          <span class="pill">read-only</span>
+        </div>
+        <div id="device-map-summary" class="workspace-subtitle"></div>
+        <div id="device-map" class="device-map-grid"></div>
       </div>
     </section>
     <section class="status-band">
@@ -2033,6 +2260,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorAvailable = false;
     let executorAllowPublish = false;
     let lastDryRunSafe = false;
+    let localWorkspaceFromExecutor = null;
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -2057,6 +2285,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function render(status) {
       $("error").style.display = "none";
       const dashboard = status.dashboard || {};
+      window.lastDashboard = dashboard;
       const operator = dashboard.operator || {};
       const health = dashboard.health || status.health || "unknown";
       const plan = status.sync_plan || {};
@@ -2071,6 +2300,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
       renderOperatorBrief(dashboard, snapshot);
       renderActionGuide(operator.action_guide || {});
+      renderWorkbench(dashboard);
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-path").textContent = operator.sync_path || "-";
       $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
@@ -2270,6 +2500,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             "green",
           );
           setExecutorButtons(true);
+          refreshLocalWorkspace();
         } else {
           setExecutorOffline();
         }
@@ -2297,6 +2528,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setExecutorButtons(available) {
       $("executor-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("executor-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
+      $("local-workspace-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
     }
 
     async function runExecutorAction(mode) {
@@ -2361,6 +2594,96 @@ DASHBOARD_HTML = r"""<!doctype html>
     function showExecutorOutput(value) {
       $("executor-output").style.display = "block";
       $("executor-output").textContent = value;
+    }
+
+    function renderWorkbench(dashboard) {
+      renderLocalWorkspace(dashboard.local_workspace || {});
+      renderCentralRepository(dashboard.central_repository || {});
+      renderDeviceMap(dashboard.device_map || {});
+      if (!executorAvailable) {
+        checkExecutor();
+      }
+    }
+
+    function renderLocalWorkspace(workspace) {
+      const live = localWorkspaceFromExecutor || {};
+      const tools = Array.isArray(live.tools) ? live.tools : (Array.isArray(workspace.tools) ? workspace.tools : []);
+      const total = live.total_skills ?? workspace.total_skills;
+      const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
+      $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
+      $("local-workspace-summary").textContent = `本机可操作区：${text(workspace.device_name || live.device_name || "Mac 本机")}，skill 总数 ${text(total)}，blocked=${text(workspace.blocked)}。${text(workspace.remote_blocked_note)}`;
+      $("local-workspace-tools").innerHTML = tools.map((tool) => `
+        <div class="workspace-tool">
+          <div class="card-head">
+            <div>
+              <div class="card-name">${escapeHtml(text(tool.name))}</div>
+              <div class="card-kind">${escapeHtml(text(tool.role || tool.state))}</div>
+            </div>
+            ${toolStatePill(tool)}
+          </div>
+          <div class="mini-label mono">${escapeHtml(text(tool.path))}</div>
+          <div class="card-stats">
+            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
+            <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk || {}))}</div></div>
+          </div>
+        </div>
+      `).join("");
+      $("local-workspace-boundary").textContent = workspace.boundary || "本地工作区只操作浏览器所在设备。";
+    }
+
+    function renderCentralRepository(repo) {
+      $("central-repository-pill").outerHTML = pill(repo.role || "WebDAV", "green").replace("<span", "<span id=\"central-repository-pill\"");
+      $("central-repository-summary").textContent = `共享事实源：${text(repo.snapshot_id)}，收录 ${text(repo.total_skills)} 个 skill，待审批 ${text(repo.blocked)}。`;
+      $("central-repository-kv").innerHTML = [
+        row("snapshot", repo.snapshot_id),
+        row("created_at", repo.created_at),
+        row("protocol", repo.protocol_version),
+        row("targeted_projection", repo.targeted_projection_total),
+      ].join("");
+      $("central-repository-boundary").textContent = repo.boundary || "中央仓库只接受显式 approved push。";
+    }
+
+    function renderDeviceMap(map) {
+      const items = Array.isArray(map.items) ? map.items : [];
+      $("device-map-summary").textContent = map.boundary || "设备地图默认只读。";
+      $("device-map").innerHTML = items.map((device) => `
+        <div class="device-map-item">
+          <div class="card-head">
+            <div>
+              <div class="card-name">${escapeHtml(text(device.name))}</div>
+              <div class="card-kind">${escapeHtml(text(device.capability))}</div>
+            </div>
+            ${pill(device.health || device.operation_scope, deviceKind(device.health))}
+          </div>
+          <div class="card-note">${escapeHtml(text(device.note))}</div>
+          <div class="card-stats">
+            <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(device.skills))}</div></div>
+            <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
+            <div class="mini-stat"><div class="mini-label">权限</div><div class="mini-value">${escapeHtml(text(device.operation_scope))}</div></div>
+            <div class="mini-stat"><div class="mini-label">新鲜度</div><div class="mini-value">${freshnessPill(device.freshness)}</div></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function refreshLocalWorkspace() {
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/local-workspace`, { method: "GET", cache: "no-store" });
+        const payload = await response.json();
+        if (response.ok && payload.ok) {
+          localWorkspaceFromExecutor = payload;
+          renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
+          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布端点已开启。" : "Mac 本机执行器在线：本机扫描和 dry-run 可用，发布端点未开启。", "green");
+          executorAvailable = true;
+          executorAllowPublish = Boolean(payload.allow_publish);
+          setExecutorButtons(true);
+        } else {
+          throw new Error(payload.error || "local workspace scan failed");
+        }
+      } catch (err) {
+        localWorkspaceFromExecutor = null;
+        setExecutorOffline();
+      }
     }
 
     function briefLine(label, value) {
