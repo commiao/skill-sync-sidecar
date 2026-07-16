@@ -1511,6 +1511,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 650;
       letter-spacing: 0;
     }
+    .brand {
+      display: grid;
+      gap: 2px;
+    }
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+    }
     main {
       max-width: 1120px;
       margin: 0 auto;
@@ -2118,7 +2126,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 <body>
   <a href="http://100.123.208.32:17172/portal" style="display:inline-block;margin:.6rem 0;font-size:13px;color:var(--muted,#647084);text-decoration:none">← 报表门户</a>
   <header>
-    <h1>Skill Sync Sidecar</h1>
+    <div class="brand">
+      <h1>Skill 同步工作台</h1>
+      <div class="brand-subtitle">本机操作 · 中央仓库 · 设备状态</div>
+    </div>
     <div class="toolbar">
       <span id="updated">Loading</span>
       <button id="refresh" type="button" title="Refresh status">Refresh</button>
@@ -2134,7 +2145,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
       </div>
       <div class="panel">
-        <h2>同步路径</h2>
+        <h2>权限边界</h2>
         <div id="operator-path" class="operator-text mono">-</div>
         <div id="operator-snapshot" class="operator-text mono">-</div>
       </div>
