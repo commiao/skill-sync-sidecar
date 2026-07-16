@@ -2120,7 +2120,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workbench-grid {
       display: grid;
-      grid-template-columns: minmax(360px, 1.45fr) minmax(260px, .75fr);
+      grid-template-columns: minmax(360px, 1.35fr) minmax(230px, .72fr) minmax(260px, .88fr);
       gap: 12px;
       margin: 12px 0 0;
     }
@@ -2166,7 +2166,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-bottom: 4px;
     }
     .workbench-full {
-      grid-column: 1 / -1;
+      grid-column: auto;
     }
     .workspace-title {
       display: flex;
@@ -2227,13 +2227,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workspace-tools {
       display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
       margin-top: 10px;
     }
     .workspace-tool {
       border: 1px solid var(--line);
       border-radius: 6px;
-      padding: 8px 10px;
+      padding: 6px 8px;
       min-width: 0;
       background: #fff;
     }
@@ -2252,15 +2253,18 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .device-map-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      grid-template-columns: 1fr;
+      gap: 6px;
     }
     .device-map-item {
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 10px;
+      padding: 8px;
       background: #fff;
       min-width: 0;
+    }
+    .device-map-item .card-head {
+      margin-bottom: 6px;
     }
     .device-map-meta {
       display: grid;
