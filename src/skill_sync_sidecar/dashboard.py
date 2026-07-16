@@ -1660,6 +1660,27 @@ DASHBOARD_HTML = r"""<!doctype html>
     .decision-next {
       margin-bottom: 0;
     }
+    .operator-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .operator-title-row .operator-title {
+      margin-bottom: 0;
+    }
+    .technical-summary {
+      margin-top: 10px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .technical-summary > summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
     .decision-boundary {
       grid-column: 1 / -1;
       padding: 0;
@@ -2593,13 +2614,29 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
       </div>
     </section>
+    <section id="review-queue-panel" class="review-queue panel" hidden>
+      <div class="panel-head">
+        <div>
+          <div class="section-label">需要你判断</div>
+          <h2>待审批清单</h2>
+        </div>
+        <span id="review-queue-count" class="pill">0</span>
+      </div>
+      <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-queue" class="review-list"></div>
+    </section>
     <section class="decision-console">
       <div id="operator-panel" class="panel decision-status">
-        <div class="section-label">当前结论</div>
-        <div id="operator-headline" class="operator-title">读取同步状态中</div>
-        <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
-        <div id="operator-brief" class="operator-brief"></div>
+        <div class="section-label">当前要做</div>
+        <div class="operator-title-row">
+          <div id="operator-headline" class="operator-title">读取同步状态中</div>
+          <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
+        </div>
         <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
+        <details class="technical-summary">
+          <summary>技术摘要</summary>
+          <div id="operator-brief" class="operator-brief"></div>
+        </details>
       </div>
       <section id="action-guide" class="action-guide panel decision-next" hidden>
         <div class="section-label">下一步</div>
@@ -2610,21 +2647,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="action-guide-summary" class="guide-summary"></div>
         <div id="action-guide-skills" class="guide-skills"></div>
         <div id="action-guide-note" class="guide-note"></div>
-        <div id="executor-panel" class="executor-panel" hidden>
-          <div class="panel-head">
-            <h2>本机执行器</h2>
-            <span id="executor-pill" class="pill">checking</span>
-          </div>
-          <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
-          <div class="executor-actions">
-            <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-            <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
-            <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
-          </div>
-          <pre id="executor-output" class="executor-output mono"></pre>
-        </div>
         <details class="guide-details">
-          <summary>执行细节</summary>
+          <summary>执行细节和本机执行器</summary>
+          <div id="executor-panel" class="executor-panel" hidden>
+            <div class="panel-head">
+              <h2>本机执行器</h2>
+              <span id="executor-pill" class="pill">checking</span>
+            </div>
+            <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
+            <div class="executor-actions">
+              <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
+              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
+              <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+            </div>
+            <pre id="executor-output" class="executor-output mono"></pre>
+          </div>
           <ol id="action-guide-steps" class="guide-steps"></ol>
         </details>
       </section>
@@ -2642,17 +2679,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </div>
       </details>
-    </section>
-    <section id="review-queue-panel" class="review-queue panel" hidden>
-      <div class="panel-head">
-        <div>
-          <div class="section-label">需要你判断</div>
-          <h2>待审批清单</h2>
-        </div>
-        <span id="review-queue-count" class="pill">0</span>
-      </div>
-      <div id="review-queue-summary" class="review-queue-summary"></div>
-      <div id="review-queue" class="review-list"></div>
     </section>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
@@ -2869,7 +2895,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderStatusStrip(dashboard, health);
       renderScopeSwitchboard(dashboard);
       renderWorkbench(dashboard);
-      $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
+      $("operator-next").textContent = conciseOperatorNext(dashboard, operator, { ...status, health });
       $("operator-path").textContent = "本机可操作；中央只接收显式推送；其他设备只读。";
       $("operator-snapshot").textContent = `当前中央版本：${text(operator.snapshot_id)}`;
       $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
@@ -2956,6 +2982,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
+    }
+
+    function conciseOperatorNext(dashboard, operator, status) {
+      const blocked = Number(dashboard.blocked || 0);
+      if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
+        return `先审 ${blocked} 个待审批项；dry-run 只预览，确认后再发布到中央仓库。`;
+      }
+      return operator.next_action || nextAction(status);
+    }
+
+    function conciseGuideSummary(guide) {
+      const skills = Array.isArray(guide.skills) ? guide.skills : [];
+      if ((guide.state || "") === "yellow" && skills.length > 0) {
+        return `重点是 ${skills.length} 个待审批 skill。先看上方清单，再按执行细节 dry-run。`;
+      }
+      return guide.summary || "";
     }
 
     function renderScopeSwitchboard(dashboard) {
@@ -3101,7 +3143,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.className = `action-guide panel decision-next ${deviceKind(state)}`;
       $("action-guide-title").textContent = guide.title || "现在怎么做";
       $("action-guide-state").outerHTML = pill(statusLabel(state), deviceKind(state)).replace("<span", "<span id=\"action-guide-state\"");
-      $("action-guide-summary").textContent = guide.summary || "";
+      $("action-guide-summary").textContent = conciseGuideSummary(guide);
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
       currentGuideSkills = skills;
       lastDryRunSafe = false;

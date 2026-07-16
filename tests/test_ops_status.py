@@ -462,15 +462,22 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
+                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
             )
             self.assertIn("id=\"operator-panel\"", DASHBOARD_HTML)
-            self.assertIn("当前结论", DASHBOARD_HTML)
+            self.assertIn("当前要做", DASHBOARD_HTML)
             self.assertIn("下一步", DASHBOARD_HTML)
+            self.assertIn("技术摘要", DASHBOARD_HTML)
             self.assertIn("安全边界", DASHBOARD_HTML)
             self.assertIn("boundary-title", DASHBOARD_HTML)
-            self.assertIn("执行细节", DASHBOARD_HTML)
+            self.assertIn("执行细节和本机执行器", DASHBOARD_HTML)
             self.assertIn("guide-details", DASHBOARD_HTML)
+            self.assertIn("conciseOperatorNext", DASHBOARD_HTML)
+            self.assertIn("conciseGuideSummary", DASHBOARD_HTML)
             self.assertIn("renderSkillChips", DASHBOARD_HTML)
             self.assertIn("skill-chip-row", DASHBOARD_HTML)
             self.assertIn("id=\"review-queue-panel\"", DASHBOARD_HTML)
