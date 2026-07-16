@@ -1919,6 +1919,51 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .review-queue {
+      margin-bottom: 12px;
+    }
+    .review-queue-summary {
+      color: var(--muted);
+      margin-bottom: 10px;
+      overflow-wrap: anywhere;
+    }
+    .review-list {
+      display: grid;
+      gap: 8px;
+    }
+    .review-item {
+      display: grid;
+      grid-template-columns: minmax(180px, .9fr) minmax(0, 1.4fr) auto;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff;
+      min-width: 0;
+    }
+    .review-skill {
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+    .review-source {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .review-action {
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+    .review-command {
+      margin-top: 6px;
+    }
+    .review-command summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
     .action-guide {
       margin-bottom: 12px;
     }
@@ -2236,6 +2281,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .decision-console { grid-template-columns: 1fr; }
       .decision-boundary { grid-column: auto; }
       .scope-list { grid-template-columns: 1fr; }
+      .review-item { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .workbench-grid { grid-template-columns: 1fr; }
@@ -2313,6 +2359,17 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
         </div>
       </div>
+    </section>
+    <section id="review-queue-panel" class="review-queue panel" hidden>
+      <div class="panel-head">
+        <div>
+          <div class="section-label">需要你判断</div>
+          <h2>待审批清单</h2>
+        </div>
+        <span id="review-queue-count" class="pill">0</span>
+      </div>
+      <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-queue" class="review-list"></div>
     </section>
     <section class="workbench-grid">
       <div class="panel local-workspace-panel">
@@ -2532,6 +2589,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderHubImport(dashboard.hub_import || {});
 
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
+      renderReviewQueue(blockedItems);
       $("blocked-empty").hidden = blockedItems.length > 0;
       $("blocked-table").hidden = blockedItems.length === 0;
       $("blocked-body").innerHTML = blockedItems.map((item) => `
@@ -2652,6 +2710,58 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${reason ? `<div class="mini-label">${escapeHtml(reason)}</div>` : ""}
         </div>
       `;
+    }
+
+    function renderReviewQueue(items) {
+      const panel = $("review-queue-panel");
+      if (!Array.isArray(items) || items.length === 0) {
+        panel.hidden = true;
+        return;
+      }
+      panel.hidden = false;
+      $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
+      const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
+      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"} 有 ${items.length} 个变更等待确认。先 dry-run，看清楚再决定是否推送到中央仓库。`;
+      $("review-queue").innerHTML = items.map((item) => {
+        const command = item.operator_command || "";
+        return `
+          <div class="review-item">
+            <div>
+              <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
+              <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
+            </div>
+            <div>
+              <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
+              ${command ? `
+                <details class="review-command">
+                  <summary>查看 dry-run 命令</summary>
+                  <div class="command-row">
+                    <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
+                    <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
+                  </div>
+                </details>
+              ` : ""}
+            </div>
+            ${pill(reviewStatusText(item), "yellow")}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function reviewActionText(item) {
+      if (item.category === "conflict") return "存在冲突，先人工合并，不要直接发布。";
+      if (item.status_action === "local_new") return "远端新增 skill，先预检内容和目标工具，再决定是否发布。";
+      if (item.status_action === "push_new") return "新 skill 等待发布，先 dry-run 审核。";
+      if (item.status_action === "push") return "已有 skill 有更新，先 dry-run 审核差异。";
+      return item.operator_action || item.recommendation || item.reason || "查看高级诊断里的建议动作。";
+    }
+
+    function reviewStatusText(item) {
+      if (item.status_action === "local_new") return "新增";
+      if (item.status_action === "push_new") return "新发布";
+      if (item.status_action === "push") return "更新";
+      if (item.category === "conflict") return "冲突";
+      return statusLabel(item.status_action || item.category || "待处理");
     }
 
     function renderActionGuide(guide) {
