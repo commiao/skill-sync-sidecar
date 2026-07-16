@@ -822,10 +822,11 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     mac = _find_device(devices, "mac")
     openclaw = _find_device(devices, "oc-vps")
     top_issue = _operator_top_issue(blocked_items)
+    action_guide = _operator_action_guide(health, blocked_items)
     if health == "green":
         next_action = "同步链路正常；继续观察 Mac / OpenClaw 自动周期。"
     elif health == "yellow" and top_issue:
-        next_action = top_issue["action"]
+        next_action = action_guide.get("summary") or top_issue["action"]
     elif health == "yellow":
         next_action = "先处理待审批队列；OpenClaw 本地改动需要 approved-push 后再上行。"
     elif health == "red":
@@ -852,6 +853,7 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
         "deferred_devices": {"windows": "本阶段跳过，后续需要三端同步时再接入。"},
         "blocked_count": len(blocked_items),
         "top_issue": top_issue,
+        "action_guide": action_guide,
     }
 
 
@@ -897,6 +899,144 @@ def _operator_issue_action(
 def _operator_issue_target(peer_id: Optional[str], peer_name: Optional[str], skill_id: Optional[str]) -> str:
     peer = peer_name or peer_id or "unknown-peer"
     return f"{peer} / {skill_id or 'unknown-skill'}"
+
+
+def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
+    openclaw_push_items = [item for item in blocked_items if _is_openclaw_writer_policy_push(item)]
+    if health == "green":
+        return {
+            "state": "green",
+            "title": "现在不用处理",
+            "summary": "Mac、OpenClaw、WebDAV 当前同步链路正常，没有待审批项。",
+            "steps": [
+                {
+                    "title": "继续观察",
+                    "detail": "保持面板打开即可；需要手动复查时刷新页面或运行状态检查。",
+                    "command": "scripts/operator-status.sh",
+                    "kind": "verify",
+                }
+            ],
+            "note": "绿色表示没有需要你马上决断的同步工作。",
+        }
+    if health == "yellow" and openclaw_push_items:
+        skill_ids = _operator_skill_ids(openclaw_push_items)
+        dry_run = _approved_push_batch_command(skill_ids)
+        publish = _approved_push_batch_command(skill_ids, yes=True)
+        return {
+            "state": "yellow",
+            "title": "现在需要人工审核",
+            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更（{', '.join(skill_ids)}），sidecar 已阻止自动上传；先运行 approved-push dry-run 审核，避免误覆盖 WebDAV。",
+            "steps": [
+                {
+                    "title": "先检查，不上传",
+                    "detail": "在 Mac 的 skill-sync-sidecar 仓库运行 dry-run。它只做预检和预览，不会写入 WebDAV。",
+                    "command": dry_run,
+                    "kind": "dry_run",
+                },
+                {
+                    "title": "确认安全后再发布",
+                    "detail": "只有 dry-run 显示 safe_to_push=true，且这些 skill 不再继续编辑时，才运行确认发布。",
+                    "command": publish,
+                    "kind": "publish",
+                },
+                {
+                    "title": "刷新状态",
+                    "detail": "发布后等 1-2 分钟，刷新本页或运行状态检查，确认 OpenClaw 从 yellow 恢复。",
+                    "command": "scripts/operator-status.sh",
+                    "kind": "verify",
+                },
+            ],
+            "skills": skill_ids,
+            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再走 dry-run -> --yes。",
+        }
+    if health == "yellow":
+        return {
+            "state": "yellow",
+            "title": "现在需要查看待审批队列",
+            "summary": f"当前有 {len(blocked_items)} 个待审批项，系统已暂停自动写入以避免误同步。",
+            "steps": [
+                {
+                    "title": "先看待审批队列",
+                    "detail": "查看下面的待审批队列，确认每个 skill 的来源设备、原因和建议命令。",
+                    "kind": "review",
+                },
+                {
+                    "title": "处理后刷新状态",
+                    "detail": "处理完成后刷新本页，确认待审批数量下降。",
+                    "command": "scripts/operator-status.sh",
+                    "kind": "verify",
+                },
+            ],
+            "note": "黄色通常表示安全门禁正在保护你的远端快照，不等于服务故障。",
+        }
+    if health == "red":
+        return {
+            "state": "red",
+            "title": "同步链路异常",
+            "summary": "当前不是审批问题，而是状态文件、WebDAV、Gateway 或 sidecar 进程可能异常。",
+            "steps": [
+                {
+                    "title": "先检查状态",
+                    "detail": "运行 operator status，看错误集中在 WebDAV、缓存还是 peer status。",
+                    "command": "scripts/operator-status.sh",
+                    "kind": "diagnose",
+                },
+                {
+                    "title": "再看服务日志",
+                    "detail": "如果状态检查仍为 red，再查看 Gateway / sidecar 容器日志。",
+                    "kind": "logs",
+                },
+            ],
+            "note": "红色时不要执行 approved-push，先恢复链路可读性。",
+        }
+    return {
+        "state": "unknown",
+        "title": "状态未知",
+        "summary": "面板还没有拿到足够信息判断下一步。",
+        "steps": [
+            {
+                "title": "刷新状态",
+                "detail": "先刷新页面；如果仍未知，再运行状态检查。",
+                "command": "scripts/operator-status.sh",
+                "kind": "verify",
+            }
+        ],
+        "note": "未知状态下先不要发布或删除任何 skill。",
+    }
+
+
+def _operator_skill_ids(items: Sequence[dict]) -> list[str]:
+    skill_ids: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        skill_id = item.get("skill_id")
+        if not skill_id:
+            continue
+        skill = str(skill_id)
+        if skill not in seen:
+            skill_ids.append(skill)
+            seen.add(skill)
+    return skill_ids
+
+
+def _approved_push_batch_command(skill_ids: Sequence[str], *, yes: bool = False) -> str:
+    args = ["scripts/openclaw-approved-push-batch.sh"]
+    if yes:
+        args.append("--yes")
+    args.extend(str(skill_id) for skill_id in skill_ids)
+    return " ".join(args)
+
+
+def _is_openclaw_writer_policy_push(item: dict) -> bool:
+    if item.get("peer_id") not in {"oc-vps", "openclaw"}:
+        return False
+    if item.get("category") != "writer_policy":
+        return False
+    status_action = item.get("status_action")
+    if status_action in {"push", "push_new", "local_new"}:
+        return True
+    reason = str(item.get("reason") or "")
+    return "push" in reason
 
 
 def _find_device(devices: list[dict], device_id: str) -> dict:
@@ -969,7 +1109,7 @@ def _blocked_item_operator_action(item: dict) -> str:
     category = item.get("category")
     if category == "conflict":
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
-    if category == "writer_policy" and status_action in {"push", "push_new"}:
+    if _is_openclaw_writer_policy_push(item):
         if peer_id in {"oc-vps", "openclaw"}:
             return f"先在 Mac 运行 OpenClaw approved-push dry-run 审核 {skill_id or 'unknown-skill'}，确认后再 --yes 发布。"
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
@@ -982,7 +1122,7 @@ def _blocked_item_operator_command(item: dict) -> Optional[str]:
     skill_id = item.get("skill_id")
     if not skill_id:
         return None
-    if item.get("category") == "writer_policy" and item.get("status_action") in {"push", "push_new"}:
+    if item.get("category") == "writer_policy" and item.get("status_action") in {"push", "push_new", "local_new"}:
         if item.get("peer_id") in {"oc-vps", "openclaw"}:
             return f"scripts/openclaw-approved-push-batch.sh {skill_id}"
         return f"skill-sync approved-push --skill-id {skill_id} --dry-run"
@@ -1584,6 +1724,84 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .action-guide {
+      margin-bottom: 18px;
+    }
+    .action-guide.green { border-color: #b8d8c8; background: #fbfffd; }
+    .action-guide.yellow { border-color: #e8d29c; background: #fffdf7; }
+    .action-guide.red { border-color: #efb8b8; background: #fffafa; }
+    .guide-summary {
+      color: var(--ink);
+      font-weight: 650;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+    }
+    .guide-note {
+      color: var(--muted);
+      margin-top: 10px;
+      overflow-wrap: anywhere;
+    }
+    .guide-skills {
+      color: var(--muted);
+      margin: 8px 0 12px;
+      overflow-wrap: anywhere;
+    }
+    .guide-steps {
+      list-style: none;
+      padding: 0;
+      margin: 12px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+    .guide-step {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .step-index {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef2f7;
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .step-title {
+      font-weight: 760;
+      margin-bottom: 3px;
+      overflow-wrap: anywhere;
+    }
+    .step-detail {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .command-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+    .guide-command {
+      margin: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f7f9fc;
+      color: var(--ink);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .copy-button {
+      min-width: 58px;
+      white-space: nowrap;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -1628,6 +1846,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
+      .command-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1654,6 +1873,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="operator-path" class="operator-text mono">-</div>
         <div id="operator-snapshot" class="operator-text mono">-</div>
       </div>
+    </section>
+    <section id="action-guide" class="action-guide panel" hidden>
+      <div class="panel-head">
+        <h2 id="action-guide-title">现在怎么做</h2>
+        <span id="action-guide-state" class="pill">unknown</span>
+      </div>
+      <div id="action-guide-summary" class="guide-summary"></div>
+      <div id="action-guide-skills" class="guide-skills"></div>
+      <ol id="action-guide-steps" class="guide-steps"></ol>
+      <div id="action-guide-note" class="guide-note"></div>
     </section>
     <section class="status-band">
       <div id="health-card" class="panel health">
@@ -1793,6 +2022,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("operator-verdict").textContent = operatorVerdict(health);
       $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
       renderOperatorBrief(dashboard, snapshot);
+      renderActionGuide(operator.action_guide || {});
       $("operator-next").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-path").textContent = operator.sync_path || "-";
       $("operator-snapshot").textContent = `snapshot: ${text(operator.snapshot_id)}`;
@@ -1909,6 +2139,55 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${reason ? `<div class="mini-label">${escapeHtml(reason)}</div>` : ""}
         </div>
       `;
+    }
+
+    function renderActionGuide(guide) {
+      const panel = $("action-guide");
+      if (!guide || !guide.title) {
+        panel.hidden = true;
+        return;
+      }
+      panel.hidden = false;
+      const state = guide.state || "unknown";
+      panel.className = `action-guide panel ${deviceKind(state)}`;
+      $("action-guide-title").textContent = guide.title || "现在怎么做";
+      $("action-guide-state").outerHTML = pill(state, deviceKind(state)).replace("<span", "<span id=\"action-guide-state\"");
+      $("action-guide-summary").textContent = guide.summary || "";
+      const skills = Array.isArray(guide.skills) ? guide.skills : [];
+      $("action-guide-skills").textContent = skills.length ? `涉及 skill：${skills.join("、")}` : "";
+      const steps = Array.isArray(guide.steps) ? guide.steps : [];
+      $("action-guide-steps").innerHTML = steps.map((step, index) => {
+        const command = step.command || "";
+        return `
+          <li class="guide-step">
+            <div class="step-index">${index + 1}</div>
+            <div>
+              <div class="step-title">${escapeHtml(text(step.title))}</div>
+              <div class="step-detail">${escapeHtml(text(step.detail))}</div>
+              ${command ? `
+                <div class="command-row">
+                  <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
+                  <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
+                </div>
+              ` : ""}
+            </div>
+          </li>
+        `;
+      }).join("");
+      $("action-guide-note").textContent = guide.note || "";
+    }
+
+    async function copyCommand(button) {
+      const command = button.dataset.command || "";
+      if (!command) return;
+      try {
+        await navigator.clipboard.writeText(command);
+        button.textContent = "已复制";
+        setTimeout(() => { button.textContent = "复制"; }, 1200);
+      } catch (err) {
+        button.textContent = "手动复制";
+        setTimeout(() => { button.textContent = "复制"; }, 1600);
+      }
     }
 
     function briefLine(label, value) {

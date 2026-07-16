@@ -395,6 +395,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["skill_id"], "beijing-recruitment")
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["category"], "writer_policy")
             self.assertIn("dry-run", status["dashboard"]["operator"]["top_issue"]["action"])
+            guide = status["dashboard"]["operator"]["action_guide"]
+            self.assertEqual(guide["title"], "现在需要人工审核")
+            self.assertIn("OpenClaw 有 1 个本地 skill 变更", guide["summary"])
+            self.assertEqual(guide["skills"], ["beijing-recruitment"])
+            self.assertEqual(
+                guide["steps"][0]["command"],
+                "scripts/openclaw-approved-push-batch.sh beijing-recruitment",
+            )
+            self.assertEqual(
+                guide["steps"][1]["command"],
+                "scripts/openclaw-approved-push-batch.sh --yes beijing-recruitment",
+            )
             self.assertEqual(
                 status["dashboard"]["operator"]["top_issue"]["command"],
                 "scripts/openclaw-approved-push-batch.sh beijing-recruitment",
@@ -432,6 +444,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"operator-verdict\"", DASHBOARD_HTML)
             self.assertIn("id=\"operator-brief\"", DASHBOARD_HTML)
             self.assertIn("renderOperatorBrief", DASHBOARD_HTML)
+            self.assertIn("id=\"action-guide\"", DASHBOARD_HTML)
+            self.assertIn("renderActionGuide", DASHBOARD_HTML)
+            self.assertIn("copyCommand", DASHBOARD_HTML)
+            self.assertIn("现在怎么做", DASHBOARD_HTML)
             self.assertIn("topIssueText", DASHBOARD_HTML)
             self.assertIn("blockedItemAction", DASHBOARD_HTML)
             self.assertIn("Recommendation / Next step", DASHBOARD_HTML)
@@ -448,6 +464,78 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("shortHash", DASHBOARD_HTML)
             self.assertIn("/api/hub-import-preview", DASHBOARD_HTML)
             self.assertIn("id=\"hub-import-preview-button\"", DASHBOARD_HTML)
+
+    def test_dashboard_beginner_guide_batches_openclaw_push_and_new_items(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+            peer_status = root / "openclaw-status.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
+            self._write_base_record(base_record, index)
+            peer_status.write_text(
+                json.dumps(
+                    {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "yellow",
+                        "writer_policy": "pull-only",
+                        "remote_snapshot": {"total": 96},
+                        "sync_plan": {
+                            "writer_policy": "pull-only",
+                            "blocked": 2,
+                            "blocked_items": [
+                                {
+                                    "skill_id": "finance-auto-bookkeeping",
+                                    "status_action": "push",
+                                    "plan_action": "blocked",
+                                    "allowed": False,
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push",
+                                },
+                                {
+                                    "skill_id": "wechat-editorial-automation",
+                                    "status_action": "local_new",
+                                    "plan_action": "blocked",
+                                    "allowed": False,
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push_new",
+                                },
+                            ],
+                        },
+                        "blocked_report": {"total": 0, "summary": {}, "items": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_dashboard_status(
+                DashboardConfig(
+                    local_root=local_root,
+                    remote_snapshot=snapshot_dir,
+                    base_record=base_record,
+                    allow_new=True,
+                    peer_status_files={"oc-vps": peer_status},
+                )
+            )
+
+            guide = status["dashboard"]["operator"]["action_guide"]
+            self.assertEqual(guide["state"], "yellow")
+            self.assertEqual(guide["skills"], ["finance-auto-bookkeeping", "wechat-editorial-automation"])
+            self.assertEqual(
+                guide["steps"][0]["command"],
+                "scripts/openclaw-approved-push-batch.sh finance-auto-bookkeeping wechat-editorial-automation",
+            )
+            self.assertEqual(
+                guide["steps"][1]["command"],
+                "scripts/openclaw-approved-push-batch.sh --yes finance-auto-bookkeeping wechat-editorial-automation",
+            )
+            self.assertEqual(
+                status["dashboard"]["blocked_items"][1]["operator_command"],
+                "scripts/openclaw-approved-push-batch.sh wechat-editorial-automation",
+            )
 
     def test_dashboard_uses_live_blocked_items_when_report_is_stale(self):
         with TemporaryDirectory() as tmp:
