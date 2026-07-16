@@ -2528,6 +2528,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       main { padding: 14px; }
       .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .scope-card { padding: 12px; }
+      .scope-switchboard { gap: 8px; }
+      .scope-card-head { margin-bottom: 4px; }
+      .scope-card-count { font-size: 16px; margin-bottom: 2px; }
+      .scope-card-note { font-size: 12px; line-height: 1.35; }
+      .scope-card.readonly .scope-card-note { display: none; }
+      .scope-card-actions { margin-top: 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
       .status-chip.primary { grid-column: 1 / -1; }
