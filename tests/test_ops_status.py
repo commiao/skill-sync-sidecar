@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from skill_sync_sidecar.dashboard import (
     build_hub_import_preview_response,
 )
 from skill_sync_sidecar.remote import FileRemote
+from skill_sync_sidecar.operator_executor import OperatorExecutorError, run_openclaw_approved_push_batch
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -447,6 +449,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"action-guide\"", DASHBOARD_HTML)
             self.assertIn("renderActionGuide", DASHBOARD_HTML)
             self.assertIn("copyCommand", DASHBOARD_HTML)
+            self.assertIn("executor-panel", DASHBOARD_HTML)
+            self.assertIn("runExecutorAction", DASHBOARD_HTML)
+            self.assertIn("127.0.0.1:18765", DASHBOARD_HTML)
             self.assertIn("现在怎么做", DASHBOARD_HTML)
             self.assertIn("topIssueText", DASHBOARD_HTML)
             self.assertIn("blockedItemAction", DASHBOARD_HTML)
@@ -895,6 +900,54 @@ class OpsStatusTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_remote_peer_status_paths(["broken"])
+
+    def test_operator_executor_parser_accepts_local_executor_arguments(self):
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "operator-executor",
+                "--repo-root",
+                "/tmp/skill-sync-sidecar",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "18765",
+                "--allow-publish",
+            ]
+        )
+
+        self.assertEqual(args.command, "operator-executor")
+        self.assertEqual(args.repo_root, "/tmp/skill-sync-sidecar")
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertEqual(args.port, 18765)
+        self.assertTrue(args.allow_publish)
+
+    def test_operator_executor_runs_dry_run_and_blocks_publish_by_default(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-approved-push-batch.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo openclaw_approved_push_batch_mode=${1#--}\n"
+                "printf '{\"safe_to_push\":true,\"approved\":2,\"approved_skill_ids\":[\"%s\",\"%s\"]}\\n' \"$2\" \"$3\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+
+            result = run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping", "wechat-publisher"])
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["mode"], "dry_run")
+            self.assertTrue(result["safe_to_push"])
+            self.assertEqual(result["approved"], 2)
+            self.assertEqual(result["approved_skill_ids"], ["finance-auto-bookkeeping", "wechat-publisher"])
+            self.assertIn("--dry-run", result["command"])
+
+            with self.assertRaises(OperatorExecutorError):
+                run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=True)
 
     def test_publish_peer_status_writes_remote_json(self):
         with TemporaryDirectory() as tmp:

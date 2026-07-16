@@ -1802,6 +1802,36 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-width: 58px;
       white-space: nowrap;
     }
+    .executor-panel {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+    .executor-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .executor-status {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .executor-output {
+      display: none;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f7f9fc;
+      color: var(--ink);
+      max-height: 340px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -1883,6 +1913,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="action-guide-skills" class="guide-skills"></div>
       <ol id="action-guide-steps" class="guide-steps"></ol>
       <div id="action-guide-note" class="guide-note"></div>
+      <div id="executor-panel" class="executor-panel" hidden>
+        <div class="panel-head">
+          <h2>本机执行器</h2>
+          <span id="executor-pill" class="pill">checking</span>
+        </div>
+        <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
+        <div class="executor-actions">
+          <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
+          <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
+          <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+        </div>
+        <pre id="executor-output" class="executor-output mono"></pre>
+      </div>
     </section>
     <section class="status-band">
       <div id="health-card" class="panel health">
@@ -1985,6 +2028,11 @@ DASHBOARD_HTML = r"""<!doctype html>
   </main>
   <script>
     const $ = (id) => document.getElementById(id);
+    const EXECUTOR_URL = "http://127.0.0.1:18765";
+    let currentGuideSkills = [];
+    let executorAvailable = false;
+    let executorAllowPublish = false;
+    let lastDryRunSafe = false;
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -2154,6 +2202,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("action-guide-state").outerHTML = pill(state, deviceKind(state)).replace("<span", "<span id=\"action-guide-state\"");
       $("action-guide-summary").textContent = guide.summary || "";
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
+      currentGuideSkills = skills;
+      lastDryRunSafe = false;
       $("action-guide-skills").textContent = skills.length ? `涉及 skill：${skills.join("、")}` : "";
       const steps = Array.isArray(guide.steps) ? guide.steps : [];
       $("action-guide-steps").innerHTML = steps.map((step, index) => {
@@ -2175,6 +2225,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         `;
       }).join("");
       $("action-guide-note").textContent = guide.note || "";
+      renderExecutorPanel(guide);
     }
 
     async function copyCommand(button) {
@@ -2188,6 +2239,128 @@ DASHBOARD_HTML = r"""<!doctype html>
         button.textContent = "手动复制";
         setTimeout(() => { button.textContent = "复制"; }, 1600);
       }
+    }
+
+    function renderExecutorPanel(guide) {
+      const panel = $("executor-panel");
+      const skills = Array.isArray(guide.skills) ? guide.skills : [];
+      if (!skills.length || guide.state !== "yellow") {
+        panel.hidden = true;
+        return;
+      }
+      panel.hidden = false;
+      $("executor-output").style.display = "none";
+      setExecutorStatus("checking", "正在检查 Mac 本机执行器。", "yellow");
+      checkExecutor();
+    }
+
+    async function checkExecutor() {
+      setExecutorButtons(false);
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/healthz`, { method: "GET", cache: "no-store" });
+        const payload = await response.json();
+        executorAvailable = response.ok && payload.ok;
+        executorAllowPublish = Boolean(payload.allow_publish);
+        if (executorAvailable) {
+          setExecutorStatus(
+            "online",
+            executorAllowPublish
+              ? "Mac 本机执行器在线：可以在面板内 dry-run；dry-run 安全后可确认发布。"
+              : "Mac 本机执行器在线：可以在面板内 dry-run；发布端点未开启，避免误写 WebDAV。",
+            "green",
+          );
+          setExecutorButtons(true);
+        } else {
+          setExecutorOffline();
+        }
+      } catch (err) {
+        setExecutorOffline();
+      }
+    }
+
+    function setExecutorOffline() {
+      executorAvailable = false;
+      executorAllowPublish = false;
+      setExecutorStatus(
+        "offline",
+        "本机执行器未启动。请复制上面的命令执行，或在 Mac 上启动：skill-sync operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-publish",
+        "yellow",
+      );
+      setExecutorButtons(false);
+    }
+
+    function setExecutorStatus(label, detail, kind) {
+      $("executor-pill").outerHTML = pill(label, kind).replace("<span", "<span id=\"executor-pill\"");
+      $("executor-status").textContent = detail;
+    }
+
+    function setExecutorButtons(available) {
+      $("executor-dry-run").disabled = !available || currentGuideSkills.length === 0;
+      $("executor-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+    }
+
+    async function runExecutorAction(mode) {
+      if (!executorAvailable || currentGuideSkills.length === 0) return;
+      const isPublish = mode === "publish";
+      if (isPublish) {
+        if (!lastDryRunSafe) {
+          showExecutorOutput("请先运行 dry-run，并确认 safe_to_push=true。");
+          return;
+        }
+        const typed = window.prompt("发布会写入 WebDAV。请输入 PUBLISH 确认：");
+        if (typed !== "PUBLISH") {
+          showExecutorOutput("已取消发布。");
+          return;
+        }
+      }
+      setExecutorButtons(false);
+      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行 dry-run，请稍等。", "yellow");
+      try {
+        const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
+        const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            skill_ids: currentGuideSkills,
+            confirm: isPublish ? "PUBLISH" : undefined,
+          }),
+        });
+        const payload = await response.json();
+        lastDryRunSafe = !isPublish && Boolean(payload.ok && payload.safe_to_push);
+        showExecutorOutput(formatExecutorResult(payload));
+        if (payload.ok) {
+          setExecutorStatus(isPublish ? "published" : "dry-run ok", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "dry-run 通过：safe_to_push=true，可以继续确认发布。", "green");
+        } else {
+          setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
+        }
+      } catch (err) {
+        showExecutorOutput(String(err));
+        setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    function formatExecutorResult(payload) {
+      const lines = [
+        `ok=${text(payload.ok)}`,
+        `mode=${text(payload.mode)}`,
+        `exit_code=${text(payload.exit_code)}`,
+        `safe_to_push=${text(payload.safe_to_push)}`,
+        `approved=${text(payload.approved)}`,
+        `skills=${Array.isArray(payload.approved_skill_ids) ? payload.approved_skill_ids.join(", ") : text(payload.approved_skill_ids)}`,
+        `command=${text(payload.command)}`,
+      ];
+      if (payload.error) lines.push(`error=${payload.error}`);
+      if (payload.stderr_tail) lines.push(`\nstderr:\n${payload.stderr_tail}`);
+      if (payload.stdout_tail) lines.push(`\nstdout:\n${payload.stdout_tail}`);
+      return lines.join("\n");
+    }
+
+    function showExecutorOutput(value) {
+      $("executor-output").style.display = "block";
+      $("executor-output").textContent = value;
     }
 
     function briefLine(label, value) {

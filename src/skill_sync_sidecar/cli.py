@@ -31,6 +31,7 @@ from .hub_import import (
 )
 from .monitor import monitor_once, render_monitor_brief, render_monitor_report, run_monitor_loop
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
+from .operator_executor import serve_operator_executor
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
 from .remote import RemoteError, build_upload_plan, download_snapshot, join_remote_path, open_remote, upload_snapshot
@@ -155,6 +156,13 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_loop.add_argument("--max-iterations", type=int, help=argparse.SUPPRESS)
     monitor_loop.add_argument("--json", action="store_true", help="Emit final report as JSON when the loop exits.")
     monitor_loop.set_defaults(func=cmd_monitor_loop)
+
+    operator_executor = subcommands.add_parser("operator-executor", help="Serve a local browser-callable executor for approved OpenClaw operations.")
+    operator_executor.add_argument("--repo-root", default=".", help="skill-sync-sidecar repo root containing scripts/openclaw-approved-push-batch.sh.")
+    operator_executor.add_argument("--host", default="127.0.0.1", help="Executor listen host.")
+    operator_executor.add_argument("--port", type=int, default=18765, help="Executor listen port.")
+    operator_executor.add_argument("--allow-publish", action="store_true", help="Allow the publish endpoint to run approved-push --yes after confirmation.")
+    operator_executor.set_defaults(func=cmd_operator_executor)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
     tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
@@ -624,6 +632,11 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         remote_peer_status_paths=remote_peer_status_paths,
     )
     serve_gateway(args.host, args.port, config)
+    return 0
+
+
+def cmd_operator_executor(args: argparse.Namespace) -> int:
+    serve_operator_executor(args.host, args.port, Path(args.repo_root).expanduser(), allow_publish=args.allow_publish)
     return 0
 
 
