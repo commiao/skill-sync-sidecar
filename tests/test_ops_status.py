@@ -451,6 +451,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("同步状态摘要", DASHBOARD_HTML)
             self.assertIn("id=\"strip-health\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-blocked\"", DASHBOARD_HTML)
+            self.assertIn(".status-strip .status-chip:nth-child(4)", DASHBOARD_HTML)
+            self.assertIn(".status-strip .status-chip:nth-child(5)", DASHBOARD_HTML)
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
             self.assertIn("Skill 同步分区", DASHBOARD_HTML)

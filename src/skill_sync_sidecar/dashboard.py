@@ -2536,7 +2536,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions { margin-top: 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
-      .status-chip.primary { grid-column: 1 / -1; }
+      .status-chip.primary { grid-column: auto; }
+      .status-strip .status-chip:nth-child(4),
+      .status-strip .status-chip:nth-child(5) {
+        display: none;
+      }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: 1fr; }
