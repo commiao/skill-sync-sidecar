@@ -1580,13 +1580,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       align-items: baseline;
       gap: 6px;
       color: var(--ink);
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 850;
       line-height: 1.15;
       margin-top: 2px;
     }
     .focus-title strong {
-      font-size: 28px;
+      font-size: 30px;
       line-height: 1;
     }
     .focus-note {
@@ -2948,8 +2948,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div id="error" class="error"></div>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
-        <div class="status-chip-label">当前要处理</div>
-        <div class="focus-title"><span id="strip-health">待审批</span><strong id="strip-blocked">-</strong><span>项</span></div>
+        <div class="status-chip-label">同步待办</div>
+        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">项待预检</span></div>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
       <div class="status-chip focus-side">
@@ -3389,18 +3389,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
       const blocked = Number(dashboard.blocked || 0);
-      $("strip-health").textContent = blocked > 0 ? "待审批" : operatorVerdict(health);
+      $("strip-health").textContent = blocked > 0 ? "项待预检" : "项待办";
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
       $("strip-focus-note").textContent = blocked > 0
-        ? "黄色表示有变更待判断，不是服务故障。先扫描本机，再预检待推送项。"
-        : "当前没有待审批项；可以扫描本机，或查看中央仓库和设备上报。";
+        ? `${blocked} 个 OpenClaw 变更等待本机预检；这不是服务故障。`
+        : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
       const actionNote = $("strip-action-note");
       if (actionNote) {
         actionNote.textContent = blocked > 0
-          ? "预检只读；发布必须再确认。"
+          ? "预检只读；发布会再次确认。"
           : "只操作 Mac 本机。";
       }
     }
