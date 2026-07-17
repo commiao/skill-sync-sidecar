@@ -3338,7 +3338,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。先预检，再决定是否推送。`;
-      const visibleItems = items.slice(0, 1);
+      const mobileReview = window.matchMedia("(max-width: 560px)").matches;
+      const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
         const command = item.operator_command || "";
@@ -3374,7 +3375,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         `;
       }).join("");
       const more = hiddenCount > 0
-        ? `<div class="review-more">还有 ${hiddenCount} 项，完整队列在下方高级诊断。</div>`
+        ? `<div class="review-more">${hiddenCount} 项完整队列在下方高级诊断。</div>`
         : "";
       $("review-queue").innerHTML = `${rows}${more}`;
       setExecutorButtons(executorAvailable);
