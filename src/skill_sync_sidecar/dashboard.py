@@ -1557,9 +1557,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     button:hover { border-color: #aeb7c6; }
     .status-strip {
       display: grid;
-      grid-template-columns: 1.2fr repeat(4, minmax(100px, .7fr));
-      gap: 10px;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+      gap: 12px;
       margin-bottom: 12px;
+      align-items: stretch;
     }
     .status-chip {
       border: 1px solid var(--line);
@@ -1568,10 +1569,51 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #fff;
       min-width: 0;
     }
-    .status-chip.primary {
+    .focus-main {
       border-left: 4px solid #d8a300;
-      padding-left: 10px;
+      padding: 14px 16px 14px 14px;
       background: #fff;
+    }
+    .focus-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      color: var(--ink);
+      font-size: 22px;
+      font-weight: 850;
+      line-height: 1.15;
+      margin-top: 2px;
+    }
+    .focus-title strong {
+      font-size: 28px;
+      line-height: 1;
+    }
+    .focus-note {
+      color: var(--muted);
+      margin-top: 8px;
+      overflow-wrap: anywhere;
+    }
+    .focus-side {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      background: #fbfcfe;
+    }
+    .focus-side button {
+      width: 100%;
+    }
+    .focus-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .focus-metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 7px;
+      background: #fff;
+      min-width: 0;
     }
     .status-chip-label {
       color: var(--muted);
@@ -1585,6 +1627,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 820;
       line-height: 1.15;
       overflow-wrap: anywhere;
+    }
+    .focus-metric .status-chip-value {
+      font-size: 15px;
     }
     .operator-band {
       display: grid;
@@ -2558,7 +2603,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 860px) {
       header { align-items: flex-start; flex-direction: column; }
       .operator-band { grid-template-columns: 1fr; }
-      .status-strip { grid-template-columns: 1fr 1fr; }
+      .status-strip { grid-template-columns: 1fr; }
       .scope-switchboard { grid-template-columns: 1fr; }
       .scope-readonly-rail { grid-template-columns: 1fr 1fr; }
       .decision-console { grid-template-columns: 1fr; }
@@ -2578,7 +2623,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
-      .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .status-strip { grid-template-columns: 1fr; gap: 8px; }
+      .focus-main { padding: 12px; }
+      .focus-title { font-size: 18px; }
+      .focus-title strong { font-size: 22px; }
+      .focus-note { margin-top: 5px; font-size: 12px; }
+      .focus-side { padding: 10px; }
+      .focus-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .scope-switchboard { grid-template-columns: 1fr; }
       .scope-readonly-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
       .scope-card { padding: 12px; }
@@ -2593,11 +2644,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
-      .status-chip.primary { grid-column: auto; }
-      .status-strip .status-chip:nth-child(4),
-      .status-strip .status-chip:nth-child(5) {
-        display: none;
-      }
       .review-queue-summary {
         font-size: 12px;
         line-height: 1.4;
@@ -2676,26 +2722,28 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
   <main>
     <div id="error" class="error"></div>
-    <section class="status-strip" aria-label="同步状态摘要">
-      <div class="status-chip primary">
-        <div class="status-chip-label">当前状态</div>
-        <div id="strip-health" class="status-chip-value">读取中</div>
+    <section class="status-strip" aria-label="当前处理状态">
+      <div class="status-chip focus-main">
+        <div class="status-chip-label">当前要处理</div>
+        <div class="focus-title"><span id="strip-health">读取中</span><strong id="strip-blocked">-</strong><span>项待审批</span></div>
+        <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
-      <div class="status-chip">
-        <div class="status-chip-label">待你处理</div>
-        <div id="strip-blocked" class="status-chip-value">-</div>
-      </div>
-      <div class="status-chip">
-        <div class="status-chip-label">本机 skill</div>
-        <div id="strip-local" class="status-chip-value">-</div>
-      </div>
-      <div class="status-chip">
-        <div class="status-chip-label">中央 skill</div>
-        <div id="strip-central" class="status-chip-value">-</div>
-      </div>
-      <div class="status-chip">
-        <div class="status-chip-label">设备</div>
-        <div id="strip-devices" class="status-chip-value">-</div>
+      <div class="status-chip focus-side">
+        <button id="strip-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+        <div class="focus-metrics" aria-label="同步范围摘要">
+          <div class="focus-metric">
+            <div class="status-chip-label">本机</div>
+            <div id="strip-local" class="status-chip-value">-</div>
+          </div>
+          <div class="focus-metric">
+            <div class="status-chip-label">中央</div>
+            <div id="strip-central" class="status-chip-value">-</div>
+          </div>
+          <div class="focus-metric">
+            <div class="status-chip-label">设备</div>
+            <div id="strip-devices" class="status-chip-value">-</div>
+          </div>
+        </div>
       </div>
     </section>
     <section class="scope-switchboard" aria-label="Skill 同步分区">
@@ -3095,11 +3143,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
+      const blocked = Number(dashboard.blocked || 0);
       $("strip-health").textContent = operatorVerdict(health);
-      $("strip-blocked").textContent = text(dashboard.blocked);
+      $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
+      $("strip-focus-note").textContent = blocked > 0
+        ? "先预检待推送项；确认 safe_to_push 后再显式发布到中央仓库。"
+        : "当前没有待审批项；可以扫描本机或观察设备上报。";
     }
 
     function conciseOperatorNext(dashboard, operator, status) {
@@ -3413,6 +3465,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setExecutorButtons(available) {
       $("executor-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("executor-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      $("strip-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("scope-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("scope-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
       $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
