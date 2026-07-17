@@ -2738,9 +2738,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         gap: 4px;
       }
       .review-item {
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 4px 8px;
-        padding: 8px 10px;
+        display: none;
+      }
+      .review-list::after {
+        content: "完整队列在下方高级诊断。";
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 7px 10px;
+        color: var(--muted);
+        background: #fff;
+        font-size: 12px;
+        font-weight: 700;
       }
       .review-source,
       .review-action {
@@ -2778,8 +2786,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         margin-top: 0;
       }
       .review-more {
-        padding: 7px 10px;
-        font-size: 12px;
+        display: none;
       }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
@@ -3117,6 +3124,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorAllowPublish = false;
     let lastDryRunSafe = false;
     let localWorkspaceFromExecutor = null;
+    let currentReviewQueueItems = [];
+    let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -3352,14 +3361,17 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderReviewQueue(items) {
       const panel = $("review-queue-panel");
       if (!Array.isArray(items) || items.length === 0) {
+        currentReviewQueueItems = [];
         panel.hidden = true;
         return;
       }
+      currentReviewQueueItems = items;
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。这里是决策队列，不是故障列表。先预检，再决定是否推送。`;
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
+      currentReviewQueueIsMobile = mobileReview;
       const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
@@ -3400,6 +3412,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       $("review-queue").innerHTML = `${rows}${more}`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function rerenderReviewQueueIfViewportModeChanged() {
+      const mobileReview = window.matchMedia("(max-width: 560px)").matches;
+      if (mobileReview === currentReviewQueueIsMobile) return;
+      renderReviewQueue(currentReviewQueueItems);
     }
 
     function reviewActionText(item) {
@@ -4036,6 +4054,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     $("refresh").addEventListener("click", refresh);
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
+    window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
     refresh();
     setInterval(refresh, 30000);
   </script>
