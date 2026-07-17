@@ -2758,6 +2758,66 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="review-queue-summary" class="review-queue-summary"></div>
       <div id="review-queue" class="review-list"></div>
     </section>
+    <section class="workspace-overview" aria-labelledby="workspace-overview-title">
+      <div class="workspace-overview-head">
+        <span class="overview-title">
+          <strong id="workspace-overview-title">Skill 管理工作台</strong>
+          <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
+        </span>
+        <span class="pill green">只操作本机</span>
+      </div>
+      <section class="workbench-grid">
+        <div class="panel local-workspace-panel">
+          <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
+          <div class="workspace-title">
+            <h2>本机 Skill 工作区</h2>
+            <span id="local-workspace-pill" class="pill">checking</span>
+          </div>
+          <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+          <div class="workspace-metrics">
+            <div class="workspace-metric">
+              <div id="local-workspace-total" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机 skill</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">本机待处理</div>
+            </div>
+            <div class="workspace-metric">
+              <div id="local-workspace-source" class="workspace-metric-value">-</div>
+              <div class="workspace-metric-label">数据来源</div>
+            </div>
+          </div>
+          <div class="workspace-actions">
+            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+          </div>
+          <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
+          <div id="local-workspace-tools" class="workspace-tools"></div>
+          <div id="local-workspace-boundary" class="boundary-note"></div>
+        </div>
+        <div class="panel">
+          <div class="readonly-kicker">只读状态 · 不直接编辑</div>
+          <div class="workspace-title">
+            <h2>中央仓库状态</h2>
+            <span id="central-repository-pill" class="pill">readonly</span>
+          </div>
+          <div id="central-repository-summary" class="workspace-subtitle"></div>
+          <div id="central-repository-kv" class="kv"></div>
+          <div id="central-repository-boundary" class="boundary-note"></div>
+        </div>
+        <div class="panel workbench-full">
+          <div class="readonly-kicker">设备实测 · 只读观察</div>
+          <div class="workspace-title">
+            <h2>其他设备状态</h2>
+            <span class="pill">read-only</span>
+          </div>
+          <div id="device-map-summary" class="workspace-subtitle"></div>
+          <div id="device-map" class="device-map-grid"></div>
+        </div>
+      </section>
+    </section>
     <section class="scope-switchboard" aria-label="Skill 同步分区">
       <div class="scope-card local">
         <div class="scope-card-head">
@@ -2846,66 +2906,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </div>
       </details>
-    </section>
-    <section class="workspace-overview" aria-labelledby="workspace-overview-title">
-      <div class="workspace-overview-head">
-        <span class="overview-title">
-          <strong id="workspace-overview-title">Skill 管理工作台</strong>
-          <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
-        </span>
-        <span class="pill green">只操作本机</span>
-      </div>
-      <section class="workbench-grid">
-        <div class="panel local-workspace-panel">
-          <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
-          <div class="workspace-title">
-            <h2>本机 Skill 工作区</h2>
-            <span id="local-workspace-pill" class="pill">checking</span>
-          </div>
-          <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
-          <div class="workspace-metrics">
-            <div class="workspace-metric">
-              <div id="local-workspace-total" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机 skill</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机待处理</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-source" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">数据来源</div>
-            </div>
-          </div>
-          <div class="workspace-actions">
-            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
-          </div>
-          <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
-          <div id="local-workspace-tools" class="workspace-tools"></div>
-          <div id="local-workspace-boundary" class="boundary-note"></div>
-        </div>
-        <div class="panel">
-          <div class="readonly-kicker">只读状态 · 不直接编辑</div>
-          <div class="workspace-title">
-            <h2>中央仓库状态</h2>
-            <span id="central-repository-pill" class="pill">readonly</span>
-          </div>
-          <div id="central-repository-summary" class="workspace-subtitle"></div>
-          <div id="central-repository-kv" class="kv"></div>
-          <div id="central-repository-boundary" class="boundary-note"></div>
-        </div>
-        <div class="panel workbench-full">
-          <div class="readonly-kicker">设备实测 · 只读观察</div>
-          <div class="workspace-title">
-            <h2>其他设备状态</h2>
-            <span class="pill">read-only</span>
-          </div>
-          <div id="device-map-summary" class="workspace-subtitle"></div>
-          <div id="device-map" class="device-map-grid"></div>
-        </div>
-      </section>
     </section>
     <details class="advanced-diagnostics">
       <summary>高级诊断：状态、设备、工具、队列明细</summary>

@@ -472,6 +472,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+                DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
             )
             self.assertLess(
@@ -511,7 +515,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
             self.assertIn("左侧管理本机 skill", DASHBOARD_HTML)
-            self.assertLess(DASHBOARD_HTML.index("decision-console"), DASHBOARD_HTML.index("workspace-overview"))
+            self.assertLess(
+                DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+                DASHBOARD_HTML.index("<section class=\"decision-console\""),
+            )
             self.assertLess(
                 DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
