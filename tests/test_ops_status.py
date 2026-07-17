@@ -453,7 +453,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"strip-health\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-blocked\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-focus-note\"", DASHBOARD_HTML)
+            self.assertIn("id=\"strip-scan-local\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-dry-run\"", DASHBOARD_HTML)
+            self.assertIn("id=\"strip-action-note\"", DASHBOARD_HTML)
             self.assertIn("同步范围摘要", DASHBOARD_HTML)
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
@@ -516,7 +518,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("完整队列在下方高级诊断", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("本机可操作；中央", DASHBOARD_HTML)
+            self.assertIn("操作区在左；中央", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
@@ -535,7 +537,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"local-workspace-action-note\"", DASHBOARD_HTML)
             self.assertIn("只读状态 · 不直接编辑", DASHBOARD_HTML)
             self.assertIn("设备实测 · 只读观察", DASHBOARD_HTML)
-            self.assertIn("扫描、预检、发布只作用于", DASHBOARD_HTML)
+            self.assertIn("的本地 skill：扫描、预检、再显式推送", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("<div class=\"workspace-actions\">"),
+                DASHBOARD_HTML.index("<div class=\"workspace-metrics\">"),
+            )
             self.assertIn("WebDAV 快照", DASHBOARD_HTML)
             self.assertIn("共享事实源收录", DASHBOARD_HTML)
             self.assertIn("statusLabel", DASHBOARD_HTML)

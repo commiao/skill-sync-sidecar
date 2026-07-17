@@ -1603,6 +1603,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     .focus-side button {
       width: 100%;
     }
+    .focus-side-actions {
+      display: grid;
+      gap: 7px;
+    }
+    .focus-side-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
     .focus-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2472,7 +2482,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin: 10px 0 12px;
+      margin: 8px 0 10px;
     }
     .workspace-actions button.primary {
       background: var(--ink);
@@ -2680,6 +2690,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .focus-note { display: none; }
       .focus-side { padding: 8px; align-content: center; }
       .focus-side button { padding: 7px 8px; }
+      .focus-side-note { display: none; }
       .focus-metrics { display: none; }
       .scope-switchboard { grid-template-columns: 1fr; }
       .scope-readonly-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -2700,7 +2711,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-metric-value { font-size: 17px; }
       .workspace-metric-label { font-size: 11px; line-height: 1.2; }
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
-      .workspace-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+      .workspace-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
       #local-workspace-refresh { grid-column: 1 / -1; }
       .local-action-note,
@@ -2808,7 +2819,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
       <div class="status-chip focus-side">
-        <button id="strip-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+        <div class="focus-side-actions">
+          <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+          <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+        </div>
+        <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；中央和其他设备只读。</div>
         <div class="focus-metrics" aria-label="同步范围摘要">
           <div class="focus-metric">
             <div class="status-chip-label">本机</div>
@@ -2852,6 +2867,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span id="local-workspace-pill" class="pill">checking</span>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+          <div class="workspace-actions">
+            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+          </div>
           <div class="workspace-metrics">
             <div class="workspace-metric">
               <div id="local-workspace-total" class="workspace-metric-value">-</div>
@@ -2865,11 +2885,6 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div id="local-workspace-source" class="workspace-metric-value">-</div>
               <div class="workspace-metric-label">数据来源</div>
             </div>
-          </div>
-          <div class="workspace-actions">
-            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
           </div>
           <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
           <div id="local-workspace-tools" class="workspace-tools"></div>
@@ -3234,8 +3249,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
       $("strip-focus-note").textContent = blocked > 0
-        ? "先预检待推送项；确认 safe_to_push 后再显式发布到中央仓库。"
-        : "当前没有待审批项；可以扫描本机或观察设备上报。";
+        ? "黄色表示有变更待判断，不是服务故障。先扫描本机，再预检待推送项。"
+        : "当前没有待审批项；可以扫描本机，或查看中央仓库和设备上报。";
+      const actionNote = $("strip-action-note");
+      if (actionNote) {
+        actionNote.textContent = blocked > 0
+          ? "预检只读；发布必须再确认。"
+          : "只操作 Mac 本机。";
+      }
     }
 
     function conciseOperatorNext(dashboard, operator, status) {
@@ -3337,7 +3358,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
-      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。先预检，再决定是否推送。`;
+      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。这里是决策队列，不是故障列表。先预检，再决定是否推送。`;
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
@@ -3667,7 +3688,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `本机可操作；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
+      $("workspace-overview-summary").textContent = `操作区在左；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
     }
 
     function renderLocalWorkspace(workspace) {
@@ -3676,8 +3697,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const total = live.total_skills ?? workspace.total_skills;
       const blocked = live.blocked ?? workspace.blocked;
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
+      const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `扫描、预检、发布只作用于 ${text(workspace.device_name || live.device_name || "Mac 本机")}；其他设备只读。`;
+      $("local-workspace-summary").textContent = `这里管理当前设备（${deviceName}）的本地 skill：扫描、预检、再显式推送到中央仓库。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
