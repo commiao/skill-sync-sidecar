@@ -3252,7 +3252,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
       const blocked = Number(dashboard.blocked || 0);
-      $("strip-health").textContent = operatorVerdict(health);
+      $("strip-health").textContent = blocked > 0 ? "待审批" : operatorVerdict(health);
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
@@ -3369,9 +3369,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
-      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。这里是决策队列，不是故障列表。先预检，再决定是否推送。`;
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
+      $("review-queue-summary").textContent = mobileReview
+        ? `${peers.join("、") || "其他设备"}：${items.length} 个待审，先预检。`
+        : `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。这里是决策队列，不是故障列表。先预检，再决定是否推送。`;
       const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
