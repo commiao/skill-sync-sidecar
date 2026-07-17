@@ -476,8 +476,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("中央仓库和其他设备只读状态", DASHBOARD_HTML)
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
-                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
             )
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
@@ -501,7 +501,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("skill-chip-row", DASHBOARD_HTML)
             self.assertIn("id=\"review-queue-panel\"", DASHBOARD_HTML)
             self.assertIn("待审批清单", DASHBOARD_HTML)
-            self.assertIn("需要你判断", DASHBOARD_HTML)
+            self.assertIn("待办任务", DASHBOARD_HTML)
             self.assertIn("renderReviewQueue", DASHBOARD_HTML)
             self.assertIn("currentReviewQueueItems", DASHBOARD_HTML)
             self.assertIn("rerenderReviewQueueIfViewportModeChanged", DASHBOARD_HTML)
@@ -524,18 +524,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("完整队列在下方高级诊断", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("操作区在左；中央", DASHBOARD_HTML)
+            self.assertIn("这里是操作区；中央", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
             )
             self.assertLess(
-                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
             )
             self.assertIn("id=\"workspace-overview-summary\"", DASHBOARD_HTML)
             self.assertIn("renderWorkspaceOverviewSummary", DASHBOARD_HTML)
-            self.assertIn("Skill 管理工作台", DASHBOARD_HTML)
+            self.assertIn("本地 Skill 工作区", DASHBOARD_HTML)
             self.assertIn("可操作 · 只影响当前设备", DASHBOARD_HTML)
             self.assertIn("id=\"local-workspace-total\"", DASHBOARD_HTML)
             self.assertIn("id=\"local-workspace-blocked\"", DASHBOARD_HTML)
@@ -550,6 +550,7 @@ class OpsStatusTest(unittest.TestCase):
             )
             self.assertIn("WebDAV 快照", DASHBOARD_HTML)
             self.assertIn("共享事实源收录", DASHBOARD_HTML)
+            self.assertIn("这里不直接编辑，只接收显式推送", DASHBOARD_HTML)
             self.assertIn("statusLabel", DASHBOARD_HTML)
             self.assertIn("scopeLabel", DASHBOARD_HTML)
             self.assertIn("中央仓库状态", DASHBOARD_HTML)

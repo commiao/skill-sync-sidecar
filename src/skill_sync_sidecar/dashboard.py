@@ -2169,7 +2169,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
     }
     .review-queue {
-      margin-bottom: 12px;
+      margin: 12px 0;
       border-left: 4px solid #d8a300;
     }
     .review-queue-summary {
@@ -2191,12 +2191,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .review-item {
       display: grid;
-      grid-template-columns: minmax(180px, .85fr) minmax(0, 1.25fr) minmax(150px, auto);
-      gap: 12px;
+      grid-template-columns: minmax(180px, .9fr) minmax(0, 1fr) minmax(104px, auto);
+      gap: 8px;
       align-items: start;
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       background: #fbfcfe;
       min-width: 0;
     }
@@ -2229,6 +2229,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .review-action {
       color: var(--ink);
+      font-weight: 720;
       overflow-wrap: anywhere;
     }
     .review-next-step {
@@ -2419,7 +2420,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 12px 0 0;
     }
     .workspace-overview {
-      margin-bottom: 12px;
+      margin: 12px 0;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
@@ -2432,7 +2433,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       justify-content: space-between;
       gap: 12px;
       border-bottom: 1px solid var(--line);
-      background: #fbfcfe;
+      background: #f8fafc;
     }
     .overview-title {
       display: grid;
@@ -2440,7 +2441,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-width: 0;
     }
     .overview-title strong {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 820;
     }
     .overview-subtitle {
@@ -2847,21 +2848,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
-    <section id="review-queue-panel" class="review-queue panel" hidden>
-      <div class="panel-head">
-        <div>
-          <div class="section-label">需要你判断</div>
-          <h2>待审批清单</h2>
-        </div>
-        <span id="review-queue-count" class="pill">0</span>
-      </div>
-      <div id="review-queue-summary" class="review-queue-summary"></div>
-      <div id="review-queue" class="review-list"></div>
-    </section>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
-          <strong id="workspace-overview-title">Skill 管理工作台</strong>
+          <strong id="workspace-overview-title">本地 Skill 工作区</strong>
           <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
         </span>
         <span class="pill green">只操作本机</span>
@@ -2917,6 +2907,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="device-map" class="device-map-grid"></div>
         </div>
       </section>
+    </section>
+    <section id="review-queue-panel" class="review-queue panel" hidden>
+      <div class="panel-head">
+        <div>
+          <div class="section-label">待办任务</div>
+          <h2>待审批清单</h2>
+        </div>
+        <span id="review-queue-count" class="pill">0</span>
+      </div>
+      <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-queue" class="review-list"></div>
     </section>
     <details class="secondary-context">
       <summary>权限边界和执行细节</summary>
@@ -3373,7 +3374,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       currentReviewQueueIsMobile = mobileReview;
       $("review-queue-summary").textContent = mobileReview
         ? `${peers.join("、") || "其他设备"}：${items.length} 个待审，先预检。`
-        : `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。这里是决策队列，不是故障列表。先预检，再决定是否推送。`;
+        : `${peers.join("、") || "其他设备"}：${items.length} 个待审。先在本机预检；通过后再显式推送到中央仓库。`;
       const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
@@ -3423,10 +3424,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewActionText(item) {
-      if (item.category === "conflict") return "存在冲突，先人工合并，不要直接发布。";
-      if (item.status_action === "local_new") return "远端新增 skill，先预检内容和目标工具，再决定是否发布。";
-      if (item.status_action === "push_new") return "新 skill 等待发布，先 dry-run 审核。";
-      if (item.status_action === "push") return "已有 skill 有更新，先 dry-run 审核差异。";
+      if (item.category === "conflict") return "冲突，先人工合并。";
+      if (item.status_action === "local_new") return "远端新增，先预检。";
+      if (item.status_action === "push_new") return "新 skill 待发布。";
+      if (item.status_action === "push") return "已有 skill 待更新。";
       return item.operator_action || item.recommendation || item.reason || "查看高级诊断里的建议动作。";
     }
 
@@ -3708,7 +3709,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `操作区在左；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
+      $("workspace-overview-summary").textContent = `这里是操作区；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
     }
 
     function renderLocalWorkspace(workspace) {
@@ -3737,7 +3738,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderCentralRepository(repo) {
       $("central-repository-pill").outerHTML = pill("WebDAV 快照", "green").replace("<span", "<span id=\"central-repository-pill\"");
-      $("central-repository-summary").textContent = `共享事实源收录 ${text(repo.total_skills)} 个 skill；当前 ${text(repo.blocked)} 个变更需要显式审批。`;
+      $("central-repository-summary").textContent = `共享事实源收录 ${text(repo.total_skills)} 个 skill；这里不直接编辑，只接收显式推送。`;
       $("central-repository-kv").innerHTML = [
         row("中央版本", repo.snapshot_id),
         row("更新时间", repo.created_at),
