@@ -513,10 +513,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("review-more", DASHBOARD_HTML)
             self.assertIn("mobileReview ? 0 : 1", DASHBOARD_HTML)
             self.assertIn(".review-item > div:nth-child(2)", DASHBOARD_HTML)
-            self.assertIn("项完整队列在下方高级诊断", DASHBOARD_HTML)
+            self.assertIn("完整队列在下方高级诊断", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("左侧管理本机 skill", DASHBOARD_HTML)
+            self.assertIn("本机可操作；中央", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
@@ -535,7 +535,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"local-workspace-action-note\"", DASHBOARD_HTML)
             self.assertIn("只读状态 · 不直接编辑", DASHBOARD_HTML)
             self.assertIn("设备实测 · 只读观察", DASHBOARD_HTML)
-            self.assertIn("这里是唯一可直接操作的区域", DASHBOARD_HTML)
+            self.assertIn("扫描、预检、发布只作用于", DASHBOARD_HTML)
             self.assertIn("WebDAV 快照", DASHBOARD_HTML)
             self.assertIn("共享事实源收录", DASHBOARD_HTML)
             self.assertIn("statusLabel", DASHBOARD_HTML)

@@ -2804,7 +2804,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
         <div class="status-chip-label">当前要处理</div>
-        <div class="focus-title"><span id="strip-health">读取中</span><strong id="strip-blocked">-</strong><span>项待审批</span></div>
+        <div class="focus-title"><span id="strip-health">待审批</span><strong id="strip-blocked">-</strong><span>项</span></div>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
       <div class="status-chip focus-side">
@@ -3375,7 +3375,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         `;
       }).join("");
       const more = hiddenCount > 0
-        ? `<div class="review-more">${hiddenCount} 项完整队列在下方高级诊断。</div>`
+        ? `<div class="review-more">完整队列在下方高级诊断。</div>`
         : "";
       $("review-queue").innerHTML = `${rows}${more}`;
       setExecutorButtons(executorAvailable);
@@ -3667,7 +3667,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `左侧管理本机 skill；中央 ${text(central.total_skills)} 个 skill 只读展示；${text(deviceCount)} 台设备只读上报`;
+      $("workspace-overview-summary").textContent = `本机可操作；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
     }
 
     function renderLocalWorkspace(workspace) {
@@ -3677,7 +3677,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blocked = live.blocked ?? workspace.blocked;
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `这里是唯一可直接操作的区域。扫描、预检、发布都只针对 ${text(workspace.device_name || live.device_name || "Mac 本机")}；其他设备不会被远程改动。`;
+      $("local-workspace-summary").textContent = `扫描、预检、发布只作用于 ${text(workspace.device_name || live.device_name || "Mac 本机")}；其他设备只读。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
