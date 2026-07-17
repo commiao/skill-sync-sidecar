@@ -2181,6 +2181,60 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: grid;
       gap: 6px;
     }
+    .review-progress {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .review-stage {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .review-stage-title {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 2px;
+      overflow-wrap: anywhere;
+    }
+    .review-stage-note {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .review-feedback {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      margin: 8px 0;
+      background: #fff;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .review-feedback[hidden] {
+      display: none;
+    }
+    .review-feedback strong {
+      color: var(--ink);
+    }
+    .review-feedback.green {
+      border-color: #b8d8c8;
+      background: #f6fbf8;
+    }
+    .review-feedback.yellow {
+      border-color: #e8d29c;
+      background: #fffaf0;
+    }
+    .review-feedback.red {
+      border-color: #efb8b8;
+      background: #fff5f5;
+    }
     .review-more {
       border: 1px dashed var(--line);
       border-radius: 8px;
@@ -2237,6 +2291,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       margin-top: 4px;
       overflow-wrap: anywhere;
+    }
+    .review-result {
+      margin-top: 6px;
     }
     .review-controls {
       display: grid;
@@ -2738,6 +2795,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       .review-list {
         gap: 4px;
       }
+      .review-progress {
+        grid-template-columns: 1fr;
+        gap: 5px;
+        margin: 6px 0;
+      }
+      .review-stage {
+        padding: 7px 9px;
+      }
+      .review-stage-note {
+        display: none;
+      }
+      .review-feedback {
+        font-size: 12px;
+        margin: 6px 0;
+      }
       .review-item {
         display: none;
       }
@@ -2917,6 +2989,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         <span id="review-queue-count" class="pill">0</span>
       </div>
       <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-progress" class="review-progress" aria-label="待审批处理进度"></div>
+      <div id="review-feedback" class="review-feedback" hidden>
+        <strong id="review-feedback-title">等待操作</strong>
+        <span id="review-feedback-detail">先运行预检。</span>
+      </div>
       <div id="review-queue" class="review-list"></div>
     </section>
     <details class="secondary-context">
@@ -3127,6 +3204,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let localWorkspaceFromExecutor = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
+    let reviewTaskResults = {};
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -3375,6 +3453,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-summary").textContent = mobileReview
         ? `${peers.join("、") || "其他设备"}：${items.length} 个待审，先预检。`
         : `${peers.join("、") || "其他设备"}：${items.length} 个待审。先在本机预检；通过后再显式推送到中央仓库。`;
+      renderReviewProgress(items);
       const visibleItems = items.slice(0, mobileReview ? 0 : 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
@@ -3393,6 +3472,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div>
               <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
               <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
+              <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
               ${command ? `
                 <details class="review-command">
                   <summary>查看 dry-run 命令</summary>
@@ -3415,6 +3495,57 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       $("review-queue").innerHTML = `${rows}${more}`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderReviewProgress(items) {
+      const total = Array.isArray(items) ? items.length : 0;
+      const checked = Array.isArray(items)
+        ? items.filter((item) => reviewTaskResults[item.skill_id]).length
+        : 0;
+      const publishReady = Object.values(reviewTaskResults).filter((result) => result && result.publishReady).length;
+      const executorState = executorAvailable ? "已连接" : "未连接";
+      const executorKind = executorAvailable ? "green" : "yellow";
+      const dryRunKind = checked > 0 ? "green" : "yellow";
+      const publishKind = publishReady > 0 ? "green" : "yellow";
+      $("review-progress").innerHTML = [
+        reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
+        reviewStage("2", "预检待审批", `${checked}/${total} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
+        reviewStage("3", "确认发布", `${publishReady}/${total} 可发布`, publishKind, "发布需要再次确认。"),
+      ].join("");
+    }
+
+    function reviewStage(index, title, status, kind, note) {
+      return `
+        <div class="review-stage">
+          <div class="review-stage-title">${escapeHtml(index)}. ${escapeHtml(title)} ${pill(status, kind)}</div>
+          <div class="review-stage-note">${escapeHtml(note)}</div>
+        </div>
+      `;
+    }
+
+    function setReviewFeedback(kind, title, detail) {
+      const feedback = $("review-feedback");
+      if (!feedback) return;
+      feedback.hidden = false;
+      feedback.className = `review-feedback ${kind || ""}`;
+      $("review-feedback-title").textContent = title;
+      $("review-feedback-detail").textContent = detail;
+    }
+
+    function updateReviewTaskResult(skillId, result) {
+      if (!skillId) return;
+      reviewTaskResults = { ...reviewTaskResults, [skillId]: result };
+      renderReviewQueue(currentReviewQueueItems);
+    }
+
+    function reviewResultText(item) {
+      const result = reviewTaskResults[item.skill_id];
+      return result ? result.label : "等待预检";
+    }
+
+    function reviewResultKind(item) {
+      const result = reviewTaskResults[item.skill_id];
+      return result ? result.kind : "yellow";
     }
 
     function rerenderReviewQueueIfViewportModeChanged() {
@@ -3587,6 +3718,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("executor-status").textContent = detail;
       const localNote = $("local-workspace-action-note");
       if (localNote) localNote.textContent = detail;
+      if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
 
     function setExecutorButtons(available) {
@@ -3600,6 +3732,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
         button.disabled = !available || !button.dataset.skillId;
       });
+      if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
 
     async function runExecutorAction(mode) {
@@ -3608,16 +3741,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (isPublish) {
         if (!lastDryRunSafe) {
           showExecutorOutput("请先运行 dry-run，并确认 safe_to_push=true。");
+          setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认 safe_to_push=true 后再发布到中央仓库。");
           return;
         }
         const typed = window.prompt("发布会写入 WebDAV。请输入 PUBLISH 确认：");
         if (typed !== "PUBLISH") {
           showExecutorOutput("已取消发布。");
+          setReviewFeedback("yellow", "发布已取消", "没有写入 WebDAV，待审批项仍保留。");
           return;
         }
       }
       setExecutorButtons(false);
       setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行 dry-run，请稍等。", "yellow");
+      setReviewFeedback("yellow", isPublish ? "正在发布" : "正在预检", isPublish ? "正在写入中央仓库，请等待完成。" : "预检只读，不会写入中央仓库。");
       try {
         const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
         const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
@@ -3634,12 +3770,25 @@ DASHBOARD_HTML = r"""<!doctype html>
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok) {
           setExecutorStatus(isPublish ? "published" : "dry-run ok", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "dry-run 通过：safe_to_push=true，可以继续确认发布。", "green");
+          setReviewFeedback(
+            "green",
+            isPublish ? "发布完成" : "预检通过",
+            isPublish ? "中央仓库已更新，请等待 1-2 分钟后刷新状态。" : "safe_to_push=true，可以继续确认发布到中央仓库。",
+          );
+          if (!isPublish) {
+            currentGuideSkills.forEach((skillId) => {
+              reviewTaskResults[skillId] = { label: "预检通过", kind: "green", publishReady: true };
+            });
+            renderReviewQueue(currentReviewQueueItems);
+          }
         } else {
           setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
+          setReviewFeedback("red", "执行失败", payload.error || "请查看下方执行输出。");
         }
       } catch (err) {
         showExecutorOutput(String(err));
         setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
+        setReviewFeedback("red", "执行器调用失败", "请确认 Mac 本机执行器仍在线。");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -3649,6 +3798,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!executorAvailable || !skillId) return;
       setExecutorButtons(false);
       setExecutorStatus("dry-run", `正在预检 ${skillId}，请稍等。`, "yellow");
+      setReviewFeedback("yellow", `正在预检 ${skillId}`, "预检只读，不会写入中央仓库。");
       try {
         const response = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-dry-run`, {
           method: "POST",
@@ -3660,14 +3810,22 @@ DASHBOARD_HTML = r"""<!doctype html>
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok && payload.safe_to_push) {
           setExecutorStatus("dry-run ok", `${skillId} 预检通过：safe_to_push=true。`, "green");
+          updateReviewTaskResult(skillId, { label: "预检通过", kind: "green", publishReady: true });
+          setReviewFeedback("green", `${skillId} 预检通过`, "safe_to_push=true，可以继续确认发布到中央仓库。");
         } else if (payload.ok) {
           setExecutorStatus("needs review", `${skillId} 预检完成，但还不能发布，请看输出。`, "yellow");
+          updateReviewTaskResult(skillId, { label: "需复核", kind: "yellow", publishReady: false });
+          setReviewFeedback("yellow", `${skillId} 需要复核`, "预检完成但还不能发布，请查看执行输出。");
         } else {
           setExecutorStatus("failed", payload.error || `${skillId} 预检失败，请查看输出。`, "red");
+          updateReviewTaskResult(skillId, { label: "预检失败", kind: "red", publishReady: false });
+          setReviewFeedback("red", `${skillId} 预检失败`, payload.error || "请查看执行输出。");
         }
       } catch (err) {
         showExecutorOutput(String(err));
         setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
+        updateReviewTaskResult(skillId, { label: "调用失败", kind: "red", publishReady: false });
+        setReviewFeedback("red", "执行器调用失败", "请确认 Mac 本机执行器仍在线。");
       } finally {
         setExecutorButtons(executorAvailable);
       }
