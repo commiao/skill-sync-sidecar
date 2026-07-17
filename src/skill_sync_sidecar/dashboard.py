@@ -2747,6 +2747,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
+    <section id="review-queue-panel" class="review-queue panel" hidden>
+      <div class="panel-head">
+        <div>
+          <div class="section-label">需要你判断</div>
+          <h2>待审批清单</h2>
+        </div>
+        <span id="review-queue-count" class="pill">0</span>
+      </div>
+      <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-queue" class="review-list"></div>
+    </section>
     <section class="scope-switchboard" aria-label="Skill 同步分区">
       <div class="scope-card local">
         <div class="scope-card-head">
@@ -2780,17 +2791,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
         </div>
       </div>
-    </section>
-    <section id="review-queue-panel" class="review-queue panel" hidden>
-      <div class="panel-head">
-        <div>
-          <div class="section-label">需要你判断</div>
-          <h2>待审批清单</h2>
-        </div>
-        <span id="review-queue-count" class="pill">0</span>
-      </div>
-      <div id="review-queue-summary" class="review-queue-summary"></div>
-      <div id="review-queue" class="review-list"></div>
     </section>
     <section class="decision-console">
       <div id="operator-panel" class="panel decision-status">

@@ -471,8 +471,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("中央仓库和其他设备只读状态", DASHBOARD_HTML)
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
-                DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
                 DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+                DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
             )
             self.assertLess(
                 DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
