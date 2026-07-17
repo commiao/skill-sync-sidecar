@@ -446,17 +446,17 @@ class OpsStatusTest(unittest.TestCase):
             self.assertTrue(any(device["id"] == "oc-vps" and device["operation_scope"] == "remote_read_only" for device in status["dashboard"]["device_map"]["items"]))
             self.assertIn("/api/summary", DASHBOARD_HTML)
             self.assertIn("Skill 同步工作台", DASHBOARD_HTML)
-            self.assertIn("本机操作 · 中央仓库 · 设备状态", DASHBOARD_HTML)
+            self.assertIn("本机可操作；中央仓库与其他设备只读", DASHBOARD_HTML)
             self.assertIn("status-strip", DASHBOARD_HTML)
             self.assertIn("当前处理状态", DASHBOARD_HTML)
-            self.assertIn("同步待办", DASHBOARD_HTML)
+            self.assertIn("本机待办", DASHBOARD_HTML)
             self.assertIn("id=\"strip-health\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-blocked\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-focus-note\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-scan-local\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-dry-run\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-action-note\"", DASHBOARD_HTML)
-            self.assertIn("同步待办", DASHBOARD_HTML)
+            self.assertIn("本机待办", DASHBOARD_HTML)
             self.assertIn("blocked > 0 ? \"项待预检\"", DASHBOARD_HTML)
             self.assertIn("这不是服务故障", DASHBOARD_HTML)
             self.assertIn("同步范围摘要", DASHBOARD_HTML)
@@ -536,7 +536,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("完整队列在下方高级诊断", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("这里是操作区；中央", DASHBOARD_HTML)
+            self.assertIn("本区可操作；中央", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
@@ -561,8 +561,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("已检测工具", DASHBOARD_HTML)
             self.assertIn("需整理提示", DASHBOARD_HTML)
             self.assertIn("只读状态 · 不直接编辑", DASHBOARD_HTML)
-            self.assertIn("设备实测 · 只读观察", DASHBOARD_HTML)
-            self.assertIn("的本地 skill：扫描、预检、再显式推送", DASHBOARD_HTML)
+            self.assertIn("其他设备 · 只读观察", DASHBOARD_HTML)
+            self.assertIn("的本地 skill：扫描目录，预检后再推送", DASHBOARD_HTML)
+            self.assertIn("otherDeviceItems", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<div class=\"workspace-actions\">"),
                 DASHBOARD_HTML.index("<div class=\"workspace-metrics\">"),

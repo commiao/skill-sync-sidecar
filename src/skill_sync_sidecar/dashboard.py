@@ -2780,6 +2780,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
+      html,
+      body {
+        max-width: 100%;
+        overflow-x: hidden;
+      }
       .portal-link { margin: 8px 14px 0; }
       header {
         flex-direction: row;
@@ -2790,16 +2795,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       h1 { font-size: 17px; }
       .brand-subtitle { display: none; }
       .toolbar { gap: 8px; font-size: 12px; }
+      #updated { display: none; }
       .toolbar button { padding: 6px 9px; }
       main { padding: 14px; }
-      .status-strip { grid-template-columns: minmax(0, 1fr) 118px; gap: 8px; }
+      .status-strip { grid-template-columns: 1fr; gap: 8px; }
       .focus-main { padding: 12px; }
       .focus-title { font-size: 18px; }
       .focus-title strong { font-size: 22px; }
       .focus-note { display: none; }
       .focus-side { padding: 8px; align-content: center; }
       .focus-side button { padding: 7px 8px; }
-      .focus-side-actions { grid-template-columns: 1fr; }
+      .focus-side-actions { grid-template-columns: 1fr 1fr; }
       .focus-side-note { display: none; }
       .focus-metrics { display: none; }
       .scope-switchboard { grid-template-columns: 1fr; }
@@ -2816,6 +2822,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
+      .workspace-overview-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
       .workspace-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
       .workspace-metric { padding: 7px 6px; }
       .workspace-metric-value { font-size: 17px; }
@@ -2825,9 +2835,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-tool-summary-value { font-size: 15px; }
       .workspace-tool-summary-label { font-size: 10px; }
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
-      .workspace-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
+      .workspace-actions { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
-      #local-workspace-refresh { grid-column: 1 / -1; }
       .local-action-note,
       #local-workspace-boundary,
       #central-repository-boundary,
@@ -2939,7 +2948,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 同步工作台</h1>
-      <div class="brand-subtitle">本机操作 · 中央仓库 · 设备状态</div>
+      <div class="brand-subtitle">本机可操作；中央仓库与其他设备只读</div>
     </div>
     <div class="toolbar">
       <span id="updated">Loading</span>
@@ -2950,7 +2959,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div id="error" class="error"></div>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
-        <div class="status-chip-label">同步待办</div>
+        <div class="status-chip-label">本机待办</div>
         <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">项待预检</span></div>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
@@ -2988,7 +2997,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="panel local-workspace-panel">
           <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
           <div class="workspace-title">
-            <h2>本机 Skill 工作区</h2>
+            <h2>本机操作</h2>
             <span id="local-workspace-pill" class="pill">checking</span>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
@@ -3030,7 +3039,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="central-repository-boundary" class="boundary-note"></div>
         </div>
         <div class="panel workbench-full">
-          <div class="readonly-kicker">设备实测 · 只读观察</div>
+          <div class="readonly-kicker">其他设备 · 只读观察</div>
           <div class="workspace-title">
             <h2>其他设备状态</h2>
             <span class="pill">read-only</span>
@@ -3062,7 +3071,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="scope-switchboard" aria-label="Skill 同步分区">
       <div class="scope-card local">
         <div class="scope-card-head">
-          <h2>本机 Skill 工作区</h2>
+          <h2>本机操作</h2>
           <span class="pill green">可操作</span>
         </div>
         <div id="scope-local-count" class="scope-card-count">-</div>
@@ -3089,7 +3098,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span class="pill">read-only</span>
           </div>
           <div id="scope-device-count" class="scope-card-count">-</div>
-          <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
+          <div id="scope-device-note" class="scope-card-note">OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
         </div>
       </div>
     </section>
@@ -3389,7 +3398,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const local = dashboard.local_workspace || {};
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
-      const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
+      const deviceCount = otherDeviceItems(map.items).length;
       const blocked = Number(dashboard.blocked || 0);
       $("strip-health").textContent = blocked > 0 ? "项待预检" : "项待办";
       $("strip-blocked").textContent = text(blocked);
@@ -3427,10 +3436,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const local = dashboard.local_workspace || {};
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
-      const items = Array.isArray(map.items) ? map.items : [];
+      const items = otherDeviceItems(map.items);
       $("scope-local-count").textContent = `${text(local.total_skills)} 个本机 skill`;
       $("scope-central-count").textContent = `${text(central.total_skills)} 个中央 skill`;
-      $("scope-device-count").textContent = `${text(items.length)} 台设备`;
+      $("scope-device-count").textContent = `${text(items.length)} 台其他设备`;
       $("scope-local-note").textContent = "授权扫描本机目录；操作只影响当前设备。";
       $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要显式审批。`;
       $("scope-device-note").textContent = "其他设备只展示各自 Agent 上报的实测状态，Gateway 不远程改设备。";
@@ -3926,8 +3935,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const local = dashboard.local_workspace || {};
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
-      const deviceCount = Array.isArray(map.items) ? map.items.length : 0;
-      $("workspace-overview-summary").textContent = `这里是操作区；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台设备只读`;
+      const deviceCount = otherDeviceItems(map.items).length;
+      $("workspace-overview-summary").textContent = `本区可操作；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台其他设备只读`;
     }
 
     function renderLocalWorkspace(workspace) {
@@ -3938,7 +3947,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `这里管理当前设备（${deviceName}）的本地 skill：扫描、预检、再显式推送到中央仓库。`;
+      $("local-workspace-summary").textContent = `${deviceName} 的本地 skill：扫描目录，预检后再推送中央仓库。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
@@ -3989,9 +3998,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderDeviceMap(map) {
-      const items = Array.isArray(map.items) ? map.items : [];
-      $("device-map-summary").textContent = map.boundary || "设备地图默认只读。";
-      $("device-map").innerHTML = items.map((device) => `
+      const items = otherDeviceItems(map.items);
+      $("device-map-summary").textContent = items.length > 0
+        ? (map.boundary || "其他设备默认只读。")
+        : "暂无其他设备上报；本机操作在左侧完成。";
+      $("device-map").innerHTML = items.length > 0 ? items.map((device) => `
         <div class="device-map-item">
           <div class="card-head">
             <div>
@@ -4005,7 +4016,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div>权限 ${escapeHtml(scopeLabel(device.operation_scope))} · ${freshnessPill(device.freshness)}</div>
           </div>
         </div>
-      `).join("");
+      `).join("") : `<div class="empty">暂无其他设备状态。</div>`;
+    }
+
+    function otherDeviceItems(items) {
+      return (Array.isArray(items) ? items : []).filter((device) => device && device.operation_scope !== "local");
     }
 
     async function refreshLocalWorkspace() {
