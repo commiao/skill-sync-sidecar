@@ -2657,7 +2657,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
       .guide-steps { grid-template-columns: 1fr; }
-      .workspace-metrics { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -2685,6 +2684,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
+      .workspace-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .workspace-metric { padding: 7px 6px; }
+      .workspace-metric-value { font-size: 17px; }
+      .workspace-metric-label { font-size: 11px; line-height: 1.2; }
       .review-queue-summary {
         font-size: 12px;
         line-height: 1.4;
@@ -3300,7 +3303,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"} 有 ${items.length} 个变更等待确认。先 dry-run，看清楚再决定是否推送到中央仓库。`;
-      const visibleItems = items.slice(0, 2);
+      const visibleItems = items.slice(0, 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
         const command = item.operator_command || "";
