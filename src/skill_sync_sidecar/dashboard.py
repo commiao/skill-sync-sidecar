@@ -2633,6 +2633,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       .review-next-step {
         grid-column: 1 / -1;
+        display: none;
       }
       .review-item > div:nth-child(2) {
         grid-column: 1 / -1;
