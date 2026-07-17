@@ -2623,13 +2623,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     @media (max-width: 560px) {
       main { padding: 14px; }
-      .status-strip { grid-template-columns: 1fr; gap: 8px; }
+      .status-strip { grid-template-columns: minmax(0, 1fr) 118px; gap: 8px; }
       .focus-main { padding: 12px; }
       .focus-title { font-size: 18px; }
       .focus-title strong { font-size: 22px; }
-      .focus-note { margin-top: 5px; font-size: 12px; }
-      .focus-side { padding: 10px; }
-      .focus-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .focus-note { display: none; }
+      .focus-side { padding: 8px; align-content: center; }
+      .focus-side button { padding: 7px 8px; }
+      .focus-metrics { display: none; }
       .scope-switchboard { grid-template-columns: 1fr; }
       .scope-readonly-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
       .scope-card { padding: 12px; }
