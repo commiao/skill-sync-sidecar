@@ -2688,6 +2688,25 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-metric { padding: 7px 6px; }
       .workspace-metric-value { font-size: 17px; }
       .workspace-metric-label { font-size: 11px; line-height: 1.2; }
+      .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
+      .workspace-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+      .workspace-actions button { padding: 7px 8px; }
+      #local-workspace-refresh { grid-column: 1 / -1; }
+      .local-action-note,
+      #local-workspace-boundary,
+      #central-repository-boundary,
+      #central-repository-kv,
+      #device-map {
+        display: none;
+      }
+      .workspace-tools {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 78px;
+        overflow: hidden;
+      }
+      .workspace-tool { padding: 5px 6px; }
+      .workspace-tool-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+      .workspace-tool-row .pill { display: none; }
       .review-queue-summary {
         font-size: 12px;
         line-height: 1.4;
