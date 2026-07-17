@@ -1597,7 +1597,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .focus-side {
       display: grid;
       gap: 8px;
-      align-content: start;
+      align-content: center;
       background: #fbfcfe;
     }
     .focus-side button {
@@ -1605,6 +1605,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .focus-side-actions {
       display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 7px;
     }
     .focus-side-note {
@@ -1621,7 +1622,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .focus-metric {
       border: 1px solid var(--line);
       border-radius: 6px;
-      padding: 6px 7px;
+      padding: 5px 7px;
       background: #fff;
       min-width: 0;
     }
@@ -2798,6 +2799,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .focus-note { display: none; }
       .focus-side { padding: 8px; align-content: center; }
       .focus-side button { padding: 7px 8px; }
+      .focus-side-actions { grid-template-columns: 1fr; }
       .focus-side-note { display: none; }
       .focus-metrics { display: none; }
       .scope-switchboard { grid-template-columns: 1fr; }
