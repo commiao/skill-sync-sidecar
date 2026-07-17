@@ -2553,6 +2553,32 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: -4px 0 10px;
       overflow-wrap: anywhere;
     }
+    .workspace-tool-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .workspace-tool-summary-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 7px 8px;
+      min-width: 0;
+    }
+    .workspace-tool-summary-value {
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 820;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+    .workspace-tool-summary-label {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
     .workspace-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2582,6 +2608,30 @@ DASHBOARD_HTML = r"""<!doctype html>
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
       margin-top: 10px;
+    }
+    .workspace-tool-details {
+      margin-top: 8px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .workspace-tool-details > summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 760;
+      list-style: none;
+    }
+    .workspace-tool-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .workspace-tool-details > summary::after {
+      content: "展开";
+      margin-left: 6px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .workspace-tool-details[open] > summary::after {
+      content: "收起";
     }
     .workspace-tool {
       border: 1px solid var(--line);
@@ -2768,6 +2818,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-metric { padding: 7px 6px; }
       .workspace-metric-value { font-size: 17px; }
       .workspace-metric-label { font-size: 11px; line-height: 1.2; }
+      .workspace-tool-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+      .workspace-tool-summary-item { padding: 6px; }
+      .workspace-tool-summary-value { font-size: 15px; }
+      .workspace-tool-summary-label { font-size: 10px; }
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
       .workspace-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
@@ -2956,7 +3010,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
           </div>
           <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
-          <div id="local-workspace-tools" class="workspace-tools"></div>
+          <div id="local-workspace-tool-summary" class="workspace-tool-summary"></div>
+          <details class="workspace-tool-details">
+            <summary>工具目录明细</summary>
+            <div id="local-workspace-tools" class="workspace-tools"></div>
+          </details>
           <div id="local-workspace-boundary" class="boundary-note"></div>
         </div>
         <div class="panel">
@@ -3882,6 +3940,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
+      renderLocalToolSummary(tools);
       $("local-workspace-tools").innerHTML = tools.map((tool) => `
         <div class="workspace-tool">
           <div class="workspace-tool-row">
@@ -3892,6 +3951,27 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       `).join("");
       $("local-workspace-boundary").textContent = workspace.boundary || "本地工作区只操作浏览器所在设备。";
+    }
+
+    function renderLocalToolSummary(tools) {
+      const items = Array.isArray(tools) ? tools : [];
+      const detected = items.filter((tool) => tool.state === "detected" || tool.installed).length;
+      const warnings = items.reduce((sum, tool) => sum + Number((tool.risk || {}).warning || 0), 0);
+      const errors = items.reduce((sum, tool) => sum + Number((tool.risk || {}).error || 0), 0);
+      $("local-workspace-tool-summary").innerHTML = [
+        toolSummaryItem(detected, "已检测工具"),
+        toolSummaryItem(warnings, "需整理提示"),
+        toolSummaryItem(errors, "错误"),
+      ].join("");
+    }
+
+    function toolSummaryItem(value, label) {
+      return `
+        <div class="workspace-tool-summary-item">
+          <div class="workspace-tool-summary-value">${escapeHtml(text(value))}</div>
+          <div class="workspace-tool-summary-label">${escapeHtml(label)}</div>
+        </div>
+      `;
     }
 
     function renderCentralRepository(repo) {
