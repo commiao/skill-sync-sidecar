@@ -507,7 +507,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("review-controls", DASHBOARD_HTML)
             self.assertIn("review-dry-run-button", DASHBOARD_HTML)
             self.assertIn("runExecutorActionForSkill", DASHBOARD_HTML)
-            self.assertIn("预检此项", DASHBOARD_HTML)
+            self.assertIn("预检", DASHBOARD_HTML)
             self.assertIn(".review-meta-item:not(:last-child)", DASHBOARD_HTML)
             self.assertIn("查看 dry-run 命令", DASHBOARD_HTML)
             self.assertIn("review-more", DASHBOARD_HTML)

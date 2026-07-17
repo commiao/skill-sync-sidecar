@@ -2739,7 +2739,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         gap: 5px;
       }
       .review-controls .pill {
-        justify-self: end;
+        display: none;
       }
       .review-controls button {
         width: auto;
@@ -3357,7 +3357,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             <div class="review-controls">
               ${pill(reviewStatusText(item), "yellow")}
-              <button type="button" class="review-dry-run-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="runExecutorActionForSkill(this.dataset.skillId)" disabled>预检此项</button>
+              <button type="button" class="review-dry-run-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="runExecutorActionForSkill(this.dataset.skillId)" disabled>预检</button>
             </div>
           </div>
         `;
