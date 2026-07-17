@@ -2552,7 +2552,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-head { margin-bottom: 4px; }
       .scope-card-count { font-size: 16px; margin-bottom: 2px; }
       .scope-card.local .scope-card-count { font-size: 18px; margin-bottom: 4px; }
-      .scope-card-focus { font-size: 13px; margin: 6px 0 0; }
+      .scope-card-focus { display: none; }
       .scope-card-note { font-size: 12px; line-height: 1.35; }
       .scope-card.readonly .scope-card-note { display: none; }
       .scope-card-actions { margin-top: 8px; }
@@ -3072,7 +3072,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("scope-local-count").textContent = `${text(local.total_skills)} 个本机 skill`;
       $("scope-central-count").textContent = `${text(central.total_skills)} 个中央 skill`;
       $("scope-device-count").textContent = `${text(items.length)} 台设备`;
-      $("scope-local-note").textContent = "授权发现本机目录是管理本机 skill 的必要能力；扫描、预检、推送都只针对当前设备。";
+      $("scope-local-note").textContent = "授权扫描本机目录；操作只影响当前设备。";
       $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要显式审批。`;
       $("scope-device-note").textContent = "其他设备只展示各自 Agent 上报的实测状态，Gateway 不远程改设备。";
     }
