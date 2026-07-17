@@ -2615,6 +2615,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       .review-action {
         display: none;
       }
+      .review-meta {
+        margin-top: 4px;
+      }
+      .review-meta-item:not(:last-child),
+      .review-command {
+        display: none;
+      }
       .review-controls {
         grid-column: 1 / -1;
         grid-template-columns: minmax(0, 1fr) auto;
