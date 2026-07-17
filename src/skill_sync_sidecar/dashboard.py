@@ -2732,13 +2732,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         display: none;
       }
       .review-controls {
-        grid-column: 1 / -1;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-column: auto;
+        grid-template-columns: 1fr;
         align-items: center;
-        justify-items: stretch;
+        justify-items: end;
+        gap: 5px;
       }
       .review-controls .pill {
         justify-self: end;
+      }
+      .review-controls button {
+        width: auto;
+        padding: 6px 8px;
       }
       .review-next-step {
         grid-column: 1 / -1;
@@ -3321,7 +3326,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
-      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"} 有 ${items.length} 个变更等待确认。先 dry-run，看清楚再决定是否推送到中央仓库。`;
+      $("review-queue-summary").textContent = `${peers.join("、") || "其他设备"}：${items.length} 个变更待审。先预检，再决定是否推送。`;
       const visibleItems = items.slice(0, 1);
       const hiddenCount = items.length - visibleItems.length;
       const rows = visibleItems.map((item) => {
