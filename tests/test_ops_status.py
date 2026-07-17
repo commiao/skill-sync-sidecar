@@ -456,11 +456,17 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
             self.assertIn("Skill 同步分区", DASHBOARD_HTML)
+            self.assertIn("scope-readonly-rail", DASHBOARD_HTML)
             self.assertIn("id=\"scope-local-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-central-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-device-count\"", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-scan\"", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-dry-run\"", DASHBOARD_HTML)
+            self.assertIn("id=\"scope-publish\"", DASHBOARD_HTML)
             self.assertIn("renderScopeSwitchboard", DASHBOARD_HTML)
             self.assertIn("授权发现本机目录", DASHBOARD_HTML)
+            self.assertIn("这里的操作只影响当前设备", DASHBOARD_HTML)
+            self.assertIn("中央仓库和其他设备只读状态", DASHBOARD_HTML)
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),

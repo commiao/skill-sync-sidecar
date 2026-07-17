@@ -1594,9 +1594,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .scope-switchboard {
       display: grid;
-      grid-template-columns: minmax(320px, 1.2fr) minmax(240px, .9fr) minmax(240px, .9fr);
+      grid-template-columns: minmax(420px, 1.55fr) minmax(260px, .75fr);
       gap: 12px;
       margin-bottom: 12px;
+      align-items: stretch;
+    }
+    .scope-readonly-rail {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
     }
     .scope-card {
       border: 1px solid var(--line);
@@ -1608,6 +1614,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .scope-card.local {
       border-left: 4px solid var(--blue);
       background: #fafdff;
+      padding: 18px;
     }
     .scope-card.readonly {
       background: #fbfcfe;
@@ -1631,10 +1638,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.2;
       margin-bottom: 4px;
     }
+    .scope-card.local .scope-card-count {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
     .scope-card-note {
       color: var(--muted);
       min-height: 38px;
       overflow-wrap: anywhere;
+    }
+    .scope-card-focus {
+      color: var(--ink);
+      font-weight: 720;
+      line-height: 1.45;
+      margin: 10px 0 2px;
     }
     .scope-card-actions {
       display: flex;
@@ -2509,6 +2526,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .operator-band { grid-template-columns: 1fr; }
       .status-strip { grid-template-columns: 1fr 1fr; }
       .scope-switchboard { grid-template-columns: 1fr; }
+      .scope-readonly-rail { grid-template-columns: 1fr 1fr; }
       .decision-console { grid-template-columns: 1fr; }
       .decision-boundary { grid-column: auto; }
       .scope-list { grid-template-columns: 1fr; }
@@ -2527,13 +2545,18 @@ DASHBOARD_HTML = r"""<!doctype html>
     @media (max-width: 560px) {
       main { padding: 14px; }
       .status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .scope-switchboard { grid-template-columns: 1fr; }
+      .scope-readonly-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
       .scope-card { padding: 12px; }
       .scope-switchboard { gap: 8px; }
       .scope-card-head { margin-bottom: 4px; }
       .scope-card-count { font-size: 16px; margin-bottom: 2px; }
+      .scope-card.local .scope-card-count { font-size: 18px; margin-bottom: 4px; }
+      .scope-card-focus { font-size: 13px; margin: 6px 0 0; }
       .scope-card-note { font-size: 12px; line-height: 1.35; }
       .scope-card.readonly .scope-card-note { display: none; }
       .scope-card-actions { margin-top: 8px; }
+      .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
       .status-chip.primary { grid-column: auto; }
@@ -2629,26 +2652,30 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div id="scope-local-count" class="scope-card-count">-</div>
         <div id="scope-local-note" class="scope-card-note">只扫描和处理当前浏览器所在设备。</div>
+        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，发布也必须显式推送到中央仓库。</div>
         <div class="scope-card-actions">
-          <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button type="button" onclick="runExecutorAction('dry_run')">预检待推送</button>
+          <button id="scope-scan" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+          <button id="scope-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央</button>
         </div>
       </div>
-      <div class="scope-card readonly">
-        <div class="scope-card-head">
-          <h2>中央仓库</h2>
-          <span class="pill">read-only</span>
+      <div class="scope-readonly-rail" aria-label="中央仓库和其他设备只读状态">
+        <div class="scope-card readonly">
+          <div class="scope-card-head">
+            <h2>中央仓库</h2>
+            <span class="pill">read-only</span>
+          </div>
+          <div id="scope-central-count" class="scope-card-count">-</div>
+          <div id="scope-central-note" class="scope-card-note">WebDAV canonical snapshot，只接受显式 approved push。</div>
         </div>
-        <div id="scope-central-count" class="scope-card-count">-</div>
-        <div id="scope-central-note" class="scope-card-note">WebDAV canonical snapshot，只接受显式 approved push。</div>
-      </div>
-      <div class="scope-card readonly">
-        <div class="scope-card-head">
-          <h2>其他设备</h2>
-          <span class="pill">read-only</span>
+        <div class="scope-card readonly">
+          <div class="scope-card-head">
+            <h2>其他设备</h2>
+            <span class="pill">read-only</span>
+          </div>
+          <div id="scope-device-count" class="scope-card-count">-</div>
+          <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
         </div>
-        <div id="scope-device-count" class="scope-card-count">-</div>
-        <div id="scope-device-note" class="scope-card-note">Mac / OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
       </div>
     </section>
     <section id="review-queue-panel" class="review-queue panel" hidden>
@@ -3294,6 +3321,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setExecutorButtons(available) {
       $("executor-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("executor-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      $("scope-dry-run").disabled = !available || currentGuideSkills.length === 0;
+      $("scope-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
       $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("local-workspace-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
     }
