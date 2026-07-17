@@ -2096,7 +2096,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .review-item {
       display: grid;
-      grid-template-columns: minmax(180px, .9fr) minmax(0, 1.4fr) auto;
+      grid-template-columns: minmax(180px, .85fr) minmax(0, 1.25fr) minmax(150px, auto);
       gap: 12px;
       align-items: start;
       border: 1px solid var(--line);
@@ -2114,9 +2114,43 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .review-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .review-meta-item {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 11px;
+      font-weight: 720;
+      line-height: 1.2;
+      padding: 3px 7px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
     .review-action {
       color: var(--ink);
       overflow-wrap: anywhere;
+    }
+    .review-next-step {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+    .review-controls {
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+      min-width: 0;
+    }
+    .review-controls button {
+      width: 100%;
+      white-space: nowrap;
     }
     .review-command {
       margin-top: 6px;
@@ -2580,6 +2614,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       .review-source,
       .review-action {
         display: none;
+      }
+      .review-controls {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        justify-items: stretch;
+      }
+      .review-controls .pill {
+        justify-self: end;
+      }
+      .review-next-step {
+        grid-column: 1 / -1;
       }
       .review-item > div:nth-child(2) {
         grid-column: 1 / -1;
@@ -3157,9 +3203,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div>
               <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
               <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
+              <div class="review-meta">
+                <span class="review-meta-item">${escapeHtml(reviewSourceText(item))}</span>
+                <span class="review-meta-item">${escapeHtml(reviewCategoryText(item))}</span>
+                <span class="review-meta-item">${escapeHtml(reviewRiskText(item))}</span>
+              </div>
             </div>
             <div>
               <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
+              <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
               ${command ? `
                 <details class="review-command">
                   <summary>查看 dry-run 命令</summary>
@@ -3170,7 +3222,10 @@ DASHBOARD_HTML = r"""<!doctype html>
                 </details>
               ` : ""}
             </div>
-            ${pill(reviewStatusText(item), "yellow")}
+            <div class="review-controls">
+              ${pill(reviewStatusText(item), "yellow")}
+              <button type="button" class="review-dry-run-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="runExecutorActionForSkill(this.dataset.skillId)" disabled>预检此项</button>
+            </div>
           </div>
         `;
       }).join("");
@@ -3178,6 +3233,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? `<div class="review-more">还有 ${hiddenCount} 项，完整明细见下方高级诊断。</div>`
         : "";
       $("review-queue").innerHTML = `${rows}${more}`;
+      setExecutorButtons(executorAvailable);
     }
 
     function reviewActionText(item) {
@@ -3186,6 +3242,34 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.status_action === "push_new") return "新 skill 等待发布，先 dry-run 审核。";
       if (item.status_action === "push") return "已有 skill 有更新，先 dry-run 审核差异。";
       return item.operator_action || item.recommendation || item.reason || "查看高级诊断里的建议动作。";
+    }
+
+    function reviewSourceText(item) {
+      const peer = item.peer_name || item.peer_id || "未知设备";
+      return `来源 ${text(peer)}`;
+    }
+
+    function reviewCategoryText(item) {
+      if (item.category === "writer_policy") return "需要显式发布";
+      if (item.category === "conflict") return "冲突";
+      if (item.category === "delete") return "删除确认";
+      return text(item.category || item.status_action || "待审批");
+    }
+
+    function reviewRiskText(item) {
+      if (item.category === "conflict") return "高风险";
+      if (item.category === "delete") return "高风险";
+      if (item.status_action === "push_new" || item.status_action === "local_new") return "中风险";
+      if (item.status_action === "push") return "低风险";
+      return "需确认";
+    }
+
+    function reviewNextStepText(item) {
+      if (item.category === "conflict") return "下一步：先生成冲突包并人工合并。";
+      if (item.category === "delete") return "下一步：确认删除意图，未确认前不要 apply。";
+      if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：预检内容和目标工具，确认后再发布。";
+      if (item.status_action === "push") return "下一步：预检差异，通过后再发布到中央仓库。";
+      return "下一步：查看 dry-run 输出和高级诊断。";
     }
 
     function reviewStatusText(item) {
@@ -3325,6 +3409,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("scope-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
       $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("local-workspace-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      document.querySelectorAll(".review-dry-run-button").forEach((button) => {
+        button.disabled = !available || !button.dataset.skillId;
+      });
     }
 
     async function runExecutorAction(mode) {
@@ -3361,6 +3448,34 @@ DASHBOARD_HTML = r"""<!doctype html>
           setExecutorStatus(isPublish ? "published" : "dry-run ok", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "dry-run 通过：safe_to_push=true，可以继续确认发布。", "green");
         } else {
           setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
+        }
+      } catch (err) {
+        showExecutorOutput(String(err));
+        setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function runExecutorActionForSkill(skillId) {
+      if (!executorAvailable || !skillId) return;
+      setExecutorButtons(false);
+      setExecutorStatus("dry-run", `正在预检 ${skillId}，请稍等。`, "yellow");
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId] }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (payload.ok && payload.safe_to_push) {
+          setExecutorStatus("dry-run ok", `${skillId} 预检通过：safe_to_push=true。`, "green");
+        } else if (payload.ok) {
+          setExecutorStatus("needs review", `${skillId} 预检完成，但还不能发布，请看输出。`, "yellow");
+        } else {
+          setExecutorStatus("failed", payload.error || `${skillId} 预检失败，请查看输出。`, "red");
         }
       } catch (err) {
         showExecutorOutput(String(err));
