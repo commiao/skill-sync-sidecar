@@ -459,6 +459,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
             self.assertIn("Skill 同步分区", DASHBOARD_HTML)
             self.assertIn("scope-readonly-rail", DASHBOARD_HTML)
+            self.assertIn("<details class=\"secondary-context\">", DASHBOARD_HTML)
+            self.assertIn("权限边界和执行细节", DASHBOARD_HTML)
             self.assertIn("id=\"scope-local-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-central-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-device-count\"", DASHBOARD_HTML)

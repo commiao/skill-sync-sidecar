@@ -1644,6 +1644,46 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-bottom: 12px;
       align-items: stretch;
     }
+    .secondary-context {
+      margin: 12px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .secondary-context > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 13px 16px;
+      font-weight: 720;
+      color: var(--ink);
+      background: #fafbfd;
+    }
+    .secondary-context > summary::-webkit-details-marker {
+      display: none;
+    }
+    .secondary-context > summary::after {
+      content: "展开";
+      float: right;
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 12px;
+    }
+    .secondary-context[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .secondary-context[open] > summary::after {
+      content: "收起";
+    }
+    .secondary-context-body {
+      display: grid;
+      gap: 12px;
+      padding: 14px 16px 16px;
+    }
+    .secondary-context .scope-switchboard,
+    .secondary-context .decision-console {
+      margin-bottom: 0;
+    }
     .scope-readonly-rail {
       display: grid;
       gap: 12px;
@@ -2814,10 +2854,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span class="pill">read-only</span>
           </div>
           <div id="device-map-summary" class="workspace-subtitle"></div>
-          <div id="device-map" class="device-map-grid"></div>
+      <div id="device-map" class="device-map-grid"></div>
         </div>
       </section>
     </section>
+    <details class="secondary-context">
+      <summary>权限边界和执行细节</summary>
+      <div class="secondary-context-body">
     <section class="scope-switchboard" aria-label="Skill 同步分区">
       <div class="scope-card local">
         <div class="scope-card-head">
@@ -2907,6 +2950,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </details>
     </section>
+      </div>
+    </details>
     <details class="advanced-diagnostics">
       <summary>高级诊断：状态、设备、工具、队列明细</summary>
       <div class="advanced-body">
