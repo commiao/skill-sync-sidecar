@@ -2661,6 +2661,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
+      .portal-link { margin: 8px 14px 0; }
+      header {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+      }
+      h1 { font-size: 17px; }
+      .brand-subtitle { display: none; }
+      .toolbar { gap: 8px; font-size: 12px; }
+      .toolbar button { padding: 6px 9px; }
       main { padding: 14px; }
       .status-strip { grid-template-columns: minmax(0, 1fr) 118px; gap: 8px; }
       .focus-main { padding: 12px; }
