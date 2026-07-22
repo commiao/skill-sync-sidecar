@@ -2178,9 +2178,73 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-bottom: 10px;
       overflow-wrap: anywhere;
     }
+    .review-recommendation {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #c8d7ef;
+      border-radius: 8px;
+      background: #f7fbff;
+      padding: 10px 12px;
+      margin: 10px 0;
+    }
+    .review-recommendation-title {
+      color: var(--ink);
+      font-weight: 850;
+      font-size: 13px;
+    }
+    .review-recommendation-summary {
+      color: var(--ink);
+      font-weight: 720;
+      overflow-wrap: anywhere;
+    }
+    .review-recommendation-steps {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .review-recommendation-step {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .review-recommendation-index {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #1f4f8a;
+      background: #e8f1ff;
+      font-weight: 850;
+      font-size: 11px;
+    }
     .review-list {
       display: grid;
       gap: 6px;
+    }
+    .review-group {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .review-group-title {
+      color: var(--ink);
+      font-weight: 850;
+      font-size: 13px;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+    .review-group-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: -2px;
+      overflow-wrap: anywhere;
     }
     .review-progress {
       display: grid;
@@ -3132,6 +3196,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <span id="review-queue-count" class="pill">0</span>
       </div>
       <div id="review-queue-summary" class="review-queue-summary"></div>
+      <div id="review-recommendation" class="review-recommendation"></div>
       <div id="review-progress" class="review-progress" aria-label="待审批处理进度"></div>
       <div id="review-feedback" class="review-feedback" hidden>
         <strong id="review-feedback-title">等待操作</strong>
@@ -3593,68 +3658,133 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
-      const deleteCount = items.filter((item) => reviewIsDeleteItem(item)).length;
-      const publishCount = items.filter((item) => reviewIsPublishCandidate(item)).length;
+      const deleteItems = reviewDeleteItems(items);
+      const publishItems = reviewPublishItems(items);
+      const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
       $("review-queue-summary").textContent =
-        `${peers.join("、") || "其他设备"}：${items.length} 个待审，其中 ${publishCount} 个可走预检/发布，${deleteCount} 个是删除决策。每一项都在下方直接处理。`;
+        `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${publishItems.length} 个 OpenClaw 更新可预检/发布，${deleteItems.length} 个 Mac 缺失项建议先保留并恢复。`;
+      renderReviewRecommendation(items);
       renderReviewProgress(items);
-      const visibleItems = items;
-      const rows = visibleItems.map((item) => {
-        const command = item.operator_command || "";
-        const reviewKey = reviewItemKey(item);
-        return `
-          <div class="review-item">
-            <div>
-              <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
-              <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
-              <div class="review-meta">
-                <span class="review-meta-item">${escapeHtml(reviewSourceText(item))}</span>
-                <span class="review-meta-item">${escapeHtml(reviewCategoryText(item))}</span>
-                <span class="review-meta-item">${escapeHtml(reviewRiskText(item))}</span>
-              </div>
-            </div>
-            <div>
-              <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
-              <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
-              <div class="review-decision">${reviewDecisionHtml(item)}</div>
-              <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
-              ${command ? `
-                <details class="review-command">
-                  <summary>查看 dry-run 命令</summary>
-                  <div class="command-row">
-                    <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
-                    <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
-                  </div>
-                </details>
-              ` : ""}
-            </div>
-            <div class="review-controls">
-              ${pill(reviewStatusText(item), "yellow")}
-              <button
-                type="button"
-                class="review-dry-run-button"
-                data-skill-id="${escapeHtml(text(item.skill_id))}"
-                data-review-key="${escapeHtml(reviewKey)}"
-                data-review-action="${escapeHtml(reviewControlAction(item))}"
-                onclick="runExecutorActionForSkill(this.dataset.skillId, this.dataset.reviewKey)"
-                disabled>${escapeHtml(reviewControlLabel(item))}</button>
-            </div>
-          </div>
-        `;
-      }).join("");
-      $("review-queue").innerHTML = rows;
+      $("review-queue").innerHTML = [
+        renderReviewGroup(
+          "先保留/恢复 Mac 缺失项",
+          deleteItems,
+          "这些不是发布按钮要处理的内容；当前面板不会删除中央仓库。"
+        ),
+        renderReviewGroup(
+          "再处理 OpenClaw 更新",
+          publishItems,
+          "逐项预检，safe_to_push=true 后再显式发布到中央仓库。"
+        ),
+        renderReviewGroup(
+          "其他待处理",
+          otherItems,
+          "冲突或未知项先看诊断，不进入一键发布。"
+        ),
+      ].filter(Boolean).join("");
       setExecutorButtons(executorAvailable);
     }
 
+    function renderReviewRecommendation(items) {
+      const target = $("review-recommendation");
+      if (!target) return;
+      const deleteItems = reviewDeleteItems(items);
+      const publishItems = reviewPublishItems(items);
+      const checkedCount = publishItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
+      const readyCount = publishItems.filter((item) => {
+        const result = reviewTaskResults[reviewItemKey(item)];
+        return result && result.publishReady;
+      }).length;
+      const remainingPrecheck = Math.max(publishItems.length - checkedCount, 0);
+      const remainingReady = Math.max(publishItems.length - readyCount, 0);
+      const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
+      target.innerHTML = `
+        <div class="review-recommendation-title">推荐操作</div>
+        <div class="review-recommendation-summary">
+          先不要删除中央仓库；保留并恢复 Mac 缺失的 ${deleteItems.length} 个 skill。继续预检 OpenClaw 的 ${publishItems.length} 个更新，全部通过后再发布。
+        </div>
+        <ol class="review-recommendation-steps">
+          <li class="review-recommendation-step">
+            <span class="review-recommendation-index">1</span>
+            <span>${deleteItems.length ? `把 Mac 缺失项标为保留/恢复：${escapeHtml(deleteNames)}。` : "当前没有 Mac 删除决策。"}</span>
+          </li>
+          <li class="review-recommendation-step">
+            <span class="review-recommendation-index">2</span>
+            <span>${remainingPrecheck > 0 ? `继续预检 OpenClaw 剩余 ${remainingPrecheck} 个更新。` : "OpenClaw 更新已完成预检。"}</span>
+          </li>
+          <li class="review-recommendation-step">
+            <span class="review-recommendation-index">3</span>
+            <span>${remainingReady > 0 ? `发布前还差 ${remainingReady} 个 safe_to_push=true。` : `可以确认发布 ${publishItems.length} 个 OpenClaw 更新到中央仓库。`}</span>
+          </li>
+        </ol>
+      `;
+    }
+
+    function renderReviewGroup(title, groupItems, note) {
+      if (!Array.isArray(groupItems) || groupItems.length === 0) return "";
+      return `
+        <section class="review-group">
+          <div class="review-group-title">${escapeHtml(title)} (${groupItems.length})</div>
+          <div class="review-group-note">${escapeHtml(note)}</div>
+          ${groupItems.map((item) => renderReviewItem(item)).join("")}
+        </section>
+      `;
+    }
+
+    function renderReviewItem(item) {
+      const command = item.operator_command || "";
+      const reviewKey = reviewItemKey(item);
+      return `
+        <div class="review-item">
+          <div>
+            <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
+            <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
+            <div class="review-meta">
+              <span class="review-meta-item">${escapeHtml(reviewSourceText(item))}</span>
+              <span class="review-meta-item">${escapeHtml(reviewCategoryText(item))}</span>
+              <span class="review-meta-item">${escapeHtml(reviewRiskText(item))}</span>
+            </div>
+          </div>
+          <div>
+            <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
+            <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
+            <div class="review-decision">${reviewDecisionHtml(item)}</div>
+            <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
+            ${command ? `
+              <details class="review-command">
+                <summary>查看 dry-run 命令</summary>
+                <div class="command-row">
+                  <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
+                  <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
+                </div>
+              </details>
+            ` : ""}
+          </div>
+          <div class="review-controls">
+            ${pill(reviewStatusText(item), "yellow")}
+            <button
+              type="button"
+              class="review-dry-run-button"
+              data-skill-id="${escapeHtml(text(item.skill_id))}"
+              data-review-key="${escapeHtml(reviewKey)}"
+              data-review-action="${escapeHtml(reviewControlAction(item))}"
+              onclick="runExecutorActionForSkill(this.dataset.skillId, this.dataset.reviewKey)"
+              disabled>${escapeHtml(reviewControlLabel(item))}</button>
+          </div>
+        </div>
+      `;
+    }
+
     function renderReviewProgress(items) {
-      const total = Array.isArray(items) ? items.length : 0;
-      const checked = Array.isArray(items)
-        ? items.filter((item) => reviewTaskResults[reviewItemKey(item)]).length
-        : 0;
-      const publishableTotal = Array.isArray(items) ? items.filter((item) => reviewIsPublishCandidate(item)).length : 0;
-      const publishReady = Object.values(reviewTaskResults).filter((result) => result && result.publishReady).length;
+      const publishableItems = Array.isArray(items) ? reviewPublishItems(items) : [];
+      const publishableTotal = publishableItems.length;
+      const checked = publishableItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
+      const publishReady = publishableItems.filter((item) => {
+        const result = reviewTaskResults[reviewItemKey(item)];
+        return result && result.publishReady;
+      }).length;
       const deleteTotal = Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)).length : 0;
       const executorState = executorAvailable ? "已连接" : "未连接";
       const executorKind = executorAvailable ? "green" : "yellow";
@@ -3665,9 +3795,25 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "发布需要再次确认。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
-        reviewStage("2", "预检待审批", `${checked}/${total} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
+        reviewStage("2", "预检 OpenClaw 更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
         reviewStage("3", "确认发布", `${publishReady}/${publishableTotal} 可发布`, publishKind, publishNote),
       ].join("");
+    }
+
+    function reviewDeleteItems(items) {
+      return Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)) : [];
+    }
+
+    function reviewPublishItems(items) {
+      return Array.isArray(items) ? items.filter((item) => reviewIsPublishCandidate(item)) : [];
+    }
+
+    function compactSkillList(names) {
+      const cleanNames = Array.isArray(names) ? names.map((name) => text(name)).filter(Boolean) : [];
+      if (cleanNames.length === 0) return "无";
+      const visible = cleanNames.slice(0, 3);
+      const hidden = cleanNames.length - visible.length;
+      return hidden > 0 ? `${visible.join("、")} 等 ${cleanNames.length} 个` : visible.join("、");
     }
 
     function reviewStage(index, title, status, kind, note) {
