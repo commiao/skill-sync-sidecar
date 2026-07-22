@@ -2224,6 +2224,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 850;
       font-size: 11px;
     }
+    .review-recommendation-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .review-recommendation-note {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     .review-list {
       display: grid;
       gap: 6px;
@@ -3719,6 +3730,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span>${remainingReady > 0 ? `发布前还差 ${remainingReady} 个 safe_to_push=true。` : `可以确认发布 ${publishItems.length} 个 OpenClaw 更新到中央仓库。`}</span>
           </li>
         </ol>
+        <div class="review-recommendation-actions">
+          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新预检 ${publishItems.length} 个更新` : `预检 ${publishItems.length} 个更新`}</button>
+          <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>确认发布 ${publishItems.length} 个 OpenClaw 更新</button>
+        </div>
+        <div id="review-recommendation-note" class="review-recommendation-note">
+          ${remainingReady > 0 ? "发布按钮会在所有 OpenClaw 更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。"}
+        </div>
       `;
     }
 
@@ -3798,6 +3816,22 @@ DASHBOARD_HTML = r"""<!doctype html>
         reviewStage("2", "预检 OpenClaw 更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
         reviewStage("3", "确认发布", `${publishReady}/${publishableTotal} 可发布`, publishKind, publishNote),
       ].join("");
+    }
+
+    function allReviewPublishCandidatesReady() {
+      const publishableItems = reviewPublishItems(currentReviewQueueItems);
+      if (publishableItems.length === 0) return false;
+      return publishableItems.every((item) => {
+        const result = reviewTaskResults[reviewItemKey(item)];
+        return result && result.publishReady;
+      });
+    }
+
+    function publishCandidateSkillIds() {
+      const skillIds = reviewPublishItems(currentReviewQueueItems)
+        .map((item) => text(item.skill_id))
+        .filter(Boolean);
+      return [...new Set(skillIds)];
     }
 
     function reviewDeleteItems(items) {
@@ -3941,6 +3975,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         return `<strong>需要人工合并</strong>冲突项不能一键发布，先查看冲突包再决定保留哪一侧。`;
       }
       if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
+        const result = reviewTaskResults[reviewItemKey(item)];
+        if (result && result.publishReady) {
+          return `<strong>已通过预检</strong>等待上方“确认发布”写入中央仓库。`;
+        }
         return `<strong>可走发布流程</strong>先点预检；只有 safe_to_push=true 后，才会解锁显式发布。`;
       }
       return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
@@ -3955,6 +3993,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewControlLabel(item) {
       if (reviewIsDeleteItem(item)) return "说明";
       if (item.category === "conflict") return "查看冲突";
+      const result = reviewTaskResults[reviewItemKey(item)];
+      if (result && result.publishReady) return "重新预检";
       return "预检";
     }
 
@@ -4084,13 +4124,29 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function setExecutorButtons(available) {
-      $("executor-dry-run").disabled = !available || currentGuideSkills.length === 0;
-      $("executor-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
-      $("strip-dry-run").disabled = !available || currentGuideSkills.length === 0;
-      $("scope-dry-run").disabled = !available || currentGuideSkills.length === 0;
-      $("scope-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
-      $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
-      $("local-workspace-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
+      const reviewReady = allReviewPublishCandidatesReady();
+      const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
+      $("executor-dry-run").disabled = !available || actionSkills.length === 0;
+      $("executor-publish").disabled = !canPublishApprovedPush;
+      $("strip-dry-run").disabled = !available || actionSkills.length === 0;
+      $("scope-dry-run").disabled = !available || actionSkills.length === 0;
+      $("scope-publish").disabled = !canPublishApprovedPush;
+      $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
+      $("local-workspace-publish").disabled = !canPublishApprovedPush;
+      const reviewDryRunAll = $("review-dry-run-all");
+      const reviewPublishAll = $("review-publish-all");
+      if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
+      if (reviewPublishAll) {
+        reviewPublishAll.disabled = !canPublishApprovedPush;
+        reviewPublishAll.title = !available
+          ? "本机执行器未在线"
+          : (!executorAllowPublish
+            ? "中央发布未开启；用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor"
+            : (!reviewReady && !lastDryRunSafe
+              ? "请先完成预检，确认全部 safe_to_push=true"
+              : "写入 WebDAV 中央仓库"));
+      }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");
       const localSkillPublishCheck = $("local-skill-publish-check");
@@ -4118,10 +4174,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     async function runExecutorAction(mode) {
-      if (!executorAvailable || currentGuideSkills.length === 0) return;
+      const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
+      if (!executorAvailable || actionSkills.length === 0) return;
       const isPublish = mode === "publish";
       if (isPublish) {
-        if (!lastDryRunSafe) {
+        if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
           showExecutorOutput("请先运行 dry-run，并确认 safe_to_push=true。");
           setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认 safe_to_push=true 后再发布到中央仓库。");
           return;
@@ -4143,7 +4200,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            skill_ids: currentGuideSkills,
+            skill_ids: actionSkills,
             confirm: isPublish ? "PUBLISH" : undefined,
           }),
         });
@@ -4158,7 +4215,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             isPublish ? "中央仓库已更新，请等待 1-2 分钟后刷新状态。" : "safe_to_push=true，可以继续确认发布到中央仓库。",
           );
           if (!isPublish) {
-            currentGuideSkills.forEach((skillId) => {
+            actionSkills.forEach((skillId) => {
               currentReviewQueueItems
                 .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
                 .forEach((item) => {
