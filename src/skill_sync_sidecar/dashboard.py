@@ -3888,8 +3888,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="review-queue-panel" class="review-queue panel" hidden>
       <div class="panel-head">
         <div>
-          <div class="section-label">待办任务</div>
-          <h2>待审批清单</h2>
+          <div id="review-queue-label" class="section-label">待办任务</div>
+          <h2 id="review-queue-title">待审批清单</h2>
         </div>
         <span id="review-queue-count" class="pill">0</span>
       </div>
@@ -5119,30 +5119,43 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteItems = reviewDeleteItems(items);
       const publishItems = reviewPublishItems(items);
       const conflictItems = reviewConflictItems(items);
+      const conflictOnly = conflictItems.length > 0 && conflictItems.length === items.length;
       const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
-      $("review-queue-summary").textContent =
-        `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${blockedBreakdownText(blockedBreakdown(items))}。`;
+      $("review-queue-label").textContent = conflictOnly ? "版本差异" : "待办任务";
+      $("review-queue-title").textContent = conflictOnly ? "版本确认" : "待审批清单";
+      $("review-progress").setAttribute("aria-label", conflictOnly ? "版本差异处理进度" : "待审批处理进度");
+      $("review-queue-summary").textContent = conflictOnly
+        ? `${peers.join("、") || "其他设备"}：只剩 ${items.length} 个版本差异。这里不是批量发布队列；先生成只读报告，再按推荐处理。`
+        : `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${blockedBreakdownText(blockedBreakdown(items))}。`;
       renderReviewRecommendation(items);
       renderReviewProgress(items);
-      $("review-queue").innerHTML = [
-        renderReviewGroup(
-          "先处理缺失/删除确认",
-          deleteItems,
-          "这些不是发布按钮要处理的内容；当前面板不会删除中央仓库。"
-        ),
-        renderReviewGroup(
-          "再处理可发布更新",
-          publishItems,
-          "逐项预检，结果显示可以发布后再显式发布到中央仓库。"
-        ),
-        renderReviewGroup(
-          "最后处理版本差异/未知项",
-          conflictItems.length ? conflictItems : otherItems,
-          "版本差异或未知项先看只读报告，不进入一键发布。"
-        ),
-      ].filter(Boolean).join("");
+      if (conflictOnly) {
+        $("review-queue").innerHTML = renderReviewGroup(
+          "当前版本差异",
+          conflictItems,
+          "点“生成只读报告”，报告会把推荐动作放在最上方。"
+        );
+      } else {
+        $("review-queue").innerHTML = [
+          renderReviewGroup(
+            "先处理缺失/删除确认",
+            deleteItems,
+            "这些不是发布按钮要处理的内容；当前面板不会删除中央仓库。"
+          ),
+          renderReviewGroup(
+            "再处理可发布更新",
+            publishItems,
+            "逐项预检，结果显示可以发布后再显式发布到中央仓库。"
+          ),
+          renderReviewGroup(
+            "最后处理版本差异/未知项",
+            conflictItems.length ? conflictItems : otherItems,
+            "版本差异或未知项先看只读报告，不进入一键发布。"
+          ),
+        ].filter(Boolean).join("");
+      }
       setExecutorButtons(executorAvailable);
     }
 
@@ -5264,9 +5277,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const executorKind = executorAvailable ? "green" : "yellow";
       if (conflictTotal > 0) {
         $("review-progress").innerHTML = [
-          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接处理版本差异。" : "先确认 Mac 本机执行器在线。"),
-          reviewStage("2", "选择保留版本", `${conflictTotal} 个待选择`, "yellow", "选择 OpenClaw 版、中央版，或手动对比。"),
-          reviewStage("3", "确认后写入", "需确认词", "yellow", "发布输入 PUBLISH；恢复输入 RESTORE。"),
+          reviewStage("1", "生成只读报告", `${conflictTotal} 个版本差异`, "yellow", "只读取 OpenClaw 和中央仓库，不写入。"),
+          reviewStage("2", "按推荐处理", "报告给出建议", "yellow", "推荐动作会显示在报告最上方。"),
+          reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认待办是否清空。" : "需要 Mac 本机执行器在线。"),
         ].join("");
         return;
       }
