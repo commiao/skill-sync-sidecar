@@ -2663,6 +2663,46 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 6px;
       margin-top: 8px;
     }
+    .simple-task-list {
+      display: grid;
+      gap: 8px;
+    }
+    .simple-task-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+      min-width: 0;
+    }
+    .simple-task-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .simple-task-title {
+      color: var(--ink);
+      font-weight: 840;
+      overflow-wrap: anywhere;
+    }
+    .simple-task-detail {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .simple-task-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .simple-task-actions .primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
     .simple-action-item {
       display: flex;
       justify-content: space-between;
@@ -3838,6 +3878,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishNames = compactSkillList(publishItems.map((item) => item.skill_id));
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
+      const judgmentCount = conflictItems.length + deleteItems.length;
       let title = "先处理需要人工判断的项目";
       let summary = `当前有 ${blocked} 个待处理项。sidecar 已暂停自动写入，避免误覆盖。`;
       if (publishItems.length > 0 && conflictItems.length === 0) {
@@ -3860,9 +3901,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="simple-action-card">
             <div class="simple-action-card-title">按这个顺序做</div>
             <ol class="simple-action-steps">
-              ${simpleActionStep(1, conflictItems.length > 0 ? `先打开高级详情，处理冲突：${conflictNames}` : "先运行预检，只检查不写入中央仓库。")}
-              ${simpleActionStep(2, publishItems.length > 0 ? `预检通过后发布 OpenClaw 更新：${publishNames}` : `确认缺失项是否需要恢复：${deleteNames}`)}
-              ${simpleActionStep(3, "发布或处理完成后刷新状态；数字下降才算闭环。")}
+              ${simpleActionStep(1, judgmentCount > 0 ? `先看“需要判断”的卡片，不要让系统自动猜。` : "先运行预检，只检查不写入中央仓库。")}
+              ${simpleActionStep(2, publishItems.length > 0 ? `再处理可自动发布的 OpenClaw 更新。` : `确认缺失项是否需要恢复：${deleteNames}`)}
+              ${simpleActionStep(3, "处理完成后刷新状态；待办数字下降才算闭环。")}
             </ol>
             <div class="simple-action-actions">
               <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检可发布项</button>
@@ -3872,11 +3913,33 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div id="simple-action-note" class="simple-action-note">发布会要求输入 PUBLISH；不会静默写中央仓库。</div>
           </div>
           <div class="simple-action-card">
-            <div class="simple-action-card-title">当前不用猜这些词</div>
-            <div class="simple-action-list">
-              ${simpleActionItem("可发布", `${publishItems.length} 个`, publishItems.length ? publishNames : "无")}
-              ${simpleActionItem("需判断", `${deleteItems.length + conflictItems.length} 个`, compactSkillList([...deleteItems, ...conflictItems].map((item) => item.skill_id)))}
-              ${simpleActionItem("总待办", `${blocked} 个`, "处理后刷新，本数值应下降")}
+            <div class="simple-action-card-title">当前任务</div>
+            <div class="simple-task-list">
+              ${simpleTaskCard(
+                "必须判断",
+                judgmentCount,
+                judgmentCount > 0 ? `这些不会自动处理：${compactSkillList([...conflictItems, ...deleteItems].map((item) => item.skill_id))}` : "暂无必须人工判断的项目。",
+                "查看并决定",
+                "openAdvancedDetails()",
+                judgmentCount > 0 ? "yellow" : "green"
+              )}
+              ${simpleTaskCard(
+                "可以自动处理",
+                publishItems.length,
+                publishItems.length > 0 ? `OpenClaw 更新：${publishNames}` : "暂无可发布更新。",
+                "预检/发布",
+                "runExecutorAction('dry_run')",
+                publishItems.length > 0 ? "yellow" : "green",
+                "simple-task-dry-run"
+              )}
+              ${simpleTaskCard(
+                "不会自动删除",
+                deleteItems.length,
+                deleteItems.length > 0 ? `缺失项：${deleteNames}。中央仓库不会被静默删除。` : "暂无删除确认。",
+                "查看详情",
+                "openAdvancedDetails()",
+                deleteItems.length > 0 ? "yellow" : "green"
+              )}
             </div>
           </div>
         </div>
@@ -3898,6 +3961,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="simple-action-item">
           <span>${escapeHtml(label)}：${escapeHtml(value)}</span>
           <span>${escapeHtml(text(detail))}</span>
+        </div>
+      `;
+    }
+
+    function simpleTaskCard(title, count, detail, actionLabel, action, kind, buttonId) {
+      return `
+        <div class="simple-task-card">
+          <div class="simple-task-head">
+            <div class="simple-task-title">${escapeHtml(title)}</div>
+            ${pill(`${text(count)} 个`, kind || "")}
+          </div>
+          <div class="simple-task-detail">${escapeHtml(text(detail))}</div>
+          <div class="simple-task-actions">
+            <button ${buttonId ? `id="${escapeHtml(buttonId)}"` : ""} type="button" onclick="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>
+          </div>
         </div>
       `;
     }
@@ -4389,6 +4467,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewPublishAll = $("review-publish-all");
       const simpleDryRun = $("simple-dry-run");
       const simplePublish = $("simple-publish");
+      const simpleTaskDryRun = $("simple-task-dry-run");
       if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
       if (reviewPublishAll) {
         reviewPublishAll.disabled = !canPublishApprovedPush;
@@ -4401,6 +4480,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               : "写入 WebDAV 中央仓库"));
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
+      if (simpleTaskDryRun) simpleTaskDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
