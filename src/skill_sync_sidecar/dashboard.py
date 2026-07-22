@@ -4045,7 +4045,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const actionNote = $("strip-action-note");
       if (actionNote) {
         actionNote.textContent = blocked > 0 && breakdown.conflict === blocked
-          ? "先生成只读冲突包，再点一个保留选项。"
+          ? "直接选择保留哪边；不确定时再手动对比。"
           : (blocked > 0
           ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
           : "只操作 Mac 本机。");
@@ -4076,7 +4076,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const breakdown = blockedBreakdown(items);
       if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.conflict === blocked) {
         const names = compactSkillList(items.map((item) => item.skill_id));
-        return `只剩冲突：${names}。先生成只读冲突包，再选择保留 OpenClaw 版或中央版。`;
+        return `只剩冲突：${names}。直接选择保留 OpenClaw 版或中央版；不确定时再手动对比。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先审 ${blocked} 个待审批项；dry-run 只预览，确认后再发布到中央仓库。`;
@@ -4215,13 +4215,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         title = conflictItems.length === 1 ? `只剩 1 个需要选择：${skill}` : `有 ${conflictItems.length} 个需要选择的冲突`;
         summary = "这不是故障，也不是待预检。它表示 OpenClaw 和中央仓库都改过同一个 skill，sidecar 不能替你猜哪边正确。";
         primaryActions = `
-          <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读冲突包</button>
-          <button type="button" onclick="openAdvancedDetails()">展开详情</button>
+          <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">保留 OpenClaw 版</button>
+          <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">保留中央版</button>
+          <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">手动对比</button>
         `;
         facts = [
-          ["第 1 步", `生成 ${skill} 的只读冲突包。`],
-          ["安全边界", "这一步不会写 WebDAV，也不会改 OpenClaw。"],
-          ["第 2 步", "生成后选择保留 OpenClaw 版、中央版，或手动合并。"],
+          ["保留 OpenClaw 版", "会先预检，通过后输入 PUBLISH 才写入中央仓库。"],
+          ["保留中央版", "会先预检，通过后输入 RESTORE 才恢复到 OpenClaw。"],
+          ["不确定", "点“手动对比”，只读查看两边差异。"],
         ];
         taskCards = "";
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -4751,9 +4752,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const executorKind = executorAvailable ? "green" : "yellow";
       if (conflictTotal > 0) {
         $("review-progress").innerHTML = [
-          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接生成只读冲突包。" : "先确认 Mac 本机执行器在线。"),
-          reviewStage("2", "生成冲突包", `${conflictTotal} 个待生成`, "yellow", "只读导出，不写 WebDAV，不改 OpenClaw。"),
-          reviewStage("3", "选择保留版本", "待选择", "yellow", "选择 OpenClaw 版、中央版，或手动合并。"),
+          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接处理冲突。" : "先确认 Mac 本机执行器在线。"),
+          reviewStage("2", "选择保留版本", `${conflictTotal} 个待选择`, "yellow", "选择 OpenClaw 版、中央版，或手动对比。"),
+          reviewStage("3", "确认后写入", "需确认词", "yellow", "发布输入 PUBLISH；恢复输入 RESTORE。"),
         ].join("");
         return;
       }
