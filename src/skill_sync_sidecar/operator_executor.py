@@ -67,6 +67,33 @@ def run_openclaw_approved_push_batch(
     }
 
 
+def run_openclaw_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 300) -> dict:
+    repo = repo_root.expanduser().resolve()
+    script = repo / "scripts" / "publish-openclaw-peer-status.sh"
+    if not script.exists():
+        raise OperatorExecutorError(f"OpenClaw peer status helper not found: {script}")
+    started_at = datetime.now(timezone.utc).isoformat()
+    proc = subprocess.run(
+        [str(script)],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    finished_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "ok": proc.returncode == 0,
+        "mode": "refresh_openclaw_peer_status",
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_code": proc.returncode,
+        "command": str(script),
+        "stdout_tail": _tail(proc.stdout),
+        "stderr_tail": _tail(proc.stderr),
+    }
+
+
 def _normalize_skill_ids(skill_ids: Sequence[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
@@ -180,6 +207,10 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         yes=True,
                         allow_publish=allow_publish,
                     )
+                    self._send_json(200 if result["ok"] else 500, result)
+                    return
+                if path == "/api/openclaw-peer-status-refresh":
+                    result = run_openclaw_peer_status_refresh(repo)
                     self._send_json(200 if result["ok"] else 500, result)
                     return
                 if path == "/api/local-skill/analyze":

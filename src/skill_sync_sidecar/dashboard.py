@@ -3552,13 +3552,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
       const blocked = Number(dashboard.blocked || 0);
-      $("strip-health").textContent = blocked > 0 ? "项待预检" : "项待办";
+      const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
+      const macBlocked = blockedItems.filter((item) => item.peer_id === "mac").length;
+      const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
+      $("strip-health").textContent = blocked > 0 ? "项待处理" : "项待办";
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
       $("strip-focus-note").textContent = blocked > 0
-        ? `${blocked} 个 OpenClaw 变更等待本机预检；这不是服务故障。`
+        ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；这不是服务故障。`
         : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
       const actionNote = $("strip-action-note");
       if (actionNote) {
@@ -4224,9 +4227,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             });
             renderReviewQueue(currentReviewQueueItems);
           }
+          if (isPublish) {
+            await refreshOpenclawPeerStatus();
+            await refresh();
+          }
         } else {
           setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
-          setReviewFeedback("red", "执行失败", payload.error || "请查看下方执行输出。");
+          setReviewFeedback("red", "执行失败", executorErrorDetail(payload));
         }
       } catch (err) {
         showExecutorOutput(String(err));
@@ -4235,6 +4242,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       } finally {
         setExecutorButtons(executorAvailable);
       }
+    }
+
+    async function refreshOpenclawPeerStatus() {
+      setReviewFeedback("yellow", "发布完成，正在刷新状态", "正在刷新 OpenClaw peer status，让 NAS 面板看到最新队列。");
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/openclaw-peer-status-refresh`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          setReviewFeedback("yellow", "发布已完成，状态刷新失败", executorErrorDetail(payload));
+          showExecutorOutput(formatExecutorResult(payload));
+          return false;
+        }
+        setReviewFeedback("green", "状态已刷新", "OpenClaw peer status 已重新发布；NAS 缓存刷新后待办会下降。");
+        return true;
+      } catch (err) {
+        setReviewFeedback("yellow", "发布已完成，状态刷新失败", String(err));
+        return false;
+      }
+    }
+
+    function executorErrorDetail(payload) {
+      if (!payload) return "请查看下方执行输出。";
+      if (payload.error) return text(payload.error);
+      const stderr = text(payload.stderr_tail || "").trim();
+      if (stderr) return stderr.split("\n").slice(-2).join(" / ");
+      const stdout = text(payload.stdout_tail || "").trim();
+      if (stdout) return stdout.split("\n").slice(-2).join(" / ");
+      return "请查看下方执行输出。";
     }
 
     async function runExecutorActionForSkill(skillId, reviewKey) {

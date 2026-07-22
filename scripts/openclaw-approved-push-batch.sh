@@ -112,6 +112,61 @@ run_remote "${python_cmd[@]}" sync-cycle \
   --dry-run \
   --json
 
+filter_file="$(mktemp "/tmp/skill-sync-approved-push-filter.XXXXXX.json")"
+trap 'rm -f "$filter_file"' EXIT
+run_remote cat /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json > "$filter_file"
+
+mapfile -t filtered_skill_ids < <(python3 - "$filter_file" "${skill_ids[@]}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+requested = sys.argv[2:]
+present = {
+    item.get("skill_id")
+    for item in report.get("items", [])
+    if item.get("category") == "writer_policy"
+    and item.get("status_action") in {"push", "push_new", "local_new"}
+}
+for skill_id in requested:
+    if skill_id in present:
+        print(skill_id)
+PY
+)
+
+if [ "${#filtered_skill_ids[@]}" -ne "${#skill_ids[@]}" ]; then
+  echo "requested_skills=${skill_ids[*]}"
+  echo "current_blocked_publish_skills=${filtered_skill_ids[*]:-}"
+  echo "stale_or_non_publish_skills_skipped=true"
+fi
+
+if [ "${#filtered_skill_ids[@]}" -eq 0 ]; then
+  python3 - "$filter_file" "$mode" "${skill_ids[@]}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+mode = sys.argv[2].removeprefix("--")
+requested = sys.argv[3:]
+print(json.dumps({
+    "ok": True,
+    "mode": "publish" if mode == "yes" else "dry_run",
+    "safe_to_push": True,
+    "approved": 0,
+    "approved_skill_ids": [],
+    "requested_skill_ids": requested,
+    "stale_skipped_skill_ids": requested,
+    "blocked_report_total": report.get("total", 0),
+    "reason": "none of the requested skills are currently blocked publish candidates",
+}, ensure_ascii=False, indent=2))
+PY
+  exit 0
+fi
+
+skill_ids=("${filtered_skill_ids[@]}")
+
 approved_args=(
   "${python_cmd[@]}" approved-push
   --local-root /home/admin/clawd/skills
