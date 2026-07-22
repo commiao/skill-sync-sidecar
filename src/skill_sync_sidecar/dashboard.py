@@ -2293,6 +2293,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-top: 4px;
       overflow-wrap: anywhere;
     }
+    .review-decision {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 7px;
+      padding: 7px 8px;
+      overflow-wrap: anywhere;
+    }
+    .review-decision strong {
+      display: block;
+      margin-bottom: 2px;
+    }
     .review-result {
       margin-top: 6px;
     }
@@ -3625,6 +3640,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div>
               <div class="review-action">${escapeHtml(reviewActionText(item))}</div>
               <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
+              <div class="review-decision">${reviewDecisionHtml(item)}</div>
               <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
               ${command ? `
                 <details class="review-command">
@@ -3638,7 +3654,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             <div class="review-controls">
               ${pill(reviewStatusText(item), "yellow")}
-              <button type="button" class="review-dry-run-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="runExecutorActionForSkill(this.dataset.skillId)" disabled>预检</button>
+              <button
+                type="button"
+                class="review-dry-run-button"
+                data-skill-id="${escapeHtml(text(item.skill_id))}"
+                data-review-action="${escapeHtml(reviewControlAction(item))}"
+                onclick="runExecutorActionForSkill(this.dataset.skillId)"
+                disabled>${escapeHtml(reviewControlLabel(item))}</button>
             </div>
           </div>
         `;
@@ -3655,15 +3677,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       const checked = Array.isArray(items)
         ? items.filter((item) => reviewTaskResults[item.skill_id]).length
         : 0;
+      const publishableTotal = Array.isArray(items) ? items.filter((item) => !reviewIsDeleteItem(item) && item.category !== "conflict").length : 0;
       const publishReady = Object.values(reviewTaskResults).filter((result) => result && result.publishReady).length;
+      const deleteTotal = Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)).length : 0;
       const executorState = executorAvailable ? "已连接" : "未连接";
       const executorKind = executorAvailable ? "green" : "yellow";
       const dryRunKind = checked > 0 ? "green" : "yellow";
       const publishKind = publishReady > 0 ? "green" : "yellow";
+      const publishNote = deleteTotal > 0
+        ? `${deleteTotal} 个删除项不会自动发布；需恢复本机或单独确认删除。`
+        : "发布需要再次确认。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
         reviewStage("2", "预检待审批", `${checked}/${total} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
-        reviewStage("3", "确认发布", `${publishReady}/${total} 可发布`, publishKind, "发布需要再次确认。"),
+        reviewStage("3", "确认发布", `${publishReady}/${publishableTotal} 可发布`, publishKind, publishNote),
       ].join("");
     }
 
@@ -3708,6 +3735,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewActionText(item) {
+      if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return "本机已删除，中央仓库仍保留。";
+      if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "中央仓库已删除，本机仍保留。";
       if (item.category === "conflict") return "冲突，先人工合并。";
       if (item.status_action === "local_new") return "远端新增，先预检。";
       if (item.status_action === "push_new") return "新 skill 待发布。";
@@ -3723,13 +3752,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewCategoryText(item) {
       if (item.category === "writer_policy") return "需要显式发布";
       if (item.category === "conflict") return "冲突";
-      if (item.category === "delete") return "删除确认";
+      if (reviewIsDeleteItem(item)) return "删除确认";
       return text(item.category || item.status_action || "待审批");
     }
 
     function reviewRiskText(item) {
       if (item.category === "conflict") return "高风险";
-      if (item.category === "delete") return "高风险";
+      if (reviewIsDeleteItem(item)) return "高风险";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "中风险";
       if (item.status_action === "push") return "低风险";
       return "需确认";
@@ -3737,18 +3766,59 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewNextStepText(item) {
       if (item.category === "conflict") return "下一步：先生成冲突包并人工合并。";
-      if (item.category === "delete") return "下一步：确认删除意图，未确认前不要 apply。";
+      if (item.status_action === "local_deleted") return "下一步：决定是恢复本机，还是单独确认删除中央仓库里的这个 skill。";
+      if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新发布，还是接受中央删除。";
+      if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除中央仓库。";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：预检内容和目标工具，确认后再发布。";
       if (item.status_action === "push") return "下一步：预检差异，通过后再发布到中央仓库。";
       return "下一步：查看 dry-run 输出和高级诊断。";
     }
 
     function reviewStatusText(item) {
+      if (item.status_action === "local_deleted") return "本机缺失";
+      if (item.status_action === "remote_deleted") return "中央缺失";
       if (item.status_action === "local_new") return "新增";
       if (item.status_action === "push_new") return "新发布";
       if (item.status_action === "push") return "更新";
       if (item.category === "conflict") return "冲突";
       return statusLabel(item.status_action || item.category || "待处理");
+    }
+
+    function reviewIsDeleteItem(item) {
+      return item && (
+        item.category === "delete" ||
+        item.category === "delete_review" ||
+        item.status_action === "local_deleted" ||
+        item.status_action === "remote_deleted"
+      );
+    }
+
+    function reviewDecisionHtml(item) {
+      if (item.status_action === "local_deleted") {
+        return `<strong>需要你决定</strong>如果这是误删，先从中央/备份恢复到本机；如果确实废弃，走单独的删除审批。当前按钮不会删除中央仓库。`;
+      }
+      if (item.status_action === "remote_deleted") {
+        return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新发布；如果中央删除是正确的，再接受删除。`;
+      }
+      if (item.category === "conflict") {
+        return `<strong>需要人工合并</strong>冲突项不能一键发布，先查看冲突包再决定保留哪一侧。`;
+      }
+      if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
+        return `<strong>可走发布流程</strong>先点预检；只有 safe_to_push=true 后，才会解锁显式发布。`;
+      }
+      return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
+    }
+
+    function reviewControlAction(item) {
+      if (reviewIsDeleteItem(item)) return "delete-review";
+      if (item.category === "conflict") return "conflict-review";
+      return "dry-run";
+    }
+
+    function reviewControlLabel(item) {
+      if (reviewIsDeleteItem(item)) return "说明";
+      if (item.category === "conflict") return "查看冲突";
+      return "预检";
     }
 
     function renderActionGuide(guide) {
@@ -3971,6 +4041,34 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     async function runExecutorActionForSkill(skillId) {
       if (!executorAvailable || !skillId) return;
+      const reviewItem = currentReviewQueueItems.find((item) => item.skill_id === skillId);
+      if (reviewIsDeleteItem(reviewItem)) {
+        updateReviewTaskResult(skillId, { label: "删除待决策", kind: "yellow", publishReady: false });
+        setReviewFeedback(
+          "yellow",
+          `${skillId} 是删除确认项`,
+          reviewItem.status_action === "local_deleted"
+            ? "本机已删除但中央仓库仍保留。下一步不是发布；请决定恢复本机，或单独确认删除中央仓库。"
+            : "中央仓库已删除但本机仍保留。请决定重新发布本机版本，或接受中央删除。",
+        );
+        showExecutorOutput(
+          [
+            `skill=${skillId}`,
+            `status_action=${text(reviewItem.status_action)}`,
+            `category=${text(reviewItem.category)}`,
+            "safe_to_push=false",
+            "next_action=restore_local_or_confirm_delete",
+            "",
+            "说明：删除类待审不会走 approved-push。sidecar 当前不会通过这个按钮删除中央仓库。",
+          ].join("\n"),
+        );
+        return;
+      }
+      if (reviewItem && reviewItem.category === "conflict") {
+        updateReviewTaskResult(skillId, { label: "冲突待合并", kind: "red", publishReady: false });
+        setReviewFeedback("red", `${skillId} 是冲突项`, "冲突项不能一键发布；先查看冲突包并人工合并。");
+        return;
+      }
       setExecutorButtons(false);
       setExecutorStatus("dry-run", `正在预检 ${skillId}，请稍等。`, "yellow");
       setReviewFeedback("yellow", `正在预检 ${skillId}`, "预检只读，不会写入中央仓库。");
