@@ -2635,6 +2635,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #fffdf7;
       border-color: #e8d29c;
     }
+    .simple-action-panel.version-difference {
+      background: #f8fbff;
+      border-color: #b8cef0;
+    }
     .simple-action-panel.red {
       border-left-color: var(--red);
       background: #fff8f8;
@@ -2752,6 +2756,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       opacity: .78;
       line-height: 1.35;
       margin-top: 2px;
+    }
+    .simple-choice-grid.single-choice {
+      min-width: min(340px, 100%);
+    }
+    .simple-choice-grid.single-choice button {
+      text-align: center;
     }
     .simple-action-actions .primary {
       background: var(--ink);
@@ -4384,7 +4394,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const restoreItems = allItems.filter((item) => reviewCanRestoreFromCentral(item));
       const blocked = Number(dashboard.blocked || allItems.length || 0);
       const breakdown = blockedBreakdown(allItems);
-      const kind = blocked === 0 ? "green" : (conflictItems.length > 0 ? "yellow" : "yellow");
+      const conflictOnly = blocked > 0 && conflictItems.length === blocked;
+      const kind = blocked === 0 ? "green" : (conflictOnly ? "version-difference" : "yellow");
       panel.className = `simple-action-panel panel ${kind}`;
       if (blocked === 0) {
         panel.innerHTML = `
@@ -4419,21 +4430,25 @@ DASHBOARD_HTML = r"""<!doctype html>
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
-        title = conflictItems.length === 1 ? `选择 ${skill} 保留哪一版` : `有 ${conflictItems.length} 个 skill 需要选择保留版本`;
-        summary = "系统发现中央仓库和设备上的版本不一致，已暂停自动写入。最安全的下一步是先看只读差异报告。";
+        title = conflictItems.length === 1 ? `还有 1 个版本差异：${skill}` : `还有 ${conflictItems.length} 个版本差异待确认`;
+        summary = "这不是服务故障，也不是待预检更新。sidecar 已暂停自动写入；先生成只读报告，看清楚两边版本后再决定。";
         primaryActions = `
-          <div class="simple-choice-grid" aria-label="选择保留版本">
-            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">推荐：我不确定，先看差异<span>最安全，只读查看两边文件，不会改任何地方。</span></button>
-            <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版<span>通过预检后输入 PUBLISH，发布到中央仓库。</span></button>
-            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版<span>通过预检后输入 RESTORE，恢复到 OpenClaw 并备份原版本。</span></button>
+          <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
+            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读报告<span>不会发布、不会恢复、不会删除；只是读取两边版本并给出推荐。</span></button>
+            <button type="button" onclick="openAdvancedDetails()">查看高级详情<span>显示原始队列和诊断信息。</span></button>
           </div>
         `;
         facts = [
-          ["推荐", "不确定就先看差异；这是只读操作。"],
-          ["选 OpenClaw", "会写中央仓库，需要 PUBLISH。"],
-          ["选中央仓库", "会写 OpenClaw，需要 RESTORE。"],
+          ["现在要做", "点“生成只读报告”。"],
+          ["不会发生", "不会自动发布、覆盖或删除。"],
+          ["报告出来后", "再选择恢复中央版、发布 OpenClaw 版，或手动处理。"],
         ];
-        taskCards = "";
+        taskCards = `
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">为什么还显示待办</div>
+            <div class="simple-action-summary">${escapeHtml(skill)} 在中央仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 的状态不一致。sidecar 正在等你确认保留哪一版。</div>
+          </div>
+        `;
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
         const item = restoreItems[0];
         const skill = text(item.skill_id || "unknown-skill");
