@@ -2559,6 +2559,145 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 12px;
       margin: 12px 0 0;
     }
+    .simple-action-panel {
+      margin: 12px 0;
+      display: grid;
+      gap: 12px;
+      border-left: 5px solid var(--blue);
+      background: #fbfdff;
+    }
+    .simple-action-panel.green {
+      border-left-color: var(--green);
+      background: #f8fffb;
+    }
+    .simple-action-panel.yellow {
+      border-left-color: #d8a300;
+      background: #fffdf7;
+    }
+    .simple-action-panel.red {
+      border-left-color: var(--red);
+      background: #fff8f8;
+    }
+    .simple-action-eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 820;
+    }
+    .simple-action-title {
+      color: var(--ink);
+      font-size: 22px;
+      font-weight: 880;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-summary {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 900px;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .simple-action-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+      min-width: 0;
+    }
+    .simple-action-card-title {
+      color: var(--ink);
+      font-weight: 840;
+      margin-bottom: 6px;
+    }
+    .simple-action-steps {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .simple-action-step {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr);
+      gap: 8px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .simple-action-index {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8f1ff;
+      color: #1f4f8a;
+      font-size: 12px;
+      font-weight: 860;
+    }
+    .simple-action-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .simple-action-actions .primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .simple-action-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .simple-action-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      padding-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .advanced-workspace {
+      margin: 12px 0;
+    }
+    .advanced-workspace > summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-weight: 840;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      list-style: none;
+    }
+    .advanced-workspace > summary::-webkit-details-marker {
+      display: none;
+    }
+    .advanced-workspace > summary::after {
+      content: "展开";
+      margin-left: 8px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .advanced-workspace[open] > summary::after {
+      content: "收起";
+    }
     .workspace-overview {
       margin: 12px 0;
       border: 1px solid var(--line);
@@ -2982,6 +3121,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
       .workspace-actions { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
+      .simple-action-panel { gap: 9px; }
+      .simple-action-title { font-size: 18px; }
+      .simple-action-grid { grid-template-columns: 1fr; gap: 8px; }
+      .simple-action-actions { display: grid; grid-template-columns: 1fr; }
+      .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
       .local-skill-input-row { grid-template-columns: 1fr; gap: 6px; }
       .local-skill-input-row input { height: 32px; }
@@ -3119,6 +3263,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
+    <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
+    <details class="advanced-workspace">
+      <summary>高级详情：设备、中央仓库、完整待审清单</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
@@ -3215,6 +3362,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       <div id="review-queue" class="review-list"></div>
     </section>
+    </details>
     <details class="secondary-context">
       <summary>权限边界和执行细节</summary>
       <div class="secondary-context-body">
@@ -3484,6 +3632,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderHubImport(dashboard.hub_import || {});
 
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
+      renderSimpleActionPanel(dashboard, blockedItems);
       renderReviewQueue(blockedItems);
       $("blocked-empty").hidden = blockedItems.length > 0;
       $("blocked-table").hidden = blockedItems.length === 0;
@@ -3659,6 +3808,105 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${reason ? `<div class="mini-label">${escapeHtml(reason)}</div>` : ""}
         </div>
       `;
+    }
+
+    function renderSimpleActionPanel(dashboard, items) {
+      const panel = $("simple-action-panel");
+      if (!panel) return;
+      const allItems = Array.isArray(items) ? items : [];
+      const publishItems = reviewPublishItems(allItems);
+      const deleteItems = reviewDeleteItems(allItems);
+      const conflictItems = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
+      const blocked = Number(dashboard.blocked || allItems.length || 0);
+      const kind = blocked === 0 ? "green" : (conflictItems.length > 0 ? "yellow" : "yellow");
+      panel.className = `simple-action-panel panel ${kind}`;
+      if (blocked === 0) {
+        panel.innerHTML = `
+          <div>
+            <div class="simple-action-eyebrow">现在建议</div>
+            <div class="simple-action-title">现在不用处理同步问题</div>
+            <div class="simple-action-summary">中央仓库、Mac、OpenClaw 当前没有待审批同步项。你可以继续扫描本机或导入新的 skill。</div>
+            <div class="simple-action-actions">
+              <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+              <button type="button" onclick="openAdvancedDetails()">查看详情</button>
+            </div>
+          </div>
+        `;
+        setExecutorButtons(executorAvailable);
+        return;
+      }
+      const publishNames = compactSkillList(publishItems.map((item) => item.skill_id));
+      const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
+      const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
+      let title = "先处理需要人工判断的项目";
+      let summary = `当前有 ${blocked} 个待处理项。sidecar 已暂停自动写入，避免误覆盖。`;
+      if (publishItems.length > 0 && conflictItems.length === 0) {
+        title = `可以处理 ${publishItems.length} 个 OpenClaw 更新`;
+        summary = "先点预检；预检通过后再点发布。删除项不会被自动发布。";
+      } else if (conflictItems.length > 0) {
+        title = `先看 ${conflictItems.length} 个冲突项`;
+        summary = "冲突表示两边内容不同，不能自动猜哪边正确。先查看详情，再决定保留哪一侧。";
+      } else if (deleteItems.length > 0) {
+        title = `先确认 ${deleteItems.length} 个缺失项`;
+        summary = "缺失项不会自动删除中央仓库。先确认是恢复本机，还是单独走删除审批。";
+      }
+      panel.innerHTML = `
+        <div>
+          <div class="simple-action-eyebrow">现在建议</div>
+          <div class="simple-action-title">${escapeHtml(title)}</div>
+          <div class="simple-action-summary">${escapeHtml(summary)}</div>
+        </div>
+        <div class="simple-action-grid">
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">按这个顺序做</div>
+            <ol class="simple-action-steps">
+              ${simpleActionStep(1, conflictItems.length > 0 ? `先打开高级详情，处理冲突：${conflictNames}` : "先运行预检，只检查不写入中央仓库。")}
+              ${simpleActionStep(2, publishItems.length > 0 ? `预检通过后发布 OpenClaw 更新：${publishNames}` : `确认缺失项是否需要恢复：${deleteNames}`)}
+              ${simpleActionStep(3, "发布或处理完成后刷新状态；数字下降才算闭环。")}
+            </ol>
+            <div class="simple-action-actions">
+              <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检可发布项</button>
+              <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+              <button type="button" onclick="openAdvancedDetails()">查看高级详情</button>
+            </div>
+            <div id="simple-action-note" class="simple-action-note">发布会要求输入 PUBLISH；不会静默写中央仓库。</div>
+          </div>
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">当前不用猜这些词</div>
+            <div class="simple-action-list">
+              ${simpleActionItem("可发布", `${publishItems.length} 个`, publishItems.length ? publishNames : "无")}
+              ${simpleActionItem("需判断", `${deleteItems.length + conflictItems.length} 个`, compactSkillList([...deleteItems, ...conflictItems].map((item) => item.skill_id)))}
+              ${simpleActionItem("总待办", `${blocked} 个`, "处理后刷新，本数值应下降")}
+            </div>
+          </div>
+        </div>
+      `;
+      setExecutorButtons(executorAvailable);
+    }
+
+    function simpleActionStep(index, value) {
+      return `
+        <li class="simple-action-step">
+          <span class="simple-action-index">${escapeHtml(text(index))}</span>
+          <span>${escapeHtml(text(value))}</span>
+        </li>
+      `;
+    }
+
+    function simpleActionItem(label, value, detail) {
+      return `
+        <div class="simple-action-item">
+          <span>${escapeHtml(label)}：${escapeHtml(value)}</span>
+          <span>${escapeHtml(text(detail))}</span>
+        </div>
+      `;
+    }
+
+    function openAdvancedDetails() {
+      const target = document.querySelector(".advanced-workspace");
+      if (!target) return;
+      target.open = true;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function renderReviewQueue(items) {
@@ -4139,6 +4387,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
       const reviewDryRunAll = $("review-dry-run-all");
       const reviewPublishAll = $("review-publish-all");
+      const simpleDryRun = $("simple-dry-run");
+      const simplePublish = $("simple-publish");
       if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
       if (reviewPublishAll) {
         reviewPublishAll.disabled = !canPublishApprovedPush;
@@ -4149,6 +4399,17 @@ DASHBOARD_HTML = r"""<!doctype html>
             : (!reviewReady && !lastDryRunSafe
               ? "请先完成预检，确认全部 safe_to_push=true"
               : "写入 WebDAV 中央仓库"));
+      }
+      if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
+      if (simplePublish) {
+        simplePublish.disabled = !canPublishApprovedPush;
+        simplePublish.title = !available
+          ? "本机执行器未在线"
+          : (!executorAllowPublish
+            ? "中央发布未开启"
+            : (!reviewReady && !lastDryRunSafe
+              ? "先预检，确认 safe_to_push=true"
+              : "发布到 WebDAV 中央仓库"));
       }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");

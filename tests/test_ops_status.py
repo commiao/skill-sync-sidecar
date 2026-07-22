@@ -506,6 +506,16 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("待审批清单", DASHBOARD_HTML)
             self.assertIn("待办任务", DASHBOARD_HTML)
             self.assertIn("renderReviewQueue", DASHBOARD_HTML)
+            self.assertIn("id=\"simple-action-panel\"", DASHBOARD_HTML)
+            self.assertIn("renderSimpleActionPanel", DASHBOARD_HTML)
+            self.assertIn("现在建议", DASHBOARD_HTML)
+            self.assertIn("按这个顺序做", DASHBOARD_HTML)
+            self.assertIn("当前不用猜这些词", DASHBOARD_HTML)
+            self.assertIn("id=\"simple-dry-run\"", DASHBOARD_HTML)
+            self.assertIn("id=\"simple-publish\"", DASHBOARD_HTML)
+            self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
+            self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
+            self.assertIn("高级详情：设备、中央仓库、完整待审清单", DASHBOARD_HTML)
             self.assertIn("currentReviewQueueItems", DASHBOARD_HTML)
             self.assertIn("rerenderReviewQueueIfViewportModeChanged", DASHBOARD_HTML)
             self.assertIn("window.addEventListener(\"resize\"", DASHBOARD_HTML)
@@ -559,6 +569,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
             self.assertIn("本区可操作；中央", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+            )
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
