@@ -967,7 +967,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "只剩版本差异需要确认",
-            "summary": f"当前不是待预检；只剩 {len(conflict_items)} 个版本差异：{skill_hint}。先生成只读差异报告，报告会告诉你该恢复中央版、发布 OpenClaw 版，还是手动处理。",
+            "summary": f"当前不能一键发布；只剩 {len(conflict_items)} 个版本差异：{skill_hint}。先生成只读差异报告，报告会告诉你该恢复中央版、发布 OpenClaw 版，还是手动处理。",
             "steps": [
                 {
                     "title": "生成只读差异报告",
@@ -997,7 +997,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         publish = _approved_push_batch_command(skill_ids, yes=True)
         return {
             "state": "yellow",
-            "title": "现在需要人工审核",
+            "title": "OpenClaw 更新需要确认",
             "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动上传；先预检审核，确认安全后再推送到中央仓库。",
             "steps": [
                 {
@@ -1025,7 +1025,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
     if health == "yellow":
         return {
             "state": "yellow",
-            "title": "现在需要查看待审批队列",
+            "title": "有同步事项需要确认",
             "summary": f"当前有 {len(blocked_items)} 个需要确认的同步事项，系统已暂停自动写入以避免误同步。",
             "steps": [
                 {
@@ -1130,6 +1130,7 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
         "tools": tools,
         "total_skills": sum(int(tool.get("skills") or 0) for tool in tools if isinstance(tool, dict)),
         "blocked": len(mac_blocked),
+        "remote_blocked": len(remote_blocked),
         "operations": {
             "scan_local": True,
             "dry_run": True,
@@ -2749,6 +2750,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-width: 220px;
       min-height: 48px;
       font-size: 15px;
+      white-space: normal;
+      text-align: center;
+    }
+    .simple-action-actions.single-primary button span {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: .78;
+      line-height: 1.35;
+      margin-top: 2px;
     }
     .simple-choice-grid {
       display: grid;
@@ -3783,10 +3794,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
-    <section class="status-strip" aria-label="当前处理状态">
+    <section class="status-strip" aria-label="状态摘要">
       <div class="status-chip focus-main">
-        <div class="status-chip-label">同步待办</div>
-        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">项待处理</span></div>
+        <div class="status-chip-label">当前状态</div>
+        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">读取中</span></div>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
       <div class="status-chip focus-side">
@@ -3812,10 +3823,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <details class="advanced-workspace">
-      <summary>可选：查看三块状态（不影响当前操作）</summary>
+      <summary>查看设备和中央仓库状态</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
     <details class="technical-workspace">
-      <summary>可选：管理本机 skill / 查看技术细节</summary>
+      <summary>高级：管理本机目录和工具明细</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
@@ -4262,12 +4273,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deviceCount = otherDeviceItems(map.items).length;
       const blocked = Number(dashboard.blocked || 0);
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
-      const macBlocked = blockedItems.filter((item) => item.peer_id === "mac").length;
-      const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
       const breakdown = blockedBreakdown(blockedItems);
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
-      $("strip-health").textContent = blocked > 0 && breakdown.conflict === blocked ? "个版本差异" : (blocked > 0 ? "项待处理" : "项待办");
-      $("strip-blocked").textContent = text(blocked);
+      $("strip-health").textContent = blocked > 0
+        ? (breakdown.conflict === blocked ? "个需要确认" : "个需要处理")
+        : "无待处理";
+      $("strip-blocked").textContent = blocked > 0 ? text(blocked) : "正常";
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
@@ -4278,19 +4289,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if (conflictOnly) {
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
-        $("strip-focus-note").textContent = `只剩版本差异：${names}。不是待预检；先点“我不确定，先看差异”。`;
+        $("strip-focus-note").textContent = `只剩版本差异：${names}。先看报告，不会自动覆盖。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
-          ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
-          : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
+          ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
+          : "同步正常。需要导入或更新本机 skill 时，再点扫描本机。";
       }
       const actionNote = $("strip-action-note");
       if (actionNote) {
         actionNote.textContent = conflictOnly
-          ? "当前没有可批量发布更新；不确定就先看差异。"
+          ? "先看报告，再决定保留哪一版。"
           : (blocked > 0
-          ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
-          : "只操作 Mac 本机。");
+          ? "不会自动写入中央仓库；确认后才会发布。"
+          : "只操作当前 Mac，本页不会跨设备乱改。");
       }
     }
 
@@ -4476,14 +4487,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.className = `simple-action-panel panel ${kind}`;
       if (blocked === 0) {
         panel.innerHTML = `
-          <div>
-            <div class="simple-action-eyebrow">现在建议</div>
-            <div class="simple-action-title">现在不用处理同步问题</div>
-            <div class="simple-action-summary">中央仓库、Mac、OpenClaw 当前没有待审批同步项。你可以继续扫描本机或导入新的 skill。</div>
-            <div class="simple-action-actions">
-              <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-              <button type="button" onclick="openAdvancedDetails()">查看详情</button>
+          <div class="simple-action-hero">
+            <div class="simple-action-plain">
+              <div class="simple-action-eyebrow">现在状态</div>
+              <div class="simple-action-title">同步正常，不需要处理</div>
+              <div class="simple-action-summary">中央仓库、Mac、OpenClaw 已对齐。你现在可以放心继续工作；只有新增或修改本机 skill 时，才需要点下面的按钮。</div>
             </div>
+            <div class="simple-choice-grid" aria-label="常用操作">
+              <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机 skill<span>看当前 Mac 上有哪些 skill、有没有变化。</span></button>
+              <button type="button" onclick="openTechnicalWorkspace()">导入或安装 skill<span>粘贴一个 skill 目录，sidecar 帮你分析和安装。</span></button>
+              <button type="button" onclick="openAdvancedDetails()">查看设备状态<span>只看 Mac、OpenClaw、NAS 是否正常。</span></button>
+            </div>
+          </div>
+          <div class="simple-action-facts">
+            <div class="simple-action-fact"><strong>不会自动乱改</strong>跨设备写入需要明确确认。</div>
+            <div class="simple-action-fact"><strong>本机可操作</strong>按钮默认只影响当前 Mac。</div>
+            <div class="simple-action-fact"><strong>其它设备只读</strong>OpenClaw 和 NAS 状态只展示，不远程操作。</div>
           </div>
         `;
         setExecutorButtons(executorAvailable);
@@ -4493,13 +4512,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
-      let title = `有 ${blocked} 个同步事项需要处理`;
-      let summary = `当前包含 ${blockedBreakdownText(breakdown)}。sidecar 已暂停自动写入，避免误覆盖。`;
-      let primaryActions = `<button type="button" onclick="openAdvancedDetails()">查看需要处理的项目</button>`;
+      let title = `需要你确认 ${blocked} 件事`;
+      let summary = `sidecar 发现有内容可能要同步，但不会自动覆盖任何设备。先看推荐按钮，确认安全后才会写入中央仓库。`;
+      let primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看这 ${blocked} 件事<span>只展开清单，不会写入或删除。</span></button>`;
       let facts = [
-        ["不会自动覆盖", "有风险时 sidecar 会停下来。"],
-        ["先确认再写入", "发布或恢复都需要你输入确认词。"],
-        ["细节可展开", "技术信息放在下方，不影响主流程。"],
+        ["不会自动覆盖", "有风险时会停下来等你确认。"],
+        ["先看再执行", "预检只读，发布前还要确认。"],
+        ["不懂也能用", "只需要按推荐按钮走。"],
       ];
       let taskCards = "";
       if (conflictItems.length > 0) {
@@ -4507,23 +4526,23 @@ DASHBOARD_HTML = r"""<!doctype html>
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
-        title = conflictItems.length === 1 ? `还有 1 个版本差异：${skill}` : `还有 ${conflictItems.length} 个版本差异待确认`;
-        summary = "这不是服务故障，也不是待预检更新。sidecar 已暂停自动写入；先生成只读报告，看清楚两边版本后再决定。";
+        title = conflictItems.length === 1 ? `需要选择保留哪一版：${skill}` : `需要选择 ${conflictItems.length} 个 skill 保留哪一版`;
+        summary = "两边都有改动。sidecar 已暂停自动写入；先生成只读报告，看报告给出的推荐，再决定。";
         primaryActions = `
           <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
-            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读报告<span>不会发布、不会恢复、不会删除；只是读取两边版本并给出推荐。</span></button>
-            <button type="button" onclick="openAdvancedDetails()">查看高级详情<span>显示原始队列和诊断信息。</span></button>
+            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读报告<span>不会发布、不会恢复、不会删除。</span></button>
+            <button type="button" onclick="openAdvancedDetails()">查看清单<span>需要时再看原始队列。</span></button>
           </div>
         `;
         facts = [
-          ["现在要做", "点“生成只读报告”。"],
+          ["现在点这个", "生成只读报告。"],
           ["不会发生", "不会自动发布、覆盖或删除。"],
           ["报告出来后", "再选择恢复中央版、发布 OpenClaw 版，或手动处理。"],
         ];
         taskCards = `
           <div class="simple-action-card">
-            <div class="simple-action-card-title">为什么还显示待办</div>
-            <div class="simple-action-summary">${escapeHtml(skill)} 在中央仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 的状态不一致。sidecar 正在等你确认保留哪一版。</div>
+            <div class="simple-action-card-title">为什么停下来</div>
+            <div class="simple-action-summary">${escapeHtml(skill)} 在中央仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 上都被改过。需要你确认保留哪一版。</div>
           </div>
         `;
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -4532,51 +4551,51 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         const restoreTarget = restoreDeviceLabel(item);
-        title = restoreItems.length === 1 ? `建议恢复缺失 skill：${skill}` : `建议恢复 ${restoreItems.length} 个缺失 skill`;
-        summary = "中央仓库仍有完整版本，缺失设备没有。默认安全动作是恢复，不删除中央仓库。";
+        title = restoreItems.length === 1 ? `有一个 skill 本机缺失：${skill}` : `有 ${restoreItems.length} 个 skill 本机缺失`;
+        summary = "中央仓库仍有完整版本，默认安全动作是恢复到本机，不删除中央仓库。";
         primaryActions = `
           <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">从中央恢复到 ${escapeHtml(restoreTarget)}</button>
           <button type="button" onclick="openAdvancedDetails()">展开详情</button>
         `;
         facts = [
-          ["现在要做", `恢复 ${skill}。`],
+          ["推荐按钮", `从中央恢复 ${skill}。`],
           ["不会发生", "不会删除中央仓库，也不会影响其他设备。"],
           ["需要确认", "恢复前会要求输入 RESTORE。"],
         ];
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (publishItems.length > 0) {
-        title = `可以处理 ${publishItems.length} 个可发布更新`;
-        summary = "先预检，只检查不写入；全部通过后再发布到中央仓库。";
+        title = `有 ${publishItems.length} 个更新可以发布`;
+        summary = "这些更新来自设备本地改动。先点预检，只检查不写入；通过后再发布到中央仓库。";
         primaryActions = `
-          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>预检可发布更新</button>
-          <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布到中央仓库</button>
+          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>先预检</button>
+          <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
         `;
         facts = [
-          ["待处理", `${publishNames}。`],
-          ["第一步", "预检不会写 WebDAV。"],
-          ["第二步", "发布前会要求输入 PUBLISH。"],
+          ["要发布", `${publishNames}。`],
+          ["第一步", "预检只读，不写中央仓库。"],
+          ["第二步", "发布前会要求你确认。"],
         ];
         taskCards = `
           <div class="simple-action-card">
-            <div class="simple-action-card-title">发布队列</div>
+            <div class="simple-action-card-title">本次会处理</div>
             <div class="simple-action-summary">${escapeHtml(publishNames)}</div>
           </div>
         `;
       } else if (deleteItems.length > 0) {
-        title = `先确认 ${deleteItems.length} 个缺失项`;
-        summary = "缺失项不会自动删除中央仓库。先确认是恢复本机，还是单独走删除审批。";
-        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项</button>`;
+        title = `有 ${deleteItems.length} 个 skill 在本机缺失`;
+        summary = "缺失不等于删除。sidecar 默认保留中央仓库，先让你决定恢复本机还是单独删除。";
+        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项<span>不会删除中央仓库。</span></button>`;
         facts = [
           ["缺失项", `${deleteNames}。`],
-          ["默认动作", "先保留中央仓库。"],
-          ["高风险动作", "删除中央仓库不会一键执行。"],
+          ["默认安全", "保留中央仓库。"],
+          ["删除保护", "删除中央仓库不会一键执行。"],
         ];
         taskCards = renderSimpleDecisionList([], deleteItems);
       }
       panel.innerHTML = `
         <div class="simple-action-hero">
           <div class="simple-action-plain">
-            <div class="simple-action-eyebrow">现在只需要做这一件事</div>
+            <div class="simple-action-eyebrow">推荐下一步</div>
             <div class="simple-action-title">${escapeHtml(title)}</div>
             <div class="simple-action-summary">${escapeHtml(summary)}</div>
           </div>
@@ -4592,7 +4611,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <strong id="simple-action-feedback-title">等待操作</strong>
           <span id="simple-action-feedback-detail">选择一个按钮后，这里会显示进度。</span>
         </div>
-        <div id="simple-action-note" class="simple-action-note">这里只展示当前要处理的一件事；技术细节在“高级详情”里。</div>
+        <div id="simple-action-note" class="simple-action-note">这里优先展示推荐动作；看不懂下面的详情也可以先按这个按钮走。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -5155,6 +5174,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    function openTechnicalWorkspace() {
+      const advanced = document.querySelector(".advanced-workspace");
+      const technical = document.querySelector(".technical-workspace");
+      if (advanced) advanced.open = true;
+      if (technical) {
+        technical.open = true;
+        technical.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (advanced) {
+        advanced.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      const input = $("local-skill-path");
+      if (input) {
+        window.setTimeout(() => input.focus(), 250);
+      }
+    }
+
     function renderReviewQueue(items) {
       const panel = $("review-queue-panel");
       if (!Array.isArray(items) || items.length === 0) {
@@ -5227,8 +5262,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const summary = conflictItems.length > 0
         ? `有 ${conflictItems.length} 个版本差异，不能一键发布。先生成只读差异报告，报告会给出恢复、发布或手动处理的推荐。`
         : (publishItems.length > 0
-          ? `有 ${publishItems.length} 个可发布更新。先预检，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
+          ? `有 ${publishItems.length} 个设备更新需要确认。先预检，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
           : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留中央仓库，不静默删除。`);
+      const publishActionLabel = !executorAvailable
+        ? "等待本机执行器"
+        : (!executorAllowPublish ? "发布权限未开启" : `确认发布 ${publishItems.length} 个 OpenClaw 更新`);
+      const publishActionNote = publishItems.length === 0
+        ? "当前没有东西可发布；如果点确认发布，也不会写入中央仓库。"
+        : (!executorAvailable
+          ? "本机执行器未在线，先启动 executor。"
+          : (!executorAllowPublish
+            ? "当前只能预检，不能写入中央仓库；需要用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装本机 executor。"
+            : (remainingReady > 0 ? "发布按钮会在所有更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。")));
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
         <div class="review-recommendation-summary">
@@ -5241,19 +5286,19 @@ DASHBOARD_HTML = r"""<!doctype html>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">2</span>
-            <span>${remainingPrecheck > 0 ? `预检剩余 ${remainingPrecheck} 个可发布更新。` : (publishItems.length ? "可发布更新已完成预检。" : "当前没有可发布更新。")}</span>
+            <span>${remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没预检。` : (publishItems.length ? "更新已完成预检。" : "当前没有可发布更新。")}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
-            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
+            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (!executorAllowPublish ? "当前发布权限未开启；预检通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`))}</span>
           </li>
         </ol>
         <div class="review-recommendation-actions">
           <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新预检 ${publishItems.length} 个更新` : `预检 ${publishItems.length} 个更新`}</button>
-          <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>确认发布 ${publishItems.length} 个 OpenClaw 更新</button>
+          <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
         </div>
         <div id="review-recommendation-note" class="review-recommendation-note">
-          ${publishItems.length === 0 ? "当前没有东西可发布；如果点确认发布，也不会写入中央仓库。" : (remainingReady > 0 ? "发布按钮会在所有更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。")}
+          ${escapeHtml(publishActionNote)}
         </div>
       `;
     }
@@ -5663,6 +5708,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function setExecutorButtons(available) {
+      if (currentReviewQueueItems.length > 0) {
+        renderReviewRecommendation(currentReviewQueueItems);
+      }
       const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
       const reviewReady = allReviewPublishCandidatesReady();
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
@@ -5690,6 +5738,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
+        simplePublish.textContent = !available
+          ? "等待执行器"
+          : (!executorAllowPublish ? "发布权限未开启" : "确认发布");
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
           ? "本机执行器未在线"
@@ -5775,6 +5826,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const isPublish = mode === "publish";
       if (isPublish) {
+        if (!executorAllowPublish) {
+          showExecutorOutput("当前本机 executor 未开启中央发布权限。请用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor 后再发布。");
+          setReviewFeedback("yellow", "发布权限未开启", "当前只能预检，不能写入中央仓库。启用发布权限后，按钮会变成可发布。");
+          setExecutorButtons(executorAvailable);
+          return;
+        }
         if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
           showExecutorOutput("请先运行预检，并确认结果显示可以发布。");
           setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认结果显示可以发布后再写入中央仓库。");
@@ -6205,7 +6262,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </div>
       `).join("");
-      $("local-workspace-boundary").textContent = workspace.boundary || "这里不会跨设备改 OpenClaw 或 Windows；其他设备只看状态。";
+      const remoteNote = workspace.remote_blocked_note && Number(workspace.remote_blocked || 0) > 0
+        ? ` ${workspace.remote_blocked_note}`
+        : "";
+      $("local-workspace-boundary").textContent = (workspace.boundary || "这里不会跨设备改 OpenClaw 或 Windows；其他设备只看状态。") + remoteNote;
     }
 
     function renderLocalToolSummary(tools) {
@@ -6273,11 +6333,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         if (response.ok && payload.ok) {
           localWorkspaceFromExecutor = payload;
-          renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
-          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布已开启。" : "Mac 本机执行器在线：本机扫描和预检可用，发布未开启。", "green");
           executorAvailable = true;
           executorAllowPublish = Boolean(payload.allow_publish);
           executorAllowLocalWrites = Boolean(payload.allow_local_writes);
+          renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
+          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布已开启。" : "Mac 本机执行器在线：本机扫描和预检可用，发布未开启。", "green");
           setExecutorButtons(true);
         } else {
           throw new Error(payload.error || "local workspace scan failed");
