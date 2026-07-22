@@ -55,10 +55,16 @@ class RemoteSnapshotCache:
         self._last_refresh = 0.0
 
     def snapshot_dir(self) -> Path:
+        return self._snapshot_dir(force=False)
+
+    def force_refresh(self) -> Path:
+        return self._snapshot_dir(force=True)
+
+    def _snapshot_dir(self, *, force: bool) -> Path:
         index_path = self.cache_dir / "index.json"
         now = time.monotonic()
         stale = now - self._last_refresh >= self.refresh_interval_seconds
-        if stale or not index_path.exists():
+        if force or stale or not index_path.exists():
             download_snapshot(self.remote, self.cache_dir, self.prefix)
             self._last_refresh = now
         return self.cache_dir
@@ -1405,7 +1411,7 @@ def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
             }
 
     preview_provider = lambda: build_hub_import_preview_response(config.hub_import_work_dir)
-    handler = _handler_factory(status_provider, preview_provider)
+    handler = _handler_factory(status_provider, preview_provider, cache.force_refresh)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"skill-sync gateway: http://{host}:{server.server_port}", flush=True)
     try:
@@ -1424,7 +1430,16 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_provider: Optional[Callable[[], dict]] = None):
+def _query_has_force_refresh(path: str) -> bool:
+    query = path.split("?", 1)[1] if "?" in path else ""
+    return any(part in {"refresh=1", "refresh=true", "force=1", "force=true"} for part in query.split("&"))
+
+
+def _handler_factory(
+    status_provider: Callable[[], dict],
+    hub_import_preview_provider: Optional[Callable[[], dict]] = None,
+    force_refresh_provider: Optional[Callable[[], None]] = None,
+):
     summary_cache = DashboardSummaryCache(
         status_provider,
         timeout_seconds=_float_env("SKILL_SYNC_SUMMARY_TIMEOUT_SECONDS", 2.0),
@@ -1441,6 +1456,8 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
                 return
             if path == "/api/status":
                 try:
+                    if _query_has_force_refresh(self.path) and force_refresh_provider is not None:
+                        force_refresh_provider()
                     payload = status_provider()
                     body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
                     self._send(200, "application/json; charset=utf-8", body)
@@ -1449,8 +1466,9 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
                     self._send(500, "application/json; charset=utf-8", body)
                 return
             if path == "/api/summary":
-                query = self.path.split("?", 1)[1] if "?" in self.path else ""
-                force = any(part in {"refresh=1", "refresh=true", "force=1", "force=true"} for part in query.split("&"))
+                force = _query_has_force_refresh(self.path)
+                if force and force_refresh_provider is not None:
+                    force_refresh_provider()
                 status_code, payload = summary_cache.get_summary(force=force)
                 body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 self._send(status_code, "application/json; charset=utf-8", body)
@@ -5057,8 +5075,40 @@ DASHBOARD_HTML = r"""<!doctype html>
       };
     }
 
+    async function waitForSkillsResolution(skillIds, actionLabel) {
+      const uniqueSkillIds = Array.from(new Set((skillIds || []).filter(Boolean)));
+      const maxAttempts = 4;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        setExecutorStatus("checking", `${actionLabel}已提交，正在确认状态 ${attempt}/${maxAttempts}。`, "yellow");
+        setReviewFeedback("yellow", "正在确认待办是否下降", `第 ${attempt}/${maxAttempts} 次读取 OpenClaw 上报和 NAS 状态；这一步只读，不会再写入。`);
+        await refreshOpenclawPeerStatus();
+        await refresh(true);
+        const remaining = reviewItemsForSkills(uniqueSkillIds);
+        if (remaining.length === 0) {
+          return { done: true, attempts: attempt, detail: "相关待办已清空。" };
+        }
+        if (attempt < maxAttempts) {
+          await wait(4000);
+        }
+      }
+      const remaining = reviewItemsForSkills(uniqueSkillIds);
+      const names = compactSkillList(remaining.map((item) => item.skill_id));
+      return {
+        done: false,
+        attempts: maxAttempts,
+        detail: remaining.length > 0
+          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关待办：${names}。`
+          : "已完成写入请求，但状态刷新结果暂时不确定。",
+      };
+    }
+
     function reviewItemsForSkill(skillId) {
       return currentReviewQueueItems.filter((item) => item.skill_id === skillId);
+    }
+
+    function reviewItemsForSkills(skillIds) {
+      const ids = new Set((skillIds || []).filter(Boolean));
+      return currentReviewQueueItems.filter((item) => ids.has(item.skill_id));
     }
 
     function wait(ms) {
@@ -5767,11 +5817,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             );
             return;
           }
-          setExecutorStatus(isPublish ? "published" : "预检通过", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "预检通过：可以继续确认发布。", "green");
+          setExecutorStatus(isPublish ? "published" : "预检通过", isPublish ? "发布已写入，正在确认状态。" : "预检通过：可以继续确认发布。", "green");
           setReviewFeedback(
             "green",
             isPublish ? "发布完成" : "预检通过",
-            isPublish ? "中央仓库已更新，请等待 1-2 分钟后刷新状态。" : "预检通过，可以继续确认发布到中央仓库。",
+            isPublish ? "中央仓库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "预检通过，可以继续确认发布到中央仓库。",
           );
           if (!isPublish) {
             actionSkills.forEach((skillId) => {
@@ -5784,24 +5834,24 @@ DASHBOARD_HTML = r"""<!doctype html>
             renderReviewQueue(currentReviewQueueItems);
           }
           if (isPublish) {
-            await refreshOpenclawPeerStatus();
-            await refresh(true);
+            const resolution = await waitForSkillsResolution(actionSkills, "确认发布");
             lastDryRunSafe = false;
             reviewTaskResults = {};
             const remaining = currentReviewQueueItems.length;
+            const relatedRemaining = reviewItemsForSkills(actionSkills);
             setReviewFeedback(
-              remaining > 0 ? "yellow" : "green",
-              "发布完成，状态已刷新",
-              remaining > 0
-                ? `中央仓库已更新；还剩 ${remaining} 个待处理：${blockedBreakdownText(blockedBreakdown(currentReviewQueueItems))}。`
-                : "中央仓库已更新；当前没有待处理同步项。",
+              resolution.done && remaining === 0 ? "green" : "yellow",
+              resolution.done ? "发布完成，状态已确认" : "发布已完成，但状态还没完全收敛",
+              resolution.done && remaining === 0
+                ? `中央仓库已更新，${actionSkills.length} 个待办已清空。`
+                : `${resolution.detail} 当前总待办 ${remaining} 个：${blockedBreakdownText(blockedBreakdown(currentReviewQueueItems))}。`,
             );
             setExecutorStatus(
-              remaining > 0 ? "published" : "done",
-              remaining > 0
-                ? `发布已完成，但还有 ${remaining} 个版本差异/删除确认类待办。`
-                : "发布已完成，待办已清空。",
-              remaining > 0 ? "yellow" : "green",
+              resolution.done && relatedRemaining.length === 0 ? "done" : "published",
+              resolution.done && relatedRemaining.length === 0
+                ? "发布已完成，相关待办已清空。"
+                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关待办。`,
+              resolution.done && relatedRemaining.length === 0 ? "green" : "yellow",
             );
           }
         } else {

@@ -600,11 +600,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/openclaw-central-restore-dry-run", DASHBOARD_HTML)
             self.assertNotIn("这会用中央仓库版本覆盖 OpenClaw", DASHBOARD_HTML)
             self.assertIn("waitForSkillResolution", DASHBOARD_HTML)
+            self.assertIn("waitForSkillsResolution", DASHBOARD_HTML)
             self.assertIn("正在确认是否完成", DASHBOARD_HTML)
+            self.assertIn("正在确认待办是否下降", DASHBOARD_HTML)
             self.assertIn("这一步只读，不会再写入", DASHBOARD_HTML)
             self.assertIn("版本差异已清空", DASHBOARD_HTML)
             self.assertIn("已写入，但待办还没清空", DASHBOARD_HTML)
             self.assertIn("reviewItemsForSkill", DASHBOARD_HTML)
+            self.assertIn("reviewItemsForSkills", DASHBOARD_HTML)
             self.assertIn("我手动合并", DASHBOARD_HTML)
             self.assertIn("查看诊断路径和版本指纹", DASHBOARD_HTML)
             self.assertIn("explainConflictChoice", DASHBOARD_HTML)
@@ -1045,6 +1048,29 @@ class OpsStatusTest(unittest.TestCase):
             self.assertFalse(device_tools["mac"]["reported"])
             self.assertEqual(device_tools["mac"]["tools"][0]["state"], "unknown")
             self.assertEqual(device_tools["oc-vps"]["tools"][0]["state"], "unknown")
+
+    def test_remote_snapshot_cache_force_refresh_bypasses_interval(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-1")
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+
+            first_dir = cache.snapshot_dir()
+            self.assertEqual(json.loads((first_dir / "index.json").read_text(encoding="utf-8"))["snapshot_id"], "snap-1")
+
+            self._write_skill(source_skills / "new-demo", "New Demo", "New demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-2")
+
+            cached_dir = cache.snapshot_dir()
+            self.assertEqual(json.loads((cached_dir / "index.json").read_text(encoding="utf-8"))["snapshot_id"], "snap-1")
+
+            refreshed_dir = cache.force_refresh()
+            self.assertEqual(json.loads((refreshed_dir / "index.json").read_text(encoding="utf-8"))["snapshot_id"], "snap-2")
 
     def test_gateway_status_groups_reported_device_tools(self):
         with TemporaryDirectory() as tmp:
