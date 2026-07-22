@@ -445,8 +445,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertTrue(any(device["id"] == "mac" and device["operation_scope"] == "local" for device in status["dashboard"]["device_map"]["items"]))
             self.assertTrue(any(device["id"] == "oc-vps" and device["operation_scope"] == "remote_read_only" for device in status["dashboard"]["device_map"]["items"]))
             self.assertIn("/api/summary", DASHBOARD_HTML)
-            self.assertIn("Skill 同步工作台", DASHBOARD_HTML)
-            self.assertIn("先处理当前任务；其他信息都在详情里", DASHBOARD_HTML)
+            self.assertIn("Skill 管理", DASHBOARD_HTML)
+            self.assertIn("看第一块建议；需要操作再用“常用操作”", DASHBOARD_HTML)
+            self.assertIn("quick-status-details", DASHBOARD_HTML)
+            self.assertIn("可选：查看状态数字", DASHBOARD_HTML)
             self.assertIn("status-strip", DASHBOARD_HTML)
             self.assertIn("状态摘要", DASHBOARD_HTML)
             self.assertIn("当前状态", DASHBOARD_HTML)
@@ -468,6 +470,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
+                DASHBOARD_HTML.index("class=\"quick-status-details\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"quick-status-details\""),
                 DASHBOARD_HTML.index("class=\"status-strip\""),
             )
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
@@ -630,7 +640,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("常用操作", DASHBOARD_HTML)
             self.assertIn("普通使用只看这里", DASHBOARD_HTML)
             self.assertIn("导入 / 安装本地 skill", DASHBOARD_HTML)
-            self.assertIn("不需要你手写 manifest", DASHBOARD_HTML)
+            self.assertIn("不需要你补配置文件", DASHBOARD_HTML)
             self.assertIn("检查后发布", DASHBOARD_HTML)
             self.assertIn("看到“无待处理”才算完成", DASHBOARD_HTML)
             self.assertIn("id=\"easy-dry-run\"", DASHBOARD_HTML)

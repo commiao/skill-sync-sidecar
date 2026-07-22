@@ -3213,6 +3213,41 @@ DASHBOARD_HTML = r"""<!doctype html>
     .advanced-workspace {
       margin: 12px 0;
     }
+    .quick-status-details {
+      margin: 10px 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .quick-status-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-weight: 760;
+      font-size: 13px;
+    }
+    .quick-status-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .quick-status-details > summary::after {
+      content: "展开";
+      margin-left: 8px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .quick-status-details[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .quick-status-details[open] > summary::after {
+      content: "收起";
+    }
+    .quick-status-details .status-strip {
+      margin: 0;
+      padding: 10px;
+    }
     .advanced-workspace > summary {
       cursor: pointer;
       color: var(--blue);
@@ -3899,8 +3934,8 @@ DASHBOARD_HTML = r"""<!doctype html>
   <a class="portal-link" href="http://100.123.208.32:17172/portal">← 报表门户</a>
   <header>
     <div class="brand">
-      <h1>Skill 同步工作台</h1>
-      <div class="brand-subtitle">先处理当前任务；其他信息都在详情里</div>
+      <h1>Skill 管理</h1>
+      <div class="brand-subtitle">看第一块建议；需要操作再用“常用操作”</div>
     </div>
     <div class="toolbar">
       <span id="updated">读取中</span>
@@ -3922,7 +3957,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">我要让本机工具能用某个 skill</div>
           <h2>导入 / 安装本地 skill</h2>
-          <p>粘贴 skill 目录或 SKILL.md 路径，sidecar 自动分析，不需要你手写 manifest。</p>
+          <p>粘贴 skill 目录或 SKILL.md 路径，sidecar 自动分析，不需要你补配置文件。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">本地 skill 路径</div>
@@ -3957,34 +3992,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
-    <section class="status-strip" aria-label="状态摘要">
-      <div class="status-chip focus-main">
-        <div class="status-chip-label">当前状态</div>
-        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">读取中</span></div>
-        <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
-      </div>
-      <div class="status-chip focus-side">
-        <div class="focus-side-actions">
-          <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
+    <details class="quick-status-details">
+      <summary>可选：查看状态数字</summary>
+      <section class="status-strip" aria-label="状态摘要">
+        <div class="status-chip focus-main">
+          <div class="status-chip-label">当前状态</div>
+          <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">读取中</span></div>
+          <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
         </div>
-        <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；共享仓库和其他设备只读。</div>
-        <div class="focus-metrics" aria-label="同步范围摘要">
-          <div class="focus-metric">
-            <div class="status-chip-label">本机</div>
-            <div id="strip-local" class="status-chip-value">-</div>
+        <div class="status-chip focus-side">
+          <div class="focus-side-actions">
+            <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
           </div>
-          <div class="focus-metric">
-            <div class="status-chip-label">共享仓库</div>
-            <div id="strip-central" class="status-chip-value">-</div>
-          </div>
-          <div class="focus-metric">
-            <div class="status-chip-label">设备</div>
-            <div id="strip-devices" class="status-chip-value">-</div>
+          <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；共享仓库和其他设备只读。</div>
+          <div class="focus-metrics" aria-label="同步范围摘要">
+            <div class="focus-metric">
+              <div class="status-chip-label">本机</div>
+              <div id="strip-local" class="status-chip-value">-</div>
+            </div>
+            <div class="focus-metric">
+              <div class="status-chip-label">共享仓库</div>
+              <div id="strip-central" class="status-chip-value">-</div>
+            </div>
+            <div class="focus-metric">
+              <div class="status-chip-label">设备</div>
+              <div id="strip-devices" class="status-chip-value">-</div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </details>
     <details class="advanced-workspace">
       <summary>可选：查看 Mac / OpenClaw / 共享仓库状态</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
@@ -6559,7 +6597,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "install failed");
-        setLocalSkillStatus("installed", "安装完成；已自动写入 manifest 和备份记录。", "green");
+        setLocalSkillStatus("installed", "安装完成；已自动写入配置和备份记录。", "green");
         renderLocalSkillInstall(payload);
         renderLocalSkillPublishHint();
         await refreshLocalWorkspace();
@@ -6607,7 +6645,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderLocalSkillAnalysis(payload) {
       const summary = payload.summary || {};
       const writes = Number(summary.will_write || 0);
-      $("local-skill-result").textContent = `${payload.skill_id} · ${payload.scope} · ${payload.manifest_source === "generated" ? "sidecar 自动生成元数据" : "读取 manifest"} · 可写入 ${writes} 个工具`;
+      $("local-skill-result").textContent = `${payload.skill_id} · ${payload.scope} · ${payload.manifest_source === "generated" ? "sidecar 自动生成元数据" : "读取配置文件"} · 可写入 ${writes} 个工具`;
       renderLocalSkillTools(payload.tools || []);
     }
 
