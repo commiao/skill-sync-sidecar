@@ -2728,6 +2728,31 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-height: 48px;
       font-size: 15px;
     }
+    .simple-choice-grid {
+      display: grid;
+      gap: 8px;
+      min-width: min(360px, 100%);
+    }
+    .simple-choice-grid button {
+      width: 100%;
+      min-width: 0;
+      min-height: 54px;
+      text-align: left;
+      white-space: normal;
+    }
+    .simple-choice-grid button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .simple-choice-grid button span {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: .78;
+      line-height: 1.35;
+      margin-top: 2px;
+    }
     .simple-action-actions .primary {
       background: var(--ink);
       color: #fff;
@@ -2738,6 +2763,35 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       margin-top: 8px;
       overflow-wrap: anywhere;
+    }
+    .simple-action-feedback {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--muted);
+      display: grid;
+      gap: 2px;
+      font-size: 13px;
+    }
+    .simple-action-feedback[hidden] {
+      display: none;
+    }
+    .simple-action-feedback strong {
+      color: var(--ink);
+      font-size: 14px;
+    }
+    .simple-action-feedback.green {
+      border-color: #a8dec2;
+      background: #f4fff8;
+    }
+    .simple-action-feedback.yellow {
+      border-color: #efd59a;
+      background: #fffaf0;
+    }
+    .simple-action-feedback.red {
+      border-color: #efb1b1;
+      background: #fff7f7;
     }
     .simple-action-list {
       display: grid;
@@ -3494,6 +3548,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .simple-action-title { font-size: 18px; }
       .simple-action-grid { grid-template-columns: 1fr; gap: 8px; }
       .simple-action-actions { display: grid; grid-template-columns: 1fr; }
+      .simple-choice-grid { min-width: 0; }
       .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
       .local-skill-input-row { grid-template-columns: 1fr; gap: 6px; }
@@ -4271,17 +4326,19 @@ DASHBOARD_HTML = r"""<!doctype html>
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
-        title = conflictItems.length === 1 ? `只剩 1 个需要选择：${skill}` : `有 ${conflictItems.length} 个需要选择的冲突`;
-        summary = "这不是故障，也不是待预检。它表示 OpenClaw 和中央仓库都改过同一个 skill，sidecar 不能替你猜哪边正确。";
+        title = conflictItems.length === 1 ? `选择 ${skill} 保留哪一版` : `有 ${conflictItems.length} 个 skill 需要选择保留版本`;
+        summary = "两边都改过，系统不会自动覆盖。你只需要选择可信版本；不确定就先看差异，查看差异不会写入任何地方。";
         primaryActions = `
-          <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版</button>
-          <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版</button>
-          <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">我不确定，先看差异</button>
+          <div class="simple-choice-grid" aria-label="选择保留版本">
+            <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版<span>发布到中央仓库，其他设备后续会拿这版。</span></button>
+            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版<span>恢复到 OpenClaw，原 OpenClaw 版本会备份。</span></button>
+            <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">我不确定，先看差异<span>只读查看两边文件，不会改任何地方。</span></button>
+          </div>
         `;
         facts = [
-          ["选 OpenClaw", "会先预检，通过后输入 PUBLISH 才写入中央仓库。"],
-          ["选中央仓库", "会先预检，通过后输入 RESTORE 才恢复到 OpenClaw。"],
-          ["不确定", "先看差异，只读查看，不会写任何地方。"],
+          ["安全规则", "不输入确认词，不会真的写入。"],
+          ["选 OpenClaw", "通过预检后输入 PUBLISH。"],
+          ["选中央仓库", "通过预检后输入 RESTORE。"],
         ];
         taskCards = "";
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -4346,6 +4403,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${facts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}
         </div>
         ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
+        <div id="simple-action-feedback" class="simple-action-feedback" hidden>
+          <strong id="simple-action-feedback-title">等待操作</strong>
+          <span id="simple-action-feedback-detail">选择一个按钮后，这里会显示进度。</span>
+        </div>
         <div id="simple-action-note" class="simple-action-note">这里只展示当前要处理的一件事；技术细节在“高级详情”里。</div>
       `;
       setExecutorButtons(executorAvailable);
@@ -4876,11 +4937,19 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function setReviewFeedback(kind, title, detail) {
       const feedback = $("review-feedback");
-      if (!feedback) return;
-      feedback.hidden = false;
-      feedback.className = `review-feedback ${kind || ""}`;
-      $("review-feedback-title").textContent = title;
-      $("review-feedback-detail").textContent = detail;
+      if (feedback) {
+        feedback.hidden = false;
+        feedback.className = `review-feedback ${kind || ""}`;
+        $("review-feedback-title").textContent = title;
+        $("review-feedback-detail").textContent = detail;
+      }
+      const simpleFeedback = $("simple-action-feedback");
+      if (simpleFeedback) {
+        simpleFeedback.hidden = false;
+        simpleFeedback.className = `simple-action-feedback ${kind || ""}`;
+        $("simple-action-feedback-title").textContent = title;
+        $("simple-action-feedback-detail").textContent = detail;
+      }
     }
 
     function updateReviewTaskResult(itemOrSkillId, result) {
