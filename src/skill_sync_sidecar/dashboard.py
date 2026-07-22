@@ -3898,6 +3898,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
+    let staleRefreshTimer = null;
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -4036,7 +4037,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-devices").textContent = text(deviceCount);
       if (blocked > 0 && breakdown.conflict === blocked) {
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
-        $("strip-focus-note").textContent = `只剩冲突：${names}。不是待预检，需要选择保留 OpenClaw 版还是中央版。`;
+        $("strip-focus-note").textContent = `只剩冲突：${names}。不是待预检；如果不确定，先点“我不确定，先看差异”。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
@@ -4045,7 +4046,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const actionNote = $("strip-action-note");
       if (actionNote) {
         actionNote.textContent = blocked > 0 && breakdown.conflict === blocked
-          ? "直接选择保留哪边；不确定时再手动对比。"
+          ? "确定哪边正确就直接选；不确定就先看差异。"
           : (blocked > 0
           ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
           : "只操作 Mac 本机。");
@@ -4076,7 +4077,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const breakdown = blockedBreakdown(items);
       if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.conflict === blocked) {
         const names = compactSkillList(items.map((item) => item.skill_id));
-        return `只剩冲突：${names}。直接选择保留 OpenClaw 版或中央版；不确定时再手动对比。`;
+        return `只剩冲突：${names}。确定哪边正确就直接选；不确定就先看差异。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先审 ${blocked} 个待审批项；dry-run 只预览，确认后再发布到中央仓库。`;
@@ -4215,14 +4216,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         title = conflictItems.length === 1 ? `只剩 1 个需要选择：${skill}` : `有 ${conflictItems.length} 个需要选择的冲突`;
         summary = "这不是故障，也不是待预检。它表示 OpenClaw 和中央仓库都改过同一个 skill，sidecar 不能替你猜哪边正确。";
         primaryActions = `
-          <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">保留 OpenClaw 版</button>
-          <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">保留中央版</button>
-          <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">手动对比</button>
+          <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版</button>
+          <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版</button>
+          <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">我不确定，先看差异</button>
         `;
         facts = [
-          ["保留 OpenClaw 版", "会先预检，通过后输入 PUBLISH 才写入中央仓库。"],
-          ["保留中央版", "会先预检，通过后输入 RESTORE 才恢复到 OpenClaw。"],
-          ["不确定", "点“手动对比”，只读查看两边差异。"],
+          ["选 OpenClaw", "会先预检，通过后输入 PUBLISH 才写入中央仓库。"],
+          ["选中央仓库", "会先预检，通过后输入 RESTORE 才恢复到 OpenClaw。"],
+          ["不确定", "先看差异，只读查看，不会写任何地方。"],
         ];
         taskCards = "";
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -5177,7 +5178,19 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     async function runExecutorAction(mode) {
       const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
-      if (!executorAvailable || actionSkills.length === 0) return;
+      if (!executorAvailable) {
+        showExecutorOutput("本机执行器未连接，无法执行预检或发布。");
+        setReviewFeedback("yellow", "执行器未连接", "请先让 Mac 本机 executor 在线；状态已重新刷新。");
+        await refresh(true);
+        checkExecutor();
+        return;
+      }
+      if (actionSkills.length === 0) {
+        showExecutorOutput("当前没有可发布更新。冲突和删除确认不会通过这个按钮自动处理。");
+        setReviewFeedback("yellow", "当前没有可发布更新", "状态已重新刷新；如果只剩冲突，请直接选择保留哪边，或先看差异。");
+        await refresh(true);
+        return;
+      }
       const isPublish = mode === "publish";
       if (isPublish) {
         if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
@@ -5241,6 +5254,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           if (isPublish) {
             await refreshOpenclawPeerStatus();
             await refresh(true);
+            lastDryRunSafe = false;
+            reviewTaskResults = {};
             const remaining = currentReviewQueueItems.length;
             setReviewFeedback(
               remaining > 0 ? "yellow" : "green",
@@ -6088,11 +6103,17 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     async function refresh(force) {
       try {
-        const endpoint = force ? "/api/summary?refresh=1" : "/api/summary";
+        const endpoint = force ? `/api/summary?refresh=1&_=${Date.now()}` : `/api/summary?_=${Date.now()}`;
         const response = await fetch(endpoint, { cache: "no-store" });
         const status = await response.json();
         if (!response.ok) throw new Error(status.error || `HTTP ${response.status}`);
         render(status);
+        const cache = status.summary_cache || (status.dashboard || {}).summary_cache || {};
+        if (!force && cache.state === "stale") {
+          $("updated").textContent = "状态缓存偏旧，正在重新读取实时状态...";
+          if (staleRefreshTimer) clearTimeout(staleRefreshTimer);
+          staleRefreshTimer = setTimeout(() => refresh(true), 800);
+        }
       } catch (error) {
         $("error").textContent = error.message;
         $("error").style.display = "block";
@@ -6103,8 +6124,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     $("refresh").addEventListener("click", () => refresh(true));
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
-    refresh(false);
-    setInterval(refresh, 30000);
+    refresh(true);
+    setInterval(() => refresh(false), 30000);
   </script>
 </body>
 </html>
