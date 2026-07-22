@@ -3092,6 +3092,55 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: -4px 0 10px;
       overflow-wrap: anywhere;
     }
+    .workspace-flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .workspace-step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px 9px;
+      min-width: 0;
+    }
+    .workspace-step strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+    .workspace-step span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .workspace-secondary {
+      margin-top: 10px;
+      border-top: 1px solid var(--line);
+      padding-top: 9px;
+    }
+    .workspace-secondary > summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 760;
+      list-style: none;
+    }
+    .workspace-secondary > summary::-webkit-details-marker {
+      display: none;
+    }
+    .workspace-secondary > summary::after {
+      content: "展开";
+      margin-left: 6px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .workspace-secondary[open] > summary::after {
+      content: "收起";
+    }
     .workspace-tool-summary {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3437,6 +3486,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-tool-summary-item { padding: 6px; }
       .workspace-tool-summary-value { font-size: 15px; }
       .workspace-tool-summary-label { font-size: 10px; }
+      .workspace-flow { grid-template-columns: 1fr; gap: 6px; }
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
       .workspace-actions { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
@@ -3585,10 +3635,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <details class="advanced-workspace">
-      <summary>查看本机、中央仓库和设备详情</summary>
+      <summary>可选：查看三块状态（不影响当前操作）</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
     <details class="technical-workspace">
-      <summary>技术诊断和工具管理</summary>
+      <summary>可选：管理本机 skill / 查看技术细节</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
@@ -3605,10 +3655,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span id="local-workspace-pill" class="pill">checking</span>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
+          <div class="workspace-flow" aria-label="本机操作流程">
+            <div class="workspace-step"><strong>1. 扫描</strong><span>读取当前 Mac 上各工具的 skill。</span></div>
+            <div class="workspace-step"><strong>2. 预检</strong><span>只看会改什么，不写中央仓库。</span></div>
+            <div class="workspace-step"><strong>3. 发布</strong><span>确认无误后输入 PUBLISH。</span></div>
+          </div>
           <div class="workspace-actions">
-            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">1 扫描本机</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>2 预检</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>3 发布中央</button>
           </div>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
@@ -3622,28 +3677,31 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>预检发布</button>
               <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布中央</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">粘贴目录后点击分析；sidecar 会自动生成同步元数据和安装计划。</div>
+            <div id="local-skill-result" class="local-skill-result">把一个 skill 目录粘进来，先点“分析”；通过后再安装到本机工具或发布中央。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
-          <div class="workspace-metrics">
-            <div class="workspace-metric">
-              <div id="local-workspace-total" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机 skill</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">本机待处理</div>
-            </div>
-            <div class="workspace-metric">
-              <div id="local-workspace-source" class="workspace-metric-value">-</div>
-              <div class="workspace-metric-label">数据来源</div>
-            </div>
-          </div>
           <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
-          <div id="local-workspace-tool-summary" class="workspace-tool-summary"></div>
-          <details class="workspace-tool-details">
-            <summary>工具目录明细</summary>
-            <div id="local-workspace-tools" class="workspace-tools"></div>
+          <details class="workspace-secondary">
+            <summary>查看数量和工具目录</summary>
+            <div class="workspace-metrics">
+              <div class="workspace-metric">
+                <div id="local-workspace-total" class="workspace-metric-value">-</div>
+                <div class="workspace-metric-label">本机 skill</div>
+              </div>
+              <div class="workspace-metric">
+                <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
+                <div class="workspace-metric-label">本机待处理</div>
+              </div>
+              <div class="workspace-metric">
+                <div id="local-workspace-source" class="workspace-metric-value">-</div>
+                <div class="workspace-metric-label">数据来源</div>
+              </div>
+            </div>
+            <div id="local-workspace-tool-summary" class="workspace-tool-summary"></div>
+            <details class="workspace-tool-details">
+              <summary>工具目录明细</summary>
+              <div id="local-workspace-tools" class="workspace-tools"></div>
+            </details>
           </details>
           <div id="local-workspace-boundary" class="boundary-note"></div>
         </div>
@@ -5545,7 +5603,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      $("workspace-overview-summary").textContent = `本区可操作；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台其他设备只读`;
+      $("workspace-overview-summary").textContent = `左边能操作当前 Mac；中央仓库和 ${text(deviceCount)} 台其他设备只读展示`;
     }
 
     function renderPlainDetails(dashboard) {
@@ -5609,7 +5667,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `${deviceName} 的本地 skill：扫描目录，预检后再推送中央仓库。`;
+      $("local-workspace-summary").textContent = `${deviceName} 是唯一可直接操作的设备：先扫描，预检安全后，再把确认的改动发布到中央仓库。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
@@ -5623,7 +5681,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </div>
       `).join("");
-      $("local-workspace-boundary").textContent = workspace.boundary || "本地工作区只操作浏览器所在设备。";
+      $("local-workspace-boundary").textContent = workspace.boundary || "这里不会跨设备改 OpenClaw 或 Windows；其他设备只看状态。";
     }
 
     function renderLocalToolSummary(tools) {
@@ -5649,7 +5707,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderCentralRepository(repo) {
       $("central-repository-pill").outerHTML = pill("WebDAV 快照", "green").replace("<span", "<span id=\"central-repository-pill\"");
-      $("central-repository-summary").textContent = `共享事实源收录 ${text(repo.total_skills)} 个 skill；这里不直接编辑，只接收显式推送。`;
+      $("central-repository-summary").textContent = `中央仓库收录 ${text(repo.total_skills)} 个 skill，是各设备同步用的共享版本；这里不直接编辑。`;
       $("central-repository-kv").innerHTML = [
         row("中央版本", repo.snapshot_id),
         row("更新时间", repo.created_at),
