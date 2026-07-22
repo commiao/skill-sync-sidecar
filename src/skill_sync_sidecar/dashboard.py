@@ -2751,6 +2751,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       border-left-color: var(--green);
       background: #f8fffb;
     }
+    .simple-action-panel.green .simple-action-hero {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .simple-action-panel.yellow {
       background: #fffdf7;
       border-color: #e8d29c;
@@ -2956,6 +2959,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--ink);
       font-size: 13px;
       margin-bottom: 2px;
+    }
+    .simple-action-done-line {
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-done-line strong {
+      color: var(--ink);
+      font-weight: 820;
     }
     .simple-task-list {
       display: grid;
@@ -4676,20 +4691,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="simple-action-hero">
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
-              <div class="simple-action-title">同步正常，不需要处理</div>
-              <div class="simple-action-summary">共享仓库、Mac、OpenClaw 已对齐。你现在可以放心继续工作；只有新增或修改本机 skill 时，才需要点下面的按钮。</div>
-            </div>
-            <div class="simple-choice-grid" aria-label="常用操作">
-              <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机 skill<span>看当前 Mac 上有哪些 skill、有没有变化。</span></button>
-              <button type="button" onclick="openTechnicalWorkspace()">导入或安装 skill<span>粘贴一个 skill 目录，sidecar 帮你分析和安装。</span></button>
-              <button type="button" onclick="openAdvancedDetails()">查看设备状态<span>只看 Mac、OpenClaw、NAS 是否正常。</span></button>
+              <div class="simple-action-title">现在不用处理</div>
+              <div class="simple-action-summary">Mac、OpenClaw 和共享仓库已对齐。需要新增、安装或发布 skill 时，直接用下面的“常用操作”。</div>
             </div>
           </div>
-          <div class="simple-action-facts">
-            <div class="simple-action-fact"><strong>不会自动乱改</strong>跨设备写入需要明确确认。</div>
-            <div class="simple-action-fact"><strong>本机可操作</strong>按钮默认只影响当前 Mac。</div>
-            <div class="simple-action-fact"><strong>其它设备只读</strong>OpenClaw 和 NAS 状态只展示，不远程操作。</div>
-          </div>
+          <div class="simple-action-done-line"><strong>安全边界：</strong>本页默认只操作当前 Mac；发布或跨设备写入前会再次确认。</div>
         `;
         setExecutorButtons(executorAvailable);
         return;
@@ -6006,6 +6012,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     async function runExecutorAction(mode) {
       const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
+      const requestedSkillsLabel = compactSkillList(actionSkills);
       if (!executorAvailable) {
         showExecutorOutput("本机助手未连接，无法执行检查或发布。按钮没有真正执行，请先确认本机助手在线。");
         setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线；状态已重新刷新。");
@@ -6091,19 +6098,27 @@ DASHBOARD_HTML = r"""<!doctype html>
             reviewTaskResults = {};
             const remaining = currentReviewQueueItems.length;
             const relatedRemaining = reviewItemsForSkills(actionSkills);
+            const unrelatedRemaining = currentReviewQueueItems.filter((item) => !actionSkills.includes(text(item.skill_id)));
+            const remainingNames = compactSkillList(currentReviewQueueItems.map((item) => item.skill_id));
+            const relatedNames = compactSkillList(relatedRemaining.map((item) => item.skill_id));
+            const unrelatedNames = compactSkillList(unrelatedRemaining.map((item) => item.skill_id));
+            const publishedCleanly = resolution.done && relatedRemaining.length === 0;
+            const detail = publishedCleanly && remaining === 0
+              ? `已发布 ${requestedSkillsLabel}，当前无待处理。`
+              : (publishedCleanly
+                ? `已发布 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的待处理项：${unrelatedNames}。这不是同一批发布失败。`
+                : `${resolution.detail} 当前剩余 ${remaining} 个：${remainingNames}；其中相关待处理：${relatedNames}。`);
             setReviewFeedback(
-              resolution.done && remaining === 0 ? "green" : "yellow",
-              resolution.done ? "发布完成，状态已确认" : "发布已完成，但状态还没完全收敛",
-              resolution.done && remaining === 0
-                ? `共享仓库已更新，${actionSkills.length} 个待办已清空。`
-                : `${resolution.detail} 当前总待办 ${remaining} 个：${blockedBreakdownText(blockedBreakdown(currentReviewQueueItems))}。`,
+              publishedCleanly && remaining === 0 ? "green" : "yellow",
+              publishedCleanly ? "本次发布已完成" : "发布已提交，仍需确认状态",
+              detail,
             );
             setExecutorStatus(
-              resolution.done && relatedRemaining.length === 0 ? "done" : "published",
-              resolution.done && relatedRemaining.length === 0
-                ? "发布已完成，相关待办已清空。"
-                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关待办。`,
-              resolution.done && relatedRemaining.length === 0 ? "green" : "yellow",
+              publishedCleanly && remaining === 0 ? "done" : "published",
+              publishedCleanly
+                ? (remaining === 0 ? "本次发布已完成，当前无待处理。" : `本次发布已完成；还有 ${remaining} 个其他待处理项。`)
+                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关待处理项。`,
+              publishedCleanly && remaining === 0 ? "green" : "yellow",
             );
           }
         } else {
