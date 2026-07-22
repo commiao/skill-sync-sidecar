@@ -1120,7 +1120,7 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
     remote_blocked = [item for item in blocked_items if item.get("peer_id") != "mac"]
     reported = bool(mac_tools.get("reported"))
     return {
-        "title": "本地 Skill 工作区",
+        "title": "本机 Skill 管理",
         "scope": "local",
         "device_id": "mac",
         "device_name": mac.get("name") or "Mac 本机",
@@ -2632,6 +2632,107 @@ DASHBOARD_HTML = r"""<!doctype html>
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    .easy-workspace {
+      margin: 10px 0 8px;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+    .easy-workspace-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+    }
+    .easy-workspace-title {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+    .easy-workspace-title strong {
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 880;
+    }
+    .easy-workspace-title span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .easy-workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.05fr) minmax(280px, .95fr);
+      gap: 0;
+    }
+    .easy-card {
+      padding: 16px 18px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+    .easy-card + .easy-card {
+      border-left: 1px solid var(--line);
+    }
+    .easy-card-label {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 860;
+    }
+    .easy-card h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 17px;
+      line-height: 1.25;
+    }
+    .easy-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .easy-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .easy-action-row button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .easy-steps {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .easy-steps li {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .easy-steps strong {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8f1ff;
+      color: #1f4f8a;
+      font-size: 12px;
+      font-weight: 880;
+    }
     .workbench-grid {
       display: grid;
       grid-template-columns: minmax(340px, 1.2fr) minmax(280px, .9fr) minmax(260px, .9fr);
@@ -3606,6 +3707,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       .review-item { grid-template-columns: 1fr; }
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
+      .easy-workspace-grid { grid-template-columns: 1fr; }
+      .easy-card + .easy-card {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
       .workbench-grid { grid-template-columns: 1fr; }
       .plain-detail-grid { grid-template-columns: 1fr; }
       .local-skill-input-row { grid-template-columns: 1fr; }
@@ -3660,6 +3766,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
+      .easy-workspace-head {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 13px 14px;
+      }
+      .easy-card { padding: 13px 14px; }
+      .easy-action-row {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .easy-action-row button { width: 100%; }
       .plain-detail-grid { grid-template-columns: 1fr; gap: 8px; }
       .workspace-overview-head {
         align-items: flex-start;
@@ -3793,6 +3910,52 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
+    <section class="easy-workspace panel" aria-label="常用操作">
+      <div class="easy-workspace-head">
+        <div class="easy-workspace-title">
+          <strong>常用操作</strong>
+          <span>普通使用只看这里：管理当前 Mac 的 skill，或把确认过的更新发布到共享仓库。</span>
+        </div>
+        <span class="pill green">只操作本机</span>
+      </div>
+      <div class="easy-workspace-grid">
+        <div class="easy-card">
+          <div class="easy-card-label">我要让本机工具能用某个 skill</div>
+          <h2>导入 / 安装本地 skill</h2>
+          <p>粘贴 skill 目录或 SKILL.md 路径，sidecar 自动分析，不需要你手写 manifest。</p>
+          <div class="local-skill-manager" aria-label="导入本地 Skill">
+            <div class="local-skill-manager-head">
+              <div class="local-skill-manager-title">本地 skill 路径</div>
+              <span id="local-skill-pill" class="pill">待分析</span>
+            </div>
+            <div class="local-skill-input-row">
+              <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
+              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">分析</button>
+              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
+              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查发布</button>
+              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布共享仓库</button>
+            </div>
+            <div id="local-skill-result" class="local-skill-result">先点“分析”。通过后，按钮会自动解锁安装或发布。</div>
+            <div id="local-skill-tools" class="local-skill-tools"></div>
+          </div>
+        </div>
+        <div class="easy-card">
+          <div class="easy-card-label">我要同步已经确认的改动</div>
+          <h2>检查后发布</h2>
+          <p>先检查，只读预览；检查通过后再发布。发布完成后面板会自动回查待办是否清空。</p>
+          <div class="easy-action-row">
+            <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+            <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
+            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布共享仓库</button>
+          </div>
+          <ol class="easy-steps" aria-label="发布流程">
+            <li><strong>1</strong><span>扫描当前 Mac 上的 skill 和工具目录。</span></li>
+            <li><strong>2</strong><span>检查会写入哪些 skill；这一步不会改共享仓库。</span></li>
+            <li><strong>3</strong><span>确认发布；发布后自动刷新状态，看到“无待处理”才算完成。</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
     <section class="status-strip" aria-label="状态摘要">
       <div class="status-chip focus-main">
@@ -3823,14 +3986,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <details class="advanced-workspace">
-      <summary>查看设备和共享仓库状态</summary>
+      <summary>可选：查看 Mac / OpenClaw / 共享仓库状态</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
     <details class="technical-workspace">
-      <summary>高级：管理本机目录和工具明细</summary>
+      <summary>高级：工具目录、版本号、原始队列</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
-          <strong id="workspace-overview-title">本地 Skill 工作区</strong>
+          <strong id="workspace-overview-title">高级明细</strong>
           <span id="workspace-overview-summary" class="overview-subtitle">读取中</span>
         </span>
         <span class="pill green">只操作本机</span>
@@ -3852,21 +4015,6 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">1 扫描本机</button>
             <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>2 检查</button>
             <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>3 发布共享仓库</button>
-          </div>
-          <div class="local-skill-manager" aria-label="导入本地 Skill">
-            <div class="local-skill-manager-head">
-              <div class="local-skill-manager-title">导入本地 Skill</div>
-              <span id="local-skill-pill" class="pill">待分析</span>
-            </div>
-            <div class="local-skill-input-row">
-              <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
-              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">分析</button>
-              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
-              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查发布</button>
-              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布共享仓库</button>
-            </div>
-            <div id="local-skill-result" class="local-skill-result">把一个 skill 目录粘进来，先点“分析”；通过后再安装到本机工具或发布共享仓库。</div>
-            <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
           <div id="local-workspace-action-note" class="local-action-note">正在检查本机助手。</div>
           <details class="workspace-secondary">
@@ -5719,6 +5867,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-dry-run").disabled = !available || actionSkills.length === 0;
       $("scope-dry-run").disabled = !available || actionSkills.length === 0;
       $("scope-publish").disabled = !canPublishApprovedPush;
+      $("easy-dry-run").disabled = !available || actionSkills.length === 0;
+      $("easy-publish").disabled = !canPublishApprovedPush;
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
       const reviewDryRunAll = $("review-dry-run-all");
@@ -5736,6 +5886,13 @@ DASHBOARD_HTML = r"""<!doctype html>
               ? "请先完成检查，确认结果显示可以发布"
               : "写入共享仓库"));
       }
+      $("easy-publish").title = !available
+        ? "本机助手未在线"
+        : (!executorAllowPublish
+          ? "发布开关未打开；当前只能检查，不能写入共享仓库"
+          : (!reviewReady && !lastDryRunSafe
+            ? "没有已检查通过的待发布更新"
+            : "发布到共享仓库"));
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         simplePublish.textContent = !available
@@ -6184,7 +6341,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      $("workspace-overview-summary").textContent = `左边能操作当前 Mac；共享仓库和 ${text(deviceCount)} 台其他设备只读展示`;
+      $("workspace-overview-summary").textContent = `这里只是高级明细；常用操作请回到页面顶部。共享仓库和 ${text(deviceCount)} 台其他设备只读展示。`;
     }
 
     function renderPlainDetails(dashboard) {
@@ -6248,7 +6405,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `${deviceName} 是唯一可直接操作的设备：先扫描，检查安全后，再把确认的改动发布到共享仓库。`;
+      $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。普通操作请用页面顶部的“常用操作”。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
@@ -6291,7 +6448,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderCentralRepository(repo) {
       $("central-repository-pill").outerHTML = pill("共享仓库", "green").replace("<span", "<span id=\"central-repository-pill\"");
-      $("central-repository-summary").textContent = `共享仓库收录 ${text(repo.total_skills)} 个 skill，是各设备同步用的共享版本；这里不直接编辑。`;
+      $("central-repository-summary").textContent = `共享仓库收录 ${text(repo.total_skills)} 个 skill。这里是只读明细，不能直接编辑。`;
       $("central-repository-kv").innerHTML = [
         row("当前版本", repo.snapshot_id),
         row("更新时间", repo.created_at),

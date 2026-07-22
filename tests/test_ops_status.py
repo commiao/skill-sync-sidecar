@@ -627,7 +627,16 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"simple-publish\"", DASHBOARD_HTML)
             self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
-            self.assertIn("查看设备和共享仓库状态", DASHBOARD_HTML)
+            self.assertIn("常用操作", DASHBOARD_HTML)
+            self.assertIn("普通使用只看这里", DASHBOARD_HTML)
+            self.assertIn("导入 / 安装本地 skill", DASHBOARD_HTML)
+            self.assertIn("不需要你手写 manifest", DASHBOARD_HTML)
+            self.assertIn("检查后发布", DASHBOARD_HTML)
+            self.assertIn("看到“无待处理”才算完成", DASHBOARD_HTML)
+            self.assertIn("id=\"easy-dry-run\"", DASHBOARD_HTML)
+            self.assertIn("id=\"easy-publish\"", DASHBOARD_HTML)
+            self.assertIn("没有已检查通过的待发布更新", DASHBOARD_HTML)
+            self.assertIn("可选：查看 Mac / OpenClaw / 共享仓库状态", DASHBOARD_HTML)
             self.assertIn("currentReviewQueueItems", DASHBOARD_HTML)
             self.assertIn("rerenderReviewQueueIfViewportModeChanged", DASHBOARD_HTML)
             self.assertIn("window.addEventListener(\"resize\"", DASHBOARD_HTML)
@@ -695,12 +704,20 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("共享仓库收录", DASHBOARD_HTML)
             self.assertIn("回到上方任务卡处理", DASHBOARD_HTML)
             self.assertIn("<details class=\"technical-workspace\">", DASHBOARD_HTML)
-            self.assertIn("高级：管理本机目录和工具明细", DASHBOARD_HTML)
+            self.assertIn("高级：工具目录、版本号、原始队列", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("左边能操作当前 Mac；共享仓库和", DASHBOARD_HTML)
+            self.assertIn("这里只是高级明细；常用操作请回到页面顶部", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
+                DASHBOARD_HTML.index("id=\"plain-detail-grid\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
             )
             self.assertLess(
@@ -717,7 +734,7 @@ class OpsStatusTest(unittest.TestCase):
             )
             self.assertIn("id=\"workspace-overview-summary\"", DASHBOARD_HTML)
             self.assertIn("renderWorkspaceOverviewSummary", DASHBOARD_HTML)
-            self.assertIn("本地 Skill 工作区", DASHBOARD_HTML)
+            self.assertIn("高级明细", DASHBOARD_HTML)
             self.assertIn("可操作 · 只影响当前设备", DASHBOARD_HTML)
             self.assertIn("workspace-flow", DASHBOARD_HTML)
             self.assertIn("本机操作流程", DASHBOARD_HTML)
@@ -727,7 +744,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("1 扫描本机", DASHBOARD_HTML)
             self.assertIn("2 检查", DASHBOARD_HTML)
             self.assertIn("3 发布共享仓库", DASHBOARD_HTML)
-            self.assertIn("把一个 skill 目录粘进来，先点“分析”", DASHBOARD_HTML)
+            self.assertIn("先点“分析”。通过后，按钮会自动解锁安装或发布", DASHBOARD_HTML)
             self.assertIn("id=\"local-workspace-total\"", DASHBOARD_HTML)
             self.assertIn("id=\"local-workspace-blocked\"", DASHBOARD_HTML)
             self.assertIn("id=\"local-workspace-source\"", DASHBOARD_HTML)
@@ -743,14 +760,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("需整理提示", DASHBOARD_HTML)
             self.assertIn("只读状态 · 不直接编辑", DASHBOARD_HTML)
             self.assertIn("其他设备 · 只读观察", DASHBOARD_HTML)
-            self.assertIn("是唯一可直接操作的设备：先扫描，检查安全后", DASHBOARD_HTML)
+            self.assertIn("是当前页面唯一能直接操作的设备", DASHBOARD_HTML)
             self.assertIn("otherDeviceItems", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<div class=\"workspace-actions\">"),
                 DASHBOARD_HTML.index("<details class=\"workspace-secondary\">"),
             )
             self.assertIn("共享仓库", DASHBOARD_HTML)
-            self.assertIn("是各设备同步用的共享版本；这里不直接编辑", DASHBOARD_HTML)
+            self.assertIn("这里是只读明细，不能直接编辑", DASHBOARD_HTML)
             self.assertIn("statusLabel", DASHBOARD_HTML)
             self.assertIn("scopeLabel", DASHBOARD_HTML)
             self.assertIn("共享仓库状态", DASHBOARD_HTML)
