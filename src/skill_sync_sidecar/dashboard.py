@@ -4692,7 +4692,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">现在不用处理</div>
-              <div class="simple-action-summary">Mac、OpenClaw 和共享仓库已对齐。需要新增、安装或发布 skill 时，直接用下面的“常用操作”。</div>
+              <div class="simple-action-summary">同步已完成，可以关闭页面或继续工作。Mac、OpenClaw 和共享仓库已对齐；以后要新增、安装或发布 skill，再用下面的“常用操作”。</div>
             </div>
           </div>
           <div class="simple-action-done-line"><strong>安全边界：</strong>本页默认只操作当前 Mac；发布或跨设备写入前会再次确认。</div>

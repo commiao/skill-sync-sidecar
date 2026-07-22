@@ -534,6 +534,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"simple-action-panel\"", DASHBOARD_HTML)
             self.assertIn("renderSimpleActionPanel", DASHBOARD_HTML)
             self.assertIn("现在不用处理", DASHBOARD_HTML)
+            self.assertIn("同步已完成，可以关闭页面或继续工作", DASHBOARD_HTML)
             self.assertIn("本页默认只操作当前 Mac；发布或跨设备写入前会再次确认", DASHBOARD_HTML)
             self.assertIn("simple-action-done-line", DASHBOARD_HTML)
             self.assertIn("推荐下一步", DASHBOARD_HTML)
