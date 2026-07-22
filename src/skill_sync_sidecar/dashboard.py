@@ -219,7 +219,7 @@ class DashboardSummaryCache:
                 "blocked": 0,
                 "operator": {
                     "headline": "状态聚合超时",
-                    "next_action": "检查 WebDAV、peer-status 或 gateway 日志；没有可用缓存时 summary 会返回 503。",
+                    "next_action": "检查共享仓库、设备上报或 gateway 日志；没有可用缓存时 summary 会返回 503。",
                     "sync_path": "Gateway summary cache",
                     "snapshot_id": None,
                     "devices": {},
@@ -667,7 +667,7 @@ def _gateway_tool_overview(projection: dict) -> list[dict]:
                 "state": "observer",
                 "skills": projected.get("canonical_targeted"),
                 "risk": {},
-                "note": "Gateway 只观察 WebDAV canonical snapshot；不扫描 NAS 容器内的工具目录。",
+                "note": "Gateway 只观察共享仓库快照；不扫描 NAS 容器内的工具目录。",
                 "projection": {
                     "canonical_targeted": projected.get("canonical_targeted"),
                     "missing": None,
@@ -733,7 +733,7 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
             "snapshot_id": snapshot.get("snapshot_id"),
             "blocked": 0,
             "policy": "read-only",
-            "note": "直接读取 WebDAV canonical snapshot，不依赖 Mac 静态导出",
+            "note": "直接读取共享仓库快照，不依赖 Mac 静态导出",
             "local_policy": [],
             "last_seen_at": gateway_last_seen_at,
             "freshness": _freshness_info(gateway_last_seen_at),
@@ -864,15 +864,15 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     elif health == "yellow" and top_issue:
         next_action = action_guide.get("summary") or top_issue["action"]
     elif health == "yellow":
-        next_action = "先处理待审批队列；OpenClaw 本地改动需要 approved-push 后再上行。"
+        next_action = "先处理待确认队列；OpenClaw 本地改动需要你确认后再发布。"
     elif health == "red":
-        next_action = "先修复状态文件、WebDAV 快照或 sidecar 进程异常。"
+        next_action = "先修复共享仓库快照、设备上报或 sidecar 进程异常。"
     else:
         next_action = "状态未知；先刷新 dashboard 或查看 sidecar 日志。"
     return {
         "headline": _headline_for_health(health),
         "next_action": next_action,
-        "sync_path": "Mac / OpenClaw <-> WebDAV -> 各工具目录",
+        "sync_path": "Mac / OpenClaw <-> 共享仓库 -> 各工具目录",
         "snapshot_id": snapshot.get("snapshot_id"),
         "daemon": {
             "status": daemon.get("daemon_status") or daemon.get("status"),
@@ -928,7 +928,7 @@ def _operator_issue_action(
     if category == "conflict":
         return f"先处理 {target} 版本差异；生成只读差异报告后选择保留版本。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
-        return f"先处理 {target}；确认后运行 approved-push。"
+        return f"先处理 {target}；确认后发布。"
     return f"先处理 {target}；查看待审批队列。"
 
 
@@ -947,7 +947,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "green",
             "title": "现在不用处理",
-            "summary": "Mac、OpenClaw、WebDAV 当前同步链路正常，没有待审批项。",
+            "summary": "Mac、OpenClaw、共享仓库当前已对齐，没有需要你处理的事项。",
             "steps": [
                 {
                     "title": "继续观察",
@@ -967,17 +967,17 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "只剩版本差异需要确认",
-            "summary": f"当前不能一键发布；只剩 {len(conflict_items)} 个版本差异：{skill_hint}。先生成只读差异报告，报告会告诉你该恢复中央版、发布 OpenClaw 版，还是手动处理。",
+            "summary": f"当前不能一键发布；只剩 {len(conflict_items)} 个版本差异：{skill_hint}。先生成只读差异报告，报告会告诉你该恢复共享仓库版、发布 OpenClaw 版，还是手动处理。",
             "steps": [
                 {
                     "title": "生成只读差异报告",
-                    "detail": "只把两边版本整理出来给你查看，不写 WebDAV，也不改 OpenClaw。",
+                    "detail": "只把两边版本整理出来给你查看，不写共享仓库，也不改 OpenClaw。",
                     "command": command,
                     "kind": "review",
                 },
                 {
                     "title": "选择保留哪边",
-                    "detail": "报告会给出推荐动作：恢复中央版、发布 OpenClaw 版，或手动整理最终版本。",
+                    "detail": "报告会给出推荐动作：恢复共享仓库版、发布 OpenClaw 版，或手动整理最终版本。",
                     "kind": "publish",
                 },
                 {
@@ -998,17 +998,17 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "OpenClaw 更新需要确认",
-            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动上传；先预检审核，确认安全后再推送到中央仓库。",
+            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再发布到共享仓库。",
             "steps": [
                 {
                     "title": "先检查，不上传",
-                    "detail": "在 Mac 的 skill-sync-sidecar 仓库运行预检。它只做预览，不会写入 WebDAV。",
+                    "detail": "只看这次会改什么，不写共享仓库。",
                     "command": dry_run,
                     "kind": "dry_run",
                 },
                 {
                     "title": "确认安全后再发布",
-                    "detail": "只有预检显示可以发布，且这些 skill 不再继续编辑时，才运行确认发布。",
+                    "detail": "只有检查结果显示可以发布，且这些 skill 不再继续编辑时，才确认发布。",
                     "command": publish,
                     "kind": "publish",
                 },
@@ -1020,7 +1020,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 },
             ],
             "skills": skill_ids,
-            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再走预检和确认发布。",
+            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再检查并确认发布。",
         }
     if health == "yellow":
         return {
@@ -1046,11 +1046,11 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "red",
             "title": "同步链路异常",
-            "summary": "当前不是审批问题，而是状态文件、WebDAV、Gateway 或 sidecar 进程可能异常。",
+            "summary": "当前不是审批问题，而是共享仓库、设备上报或后台服务可能异常。",
             "steps": [
                 {
                     "title": "先检查状态",
-                    "detail": "运行 operator status，看错误集中在 WebDAV、缓存还是 peer status。",
+                    "detail": "运行状态检查，看错误集中在共享仓库、缓存还是设备上报。",
                     "command": "scripts/operator-status.sh",
                     "kind": "diagnose",
                 },
@@ -1060,7 +1060,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                     "kind": "logs",
                 },
             ],
-            "note": "红色时不要执行 approved-push，先恢复链路可读性。",
+            "note": "红色时先不要发布，先恢复状态可读性。",
         }
     return {
         "state": "unknown",
@@ -1137,7 +1137,7 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
             "publish_to_central": len(mac_blocked) > 0,
             "operate_other_devices": False,
         },
-        "primary_action": "连接本机执行器后可实时扫描本机 skill，并对本机变更做预检。",
+        "primary_action": "本机助手在线后，可扫描本机 skill，并在发布前做安全检查。",
         "boundary": "这里默认只操作浏览器所在 Mac；其他设备只读展示，除非该设备自己的 Agent 暴露受控操作。",
         "remote_blocked_note": f"当前另有 {len(remote_blocked)} 个非本机待审批项，放在设备地图里处理。",
     }
@@ -1147,9 +1147,9 @@ def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: 
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     projection_total = sum(int((tool.get("projection") or {}).get("canonical_targeted") or 0) for tool in tools if isinstance(tool, dict))
     return {
-        "title": "中央仓库",
+        "title": "共享仓库",
         "scope": "central",
-        "role": "WebDAV canonical snapshot",
+        "role": "共享版本快照",
         "health": "green" if snapshot.get("snapshot_id") else "unknown",
         "snapshot_id": snapshot.get("snapshot_id"),
         "created_at": snapshot.get("created_at"),
@@ -1163,7 +1163,7 @@ def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: 
             "direct_edit": False,
             "operate_devices": False,
         },
-        "boundary": "中央仓库是共享事实源；面板只展示它的状态，写入只能来自本机或设备 Agent 的显式 approved push。",
+        "boundary": "共享仓库保存各设备共同使用的版本；只有你明确确认后才会写入。",
     }
 
 
@@ -1295,7 +1295,7 @@ def _blocked_item_operator_action(item: dict) -> str:
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
     if _is_openclaw_writer_policy_push(item):
         if peer_id in {"oc-vps", "openclaw"}:
-            return f"先在 Mac 运行 OpenClaw 预检审核 {skill_id or 'unknown-skill'}，确认后再发布。"
+            return f"先在 Mac 检查 OpenClaw 更新 {skill_id or 'unknown-skill'}，确认后再发布。"
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
     if category == "delete":
         return f"先人工确认 {skill_id or 'unknown-skill'} 是否应删除；未确认前不要自动 apply。"
@@ -1398,8 +1398,8 @@ def serve_gateway(host: str, port: int, config: GatewayConfig) -> None:
                     "blocked": 0,
                     "operator": {
                         "headline": "同步链路异常",
-                        "next_action": "先检查 WebDAV 连接、认证或 gateway 缓存目录。",
-                        "sync_path": "WebDAV -> Gateway",
+                        "next_action": "先检查共享仓库连接、认证或 gateway 缓存目录。",
+                        "sync_path": "共享仓库 -> Gateway",
                         "snapshot_id": None,
                         "devices": {},
                         "blocked_count": 0,
@@ -3803,16 +3803,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="status-chip focus-side">
         <div class="focus-side-actions">
           <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
+          <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
         </div>
-        <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；中央和其他设备只读。</div>
+        <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；共享仓库和其他设备只读。</div>
         <div class="focus-metrics" aria-label="同步范围摘要">
           <div class="focus-metric">
             <div class="status-chip-label">本机</div>
             <div id="strip-local" class="status-chip-value">-</div>
           </div>
           <div class="focus-metric">
-            <div class="status-chip-label">中央</div>
+            <div class="status-chip-label">共享仓库</div>
             <div id="strip-central" class="status-chip-value">-</div>
           </div>
           <div class="focus-metric">
@@ -3823,7 +3823,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <details class="advanced-workspace">
-      <summary>查看设备和中央仓库状态</summary>
+      <summary>查看设备和共享仓库状态</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
     <details class="technical-workspace">
       <summary>高级：管理本机目录和工具明细</summary>
@@ -3845,13 +3845,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
           <div class="workspace-flow" aria-label="本机操作流程">
             <div class="workspace-step"><strong>1. 扫描</strong><span>读取当前 Mac 上各工具的 skill。</span></div>
-            <div class="workspace-step"><strong>2. 预检</strong><span>只看会改什么，不写中央仓库。</span></div>
-            <div class="workspace-step"><strong>3. 发布</strong><span>确认无误后输入 PUBLISH。</span></div>
+            <div class="workspace-step"><strong>2. 检查</strong><span>只看会改什么，不写共享仓库。</span></div>
+            <div class="workspace-step"><strong>3. 发布</strong><span>确认无误后再写入共享仓库。</span></div>
           </div>
           <div class="workspace-actions">
             <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">1 扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>2 预检</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>3 发布中央</button>
+            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>2 检查</button>
+            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>3 发布共享仓库</button>
           </div>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
@@ -3862,13 +3862,13 @@ DASHBOARD_HTML = r"""<!doctype html>
               <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
               <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">分析</button>
               <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
-              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>预检发布</button>
-              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布中央</button>
+              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查发布</button>
+              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布共享仓库</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">把一个 skill 目录粘进来，先点“分析”；通过后再安装到本机工具或发布中央。</div>
+            <div id="local-skill-result" class="local-skill-result">把一个 skill 目录粘进来，先点“分析”；通过后再安装到本机工具或发布共享仓库。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
-          <div id="local-workspace-action-note" class="local-action-note">正在检查本机执行器。</div>
+          <div id="local-workspace-action-note" class="local-action-note">正在检查本机助手。</div>
           <details class="workspace-secondary">
             <summary>查看数量和工具目录</summary>
             <div class="workspace-metrics">
@@ -3896,7 +3896,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="panel">
           <div class="readonly-kicker">只读状态 · 不直接编辑</div>
           <div class="workspace-title">
-            <h2>中央仓库状态</h2>
+            <h2>共享仓库状态</h2>
             <span id="central-repository-pill" class="pill">只读</span>
           </div>
           <div id="central-repository-summary" class="workspace-subtitle"></div>
@@ -3927,7 +3927,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="review-progress" class="review-progress" aria-label="待审批处理进度"></div>
       <div id="review-feedback" class="review-feedback" hidden>
         <strong id="review-feedback-title">等待操作</strong>
-        <span id="review-feedback-detail">先运行预检。</span>
+        <span id="review-feedback-detail">先检查。</span>
       </div>
       <div id="review-queue" class="review-list"></div>
     </section>
@@ -3944,21 +3944,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div id="scope-local-count" class="scope-card-count">-</div>
         <div id="scope-local-note" class="scope-card-note">只扫描和处理当前浏览器所在设备。</div>
-        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，发布也必须显式推送到中央仓库。</div>
+        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，发布也必须你明确确认。</div>
         <div class="scope-card-actions">
           <button id="scope-scan" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
-          <button id="scope-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央</button>
+          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
+          <button id="scope-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布共享仓库</button>
         </div>
       </div>
-      <div class="scope-readonly-rail" aria-label="中央仓库和其他设备只读状态">
+      <div class="scope-readonly-rail" aria-label="共享仓库和其他设备只读状态">
         <div class="scope-card readonly">
           <div class="scope-card-head">
-            <h2>中央仓库</h2>
+            <h2>共享仓库</h2>
             <span class="pill">只读</span>
           </div>
           <div id="scope-central-count" class="scope-card-count">-</div>
-          <div id="scope-central-note" class="scope-card-note">WebDAV 中央快照，只接受你确认后的发布。</div>
+          <div id="scope-central-note" class="scope-card-note">共享版本库，只接受你确认后的发布。</div>
         </div>
         <div class="scope-card readonly">
           <div class="scope-card-head">
@@ -3993,16 +3993,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="action-guide-skills" class="guide-skills"></div>
         <div id="action-guide-note" class="guide-note"></div>
         <details class="guide-details">
-          <summary>执行细节和本机执行器</summary>
+          <summary>高级：本机助手和执行日志</summary>
           <div id="executor-panel" class="executor-panel" hidden>
             <div class="panel-head">
-              <h2>本机执行器</h2>
+              <h2>本机助手</h2>
               <span id="executor-pill" class="pill">检查中</span>
             </div>
-            <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
+            <div id="executor-status" class="executor-status">正在检查 Mac 本机助手。</div>
             <div class="executor-actions">
               <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键预检</button>
+              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键检查</button>
               <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
             </div>
             <pre id="executor-output" class="executor-output mono"></pre>
@@ -4018,8 +4018,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="boundary-body">
           <div id="operator-snapshot" class="operator-text mono">-</div>
           <div class="scope-list">
-            <div class="scope-line"><strong>本机</strong><span>可扫描、预检、显式推送</span></div>
-            <div class="scope-line"><strong>中央</strong><span>只展示 WebDAV 共享快照</span></div>
+            <div class="scope-line"><strong>本机</strong><span>可扫描、检查、显式发布</span></div>
+            <div class="scope-line"><strong>共享仓库</strong><span>只展示共同版本</span></div>
             <div class="scope-line"><strong>设备</strong><span>只读观察各 Agent 上报状态</span></div>
           </div>
         </div>
@@ -4047,7 +4047,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="allowed" class="metric-value">-</div>
       </div>
       <div class="metric">
-        <div class="metric-label">中央技能</div>
+        <div class="metric-label">共享技能</div>
         <div id="remote-total" class="metric-value">-</div>
       </div>
       <div class="metric">
@@ -4067,7 +4067,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="planned-devices" class="cards"></section>
     <div class="section-title">
       <h2>工具</h2>
-      <span class="section-help">WebDAV 中央快照对各工具的目标覆盖，不代表某台设备已安装</span>
+      <span class="section-help">共享仓库对各工具的目标覆盖，不代表某台设备已安装</span>
     </div>
     <section id="tools" class="cards"></section>
     <div class="section-title">
@@ -4161,8 +4161,8 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function nextAction(status) {
       if (status.health === "green") return "当前没有需要审核的同步项。";
-      if (status.health === "yellow") return "先处理待审批队列，再决定是否发布到中央仓库。";
-      if (status.health === "red") return "先修复状态文件、WebDAV 或 sidecar 进程异常。";
+      if (status.health === "yellow") return "先处理待确认事项，再决定是否发布到共享仓库。";
+      if (status.health === "red") return "先修复共享仓库、设备上报或后台服务异常。";
       return "状态暂不可读。";
     }
 
@@ -4189,8 +4189,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderScopeSwitchboard(dashboard);
       renderWorkbench(dashboard);
       $("operator-next").textContent = conciseOperatorNext(dashboard, operator, { ...status, health });
-      $("operator-path").textContent = "本机可操作；中央只接收显式推送；其他设备只读。";
-      $("operator-snapshot").textContent = `当前中央版本：${text(operator.snapshot_id)}`;
+      $("operator-path").textContent = "本机可操作；共享仓库只接收确认后的发布；其他设备只读。";
+      $("operator-snapshot").textContent = `当前共享仓库版本：${text(operator.snapshot_id)}`;
       $("blocked").textContent = text(dashboard.blocked ?? plan.blocked ?? blockedReport.total);
       $("allowed").textContent = text(plan.allowed);
       $("remote-total").textContent = text(snapshot.total);
@@ -4284,7 +4284,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-devices").textContent = text(deviceCount);
       const stripDryRun = $("strip-dry-run");
       if (stripDryRun) {
-        stripDryRun.textContent = conflictOnly ? "先看差异" : "预检待推送";
+        stripDryRun.textContent = conflictOnly ? "先看差异" : "检查待发布";
         stripDryRun.onclick = conflictOnly ? runFirstConflictPackage : (() => runExecutorAction("dry_run"));
       }
       if (conflictOnly) {
@@ -4300,7 +4300,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         actionNote.textContent = conflictOnly
           ? "先看报告，再决定保留哪一版。"
           : (blocked > 0
-          ? "不会自动写入中央仓库；确认后才会发布。"
+          ? "不会自动写入共享仓库；确认后才会发布。"
           : "只操作当前 Mac，本页不会跨设备乱改。");
       }
     }
@@ -4332,7 +4332,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return `只剩版本差异：${names}。先看只读差异报告，报告会给出推荐动作。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
-        return `先审 ${blocked} 个待审批项；预检只预览，确认后再发布到中央仓库。`;
+        return `先处理 ${blocked} 个待确认事项；检查只预览，确认后再发布到共享仓库。`;
       }
       return operator.next_action || nextAction(status);
     }
@@ -4340,7 +4340,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function conciseGuideSummary(guide) {
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
       if ((guide.state || "") === "yellow" && skills.length > 0) {
-        return `重点是 ${skills.length} 个待审批 skill。先看上方清单，再按执行细节预检。`;
+        return `重点是 ${skills.length} 个待确认 skill。先看上方推荐动作，再检查。`;
       }
       return guide.summary || "";
     }
@@ -4351,10 +4351,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const map = dashboard.device_map || {};
       const items = otherDeviceItems(map.items);
       $("scope-local-count").textContent = `${text(local.total_skills)} 个本机 skill`;
-      $("scope-central-count").textContent = `${text(central.total_skills)} 个中央 skill`;
+      $("scope-central-count").textContent = `${text(central.total_skills)} 个共享 skill`;
       $("scope-device-count").textContent = `${text(items.length)} 台其他设备`;
       $("scope-local-note").textContent = "授权扫描本机目录；操作只影响当前设备。";
-      $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要你确认。`;
+      $("scope-central-note").textContent = `共享仓库保存共同版本；当前 ${text(central.blocked)} 个变更需要你确认。`;
       $("scope-device-note").textContent = "其他设备只展示各自 Agent 上报的实测状态，Gateway 不远程改设备。";
     }
 
@@ -4393,7 +4393,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function modeLabel(value) {
-      if (value === "dry_run") return "预检";
+      if (value === "dry_run") return "检查";
       if (value === "apply") return "执行";
       if (value === "publish") return "发布";
       if (value === "update_available") return "可更新";
@@ -4417,8 +4417,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (value === "cancelled") return "已取消";
       if (value === "failed") return "失败";
       if (value === "error") return "错误";
-      if (value === "dry-run") return "预检中";
-      if (value === "dry-run ok") return "预检通过";
+      if (value === "dry-run") return "检查中";
+      if (value === "dry-run ok") return "检查通过";
       if (value === "publish ok") return "可发布";
       if (value === "restore check") return "检查恢复";
       if (value === "conflict publish check") return "检查发布";
@@ -4491,7 +4491,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">同步正常，不需要处理</div>
-              <div class="simple-action-summary">中央仓库、Mac、OpenClaw 已对齐。你现在可以放心继续工作；只有新增或修改本机 skill 时，才需要点下面的按钮。</div>
+              <div class="simple-action-summary">共享仓库、Mac、OpenClaw 已对齐。你现在可以放心继续工作；只有新增或修改本机 skill 时，才需要点下面的按钮。</div>
             </div>
             <div class="simple-choice-grid" aria-label="常用操作">
               <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机 skill<span>看当前 Mac 上有哪些 skill、有没有变化。</span></button>
@@ -4513,11 +4513,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
       let title = `需要你确认 ${blocked} 件事`;
-      let summary = `sidecar 发现有内容可能要同步，但不会自动覆盖任何设备。先看推荐按钮，确认安全后才会写入中央仓库。`;
+      let summary = `sidecar 发现有内容可能要同步，但不会自动覆盖任何设备。先看推荐按钮，确认安全后才会写入共享仓库。`;
       let primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看这 ${blocked} 件事<span>只展开清单，不会写入或删除。</span></button>`;
       let facts = [
         ["不会自动覆盖", "有风险时会停下来等你确认。"],
-        ["先看再执行", "预检只读，发布前还要确认。"],
+        ["先看再执行", "检查只读，发布前还要确认。"],
         ["不懂也能用", "只需要按推荐按钮走。"],
       ];
       let taskCards = "";
@@ -4537,12 +4537,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         facts = [
           ["现在点这个", "生成只读报告。"],
           ["不会发生", "不会自动发布、覆盖或删除。"],
-          ["报告出来后", "再选择恢复中央版、发布 OpenClaw 版，或手动处理。"],
+          ["报告出来后", "再选择恢复共享仓库版、发布 OpenClaw 版，或手动处理。"],
         ];
         taskCards = `
           <div class="simple-action-card">
             <div class="simple-action-card-title">为什么停下来</div>
-            <div class="simple-action-summary">${escapeHtml(skill)} 在中央仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 上都被改过。需要你确认保留哪一版。</div>
+            <div class="simple-action-summary">${escapeHtml(skill)} 在共享仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 上都被改过。需要你确认保留哪一版。</div>
           </div>
         `;
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -4552,27 +4552,27 @@ DASHBOARD_HTML = r"""<!doctype html>
         const reviewKey = reviewItemKey(item);
         const restoreTarget = restoreDeviceLabel(item);
         title = restoreItems.length === 1 ? `有一个 skill 本机缺失：${skill}` : `有 ${restoreItems.length} 个 skill 本机缺失`;
-        summary = "中央仓库仍有完整版本，默认安全动作是恢复到本机，不删除中央仓库。";
+        summary = "共享仓库仍有完整版本，默认安全动作是恢复到本机，不删除共享仓库。";
         primaryActions = `
-          <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">从中央恢复到 ${escapeHtml(restoreTarget)}</button>
+          <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">从共享仓库恢复到 ${escapeHtml(restoreTarget)}</button>
           <button type="button" onclick="openAdvancedDetails()">展开详情</button>
         `;
         facts = [
-          ["推荐按钮", `从中央恢复 ${skill}。`],
-          ["不会发生", "不会删除中央仓库，也不会影响其他设备。"],
-          ["需要确认", "恢复前会要求输入 RESTORE。"],
+          ["推荐按钮", `从共享仓库恢复 ${skill}。`],
+          ["不会发生", "不会删除共享仓库，也不会影响其他设备。"],
+          ["需要确认", "恢复前会再次确认。"],
         ];
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (publishItems.length > 0) {
         title = `有 ${publishItems.length} 个更新可以发布`;
-        summary = "这些更新来自设备本地改动。先点预检，只检查不写入；通过后再发布到中央仓库。";
+        summary = "这些更新来自设备本地改动。先点检查，只看会改什么；通过后再发布到共享仓库。";
         primaryActions = `
-          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>先预检</button>
+          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
           <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
         `;
         facts = [
           ["要发布", `${publishNames}。`],
-          ["第一步", "预检只读，不写中央仓库。"],
+          ["第一步", "检查只读，不写共享仓库。"],
           ["第二步", "发布前会要求你确认。"],
         ];
         taskCards = `
@@ -4583,12 +4583,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         `;
       } else if (deleteItems.length > 0) {
         title = `有 ${deleteItems.length} 个 skill 在本机缺失`;
-        summary = "缺失不等于删除。sidecar 默认保留中央仓库，先让你决定恢复本机还是单独删除。";
-        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项<span>不会删除中央仓库。</span></button>`;
+        summary = "缺失不等于删除。sidecar 默认保留共享仓库，先让你决定恢复本机还是单独删除。";
+        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项<span>不会删除共享仓库。</span></button>`;
         facts = [
           ["缺失项", `${deleteNames}。`],
-          ["默认安全", "保留中央仓库。"],
-          ["删除保护", "删除中央仓库不会一键执行。"],
+          ["默认安全", "保留共享仓库。"],
+          ["删除保护", "删除共享仓库不会一键执行。"],
         ];
         taskCards = renderSimpleDecisionList([], deleteItems);
       }
@@ -4649,14 +4649,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       const title = isDelete ? `${skill}：本机缺失` : `${skill}：版本需要确认`;
       const restoreTarget = restoreDeviceLabel(item);
       const detail = canRestore
-        ? `中央仓库里有完整版本，${restoreTarget} 当前缺失。推荐直接从中央恢复；这不会删除中央仓库，也不会覆盖其他设备。`
+        ? `共享仓库里有完整版本，${restoreTarget} 当前缺失。推荐直接从共享仓库恢复；这不会删除共享仓库，也不会覆盖其他设备。`
         : (isDelete
-          ? "推荐先保留中央仓库，不自动删除。确认这个 skill 还要用时，从中央恢复到本机；确认废弃时，再单独走删除审批。"
+          ? "推荐先保留共享仓库，不自动删除。确认这个 skill 还要用时，从共享仓库恢复到本机；确认废弃时，再单独走删除审批。"
           : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。");
-      const primaryLabel = canRestore ? `从中央恢复到 ${restoreTarget}` : (isDelete ? "保留中央，稍后恢复" : "生成差异报告");
+      const primaryLabel = canRestore ? `从共享仓库恢复到 ${restoreTarget}` : (isDelete ? "保留共享仓库，稍后恢复" : "生成差异报告");
       const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
       const secondaryDetail = isDelete
-        ? "删除中央仓库属于高风险操作，当前面板不会一键执行。"
+        ? "删除共享仓库属于高风险操作，当前面板不会一键执行。"
         : "版本差异不会自动覆盖，当前面板不会猜哪边正确。";
       return `
         <div class="simple-decision-card warning">
@@ -4719,10 +4719,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const localMissing = (review.local || {}).state === "absent";
       const remoteMissing = (review.remote || {}).state === "absent";
       const summary = localMissing && !remoteMissing
-        ? "OpenClaw 当前缺失这个 skill，中央仓库仍有完整版本。推荐先恢复中央版到 OpenClaw；面板不会一键删除中央仓库。"
+        ? "OpenClaw 当前缺失这个 skill，共享仓库仍有完整版本。推荐先恢复共享仓库版到 OpenClaw；面板不会一键删除共享仓库。"
         : (!localMissing && remoteMissing
-          ? "中央仓库缺失这个 skill，OpenClaw 仍有版本。确认 OpenClaw 版正确后，再发布到中央仓库。"
-          : "先看下面三块摘要。下一步不是继续预检，而是判断保留 OpenClaw 版、保留中央仓库版，还是手动合并。");
+          ? "共享仓库缺失这个 skill，OpenClaw 仍有版本。确认 OpenClaw 版正确后，再发布到共享仓库。"
+          : "先看下面三块摘要。下一步不是继续检查，而是判断保留 OpenClaw 版、保留共享仓库版，还是手动合并。");
       panel.hidden = false;
       panel.innerHTML = `
         <div>
@@ -4733,14 +4733,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         ${renderConflictRecommendedAction(skillId, review)}
         <div class="conflict-version-grid" aria-label="版本差异摘要">
           ${renderConflictVersionCard(review.local_label || "OpenClaw 版", review.local || {}, localHash)}
-          ${renderConflictVersionCard(review.remote_label || "中央仓库版", review.remote || {}, remoteHash)}
+          ${renderConflictVersionCard(review.remote_label || "共享仓库版", review.remote || {}, remoteHash)}
           ${renderConflictVersionCard(review.base_label || "共同基线", review.base || {}, baseHash)}
         </div>
         ${renderConflictChoiceGrid(skillId, review)}
         <details class="conflict-diagnostic">
           <summary>查看诊断路径和版本指纹</summary>
           <div>报告路径：${escapeHtml(packagePath || "未返回路径")}</div>
-          <div>OpenClaw 版：${escapeHtml(localHash)} · 中央版：${escapeHtml(remoteHash)} · 共同基线：${escapeHtml(baseHash)}</div>
+          <div>OpenClaw 版：${escapeHtml(localHash)} · 共享仓库版：${escapeHtml(remoteHash)} · 共同基线：${escapeHtml(baseHash)}</div>
         </details>
       `;
       panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4755,10 +4755,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-next-action">
             <div>
               <div class="simple-action-eyebrow">推荐下一步</div>
-              <div class="conflict-next-title">恢复中央版到 OpenClaw</div>
-              <div class="conflict-next-copy">报告判断：OpenClaw 当前缺失，中央仓库仍有完整版本。这一步会要求输入 RESTORE，执行前会备份 OpenClaw 现状。</div>
+              <div class="conflict-next-title">恢复共享仓库版到 OpenClaw</div>
+              <div class="conflict-next-copy">报告判断：OpenClaw 当前缺失，共享仓库仍有完整版本。这一步执行前会再次确认，并备份 OpenClaw 现状。</div>
             </div>
-            <button type="button" class="primary central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
+            <button type="button" class="primary central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复共享仓库版到 OpenClaw</button>
           </div>
         `;
       }
@@ -4767,8 +4767,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-next-action">
             <div>
               <div class="simple-action-eyebrow">推荐下一步</div>
-              <div class="conflict-next-title">发布 OpenClaw 版到中央仓库</div>
-              <div class="conflict-next-copy">报告判断：中央仓库缺失，OpenClaw 仍有版本。这一步会要求输入 PUBLISH，只把这个 skill 发布到 WebDAV 中央仓库。</div>
+              <div class="conflict-next-title">发布 OpenClaw 版到共享仓库</div>
+              <div class="conflict-next-copy">报告判断：共享仓库缺失，OpenClaw 仍有版本。这一步只把这个 skill 发布到共享仓库，执行前会再次确认。</div>
             </div>
             <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapedSkill}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版</button>
           </div>
@@ -4779,7 +4779,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div>
             <div class="simple-action-eyebrow">推荐下一步</div>
             <div class="conflict-next-title">先比较三块摘要，再选择版本</div>
-            <div class="conflict-next-copy">OpenClaw 和中央仓库都存在版本。sidecar 不猜哪边正确；先看摘要，再选发布、恢复或手动合并。</div>
+            <div class="conflict-next-copy">OpenClaw 和共享仓库都存在版本。sidecar 不猜哪边正确；先看摘要，再选发布、恢复或手动合并。</div>
           </div>
           <button type="button" onclick="openAdvancedDetails()">查看完整队列</button>
         </div>
@@ -4796,9 +4796,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             <summary>其他选择和风险说明</summary>
             <div class="conflict-choice-grid">
             <div class="conflict-choice">
-              <strong>我确认要删除中央仓库版</strong>
-              <span>这是高风险操作。当前面板不会一键删除中央仓库，避免误删共享版本。</span>
-              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '删除中央仓库属于高风险操作；请先确认这个 skill 已废弃，再走单独删除审批。')">查看删除说明</button>
+              <strong>我确认要删除共享仓库版</strong>
+              <span>这是高风险操作。当前面板不会一键删除共享仓库，避免误删共享版本。</span>
+              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '删除共享仓库属于高风险操作；请先确认这个 skill 已废弃，再走单独删除审批。')">查看删除说明</button>
             </div>
             <div class="conflict-choice">
               <strong>我手动处理</strong>
@@ -4815,9 +4815,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             <summary>其他选择和风险说明</summary>
             <div class="conflict-choice-grid">
             <div class="conflict-choice">
-              <strong>我确认中央仓库缺失是正确的</strong>
+              <strong>我确认共享仓库缺失是正确的</strong>
               <span>这是删除/下架决策。当前面板不会自动删除 OpenClaw 本地版本。</span>
-              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '中央仓库缺失可能代表下架；确认前不要自动删除 OpenClaw 本地版本。')">查看下架说明</button>
+              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '共享仓库缺失可能代表下架；确认前不要自动删除 OpenClaw 本地版本。')">查看下架说明</button>
             </div>
             <div class="conflict-choice">
               <strong>我手动处理</strong>
@@ -4834,13 +4834,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-choice-grid">
           <div class="conflict-choice">
             <strong>保留 OpenClaw 版</strong>
-            <span>OpenClaw 上的是你要的最新版。会写入 WebDAV 中央仓库；需要输入 PUBLISH。</span>
-            <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapedSkill}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版到中央仓库</button>
+            <span>OpenClaw 上的是你要的最新版。会写入共享仓库；执行前会再次确认。</span>
+            <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapedSkill}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版到共享仓库</button>
           </div>
           <div class="conflict-choice">
-            <strong>保留中央仓库版</strong>
-            <span>中央仓库里的是正确版本。会恢复到 OpenClaw；原 OpenClaw 版本会备份，需要输入 RESTORE。</span>
-            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
+            <strong>保留共享仓库版</strong>
+            <span>共享仓库里的是正确版本。会恢复到 OpenClaw；原 OpenClaw 版本会备份，执行前会再次确认。</span>
+            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复共享仓库版到 OpenClaw</button>
           </div>
           <div class="conflict-choice">
             <strong>我手动合并</strong>
@@ -4887,7 +4887,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         setReviewFeedback(
           "yellow",
           `准备保留 OpenClaw 版：${skillId}`,
-          "这是上行发布决策。为了安全，下一步需要在高级详情中确认该 skill 的 OpenClaw 版本，然后走 approved push；当前按钮不会直接写中央仓库。",
+          "这是发布决策。为了安全，下一步需要确认该 skill 的 OpenClaw 版本；当前按钮不会直接写共享仓库。",
         );
         openAdvancedDetails();
         return;
@@ -4895,15 +4895,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (choice === "central") {
         setReviewFeedback(
           "yellow",
-          `准备保留中央版：${skillId}`,
-          "这是下行恢复决策。为了安全，下一步需要确认中央版本正确，再从中央恢复到 OpenClaw；当前按钮不会直接覆盖 OpenClaw。",
+          `准备保留共享仓库版：${skillId}`,
+          "这是恢复决策。为了安全，下一步需要确认共享仓库版本正确，再恢复到 OpenClaw；当前按钮不会直接覆盖 OpenClaw。",
         );
         return;
       }
       setReviewFeedback(
         "yellow",
         `手动合并：${skillId}`,
-        "打开诊断路径里的只读差异报告，对比 OpenClaw 版和中央仓库版；合并完成后，把最终版本作为一次明确变更发布。",
+        "打开诊断路径里的只读差异报告，对比 OpenClaw 版和共享仓库版；合并完成后，把最终版本作为一次明确变更发布。",
       );
     }
 
@@ -4931,12 +4931,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable || !executorAllowPublish) {
-        setReviewFeedback("yellow", "发布未开启", "发布 OpenClaw 版需要 Mac 本机 executor 在线，并启用 --allow-publish。");
+        setReviewFeedback("yellow", "发布未开启", "发布 OpenClaw 版需要 Mac 本机助手在线，并打开发布开关。");
         return;
       }
       setExecutorButtons(false);
-      setExecutorStatus("conflict publish check", `正在预检发布 OpenClaw 版 ${skillId}。`, "yellow");
-      setReviewFeedback("yellow", `正在预检 OpenClaw 版：${skillId}`, "预检只读，不会写 WebDAV。");
+      setExecutorStatus("conflict publish check", `正在检查发布 OpenClaw 版 ${skillId}。`, "yellow");
+      setReviewFeedback("yellow", `正在检查 OpenClaw 版：${skillId}`, "检查只读，不会写共享仓库。");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-dry-run`, {
           method: "POST",
@@ -4949,27 +4949,27 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_push || Number(dryRunPayload.approved || 0) === 0) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `预检通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
         if (!confirmProtectedWrite({
           word: "PUBLISH",
           title: `确认发布 OpenClaw 版：${skillId}`,
           will: [
-            `把 OpenClaw 上的 ${skillId} 发布为中央仓库版本。`,
+            `把 OpenClaw 上的 ${skillId} 发布为共享仓库版本。`,
             "只处理这一个 skill。",
             "完成后自动刷新状态，确认待办是否清空。",
           ],
           willNot: [
-            "不会删除中央仓库里的其他 skill。",
+            "不会删除共享仓库里的其他 skill。",
             "不会修改 Mac 本机工具目录。",
-            "不会绕过 WebDAV 发布权限。",
+            "不会绕过发布权限。",
           ],
         })) {
           setExecutorStatus("cancelled", "发布 OpenClaw 版已取消。", "yellow");
-          setReviewFeedback("yellow", "已取消", "没有写入 WebDAV，版本差异仍保留。");
+          setReviewFeedback("yellow", "已取消", "没有写入共享仓库，版本差异仍保留。");
           return;
         }
         setExecutorStatus("publishing", `正在发布 OpenClaw 版：${skillId}。`, "yellow");
-        setReviewFeedback("yellow", `正在发布 OpenClaw 版：${skillId}`, "正在写入 WebDAV 中央仓库；完成后会刷新 OpenClaw 状态。");
+        setReviewFeedback("yellow", `正在发布 OpenClaw 版：${skillId}`, "正在写入共享仓库；完成后会刷新 OpenClaw 状态。");
         const publishResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-publish`, {
           method: "POST",
           cache: "no-store",
@@ -4983,7 +4983,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
         const resolution = await waitForSkillResolution(skillId, "发布 OpenClaw 版");
         if (resolution.done) {
-          setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到中央仓库。`, "green");
+          setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到共享仓库。`, "green");
           setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, `版本差异已清空，用了 ${resolution.attempts} 次状态确认。`);
           hideConflictResolutionPanel();
         } else {
@@ -5002,12 +5002,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机 executor 在线，并启用 --allow-local-writes。");
+        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机助手在线，并打开本机写入开关。");
         return;
       }
       setExecutorButtons(false);
-      setExecutorStatus("restore check", `正在预检恢复中央版 ${skillId}。`, "yellow");
-      setReviewFeedback("yellow", `正在预检恢复中央版：${skillId}`, "预检只读，不会写 WebDAV，也不会改 OpenClaw。");
+      setExecutorStatus("restore check", `正在检查恢复共享仓库版 ${skillId}。`, "yellow");
+      setReviewFeedback("yellow", `正在检查共享仓库版：${skillId}`, "检查只读，不会写共享仓库，也不会改 OpenClaw。");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-central-restore-dry-run`, {
           method: "POST",
@@ -5020,27 +5020,27 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `预检通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
         if (!confirmProtectedWrite({
           word: "RESTORE",
-          title: `确认恢复中央版：${skillId}`,
+          title: `确认恢复共享仓库版：${skillId}`,
           will: [
-            `把中央仓库版本恢复到 OpenClaw 的 ${skillId}。`,
+            `把共享仓库版本恢复到 OpenClaw 的 ${skillId}。`,
             "执行前保留 OpenClaw 当前目录备份。",
             "完成后自动刷新状态，确认待办是否清空。",
           ],
           willNot: [
-            "不会删除 WebDAV 中央仓库版本。",
+            "不会删除共享仓库版本。",
             "不会修改 Mac 本机工具目录。",
             "不会处理其他 skill。",
           ],
         })) {
-          setExecutorStatus("cancelled", "恢复中央版已取消。", "yellow");
-          setReviewFeedback("yellow", "已取消", "没有写入 OpenClaw，也没有写入中央仓库。");
+          setExecutorStatus("cancelled", "恢复共享仓库版已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入 OpenClaw，也没有写入共享仓库。");
           return;
         }
-        setExecutorStatus("restoring", `正在把中央版恢复到 OpenClaw：${skillId}。`, "yellow");
-        setReviewFeedback("yellow", `正在恢复中央版：${skillId}`, "正在写入 OpenClaw skill 目录；原 OpenClaw 版本会进入备份目录。");
+        setExecutorStatus("restoring", `正在把共享仓库版恢复到 OpenClaw：${skillId}。`, "yellow");
+        setReviewFeedback("yellow", `正在恢复共享仓库版：${skillId}`, "正在写入 OpenClaw skill 目录；原 OpenClaw 版本会进入备份目录。");
         const restoreResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-central-restore`, {
           method: "POST",
           cache: "no-store",
@@ -5052,18 +5052,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!restoreResponse.ok || !restorePayload.ok) {
           throw new Error(executorErrorDetail(restorePayload));
         }
-        const resolution = await waitForSkillResolution(skillId, "恢复中央版");
+        const resolution = await waitForSkillResolution(skillId, "恢复共享仓库版");
         if (resolution.done) {
-          setExecutorStatus("restored", `${skillId} 已恢复为中央仓库版本。`, "green");
-          setReviewFeedback("green", `${skillId} 已恢复为中央版`, `版本差异已清空，用了 ${resolution.attempts} 次状态确认。`);
+          setExecutorStatus("restored", `${skillId} 已恢复为共享仓库版本。`, "green");
+          setReviewFeedback("green", `${skillId} 已恢复为共享仓库版`, `版本差异已清空，用了 ${resolution.attempts} 次状态确认。`);
           hideConflictResolutionPanel();
         } else {
           setExecutorStatus("needs decision", `${skillId} 已恢复，仍在等待状态确认。`, "yellow");
           setReviewFeedback("yellow", `${skillId} 已恢复，但待办还没清空`, resolution.detail);
         }
       } catch (err) {
-        setExecutorStatus("failed", "恢复中央版失败，请查看输出。", "red");
-        setReviewFeedback("red", "恢复中央版失败", String(err));
+        setExecutorStatus("failed", "恢复共享仓库版失败，请查看输出。", "red");
+        setReviewFeedback("red", "恢复共享仓库版失败", String(err));
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -5227,12 +5227,12 @@ DASHBOARD_HTML = r"""<!doctype html>
           renderReviewGroup(
             "先处理缺失/删除确认",
             deleteItems,
-            "这些不是发布按钮要处理的内容；当前面板不会删除中央仓库。"
+            "这些不是发布按钮要处理的内容；当前面板不会删除共享仓库。"
           ),
           renderReviewGroup(
             "再处理可发布更新",
             publishItems,
-            "逐项预检，结果显示可以发布后再显式发布到中央仓库。"
+            "逐项检查，结果显示可以发布后再显式发布到共享仓库。"
           ),
           renderReviewGroup(
             "最后处理版本差异/未知项",
@@ -5262,18 +5262,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const summary = conflictItems.length > 0
         ? `有 ${conflictItems.length} 个版本差异，不能一键发布。先生成只读差异报告，报告会给出恢复、发布或手动处理的推荐。`
         : (publishItems.length > 0
-          ? `有 ${publishItems.length} 个设备更新需要确认。先预检，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
-          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留中央仓库，不静默删除。`);
+          ? `有 ${publishItems.length} 个设备更新需要确认。先检查，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
+          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`);
       const publishActionLabel = !executorAvailable
-        ? "等待本机执行器"
-        : (!executorAllowPublish ? "发布权限未开启" : `确认发布 ${publishItems.length} 个 OpenClaw 更新`);
+        ? "等待本机助手"
+        : (!executorAllowPublish ? "发布开关未打开" : `确认发布 ${publishItems.length} 个 OpenClaw 更新`);
       const publishActionNote = publishItems.length === 0
-        ? "当前没有东西可发布；如果点确认发布，也不会写入中央仓库。"
+        ? "当前没有东西可发布；如果点确认发布，也不会写入共享仓库。"
         : (!executorAvailable
-          ? "本机执行器未在线，先启动 executor。"
+          ? "本机助手未在线，先启动本机助手。"
           : (!executorAllowPublish
-            ? "当前只能预检，不能写入中央仓库；需要用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装本机 executor。"
-            : (remainingReady > 0 ? "发布按钮会在所有更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。")));
+            ? "当前只能检查，不能写入共享仓库；需要重新安装本机助手并打开发布开关。"
+            : (remainingReady > 0 ? "发布按钮会在所有更新检查通过后解锁。" : "下一步就是点“确认发布”，确认后写入共享仓库。")));
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
         <div class="review-recommendation-summary">
@@ -5286,15 +5286,15 @@ DASHBOARD_HTML = r"""<!doctype html>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">2</span>
-            <span>${remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没预检。` : (publishItems.length ? "更新已完成预检。" : "当前没有可发布更新。")}</span>
+            <span>${remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。")}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
-            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (!executorAllowPublish ? "当前发布权限未开启；预检通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`))}</span>
+            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享仓库。`))}</span>
           </li>
         </ol>
         <div class="review-recommendation-actions">
-          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新预检 ${publishItems.length} 个更新` : `预检 ${publishItems.length} 个更新`}</button>
+          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查 ${publishItems.length} 个更新` : `检查 ${publishItems.length} 个更新`}</button>
           <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
         </div>
         <div id="review-recommendation-note" class="review-recommendation-note">
@@ -5335,7 +5335,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
             ${command ? `
               <details class="review-command">
-                <summary>查看预检命令</summary>
+                <summary>查看检查命令</summary>
                 <div class="command-row">
                   <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
                   <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
@@ -5372,9 +5372,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const executorKind = executorAvailable ? "green" : "yellow";
       if (conflictTotal > 0) {
         $("review-progress").innerHTML = [
-          reviewStage("1", "生成只读报告", `${conflictTotal} 个版本差异`, "yellow", "只读取 OpenClaw 和中央仓库，不写入。"),
+          reviewStage("1", "生成只读报告", `${conflictTotal} 个版本差异`, "yellow", "只读取 OpenClaw 和共享仓库，不写入。"),
           reviewStage("2", "按推荐处理", "报告给出建议", "yellow", "推荐动作会显示在报告最上方。"),
-          reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认待办是否清空。" : "需要 Mac 本机执行器在线。"),
+          reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认待办是否清空。" : "需要 Mac 本机助手在线。"),
         ].join("");
         return;
       }
@@ -5384,8 +5384,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? `${deleteTotal} 个删除项不会自动发布；需恢复本机或单独确认删除。`
         : "发布需要再次确认。";
       $("review-progress").innerHTML = [
-        reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
-        reviewStage("2", "预检可发布更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, publishableTotal > 0 ? "预检只读，不会写 WebDAV。" : "当前没有可发布项；不要反复点发布。"),
+        reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : "先确认 Mac 本机助手在线。"),
+        reviewStage("2", "检查可发布更新", `${checked}/${publishableTotal} 已检查`, dryRunKind, publishableTotal > 0 ? "检查只读，不会写共享仓库。" : "当前没有可发布项；不要反复点发布。"),
         reviewStage("3", conflictTotal > 0 ? "版本确认" : "确认发布", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可发布`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
       ].join("");
     }
@@ -5461,7 +5461,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewResultText(item) {
       const result = reviewTaskResults[reviewItemKey(item)];
-      return result ? result.label : "等待预检";
+      return result ? result.label : "等待检查";
     }
 
     function reviewResultKind(item) {
@@ -5476,10 +5476,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewActionText(item) {
-      if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return "本机已删除，中央仓库仍保留。";
-      if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "中央仓库已删除，本机仍保留。";
+      if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return "本机已删除，共享仓库仍保留。";
+      if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "共享仓库已删除，本机仍保留。";
       if (item.category === "conflict") return "版本不一致，先看只读报告。";
-      if (item.status_action === "local_new") return "远端新增，先预检。";
+      if (item.status_action === "local_new") return "远端新增，先检查。";
       if (item.status_action === "push_new") return "新 skill 待发布。";
       if (item.status_action === "push") return "已有 skill 待更新。";
       return item.operator_action || item.recommendation || item.reason || "查看高级诊断里的建议动作。";
@@ -5507,17 +5507,17 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewNextStepText(item) {
       if (item.category === "conflict") return "下一步：先生成只读差异报告，再按推荐恢复、发布或手动处理。";
-      if (item.status_action === "local_deleted") return "下一步：决定是恢复本机，还是单独确认删除中央仓库里的这个 skill。";
-      if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新发布，还是接受中央删除。";
-      if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除中央仓库。";
-      if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：预检内容和目标工具，确认后再发布。";
-      if (item.status_action === "push") return "下一步：预检差异，通过后再发布到中央仓库。";
-      return "下一步：查看预检输出和高级诊断。";
+      if (item.status_action === "local_deleted") return "下一步：决定是恢复本机，还是单独确认删除共享仓库里的这个 skill。";
+      if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新发布，还是接受共享仓库删除。";
+      if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除共享仓库。";
+      if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：检查内容和目标工具，确认后再发布。";
+      if (item.status_action === "push") return "下一步：检查差异，通过后再发布到共享仓库。";
+      return "下一步：查看检查输出和高级诊断。";
     }
 
     function reviewStatusText(item) {
       if (item.status_action === "local_deleted") return "本机缺失";
-      if (item.status_action === "remote_deleted") return "中央缺失";
+      if (item.status_action === "remote_deleted") return "共享仓库缺失";
       if (item.status_action === "local_new") return "新增";
       if (item.status_action === "push_new") return "新发布";
       if (item.status_action === "push") return "更新";
@@ -5550,10 +5550,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewDecisionHtml(item) {
       if (item.status_action === "local_deleted") {
-        return `<strong>需要你决定</strong>如果这是误删，先从中央/备份恢复到本机；如果确实废弃，走单独的删除审批。当前按钮不会删除中央仓库。`;
+        return `<strong>需要你决定</strong>如果这是误删，先从共享仓库/备份恢复到本机；如果确实废弃，走单独的删除审批。当前按钮不会删除共享仓库。`;
       }
       if (item.status_action === "remote_deleted") {
-        return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新发布；如果中央删除是正确的，再接受删除。`;
+        return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新发布；如果共享仓库删除是正确的，再接受删除。`;
       }
       if (item.category === "conflict") {
         return `<strong>需要确认版本</strong>不能一键发布；先查看只读差异报告，再按推荐恢复、发布或手动处理。`;
@@ -5561,9 +5561,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
         const result = reviewTaskResults[reviewItemKey(item)];
         if (result && result.publishReady) {
-          return `<strong>已通过预检</strong>等待上方“确认发布”写入中央仓库。`;
+          return `<strong>已通过检查</strong>等待上方“确认发布”写入共享仓库。`;
         }
-        return `<strong>可走发布流程</strong>先点预检；只有结果显示可以发布后，才会解锁显式发布。`;
+        return `<strong>可走发布流程</strong>先点检查；只有结果显示可以发布后，才会解锁显式发布。`;
       }
       return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
     }
@@ -5571,15 +5571,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewControlAction(item) {
       if (reviewIsDeleteItem(item)) return "delete-review";
       if (item.category === "conflict") return "conflict-review";
-      return "预检";
+      return "检查";
     }
 
     function reviewControlLabel(item) {
       if (reviewIsDeleteItem(item)) return "说明";
       if (item.category === "conflict") return "看差异";
       const result = reviewTaskResults[reviewItemKey(item)];
-      if (result && result.publishReady) return "重新预检";
-      return "预检";
+      if (result && result.publishReady) return "重新检查";
+      return "检查";
     }
 
     function renderActionGuide(guide) {
@@ -5657,7 +5657,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       panel.hidden = false;
       $("executor-output").style.display = "none";
-      setExecutorStatus("checking", "正在检查 Mac 本机执行器。", "yellow");
+      setExecutorStatus("checking", "正在检查 Mac 本机助手。", "yellow");
       checkExecutor();
     }
 
@@ -5673,8 +5673,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           setExecutorStatus(
             "online",
             executorAllowLocalWrites
-              ? "Mac 本机执行器在线：可以扫描、分析并安装本机 skill。"
-              : "Mac 本机执行器在线：可以扫描和分析本机 skill；本机写入未开启。",
+              ? "Mac 本机助手在线：可以扫描、分析并安装本机 skill。"
+              : "Mac 本机助手在线：可以扫描和分析本机 skill；本机写入未开启。",
             "green",
           );
           setExecutorButtons(true);
@@ -5693,7 +5693,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       executorAllowLocalWrites = false;
       setExecutorStatus(
         "offline",
-        "本机执行器未启动。请复制上面的命令执行，或在 Mac 上启动：skill-sync operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-local-writes",
+        "本机助手未启动。请先启动本机助手；技术命令在高级日志里查看。",
         "yellow",
       );
       setExecutorButtons(false);
@@ -5729,26 +5729,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (reviewPublishAll) {
         reviewPublishAll.disabled = !canPublishApprovedPush;
         reviewPublishAll.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "中央发布未开启；用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor"
+            ? "发布开关未打开；当前只能检查，不能写入共享仓库"
             : (!reviewReady && !lastDryRunSafe
-              ? "请先完成预检，确认结果显示可以发布"
-              : "写入 WebDAV 中央仓库"));
+              ? "请先完成检查，确认结果显示可以发布"
+              : "写入共享仓库"));
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         simplePublish.textContent = !available
-          ? "等待执行器"
-          : (!executorAllowPublish ? "发布权限未开启" : "确认发布");
+          ? "等待本机助手"
+          : (!executorAllowPublish ? "发布开关未打开" : "确认发布");
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "中央发布未开启"
+            ? "发布开关未打开"
             : (!reviewReady && !lastDryRunSafe
-              ? "先预检，确认结果显示可以发布"
-              : "发布到 WebDAV 中央仓库"));
+              ? "先检查，确认结果显示可以发布"
+              : "发布到共享仓库"));
       }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");
@@ -5763,12 +5763,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (localSkillPublish) {
         localSkillPublish.disabled = !available || !executorAllowPublish || !lastLocalSkillAnalysis;
         localSkillPublish.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!lastLocalSkillAnalysis
             ? "请先分析一个本地 skill"
             : (!executorAllowPublish
-              ? "中央发布未开启；用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor"
-              : "发布到 WebDAV 中央仓库"));
+              ? "发布开关未打开；当前只能检查"
+              : "发布到共享仓库"));
       }
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
         button.disabled = !available || !button.dataset.skillId;
@@ -5776,35 +5776,35 @@ DASHBOARD_HTML = r"""<!doctype html>
       document.querySelectorAll(".central-restore-button").forEach((button) => {
         button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
         button.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? "恢复需要本机写入权限；用 --allow-local-writes 启动 executor"
-            : "从中央仓库恢复到缺失设备");
+            ? "恢复需要打开本机写入开关"
+            : "从共享仓库恢复到缺失设备");
       });
       document.querySelectorAll(".conflict-package-button").forEach((button) => {
         const endpoint = conflictPackageEndpoint(button.dataset.peerId || "");
         button.disabled = !available || !endpoint || !button.dataset.skillId;
         button.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!endpoint
             ? "这个设备还没有接入差异报告生成"
-            : "生成只读差异报告，不写中央仓库或设备 skill 目录");
+            : "生成只读差异报告，不写共享仓库或设备 skill 目录");
       });
       document.querySelectorAll(".central-conflict-restore-button").forEach((button) => {
         button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
         button.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? "恢复需要本机写入授权；用 --allow-local-writes 启动 executor"
-            : "先预检，再输入 RESTORE，把中央版本恢复到 OpenClaw");
+            ? "恢复需要打开本机写入开关"
+            : "先检查，再确认，把共享仓库版本恢复到 OpenClaw");
       });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
-          ? "本机执行器未在线"
+          ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "发布需要授权；用 --allow-publish 启动 executor"
-            : "先预检，再输入 PUBLISH，把 OpenClaw 版本发布到中央仓库");
+            ? "发布需要打开发布开关"
+            : "先检查，再确认，把 OpenClaw 版本发布到共享仓库");
       });
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
@@ -5812,8 +5812,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function runExecutorAction(mode) {
       const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
       if (!executorAvailable) {
-        showExecutorOutput("本机执行器未连接，无法执行预检或发布。");
-        setReviewFeedback("yellow", "执行器未连接", "请先让 Mac 本机 executor 在线；状态已重新刷新。");
+        showExecutorOutput("本机助手未连接，无法执行检查或发布。按钮没有真正执行，请先确认本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线；状态已重新刷新。");
         await refresh(true);
         checkExecutor();
         return;
@@ -5827,26 +5827,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       const isPublish = mode === "publish";
       if (isPublish) {
         if (!executorAllowPublish) {
-          showExecutorOutput("当前本机 executor 未开启中央发布权限。请用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor 后再发布。");
-          setReviewFeedback("yellow", "发布权限未开启", "当前只能预检，不能写入中央仓库。启用发布权限后，按钮会变成可发布。");
+          showExecutorOutput("当前没有打开发布开关，所以只能检查，不能写入共享仓库。");
+          setReviewFeedback("yellow", "发布开关未打开", "当前只能检查，不能写入共享仓库。打开发布开关后，按钮会变成可发布。");
           setExecutorButtons(executorAvailable);
           return;
         }
         if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
-          showExecutorOutput("请先运行预检，并确认结果显示可以发布。");
-          setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认结果显示可以发布后再写入中央仓库。");
+          showExecutorOutput("请先运行检查，并确认结果显示可以发布。");
+          setReviewFeedback("yellow", "还不能发布", "请先运行检查，确认结果显示可以发布后再写入共享仓库。");
           return;
         }
-        const typed = window.prompt("发布会写入 WebDAV。请输入 PUBLISH 确认：");
+        const typed = window.prompt("发布会写入共享仓库。请输入 PUBLISH 确认：");
         if (typed !== "PUBLISH") {
           showExecutorOutput("已取消发布。");
-          setReviewFeedback("yellow", "发布已取消", "没有写入 WebDAV，待审批项仍保留。");
+          setReviewFeedback("yellow", "发布已取消", "没有写入共享仓库，待确认项仍保留。");
           return;
         }
       }
       setExecutorButtons(false);
-      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行预检，请稍等。", "yellow");
-      setReviewFeedback("yellow", isPublish ? "正在发布" : "正在预检", isPublish ? "正在写入中央仓库，请等待完成。" : "预检只读，不会写入中央仓库。");
+      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
+      setReviewFeedback("yellow", isPublish ? "正在发布" : "正在检查", isPublish ? "正在写入共享仓库，请等待完成。" : "检查只读，不会写入共享仓库。");
       try {
         const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
         const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
@@ -5869,23 +5869,23 @@ DASHBOARD_HTML = r"""<!doctype html>
             setExecutorStatus("no changes", "没有发布任何 skill；队列已变化或当前项已不再是可发布更新。", "yellow");
             setReviewFeedback(
               "yellow",
-              "没有写入中央仓库",
-              "确认发布返回 approved=0。通常表示预检后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前待办分类。",
+              "没有写入共享仓库",
+              "确认发布返回 approved=0。通常表示检查后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前待办分类。",
             );
             return;
           }
-          setExecutorStatus(isPublish ? "published" : "预检通过", isPublish ? "发布已写入，正在确认状态。" : "预检通过：可以继续确认发布。", "green");
+          setExecutorStatus(isPublish ? "published" : "检查通过", isPublish ? "发布已写入，正在确认状态。" : "检查通过：可以继续确认发布。", "green");
           setReviewFeedback(
             "green",
-            isPublish ? "发布完成" : "预检通过",
-            isPublish ? "中央仓库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "预检通过，可以继续确认发布到中央仓库。",
+            isPublish ? "发布完成" : "检查通过",
+            isPublish ? "共享仓库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续确认发布到共享仓库。",
           );
           if (!isPublish) {
             actionSkills.forEach((skillId) => {
               currentReviewQueueItems
                 .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
                 .forEach((item) => {
-                  reviewTaskResults[reviewItemKey(item)] = { label: "预检通过", kind: "green", publishReady: true };
+                  reviewTaskResults[reviewItemKey(item)] = { label: "检查通过", kind: "green", publishReady: true };
                 });
             });
             renderReviewQueue(currentReviewQueueItems);
@@ -5900,7 +5900,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               resolution.done && remaining === 0 ? "green" : "yellow",
               resolution.done ? "发布完成，状态已确认" : "发布已完成，但状态还没完全收敛",
               resolution.done && remaining === 0
-                ? `中央仓库已更新，${actionSkills.length} 个待办已清空。`
+                ? `共享仓库已更新，${actionSkills.length} 个待办已清空。`
                 : `${resolution.detail} 当前总待办 ${remaining} 个：${blockedBreakdownText(blockedBreakdown(currentReviewQueueItems))}。`,
             );
             setExecutorStatus(
@@ -5917,15 +5917,15 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
       } catch (err) {
         showExecutorOutput(String(err));
-        setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
-        setReviewFeedback("red", "执行器调用失败", "请确认 Mac 本机执行器仍在线。");
+        setExecutorStatus("failed", "本机助手调用失败，请确认本机服务仍在线。", "red");
+        setReviewFeedback("red", "本机助手调用失败", "请确认 Mac 本机助手仍在线。");
       } finally {
         setExecutorButtons(executorAvailable);
       }
     }
 
     async function refreshOpenclawPeerStatus() {
-      setReviewFeedback("yellow", "发布完成，正在刷新状态", "正在刷新 OpenClaw peer status，让 NAS 面板看到最新队列。");
+      setReviewFeedback("yellow", "发布完成，正在刷新状态", "正在刷新 OpenClaw 状态，让 NAS 面板看到最新队列。");
       try {
         const response = await fetch(`${EXECUTOR_URL}/api/openclaw-peer-status-refresh`, {
           method: "POST",
@@ -5961,8 +5961,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在预检恢复 ${skillId}`, "预检只读；先确认中央仓库里有可恢复版本。");
-      setExecutorStatus("restore check", `正在预检从中央恢复 ${skillId}。`, "yellow");
+      setReviewFeedback("yellow", `正在检查恢复 ${skillId}`, "检查只读；先确认共享仓库里有可恢复版本。");
+      setExecutorStatus("restore check", `正在检查从共享仓库恢复 ${skillId}。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}${endpointBase}-dry-run`, {
           method: "POST",
@@ -5976,14 +5976,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           throw new Error(executorErrorDetail(dryRunPayload));
         }
         updateReviewTaskResult(reviewKey || skillId, { label: "可恢复", kind: "green", publishReady: false });
-        const typed = window.prompt(`将从中央仓库恢复 ${skillId}。请输入 RESTORE 确认：`);
+        const typed = window.prompt(`将从共享仓库恢复 ${skillId}。请输入 RESTORE 确认：`);
         if (typed !== "RESTORE") {
-          setReviewFeedback("yellow", "恢复已取消", "没有写入设备目录，中央仓库也没有变化。");
+          setReviewFeedback("yellow", "恢复已取消", "没有写入设备目录，共享仓库也没有变化。");
           setExecutorStatus("cancelled", "恢复已取消。", "yellow");
           return;
         }
         setReviewFeedback("yellow", `正在恢复 ${skillId}`, "正在写入缺失设备目录，并保留备份记录。");
-        setExecutorStatus("restoring", `正在从中央恢复 ${skillId}。`, "yellow");
+        setExecutorStatus("restoring", `正在从共享仓库恢复 ${skillId}。`, "yellow");
         const restoreResponse = await fetch(`${EXECUTOR_URL}${endpointBase}`, {
           method: "POST",
           cache: "no-store",
@@ -6002,7 +6002,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           stillBlocked ? `${skillId} 已恢复，等待状态收敛` : `${skillId} 已恢复`,
           stillBlocked ? "设备状态可能还在刷新中，稍后再刷新一次。" : "待办已刷新；如果数字下降，说明闭环完成。",
         );
-        setExecutorStatus("restored", `${skillId} 已从中央恢复。`, "green");
+        setExecutorStatus("restored", `${skillId} 已从共享仓库恢复。`, "green");
       } catch (err) {
         setReviewFeedback("red", "恢复失败", String(err));
         setExecutorStatus("failed", "恢复失败，请查看执行输出。", "red");
@@ -6021,12 +6021,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "执行器未连接", "请先让 Mac 本机 executor 在线。");
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
         return;
       }
       setExecutorButtons(false);
       setExecutorStatus("conflict package", `正在生成 ${skillId} 的差异报告。`, "yellow");
-      setReviewFeedback("yellow", `正在生成 ${skillId} 差异报告`, "这是只读诊断，不会写 WebDAV，也不会改设备 skill 目录。");
+      setReviewFeedback("yellow", `正在生成 ${skillId} 差异报告`, "这是只读诊断，不会写共享仓库，也不会改设备 skill 目录。");
       try {
         const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
           method: "POST",
@@ -6046,8 +6046,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           "yellow",
           `${skillId} 差异报告已生成`,
           packagePath
-            ? "下一步在上方选择：保留 OpenClaw 版、保留中央版，或手动合并。路径已折叠在诊断里。"
-            : "下一步在上方选择：保留 OpenClaw 版、保留中央版，或手动合并。",
+            ? "下一步在上方选择：保留 OpenClaw 版、保留共享仓库版，或手动合并。路径已折叠在诊断里。"
+            : "下一步在上方选择：保留 OpenClaw 版、保留共享仓库版，或手动合并。",
         );
       } catch (err) {
         setExecutorStatus("failed", "差异报告生成失败，请查看输出。", "red");
@@ -6088,8 +6088,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           "yellow",
           `${skillId} 是删除确认项`,
           reviewItem.status_action === "local_deleted"
-            ? "本机已删除但中央仓库仍保留。下一步不是发布；请决定恢复本机，或单独确认删除中央仓库。"
-            : "中央仓库已删除但本机仍保留。请决定重新发布本机版本，或接受中央删除。",
+            ? "本机已删除但共享仓库仍保留。下一步不是发布；请决定恢复本机，或单独确认删除共享仓库。"
+            : "共享仓库已删除但本机仍保留。请决定重新发布本机版本，或接受共享仓库删除。",
         );
         showExecutorOutput(
           [
@@ -6099,7 +6099,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             "safe_to_push=false",
             "next_action=restore_local_or_confirm_delete",
             "",
-            "说明：删除类待审不会走 approved-push。sidecar 当前不会通过这个按钮删除中央仓库。",
+            "说明：删除类待审不会走发布按钮。sidecar 当前不会通过这个按钮删除共享仓库。",
           ].join("\n"),
         );
         return;
@@ -6110,8 +6110,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       setExecutorButtons(false);
-      setExecutorStatus("dry-run", `正在预检 ${skillId}，请稍等。`, "yellow");
-      setReviewFeedback("yellow", `正在预检 ${skillId}`, "预检只读，不会写入中央仓库。");
+      setExecutorStatus("dry-run", `正在检查 ${skillId}，请稍等。`, "yellow");
+      setReviewFeedback("yellow", `正在检查 ${skillId}`, "检查只读，不会写入共享仓库。");
       try {
         const response = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-dry-run`, {
           method: "POST",
@@ -6122,23 +6122,23 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok && payload.safe_to_push) {
-          setExecutorStatus("预检通过", `${skillId} 预检通过：可以发布。`, "green");
-          updateReviewTaskResult(reviewItem || skillId, { label: "预检通过", kind: "green", publishReady: true });
-          setReviewFeedback("green", `${skillId} 预检通过`, "可以继续确认发布到中央仓库。");
+          setExecutorStatus("检查通过", `${skillId} 检查通过：可以发布。`, "green");
+          updateReviewTaskResult(reviewItem || skillId, { label: "检查通过", kind: "green", publishReady: true });
+          setReviewFeedback("green", `${skillId} 检查通过`, "可以继续确认发布到共享仓库。");
         } else if (payload.ok) {
-          setExecutorStatus("needs review", `${skillId} 预检完成，但还不能发布，请看输出。`, "yellow");
+          setExecutorStatus("needs review", `${skillId} 检查完成，但还不能发布，请看输出。`, "yellow");
           updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
-          setReviewFeedback("yellow", `${skillId} 需要复核`, "预检完成但还不能发布，请查看执行输出。");
+          setReviewFeedback("yellow", `${skillId} 需要复核`, "检查完成但还不能发布，请查看执行输出。");
         } else {
-          setExecutorStatus("failed", payload.error || `${skillId} 预检失败，请查看输出。`, "red");
-          updateReviewTaskResult(reviewItem || skillId, { label: "预检失败", kind: "red", publishReady: false });
-          setReviewFeedback("red", `${skillId} 预检失败`, payload.error || "请查看执行输出。");
+          setExecutorStatus("failed", payload.error || `${skillId} 检查失败，请查看输出。`, "red");
+          updateReviewTaskResult(reviewItem || skillId, { label: "检查失败", kind: "red", publishReady: false });
+          setReviewFeedback("red", `${skillId} 检查失败`, payload.error || "请查看执行输出。");
         }
       } catch (err) {
         showExecutorOutput(String(err));
-        setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
+        setExecutorStatus("failed", "本机助手调用失败，请确认本机服务仍在线。", "red");
         updateReviewTaskResult(reviewItem || skillId, { label: "调用失败", kind: "red", publishReady: false });
-        setReviewFeedback("red", "执行器调用失败", "请确认 Mac 本机执行器仍在线。");
+        setReviewFeedback("red", "本机助手调用失败", "请确认 Mac 本机助手仍在线。");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -6184,7 +6184,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      $("workspace-overview-summary").textContent = `左边能操作当前 Mac；中央仓库和 ${text(deviceCount)} 台其他设备只读展示`;
+      $("workspace-overview-summary").textContent = `左边能操作当前 Mac；共享仓库和 ${text(deviceCount)} 台其他设备只读展示`;
     }
 
     function renderPlainDetails(dashboard) {
@@ -6206,9 +6206,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           action: Number(local.blocked || 0) > 0 ? "有本机待处理项。" : "当前不用处理本机。",
         },
         {
-          title: "中央仓库",
+          title: "共享仓库",
           state: central.health || "green",
-          line: `WebDAV 中央仓库收录 ${text(central.total_skills)} 个 skill。`,
+          line: `共享仓库收录 ${text(central.total_skills)} 个 skill。`,
           action: "不要直接编辑；只接受确认后的发布。",
         },
         {
@@ -6248,7 +6248,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `${deviceName} 是唯一可直接操作的设备：先扫描，预检安全后，再把确认的改动发布到中央仓库。`;
+      $("local-workspace-summary").textContent = `${deviceName} 是唯一可直接操作的设备：先扫描，检查安全后，再把确认的改动发布到共享仓库。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
@@ -6290,15 +6290,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderCentralRepository(repo) {
-      $("central-repository-pill").outerHTML = pill("WebDAV 快照", "green").replace("<span", "<span id=\"central-repository-pill\"");
-      $("central-repository-summary").textContent = `中央仓库收录 ${text(repo.total_skills)} 个 skill，是各设备同步用的共享版本；这里不直接编辑。`;
+      $("central-repository-pill").outerHTML = pill("共享仓库", "green").replace("<span", "<span id=\"central-repository-pill\"");
+      $("central-repository-summary").textContent = `共享仓库收录 ${text(repo.total_skills)} 个 skill，是各设备同步用的共享版本；这里不直接编辑。`;
       $("central-repository-kv").innerHTML = [
-        row("中央版本", repo.snapshot_id),
+        row("当前版本", repo.snapshot_id),
         row("更新时间", repo.created_at),
         row("协议版本", repo.protocol_version),
         row("目标覆盖", repo.targeted_projection_total),
       ].join("");
-      $("central-repository-boundary").textContent = repo.boundary || "中央仓库只接受显式 approved push。";
+      $("central-repository-boundary").textContent = repo.boundary || "共享仓库只接受你确认后的发布。";
     }
 
     function renderDeviceMap(map) {
@@ -6337,7 +6337,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           executorAllowPublish = Boolean(payload.allow_publish);
           executorAllowLocalWrites = Boolean(payload.allow_local_writes);
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
-          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布已开启。" : "Mac 本机执行器在线：本机扫描和预检可用，发布未开启。", "green");
+          setExecutorStatus("online", payload.allow_publish ? "Mac 本机助手在线：本机扫描可用，发布已开启。" : "Mac 本机助手在线：本机扫描和检查可用，发布未开启。", "green");
           setExecutorButtons(true);
         } else {
           throw new Error(payload.error || "local workspace scan failed");
@@ -6381,7 +6381,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function installLocalSkill() {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (!executorAllowLocalWrites) {
-        renderLocalSkillError("本机写入未授权：请用 --allow-local-writes 启动 executor。");
+        renderLocalSkillError("本机写入未授权：请打开本机写入开关后再安装。");
         return;
       }
       const writes = Number((lastLocalSkillAnalysis.summary || {}).will_write || 0);
@@ -6416,17 +6416,17 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function publishLocalSkill(realPublish) {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (realPublish && !executorAllowPublish) {
-        renderLocalSkillError("中央发布未授权：请用 --allow-publish 启动 executor。");
+        renderLocalSkillError("发布未授权：请打开发布开关后再发布到共享仓库。");
         return;
       }
       if (realPublish) {
-        const typed = window.prompt(`将 ${lastLocalSkillAnalysis.skill_id} 发布到中央仓库。请输入 PUBLISH 确认：`);
+        const typed = window.prompt(`将 ${lastLocalSkillAnalysis.skill_id} 发布到共享仓库。请输入 PUBLISH 确认：`);
         if (typed !== "PUBLISH") {
-          setLocalSkillStatus("cancelled", "已取消发布，没有写入中央仓库。", "yellow");
+          setLocalSkillStatus("cancelled", "已取消发布，没有写入共享仓库。", "yellow");
           return;
         }
       }
-      setLocalSkillStatus(realPublish ? "publishing" : "checking", realPublish ? "正在发布到中央仓库。" : "正在预检发布。", "yellow");
+      setLocalSkillStatus(realPublish ? "publishing" : "checking", realPublish ? "正在发布到共享仓库。" : "正在检查发布。", "yellow");
       setExecutorButtons(false);
       try {
         const endpoint = realPublish ? "/api/local-skill/publish" : "/api/local-skill/publish-dry-run";
@@ -6438,8 +6438,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
-        setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "中央仓库已更新。" : "预检通过，可以发布中央。", "green");
-        $("local-skill-result").textContent = `${payload.skill_id} · ${modeLabel(payload.mode)} · ${payload.safe_to_push ? "可以发布" : "需要复核"} · 文件 ${text(payload.uploaded_files)} · 中央版本 ${text(payload.snapshot_id)}`;
+        setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "共享仓库已更新。" : "检查通过，可以发布到共享仓库。", "green");
+        $("local-skill-result").textContent = `${payload.skill_id} · ${modeLabel(payload.mode)} · ${payload.safe_to_push ? "可以发布" : "需要复核"} · 文件 ${text(payload.uploaded_files)} · 共享仓库版本 ${text(payload.snapshot_id)}`;
       } catch (err) {
         renderLocalSkillError(String(err));
       } finally {
@@ -6463,7 +6463,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderLocalSkillPublishHint() {
       if (!lastLocalSkillAnalysis) return;
       if (!executorAllowPublish) {
-        $("local-skill-result").textContent += " · 中央发布未开启，可先点预检发布；真实发布需启用发布权限";
+        $("local-skill-result").textContent += " · 发布开关未打开，可先检查发布；真实发布需启用发布权限";
       }
     }
 
@@ -6673,7 +6673,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderHubImportPreview(payload) {
       const preview = payload.preview || {};
       const applyPlan = payload.apply_plan || {};
-      $("hub-import-preview-status").textContent = "预览包已生成，当前只做预检，不执行写入。";
+      $("hub-import-preview-status").textContent = "预览包已生成，当前只做检查，不执行写入。";
       $("hub-import-preview-result").innerHTML = [
         row("preview_json", preview.preview_json),
         row("preview_md", preview.preview_md),
