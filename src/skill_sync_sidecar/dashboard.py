@@ -2703,6 +2703,56 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #fff;
       border-color: var(--ink);
     }
+    .simple-decision-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .simple-decision-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+    .simple-decision-card.warning {
+      border-color: #e8d29c;
+      background: #fffdf7;
+    }
+    .simple-decision-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .simple-decision-title {
+      color: var(--ink);
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+    .simple-decision-source {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .simple-decision-copy {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .simple-decision-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .simple-decision-actions .primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
     .simple-action-item {
       display: flex;
       justify-content: space-between;
@@ -3911,6 +3961,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button type="button" onclick="openAdvancedDetails()">查看高级详情</button>
             </div>
             <div id="simple-action-note" class="simple-action-note">发布会要求输入 PUBLISH；不会静默写中央仓库。</div>
+            ${renderSimpleDecisionList(conflictItems, deleteItems)}
           </div>
           <div class="simple-action-card">
             <div class="simple-action-card-title">当前任务</div>
@@ -3945,6 +3996,56 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderSimpleDecisionList(conflictItems, deleteItems) {
+      const decisions = [
+        ...(Array.isArray(conflictItems) ? conflictItems : []),
+        ...(Array.isArray(deleteItems) ? deleteItems : []),
+      ];
+      if (decisions.length === 0) return "";
+      return `
+        <div class="simple-decision-list">
+          ${decisions.map((item) => renderSimpleDecisionCard(item)).join("")}
+        </div>
+      `;
+    }
+
+    function renderSimpleDecisionCard(item) {
+      const skill = text(item.skill_id || "unknown-skill");
+      const peer = text(item.peer_name || item.peer_id || "未知设备");
+      const isDelete = reviewIsDeleteItem(item);
+      const isConflict = item.category === "conflict" || item.status_action === "conflict";
+      const title = isDelete ? `${skill}：本机缺失` : `${skill}：两边内容不一致`;
+      const detail = isDelete
+        ? "推荐先保留中央仓库，不自动删除。确认这个 skill 还要用时，从中央恢复到本机；确认废弃时，再单独走删除审批。"
+        : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。";
+      const primaryLabel = isDelete ? "保留中央，稍后恢复" : "查看差异再决定";
+      const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
+      const secondaryDetail = isDelete
+        ? "删除中央仓库属于高风险操作，当前面板不会一键执行。"
+        : "冲突不会自动合并，当前面板不会猜哪边正确。";
+      return `
+        <div class="simple-decision-card warning">
+          <div class="simple-decision-head">
+            <div>
+              <div class="simple-decision-title">${escapeHtml(title)}</div>
+              <div class="simple-decision-source">${escapeHtml(peer)}</div>
+            </div>
+            ${pill(isConflict ? "需选择" : "需确认", "yellow")}
+          </div>
+          <div class="simple-decision-copy">${escapeHtml(detail)}</div>
+          <div class="simple-decision-actions">
+            <button type="button" class="primary" onclick="openAdvancedDetails()">${escapeHtml(primaryLabel)}</button>
+            <button type="button" onclick="showDecisionExplanation('${escapeHtml(skill)}', '${escapeHtml(secondaryDetail)}')">${escapeHtml(secondaryLabel)}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function showDecisionExplanation(skillId, detail) {
+      setReviewFeedback("yellow", `${skillId} 需要人工确认`, detail);
+      openAdvancedDetails();
     }
 
     function simpleActionStep(index, value) {
