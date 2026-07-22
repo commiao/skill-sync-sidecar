@@ -3950,7 +3950,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 管理</h1>
-      <div class="brand-subtitle">看第一块建议；需要操作再用“常用操作”</div>
+      <div class="brand-subtitle">第一块说不用处理就可以关掉；要操作再选下面的场景</div>
     </div>
     <div class="toolbar">
       <span id="updated">读取中</span>
@@ -3960,19 +3960,19 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
-    <section class="easy-workspace panel" aria-label="常用操作">
+    <section class="easy-workspace panel" aria-label="你想做什么">
       <div class="easy-workspace-head">
         <div class="easy-workspace-title">
-          <strong>常用操作</strong>
-          <span>普通使用只看这里：管理当前 Mac 的 skill，或把确认过的更新发布到共享仓库。</span>
+          <strong>你想做什么？</strong>
+          <span>选一个场景即可。本页默认只操作当前 Mac；同步到其他设备前会再次确认。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </div>
       <div class="easy-workspace-grid">
         <div class="easy-card">
-          <div class="easy-card-label">我要让本机工具能用某个 skill</div>
-          <h2>导入 / 安装本地 skill</h2>
-          <p>粘贴 skill 目录或 SKILL.md 路径，sidecar 自动分析，不需要你补配置文件。</p>
+          <div class="easy-card-label">场景 1</div>
+          <h2>让某个 skill 在本机可用</h2>
+          <p>粘贴 skill 目录或 SKILL.md 路径，点“一键分析”。通过后，安装和同步按钮会自动解锁。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">本地 skill 路径</div>
@@ -3980,28 +3980,28 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             <div class="local-skill-input-row">
               <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
-              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">分析</button>
-              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
-              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查发布</button>
-              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布共享仓库</button>
+              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">一键分析</button>
+              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机</button>
+              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查同步</button>
+              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>同步到其他设备</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">先点“分析”。通过后，按钮会自动解锁安装或发布。</div>
+            <div id="local-skill-result" class="local-skill-result">先点“一键分析”。通过后，按钮会自动解锁。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
         </div>
         <div class="easy-card">
-          <div class="easy-card-label">我要同步已经确认的改动</div>
-          <h2>检查后发布</h2>
-          <p>先检查，只读预览；检查通过后再发布。发布完成后面板会自动回查待办是否清空。</p>
+          <div class="easy-card-label">场景 2</div>
+          <h2>把已确认的更新同步出去</h2>
+          <p>先检查，只读预览；没问题再同步到其他设备。完成后面板会自动确认是否还有待处理。</p>
           <div class="easy-action-row">
-            <button type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
-            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布共享仓库</button>
+            <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
+            <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
+            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>同步到其他设备</button>
           </div>
           <ol class="easy-steps" aria-label="发布流程">
-            <li><strong>1</strong><span>扫描当前 Mac 上的 skill 和工具目录。</span></li>
-            <li><strong>2</strong><span>检查会写入哪些 skill；这一步不会改共享仓库。</span></li>
-            <li><strong>3</strong><span>确认发布；发布后自动刷新状态，看到“无待处理”才算完成。</span></li>
+            <li><strong>1</strong><span>刷新当前 Mac 上的 skill 和工具目录。</span></li>
+            <li><strong>2</strong><span>先看会同步哪些 skill；这一步不会写入。</span></li>
+            <li><strong>3</strong><span>确认同步；看到“无待处理”才算完成。</span></li>
           </ol>
         </div>
       </div>
