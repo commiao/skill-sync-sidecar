@@ -1612,9 +1612,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     button:hover { border-color: #aeb7c6; }
     .status-strip {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
-      gap: 12px;
-      margin-bottom: 12px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      margin: 8px 0 12px;
       align-items: stretch;
     }
     .status-chip {
@@ -1625,9 +1625,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-width: 0;
     }
     .focus-main {
-      border-left: 4px solid #d8a300;
-      padding: 14px 16px 14px 14px;
-      background: #fff;
+      border-left: 0;
+      padding: 9px 12px;
+      background: #fbfcfe;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
     }
     .focus-title {
       display: flex;
@@ -1635,22 +1639,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       align-items: baseline;
       gap: 6px;
       color: var(--ink);
-      font-size: 20px;
+      font-size: 14px;
       font-weight: 850;
       line-height: 1.15;
-      margin-top: 2px;
+      margin-top: 0;
     }
     .focus-title strong {
-      font-size: 30px;
+      font-size: 18px;
       line-height: 1;
     }
     .focus-note {
       color: var(--muted);
-      margin-top: 8px;
+      margin-top: 0;
       overflow-wrap: anywhere;
+      font-size: 12px;
     }
     .focus-side {
-      display: grid;
+      display: none;
       gap: 8px;
       align-content: center;
       background: #fbfcfe;
@@ -2615,19 +2620,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 12px 0 0;
     }
     .simple-action-panel {
-      margin: 12px 0;
+      margin: 10px 0 8px;
       display: grid;
-      gap: 12px;
-      border-left: 5px solid var(--blue);
+      gap: 14px;
+      border-left: 0;
       background: #fbfdff;
+      padding: 20px;
     }
     .simple-action-panel.green {
       border-left-color: var(--green);
       background: #f8fffb;
     }
     .simple-action-panel.yellow {
-      border-left-color: #d8a300;
       background: #fffdf7;
+      border-color: #e8d29c;
     }
     .simple-action-panel.red {
       border-left-color: var(--red);
@@ -2635,8 +2641,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .simple-action-hero {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, auto);
+      gap: 20px;
       align-items: center;
     }
     .simple-action-plain {
@@ -2647,17 +2653,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--muted);
       font-size: 12px;
       font-weight: 820;
+      text-transform: none;
     }
     .simple-action-title {
       color: var(--ink);
-      font-size: 22px;
+      font-size: 26px;
       font-weight: 880;
       line-height: 1.2;
       overflow-wrap: anywhere;
     }
     .simple-action-summary {
       color: var(--muted);
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1.5;
       max-width: 900px;
       overflow-wrap: anywhere;
@@ -2717,8 +2724,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-top: 0;
     }
     .simple-action-actions.single-primary button {
-      min-width: 180px;
-      min-height: 42px;
+      min-width: 220px;
+      min-height: 48px;
+      font-size: 15px;
     }
     .simple-action-actions .primary {
       background: var(--ink);
@@ -2743,7 +2751,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .simple-action-fact {
       border-top: 1px solid var(--line);
-      padding-top: 8px;
+      padding: 10px 0 0;
       color: var(--muted);
       font-size: 12px;
       line-height: 1.35;
@@ -2847,16 +2855,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .conflict-resolution {
       display: grid;
-      gap: 10px;
+      gap: 14px;
       border: 1px solid #e8d29c;
       border-radius: 8px;
       background: #fffdf7;
-      padding: 12px;
+      padding: 18px;
       margin-top: 10px;
     }
     .conflict-resolution-title {
       color: var(--ink);
-      font-size: 15px;
+      font-size: 20px;
       font-weight: 860;
       overflow-wrap: anywhere;
     }
@@ -2868,13 +2876,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     .conflict-choice-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      gap: 10px;
     }
     .conflict-choice {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      padding: 10px;
+      padding: 12px;
       min-width: 0;
       display: grid;
       gap: 6px;
@@ -2892,6 +2900,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .conflict-choice button {
       margin-top: 2px;
+      min-height: 38px;
     }
     .conflict-diagnostic {
       color: var(--muted);
@@ -3466,7 +3475,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 同步工作台</h1>
-      <div class="brand-subtitle">本机可操作；中央仓库与其他设备只读</div>
+      <div class="brand-subtitle">先处理当前任务；其他信息都在详情里</div>
     </div>
     <div class="toolbar">
       <span id="updated">Loading</span>
@@ -3475,6 +3484,8 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
   <main>
     <div id="error" class="error"></div>
+    <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
+    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="冲突解决向导"></section>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
         <div class="status-chip-label">同步待办</div>
@@ -3503,10 +3514,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
-    <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
-    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="冲突解决向导"></section>
     <details class="advanced-workspace">
-      <summary>高级详情：设备、中央仓库、完整待审清单</summary>
+      <summary>查看本机、中央仓库和设备详情</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
@@ -4136,11 +4145,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           <button type="button" onclick="openAdvancedDetails()">展开详情</button>
         `;
         facts = [
-          ["现在要做", `生成 ${skill} 的冲突包。`],
-          ["不会发生", "不会写 WebDAV，也不会改 OpenClaw skill。"],
-          ["下一步", "看本地版和中央版，再选择保留哪边。"],
+          ["第 1 步", `生成 ${skill} 的只读冲突包。`],
+          ["安全边界", "这一步不会写 WebDAV，也不会改 OpenClaw。"],
+          ["第 2 步", "生成后选择保留 OpenClaw 版、中央版，或手动合并。"],
         ];
-        taskCards = renderSimpleDecisionList(conflictItems, deleteItems);
+        taskCards = "";
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
         const item = restoreItems[0];
         const skill = text(item.skill_id || "unknown-skill");
@@ -4203,7 +4212,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${facts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}
         </div>
         ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
-        <div id="simple-action-note" class="simple-action-note">待办数字下降才算闭环；技术细节在下方“高级详情”。</div>
+        <div id="simple-action-note" class="simple-action-note">这里只展示当前要处理的一件事；技术细节在“高级详情”里。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -4307,17 +4316,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="conflict-choice-grid">
           <div class="conflict-choice">
             <strong>保留 OpenClaw 版</strong>
-            <span>适合 OpenClaw 上的修改才是最新正确版本。下一步会把 OpenClaw 版本显式发布到中央仓库。</span>
+            <span>OpenClaw 上的是你要的最新版。会写入 WebDAV 中央仓库；需要输入 PUBLISH。</span>
             <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skillId)}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版到中央仓库</button>
           </div>
           <div class="conflict-choice">
             <strong>保留中央仓库版</strong>
-            <span>适合中央仓库里的版本才是正确版本。下一步会把中央版本恢复到 OpenClaw。</span>
+            <span>中央仓库里的是正确版本。会恢复到 OpenClaw；原 OpenClaw 版本会备份，需要输入 RESTORE。</span>
             <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skillId)}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
           </div>
           <div class="conflict-choice">
             <strong>我手动合并</strong>
-            <span>适合两边都有价值。先打开冲突包，合并后再作为一个明确版本发布。</span>
+            <span>两边都有内容要保留。先看冲突包路径，手动合并后再发布最终版本。</span>
             <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'manual')">打开手动合并说明</button>
           </div>
         </div>
