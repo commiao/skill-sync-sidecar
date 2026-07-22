@@ -609,11 +609,22 @@ class OpsStatusTest(unittest.TestCase):
             self.assertNotIn("完整队列在下方高级诊断", DASHBOARD_HTML)
             self.assertNotIn("预检待审批", DASHBOARD_HTML)
             self.assertNotIn("display: none;\\n      }\\n      .review-list::after", DASHBOARD_HTML)
+            self.assertIn("id=\"plain-detail-grid\"", DASHBOARD_HTML)
+            self.assertIn("renderPlainDetails", DASHBOARD_HTML)
+            self.assertIn("Mac 本机", DASHBOARD_HTML)
+            self.assertIn("中央仓库收录", DASHBOARD_HTML)
+            self.assertIn("回到上方任务卡处理", DASHBOARD_HTML)
+            self.assertIn("<details class=\"technical-workspace\">", DASHBOARD_HTML)
+            self.assertIn("技术诊断和工具管理", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
             self.assertIn("本区可操作；中央", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"plain-detail-grid\""),
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
             )
             self.assertLess(

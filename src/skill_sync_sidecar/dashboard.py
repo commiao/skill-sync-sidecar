@@ -2947,6 +2947,74 @@ DASHBOARD_HTML = r"""<!doctype html>
     .advanced-workspace[open] > summary::after {
       content: "收起";
     }
+    .plain-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .plain-detail-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .plain-detail-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .plain-detail-title {
+      color: var(--ink);
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+    .plain-detail-line {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .plain-detail-action {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 720;
+      overflow-wrap: anywhere;
+    }
+    .technical-workspace {
+      margin: 12px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .technical-workspace > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 11px 14px;
+      color: var(--blue);
+      font-weight: 820;
+      background: #fbfcfe;
+    }
+    .technical-workspace > summary::-webkit-details-marker {
+      display: none;
+    }
+    .technical-workspace > summary::after {
+      content: "展开";
+      margin-left: 8px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .technical-workspace[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .technical-workspace[open] > summary::after {
+      content: "收起";
+    }
     .workspace-overview {
       margin: 12px 0;
       border: 1px solid var(--line);
@@ -3303,6 +3371,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .workbench-grid { grid-template-columns: 1fr; }
+      .plain-detail-grid { grid-template-columns: 1fr; }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
       .cards { grid-template-columns: 1fr; }
@@ -3355,6 +3424,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .scope-card-actions button { flex: 1 1 92px; padding: 7px 8px; }
       .scope-card-note { min-height: 0; }
       .status-chip { padding: 8px 10px; }
+      .plain-detail-grid { grid-template-columns: 1fr; gap: 8px; }
       .workspace-overview-head {
         align-items: flex-start;
         flex-direction: column;
@@ -3516,6 +3586,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     </section>
     <details class="advanced-workspace">
       <summary>查看本机、中央仓库和设备详情</summary>
+    <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
+    <details class="technical-workspace">
+      <summary>技术诊断和工具管理</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
       <div class="workspace-overview-head">
         <span class="overview-title">
@@ -3612,6 +3685,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       <div id="review-queue" class="review-list"></div>
     </section>
+    </details>
     </details>
     <details class="secondary-context">
       <summary>权限边界和执行细节</summary>
@@ -5440,6 +5514,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderWorkbench(dashboard) {
+      renderPlainDetails(dashboard);
       renderLocalWorkspace(dashboard.local_workspace || {});
       renderCentralRepository(dashboard.central_repository || {});
       renderDeviceMap(dashboard.device_map || {});
@@ -5455,6 +5530,59 @@ DASHBOARD_HTML = r"""<!doctype html>
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
       $("workspace-overview-summary").textContent = `本区可操作；中央 ${text(central.total_skills)} 个 skill、${text(deviceCount)} 台其他设备只读`;
+    }
+
+    function renderPlainDetails(dashboard) {
+      const local = dashboard.local_workspace || {};
+      const central = dashboard.central_repository || {};
+      const deviceMap = dashboard.device_map || {};
+      const devices = Array.isArray(deviceMap.items) ? deviceMap.items : [];
+      const openclaw = devices.find((device) => device.id === "oc-vps" || device.id === "openclaw") || {};
+      const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
+      const conflictItems = blockedItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
+      const openclawAction = conflictItems.length > 0
+        ? `有 ${conflictItems.length} 个冲突，回到上方任务卡处理。`
+        : (Number(openclaw.blocked || 0) > 0 ? "有待处理项，回到上方任务卡处理。" : "不用操作。");
+      const cards = [
+        {
+          title: "Mac 本机",
+          state: local.health || "green",
+          line: "本机可以扫描、安装和显式发布 skill。",
+          action: Number(local.blocked || 0) > 0 ? "有本机待处理项。" : "当前不用处理本机。",
+        },
+        {
+          title: "中央仓库",
+          state: central.health || "green",
+          line: `WebDAV 中央仓库收录 ${text(central.total_skills)} 个 skill。`,
+          action: "不要直接编辑；只接受确认后的发布。",
+        },
+        {
+          title: "OpenClaw",
+          state: openclaw.health || "unknown",
+          line: openclaw.freshness && openclaw.freshness.label
+            ? `状态 ${text(openclaw.freshness.label)} 更新。`
+            : "等待 OpenClaw Agent 上报。",
+          action: openclawAction,
+        },
+      ];
+      $("plain-detail-grid").innerHTML = cards.map((card) => `
+        <article class="plain-detail-card">
+          <div class="plain-detail-head">
+            <div class="plain-detail-title">${escapeHtml(card.title)}</div>
+            ${pill(plainHealthLabel(card.state), deviceKind(card.state))}
+          </div>
+          <div class="plain-detail-line">${escapeHtml(card.line)}</div>
+          <div class="plain-detail-action">${escapeHtml(card.action)}</div>
+        </article>
+      `).join("");
+    }
+
+    function plainHealthLabel(value) {
+      if (value === "green") return "正常";
+      if (value === "yellow") return "需处理";
+      if (value === "red") return "异常";
+      if (value === "not_configured") return "未接入";
+      return "未知";
     }
 
     function renderLocalWorkspace(workspace) {
