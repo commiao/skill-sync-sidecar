@@ -558,6 +558,20 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("generateConflictPackage", DASHBOARD_HTML)
             self.assertIn("id=\"conflict-resolution-panel\"", DASHBOARD_HTML)
             self.assertIn("renderConflictResolutionPanel", DASHBOARD_HTML)
+            self.assertIn("只读差异报告已生成", DASHBOARD_HTML)
+            self.assertIn("冲突版本摘要", DASHBOARD_HTML)
+            self.assertIn("renderConflictVersionCard", DASHBOARD_HTML)
+            self.assertIn("renderConflictChoiceGrid", DASHBOARD_HTML)
+            self.assertIn("conflictFilesText", DASHBOARD_HTML)
+            self.assertIn("OpenClaw 版", DASHBOARD_HTML)
+            self.assertIn("中央仓库版", DASHBOARD_HTML)
+            self.assertIn("共同基线", DASHBOARD_HTML)
+            self.assertIn("文件：${count} 个", DASHBOARD_HTML)
+            self.assertIn("版本指纹", DASHBOARD_HTML)
+            self.assertIn("OpenClaw 当前缺失这个 skill，中央仓库仍有完整版本", DASHBOARD_HTML)
+            self.assertIn("推荐：恢复中央仓库版", DASHBOARD_HTML)
+            self.assertIn("当前面板不会一键删除中央仓库", DASHBOARD_HTML)
+            self.assertIn("推荐：发布 OpenClaw 版", DASHBOARD_HTML)
             self.assertIn("保留 OpenClaw 版", DASHBOARD_HTML)
             self.assertIn("发布 OpenClaw 版到中央仓库", DASHBOARD_HTML)
             self.assertIn("publishOpenclawVersionForConflict", DASHBOARD_HTML)
@@ -573,6 +587,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("explainConflictChoice", DASHBOARD_HTML)
             self.assertIn("conflictPackageEndpoint", DASHBOARD_HTML)
             self.assertIn("/api/openclaw-conflict-package", DASHBOARD_HTML)
+            self.assertIn("差异报告已生成", DASHBOARD_HTML)
+            self.assertIn("先查看只读差异报告，再选择保留版本", DASHBOARD_HTML)
             self.assertIn("approved=0", DASHBOARD_HTML)
             self.assertIn("没有写入中央仓库", DASHBOARD_HTML)
             self.assertIn("当前没有可发布更新。冲突和删除确认不会通过这个按钮自动处理。", DASHBOARD_HTML)
@@ -1322,10 +1338,22 @@ class OpsStatusTest(unittest.TestCase):
             repo = Path(tmp)
             scripts = repo / "scripts"
             scripts.mkdir()
+            package_dir = repo / "conflict"
+            (package_dir / "local" / "scripts").mkdir(parents=True)
+            (package_dir / "remote").mkdir(parents=True)
+            (package_dir / "local" / "SKILL.md").write_text(
+                "---\nname: Finance Local\ndescription: OpenClaw edited version\n---\n# Finance Local\n",
+                encoding="utf-8",
+            )
+            (package_dir / "local" / "scripts" / "run.py").write_text("print('local')\n", encoding="utf-8")
+            (package_dir / "remote" / "SKILL.md").write_text(
+                "---\nname: Finance Central\ndescription: Central repository version\n---\n# Finance Central\n",
+                encoding="utf-8",
+            )
             helper = scripts / "openclaw-conflict-package.sh"
             helper.write_text(
                 "#!/usr/bin/env bash\n"
-                "printf '{\"ok\":true,\"total_conflicts\":1,\"packages\":[{\"skill_id\":\"%s\",\"path\":\"/tmp/conflict\"}]}\\n' \"$1\"\n",
+                f"printf '{{\"ok\":true,\"total_conflicts\":1,\"packages\":[{{\"skill_id\":\"%s\",\"path\":\"{package_dir}\"}}]}}\\n' \"$1\"\n",
                 encoding="utf-8",
             )
             os.chmod(helper, 0o755)
@@ -1336,6 +1364,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(result["mode"], "conflict_package")
             self.assertEqual(result["total_conflicts"], 1)
             self.assertEqual(result["packages"][0]["skill_id"], "finance-auto-bookkeeping")
+            review = result["packages"][0]["review"]
+            self.assertEqual(review["local"]["title"], "Finance Local")
+            self.assertEqual(review["local"]["description"], "OpenClaw edited version")
+            self.assertEqual(review["local"]["file_count"], 2)
+            self.assertEqual(review["remote"]["title"], "Finance Central")
+            self.assertEqual(review["remote"]["description"], "Central repository version")
+            self.assertEqual(review["base"]["state"], "absent")
+            self.assertIn("先比较 OpenClaw 版和中央仓库版", review["decision_hint"])
             self.assertIn("openclaw-conflict-package.sh finance-auto-bookkeeping", result["command"])
 
     def test_publish_peer_status_writes_remote_json(self):

@@ -222,11 +222,113 @@ def run_openclaw_conflict_package(
         "command": " ".join(command),
         "skill_ids": normalized,
         "total_conflicts": parsed.get("total_conflicts") if isinstance(parsed, dict) else None,
-        "packages": parsed.get("packages") if isinstance(parsed, dict) else [],
+        "packages": _enrich_conflict_packages(parsed.get("packages") if isinstance(parsed, dict) else []),
         "result": parsed,
         "stdout_tail": _tail(proc.stdout),
         "stderr_tail": _tail(proc.stderr),
     }
+
+
+def _enrich_conflict_packages(packages: object) -> list[dict]:
+    if not isinstance(packages, list):
+        return []
+    enriched: list[dict] = []
+    for raw in packages:
+        if not isinstance(raw, dict):
+            continue
+        package = dict(raw)
+        package_path = Path(str(package.get("path") or ""))
+        if package_path.exists() and package_path.is_dir():
+            package["review"] = {
+                "local_label": "OpenClaw 版",
+                "remote_label": "中央仓库版",
+                "base_label": "共同基线",
+                "local": _summarize_conflict_material(package_path / "local"),
+                "remote": _summarize_conflict_material(package_path / "remote"),
+                "base": _summarize_conflict_material(package_path / "base"),
+                "decision_hint": "先比较 OpenClaw 版和中央仓库版；确定哪边正确后，再选择写入动作。",
+            }
+        enriched.append(package)
+    return enriched
+
+
+def _summarize_conflict_material(path: Path) -> dict:
+    if not path.exists():
+        return {"state": "absent", "title": "缺失", "description": "", "file_count": 0, "files": []}
+    if not path.is_dir():
+        return {"state": "unknown", "title": path.name, "description": "", "file_count": 0, "files": []}
+
+    files = sorted(
+        str(file.relative_to(path))
+        for file in path.rglob("*")
+        if file.is_file() and "__pycache__" not in file.parts
+    )
+    skill_md = path / "SKILL.md"
+    title = path.name
+    description = ""
+    if skill_md.exists():
+        title, description = _summarize_skill_md(skill_md)
+    return {
+        "state": "present",
+        "title": title,
+        "description": description,
+        "file_count": len(files),
+        "files": files[:12],
+        "has_more_files": len(files) > 12,
+        "skill_md": str(skill_md) if skill_md.exists() else None,
+    }
+
+
+def _summarize_skill_md(path: Path) -> tuple[str, str]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return path.parent.name, ""
+    frontmatter = _frontmatter(text)
+    title = frontmatter.get("name") or _first_heading(text) or path.parent.name
+    description = frontmatter.get("description") or _first_paragraph(text)
+    return title.strip() or path.parent.name, description.strip()
+
+
+def _frontmatter(text: str) -> dict[str, str]:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    values: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if key in {"name", "description"}:
+            values[key] = value.strip().strip("\"'")
+    return values
+
+
+def _first_heading(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip()
+    return ""
+
+
+def _first_paragraph(text: str) -> str:
+    in_frontmatter = False
+    frontmatter_done = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "---" and not frontmatter_done:
+            in_frontmatter = not in_frontmatter
+            if not in_frontmatter:
+                frontmatter_done = True
+            continue
+        if in_frontmatter or not stripped or stripped.startswith("#"):
+            continue
+        return stripped
+    return ""
 
 
 def _normalize_skill_ids(skill_ids: Sequence[str]) -> list[str]:

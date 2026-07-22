@@ -83,25 +83,118 @@ run_remote "${python_cmd[@]}" conflict-package \
   --out "$out_dir" \
   --json > "$local_result_json"
 
-python3 - "$local_result_json" "${skill_ids[@]}" <<'PY'
+run_remote "${remote_env[@]}" "$OPENCLAW_PYTHON" - "$out_dir" "${skill_ids[@]}" <<'PY'
 import json
+from pathlib import Path
 import sys
 
-result_json = sys.argv[1]
+out_dir = Path(sys.argv[1])
 requested = [item for item in sys.argv[2:] if item]
-payload = json.load(open(result_json, encoding="utf-8"))
+payload = json.loads((out_dir / "conflict-index.json").read_text(encoding="utf-8"))
 packages = payload.get("packages", [])
 if requested:
     wanted = set(requested)
     packages = [item for item in packages if item.get("skill_id") in wanted]
+
+
+def summarize_material(path):
+    path = Path(path)
+    if not path.exists():
+        return {"state": "absent", "title": "缺失", "description": "", "file_count": 0, "files": []}
+    files = sorted(
+        str(item.relative_to(path))
+        for item in path.rglob("*")
+        if item.is_file() and "__pycache__" not in item.parts
+    )
+    title = path.name
+    description = ""
+    skill_md = path / "SKILL.md"
+    if skill_md.exists():
+        title, description = summarize_skill_md(skill_md, path.name)
+    return {
+        "state": "present",
+        "title": title,
+        "description": description,
+        "file_count": len(files),
+        "files": files[:12],
+        "has_more_files": len(files) > 12,
+        "skill_md": str(skill_md) if skill_md.exists() else None,
+    }
+
+
+def summarize_skill_md(path, fallback):
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return fallback, ""
+    metadata = frontmatter(text)
+    title = metadata.get("name") or first_heading(text) or fallback
+    description = metadata.get("description") or first_paragraph(text)
+    return title.strip() or fallback, description.strip()
+
+
+def frontmatter(text):
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    result = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key.strip() in {"name", "description"}:
+            result[key.strip()] = value.strip().strip("\"'")
+    return result
+
+
+def first_heading(text):
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            return stripped.lstrip("#").strip()
+    return ""
+
+
+def first_paragraph(text):
+    in_frontmatter = False
+    frontmatter_done = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "---" and not frontmatter_done:
+            in_frontmatter = not in_frontmatter
+            if not in_frontmatter:
+                frontmatter_done = True
+            continue
+        if in_frontmatter or not stripped or stripped.startswith("#"):
+            continue
+        return stripped
+    return ""
+
+
+enriched = []
+for package in packages:
+    item = dict(package)
+    package_path = Path(str(item.get("path") or ""))
+    item["review"] = {
+        "local_label": "OpenClaw 版",
+        "remote_label": "中央仓库版",
+        "base_label": "共同基线",
+        "local": summarize_material(package_path / "local"),
+        "remote": summarize_material(package_path / "remote"),
+        "base": summarize_material(package_path / "base"),
+        "decision_hint": "先比较 OpenClaw 版和中央仓库版；确定哪边正确后，再选择写入动作。",
+    }
+    enriched.append(item)
 print(json.dumps({
     "ok": True,
     "record_type": "skill-sync-openclaw-conflict-package",
     "mode": "conflict_package",
     "read_only": True,
     "skill_ids": requested,
-    "total_conflicts": len(packages),
+    "total_conflicts": len(enriched),
     "out": payload.get("out"),
-    "packages": packages,
+    "packages": enriched,
 }, ensure_ascii=False, indent=2))
 PY
