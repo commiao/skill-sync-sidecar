@@ -4143,12 +4143,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const macBlocked = blockedItems.filter((item) => item.peer_id === "mac").length;
       const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
       const breakdown = blockedBreakdown(blockedItems);
+      const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
       $("strip-health").textContent = blocked > 0 && breakdown.conflict === blocked ? "个冲突" : (blocked > 0 ? "项待处理" : "项待办");
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
-      if (blocked > 0 && breakdown.conflict === blocked) {
+      const stripDryRun = $("strip-dry-run");
+      if (stripDryRun) {
+        stripDryRun.textContent = conflictOnly ? "先看差异" : "预检待推送";
+        stripDryRun.onclick = conflictOnly ? runFirstConflictPackage : (() => runExecutorAction("dry_run"));
+      }
+      if (conflictOnly) {
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
         $("strip-focus-note").textContent = `只剩冲突：${names}。不是待预检；如果不确定，先点“我不确定，先看差异”。`;
       } else {
@@ -4158,8 +4164,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const actionNote = $("strip-action-note");
       if (actionNote) {
-        actionNote.textContent = blocked > 0 && breakdown.conflict === blocked
-          ? "确定哪边正确就直接选；不确定就先看差异。"
+        actionNote.textContent = conflictOnly
+          ? "当前没有可批量发布更新；不确定就先看差异。"
           : (blocked > 0
           ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
           : "只操作 Mac 本机。");
@@ -4379,18 +4385,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         title = conflictItems.length === 1 ? `选择 ${skill} 保留哪一版` : `有 ${conflictItems.length} 个 skill 需要选择保留版本`;
-        summary = "两边都改过，系统不会自动覆盖。你只需要选择可信版本；不确定就先看差异，查看差异不会写入任何地方。";
+        summary = "两边都改过，系统不会自动覆盖。最安全的下一步是先看差异；只有确定哪边正确时，再选择写入。";
         primaryActions = `
           <div class="simple-choice-grid" aria-label="选择保留版本">
-            <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版<span>发布到中央仓库，其他设备后续会拿这版。</span></button>
-            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版<span>恢复到 OpenClaw，原 OpenClaw 版本会备份。</span></button>
-            <button type="button" class="conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">我不确定，先看差异<span>只读查看两边文件，不会改任何地方。</span></button>
+            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">推荐：我不确定，先看差异<span>最安全，只读查看两边文件，不会改任何地方。</span></button>
+            <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skill)}" onclick="publishOpenclawVersionForConflict(this)">我确定 OpenClaw 上的是最新版<span>通过预检后输入 PUBLISH，发布到中央仓库。</span></button>
+            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skill)}" onclick="restoreCentralVersionForConflict(this)">我确定中央仓库是正确版<span>通过预检后输入 RESTORE，恢复到 OpenClaw 并备份原版本。</span></button>
           </div>
         `;
         facts = [
-          ["安全规则", "不输入确认词，不会真的写入。"],
-          ["选 OpenClaw", "通过预检后输入 PUBLISH。"],
-          ["选中央仓库", "通过预检后输入 RESTORE。"],
+          ["推荐", "不确定就先看差异；这是只读操作。"],
+          ["选 OpenClaw", "会写中央仓库，需要 PUBLISH。"],
+          ["选中央仓库", "会写 OpenClaw，需要 RESTORE。"],
         ];
         taskCards = "";
       } else if (restoreItems.length > 0 && publishItems.length === 0) {
@@ -4462,6 +4468,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-note" class="simple-action-note">这里只展示当前要处理的一件事；技术细节在“高级详情”里。</div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function runFirstConflictPackage() {
+      const button = document.querySelector(".conflict-package-button");
+      if (!button) {
+        setReviewFeedback("yellow", "还没有可查看的冲突项", "状态已刷新；如果仍有冲突，上方会出现“推荐：我不确定，先看差异”。");
+        refresh(true);
+        return;
+      }
+      button.click();
     }
 
     function renderSimpleDecisionList(conflictItems, deleteItems) {

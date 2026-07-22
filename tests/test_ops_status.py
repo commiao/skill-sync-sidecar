@@ -458,7 +458,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"strip-action-note\"", DASHBOARD_HTML)
             self.assertIn("个冲突", DASHBOARD_HTML)
             self.assertIn("不是待预检；如果不确定，先点“我不确定，先看差异”", DASHBOARD_HTML)
-            self.assertIn("确定哪边正确就直接选；不确定就先看差异", DASHBOARD_HTML)
+            self.assertIn("当前没有可批量发布更新；不确定就先看差异", DASHBOARD_HTML)
+            self.assertIn("runFirstConflictPackage", DASHBOARD_HTML)
             self.assertIn("待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个", DASHBOARD_HTML)
             self.assertIn("blockedBreakdownText", DASHBOARD_HTML)
             self.assertIn("发布只处理“可发布更新”；冲突和删除确认需要单独决策。", DASHBOARD_HTML)
@@ -518,16 +519,25 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("选择 ${skill} 保留哪一版", DASHBOARD_HTML)
             self.assertIn("simple-choice-grid", DASHBOARD_HTML)
             self.assertIn("aria-label=\"选择保留版本\"", DASHBOARD_HTML)
+            self.assertIn("推荐：我不确定，先看差异", DASHBOARD_HTML)
+            self.assertIn("最安全，只读查看两边文件，不会改任何地方", DASHBOARD_HTML)
             self.assertIn("我确定 OpenClaw 上的是最新版", DASHBOARD_HTML)
-            self.assertIn("发布到中央仓库，其他设备后续会拿这版", DASHBOARD_HTML)
+            self.assertIn("通过预检后输入 PUBLISH，发布到中央仓库", DASHBOARD_HTML)
             self.assertIn("我确定中央仓库是正确版", DASHBOARD_HTML)
-            self.assertIn("恢复到 OpenClaw，原 OpenClaw 版本会备份", DASHBOARD_HTML)
+            self.assertIn("通过预检后输入 RESTORE，恢复到 OpenClaw 并备份原版本", DASHBOARD_HTML)
             self.assertIn("我不确定，先看差异", DASHBOARD_HTML)
             self.assertIn("只读查看两边文件，不会改任何地方", DASHBOARD_HTML)
-            self.assertIn("安全规则", DASHBOARD_HTML)
-            self.assertIn("不输入确认词，不会真的写入", DASHBOARD_HTML)
-            self.assertIn("通过预检后输入 PUBLISH", DASHBOARD_HTML)
-            self.assertIn("通过预检后输入 RESTORE", DASHBOARD_HTML)
+            self.assertIn("不确定就先看差异；这是只读操作", DASHBOARD_HTML)
+            self.assertIn("会写中央仓库，需要 PUBLISH", DASHBOARD_HTML)
+            self.assertIn("会写 OpenClaw，需要 RESTORE", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("推荐：我不确定，先看差异"),
+                DASHBOARD_HTML.index("我确定 OpenClaw 上的是最新版"),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("推荐：我不确定，先看差异"),
+                DASHBOARD_HTML.index("我确定中央仓库是正确版"),
+            )
             self.assertIn("id=\"simple-action-feedback\"", DASHBOARD_HTML)
             self.assertIn("id=\"simple-action-feedback-title\"", DASHBOARD_HTML)
             self.assertIn("选择一个按钮后，这里会显示进度", DASHBOARD_HTML)
