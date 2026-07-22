@@ -992,17 +992,17 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "现在需要人工审核",
-            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动上传；先 approved-push dry-run 审核，确认安全后再推送到中央仓库。",
+            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动上传；先预检审核，确认安全后再推送到中央仓库。",
             "steps": [
                 {
                     "title": "先检查，不上传",
-                    "detail": "在 Mac 的 skill-sync-sidecar 仓库运行 dry-run。它只做预检和预览，不会写入 WebDAV。",
+                    "detail": "在 Mac 的 skill-sync-sidecar 仓库运行预检。它只做预览，不会写入 WebDAV。",
                     "command": dry_run,
                     "kind": "dry_run",
                 },
                 {
                     "title": "确认安全后再发布",
-                    "detail": "只有 dry-run 显示 safe_to_push=true，且这些 skill 不再继续编辑时，才运行确认发布。",
+                    "detail": "只有预检显示可以发布，且这些 skill 不再继续编辑时，才运行确认发布。",
                     "command": publish,
                     "kind": "publish",
                 },
@@ -1014,7 +1014,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 },
             ],
             "skills": skill_ids,
-            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再走 dry-run -> --yes。",
+            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再走预检和确认发布。",
         }
     if health == "yellow":
         return {
@@ -1130,7 +1130,7 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
             "publish_to_central": len(mac_blocked) > 0,
             "operate_other_devices": False,
         },
-        "primary_action": "连接本机执行器后可实时扫描本机 skill，并对本机变更做 dry-run。",
+        "primary_action": "连接本机执行器后可实时扫描本机 skill，并对本机变更做预检。",
         "boundary": "这里默认只操作浏览器所在 Mac；其他设备只读展示，除非该设备自己的 Agent 暴露受控操作。",
         "remote_blocked_note": f"当前另有 {len(remote_blocked)} 个非本机待审批项，放在设备地图里处理。",
     }
@@ -1288,7 +1288,7 @@ def _blocked_item_operator_action(item: dict) -> str:
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
     if _is_openclaw_writer_policy_push(item):
         if peer_id in {"oc-vps", "openclaw"}:
-            return f"先在 Mac 运行 OpenClaw approved-push dry-run 审核 {skill_id or 'unknown-skill'}，确认后再 --yes 发布。"
+            return f"先在 Mac 运行 OpenClaw 预检审核 {skill_id or 'unknown-skill'}，确认后再发布。"
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
     if category == "delete":
         return f"先人工确认 {skill_id or 'unknown-skill'} 是否应删除；未确认前不要自动 apply。"
@@ -3653,7 +3653,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="brand-subtitle">先处理当前任务；其他信息都在详情里</div>
     </div>
     <div class="toolbar">
-      <span id="updated">Loading</span>
+      <span id="updated">读取中</span>
       <button id="refresh" type="button" title="刷新状态">刷新</button>
     </div>
   </header>
@@ -3707,7 +3707,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="workspace-eyebrow">可操作 · 只影响当前设备</div>
           <div class="workspace-title">
             <h2>本机操作</h2>
-            <span id="local-workspace-pill" class="pill">checking</span>
+            <span id="local-workspace-pill" class="pill">检查中</span>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
           <div class="workspace-flow" aria-label="本机操作流程">
@@ -3723,7 +3723,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">导入本地 Skill</div>
-              <span id="local-skill-pill" class="pill">ready</span>
+              <span id="local-skill-pill" class="pill">待分析</span>
             </div>
             <div class="local-skill-input-row">
               <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
@@ -3764,7 +3764,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="readonly-kicker">只读状态 · 不直接编辑</div>
           <div class="workspace-title">
             <h2>中央仓库状态</h2>
-            <span id="central-repository-pill" class="pill">readonly</span>
+            <span id="central-repository-pill" class="pill">只读</span>
           </div>
           <div id="central-repository-summary" class="workspace-subtitle"></div>
           <div id="central-repository-kv" class="kv"></div>
@@ -3774,7 +3774,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="readonly-kicker">其他设备 · 只读观察</div>
           <div class="workspace-title">
             <h2>其他设备状态</h2>
-            <span class="pill">read-only</span>
+            <span class="pill">只读</span>
           </div>
           <div id="device-map-summary" class="workspace-subtitle"></div>
       <div id="device-map" class="device-map-grid"></div>
@@ -3822,15 +3822,15 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="scope-card readonly">
           <div class="scope-card-head">
             <h2>中央仓库</h2>
-            <span class="pill">read-only</span>
+            <span class="pill">只读</span>
           </div>
           <div id="scope-central-count" class="scope-card-count">-</div>
-          <div id="scope-central-note" class="scope-card-note">WebDAV canonical snapshot，只接受显式 approved push。</div>
+          <div id="scope-central-note" class="scope-card-note">WebDAV 中央快照，只接受你确认后的发布。</div>
         </div>
         <div class="scope-card readonly">
           <div class="scope-card-head">
             <h2>其他设备</h2>
-            <span class="pill">read-only</span>
+            <span class="pill">只读</span>
           </div>
           <div id="scope-device-count" class="scope-card-count">-</div>
           <div id="scope-device-note" class="scope-card-note">OpenClaw / Windows 自己上报实测状态，Gateway 不远程改设备。</div>
@@ -3842,7 +3842,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="section-label">当前要做</div>
         <div class="operator-title-row">
           <div id="operator-headline" class="operator-title">读取同步状态中</div>
-          <div id="operator-verdict" class="operator-verdict">UNKNOWN</div>
+          <div id="operator-verdict" class="operator-verdict">未知</div>
         </div>
         <div id="operator-next" class="operator-text">等待 sidecar 返回状态。</div>
         <details class="technical-summary">
@@ -3854,7 +3854,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="section-label">下一步</div>
         <div class="panel-head">
           <h2 id="action-guide-title">现在怎么做</h2>
-          <span id="action-guide-state" class="pill">unknown</span>
+          <span id="action-guide-state" class="pill">未知</span>
         </div>
         <div id="action-guide-summary" class="guide-summary"></div>
         <div id="action-guide-skills" class="guide-skills"></div>
@@ -3864,12 +3864,12 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="executor-panel" class="executor-panel" hidden>
             <div class="panel-head">
               <h2>本机执行器</h2>
-              <span id="executor-pill" class="pill">checking</span>
+              <span id="executor-pill" class="pill">检查中</span>
             </div>
             <div id="executor-status" class="executor-status">正在检查 Mac 本机执行器。</div>
             <div class="executor-actions">
               <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键 dry-run</button>
+              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键预检</button>
               <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
             </div>
             <pre id="executor-output" class="executor-output mono"></pre>
@@ -3901,8 +3901,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="health-card" class="panel health">
         <span class="dot"></span>
         <div>
-          <div id="health" class="health-title">Unknown</div>
-          <div id="next-action" class="health-subtitle">Waiting for status</div>
+          <div id="health" class="health-title">未知</div>
+          <div id="next-action" class="health-subtitle">等待状态</div>
         </div>
       </div>
       <div class="metric">
@@ -3910,15 +3910,15 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="blocked" class="metric-value">-</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Allowed</div>
+        <div class="metric-label">允许操作</div>
         <div id="allowed" class="metric-value">-</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Remote Skills</div>
+        <div class="metric-label">中央技能</div>
         <div id="remote-total" class="metric-value">-</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Cycles</div>
+        <div class="metric-label">同步轮次</div>
         <div id="cycles" class="metric-value">-</div>
       </div>
     </section>
@@ -3934,7 +3934,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="planned-devices" class="cards"></section>
     <div class="section-title">
       <h2>工具</h2>
-      <span class="section-help">WebDAV canonical snapshot 对各工具的目标覆盖，不代表某台设备已安装</span>
+      <span class="section-help">WebDAV 中央快照对各工具的目标覆盖，不代表某台设备已安装</span>
     </div>
     <section id="tools" class="cards"></section>
     <div class="section-title">
@@ -3952,37 +3952,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="hub-import-preview-status" class="operator-text"></div>
       <div id="hub-import-preview-result" class="kv"></div>
       <table id="hub-import-apply-table" hidden>
-        <thead><tr><th>Skill</th><th>Apply</th><th>原因</th></tr></thead>
+        <thead><tr><th>Skill</th><th>操作</th><th>原因</th></tr></thead>
         <tbody id="hub-import-apply-body"></tbody>
       </table>
       <table id="hub-import-table" hidden>
         <thead><tr><th>Skill</th><th>判断</th><th>建议</th><th>来源</th></tr></thead>
         <tbody id="hub-import-body"></tbody>
       </table>
-      <div id="hub-import-empty" class="empty">No external import candidates.</div>
+      <div id="hub-import-empty" class="empty">暂无外部可导入项。</div>
     </div>
     <section class="grid">
       <div class="stack">
         <div class="panel">
           <h2>待审批队列</h2>
-          <div id="blocked-empty" class="empty">No pending approval items.</div>
+          <div id="blocked-empty" class="empty">暂无待审批项。</div>
           <table id="blocked-table" hidden>
-            <thead><tr><th>Skill</th><th>Status</th><th>Category</th><th>Hashes</th><th>Recommendation / Next step</th></tr></thead>
+            <thead><tr><th>Skill</th><th>状态</th><th>分类</th><th>版本指纹</th><th>建议 / 下一步</th></tr></thead>
             <tbody id="blocked-body"></tbody>
           </table>
         </div>
         <div class="panel">
-          <h2>Sync Summary</h2>
+          <h2>同步摘要</h2>
           <div id="summary" class="kv"></div>
         </div>
       </div>
       <div class="stack">
         <div class="panel">
-          <h2>Daemon</h2>
+          <h2>同步进程</h2>
           <div id="daemon" class="kv"></div>
         </div>
         <div class="panel">
-          <h2>Peer Local Policy</h2>
+          <h2>设备本地策略</h2>
         <div id="overrides" class="kv"></div>
       </div>
         <div class="panel">
@@ -3990,7 +3990,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="operator-devices" class="device-lines"></div>
         </div>
         <div class="panel">
-          <h2>Artifacts</h2>
+          <h2>产物路径</h2>
           <div id="artifacts" class="kv"></div>
         </div>
       </div>
@@ -4062,7 +4062,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("allowed").textContent = text(plan.allowed);
       $("remote-total").textContent = text(snapshot.total);
       $("cycles").textContent = text(daemon.cycles_run);
-      $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      $("updated").textContent = `更新于 ${new Date().toLocaleTimeString()}`;
       renderDevices(Array.isArray(dashboard.devices) ? dashboard.devices : []);
       renderPlannedDevices(Array.isArray(dashboard.planned_devices) ? dashboard.planned_devices : []);
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
@@ -4193,7 +4193,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return `只剩冲突：${names}。确定哪边正确就直接选；不确定就先看差异。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
-        return `先审 ${blocked} 个待审批项；dry-run 只预览，确认后再发布到中央仓库。`;
+        return `先审 ${blocked} 个待审批项；预检只预览，确认后再发布到中央仓库。`;
       }
       return operator.next_action || nextAction(status);
     }
@@ -4201,7 +4201,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function conciseGuideSummary(guide) {
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
       if ((guide.state || "") === "yellow" && skills.length > 0) {
-        return `重点是 ${skills.length} 个待审批 skill。先看上方清单，再按执行细节 dry-run。`;
+        return `重点是 ${skills.length} 个待审批 skill。先看上方清单，再按执行细节预检。`;
       }
       return guide.summary || "";
     }
@@ -4215,14 +4215,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("scope-central-count").textContent = `${text(central.total_skills)} 个中央 skill`;
       $("scope-device-count").textContent = `${text(items.length)} 台其他设备`;
       $("scope-local-note").textContent = "授权扫描本机目录；操作只影响当前设备。";
-      $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要显式审批。`;
+      $("scope-central-note").textContent = `中央仓库是 WebDAV 共享事实源；当前 ${text(central.blocked)} 个变更需要你确认。`;
       $("scope-device-note").textContent = "其他设备只展示各自 Agent 上报的实测状态，Gateway 不远程改设备。";
     }
 
     function statusLabel(value) {
       if (value === "green") return "正常";
-      if (value === "yellow") return "需要审核";
-      if (value === "red") return "需要处理";
+      if (value === "yellow") return "需处理";
+      if (value === "red") return "异常";
+      if (value === "not_configured") return "未接入";
+      if (value === "not_connected") return "未连接";
+      if (value === "unknown") return "未知";
       if (value === "local") return "本机可操作";
       if (value === "read_only") return "只读";
       if (value === "remote_read_only") return "远端只读";
@@ -4233,9 +4236,58 @@ DASHBOARD_HTML = r"""<!doctype html>
     function scopeLabel(value) {
       if (value === "local") return "本机可操作";
       if (value === "read_only") return "只读聚合";
+      if (value === "read-only") return "只读";
+      if (value === "pull-only") return "只下行";
+      if (value === "push-pull") return "双向同步";
       if (value === "remote_read_only") return "远端只读";
       if (value === "planned") return "待接入";
       return text(value || "未知");
+    }
+
+    function healthLabel(value) {
+      if (value === "green") return "正常";
+      if (value === "yellow") return "需处理";
+      if (value === "red") return "异常";
+      if (value === "not_configured") return "未接入";
+      if (value === "not_connected") return "未连接";
+      return text(value || "未知");
+    }
+
+    function modeLabel(value) {
+      if (value === "dry_run") return "预检";
+      if (value === "apply") return "执行";
+      if (value === "publish") return "发布";
+      if (value === "update_available") return "可更新";
+      if (value === "already_in_hub") return "已在 Hub";
+      if (value === "importable") return "可导入";
+      if (value === "not_compatible") return "暂不兼容";
+      return text(value || "未知");
+    }
+
+    function statusPillLabel(value) {
+      if (value === "online") return "在线";
+      if (value === "checking") return "检查中";
+      if (value === "analyzing") return "分析中";
+      if (value === "ready") return "已就绪";
+      if (value === "publishing") return "发布中";
+      if (value === "published") return "已发布";
+      if (value === "restoring") return "恢复中";
+      if (value === "restored") return "已恢复";
+      if (value === "installing") return "安装中";
+      if (value === "installed") return "已安装";
+      if (value === "cancelled") return "已取消";
+      if (value === "failed") return "失败";
+      if (value === "error") return "错误";
+      if (value === "dry-run") return "预检中";
+      if (value === "dry-run ok") return "预检通过";
+      if (value === "publish ok") return "可发布";
+      if (value === "restore check") return "检查恢复";
+      if (value === "conflict publish check") return "检查发布";
+      if (value === "conflict package") return "生成差异";
+      if (value === "needs decision") return "需选择";
+      if (value === "needs review") return "需复核";
+      if (value === "no changes") return "无变更";
+      return modeLabel(value);
     }
 
     function renderOperatorBrief(dashboard, snapshot) {
@@ -4743,7 +4795,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         renderReviewGroup(
           "再处理可发布更新",
           publishItems,
-          "逐项预检，safe_to_push=true 后再显式发布到中央仓库。"
+          "逐项预检，结果显示可以发布后再显式发布到中央仓库。"
         ),
         renderReviewGroup(
           "最后处理冲突/未知项",
@@ -4772,7 +4824,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const summary = conflictItems.length > 0
         ? `有 ${conflictItems.length} 个真实冲突，不能一键发布。先生成冲突包，看清本地版、中央版和基线哈希，再选择保留哪边或人工合并。`
         : (publishItems.length > 0
-          ? `有 ${publishItems.length} 个可发布更新。先预检，全部 safe_to_push=true 后再确认发布；缺失/删除项不会被发布按钮处理。`
+          ? `有 ${publishItems.length} 个可发布更新。先预检，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
           : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留中央仓库，不静默删除。`);
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
@@ -4790,7 +4842,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
-            <span>${publishItems.length === 0 ? "不要点发布；先完成冲突/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个 safe_to_push=true。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
+            <span>${publishItems.length === 0 ? "不要点发布；先完成冲突/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
           </li>
         </ol>
         <div class="review-recommendation-actions">
@@ -4835,7 +4887,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
             ${command ? `
               <details class="review-command">
-                <summary>查看 dry-run 命令</summary>
+                <summary>查看预检命令</summary>
                 <div class="command-row">
                   <pre class="guide-command mono"><code>${escapeHtml(command)}</code></pre>
                   <button type="button" class="copy-button" data-command="${escapeHtml(command)}" onclick="copyCommand(this)">复制</button>
@@ -5012,7 +5064,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除中央仓库。";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：预检内容和目标工具，确认后再发布。";
       if (item.status_action === "push") return "下一步：预检差异，通过后再发布到中央仓库。";
-      return "下一步：查看 dry-run 输出和高级诊断。";
+      return "下一步：查看预检输出和高级诊断。";
     }
 
     function reviewStatusText(item) {
@@ -5063,7 +5115,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (result && result.publishReady) {
           return `<strong>已通过预检</strong>等待上方“确认发布”写入中央仓库。`;
         }
-        return `<strong>可走发布流程</strong>先点预检；只有 safe_to_push=true 后，才会解锁显式发布。`;
+        return `<strong>可走发布流程</strong>先点预检；只有结果显示可以发布后，才会解锁显式发布。`;
       }
       return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
     }
@@ -5071,7 +5123,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewControlAction(item) {
       if (reviewIsDeleteItem(item)) return "delete-review";
       if (item.category === "conflict") return "conflict-review";
-      return "dry-run";
+      return "预检";
     }
 
     function reviewControlLabel(item) {
@@ -5200,7 +5252,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function setExecutorStatus(label, detail, kind) {
-      $("executor-pill").outerHTML = pill(label, kind).replace("<span", "<span id=\"executor-pill\"");
+      $("executor-pill").outerHTML = pill(statusPillLabel(label), kind).replace("<span", "<span id=\"executor-pill\"");
       $("executor-status").textContent = detail;
       const localNote = $("local-workspace-action-note");
       if (localNote) localNote.textContent = detail;
@@ -5230,7 +5282,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!executorAllowPublish
             ? "中央发布未开启；用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor"
             : (!reviewReady && !lastDryRunSafe
-              ? "请先完成预检，确认全部 safe_to_push=true"
+              ? "请先完成预检，确认结果显示可以发布"
               : "写入 WebDAV 中央仓库"));
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
@@ -5241,7 +5293,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!executorAllowPublish
             ? "中央发布未开启"
             : (!reviewReady && !lastDryRunSafe
-              ? "先预检，确认 safe_to_push=true"
+              ? "先预检，确认结果显示可以发布"
               : "发布到 WebDAV 中央仓库"));
       }
       const localSkillAnalyze = $("local-skill-analyze");
@@ -5290,7 +5342,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机执行器未在线"
           : (!executorAllowLocalWrites
             ? "恢复需要本机写入授权；用 --allow-local-writes 启动 executor"
-            : "先 dry-run，再输入 RESTORE，把中央版本恢复到 OpenClaw");
+            : "先预检，再输入 RESTORE，把中央版本恢复到 OpenClaw");
       });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
@@ -5298,7 +5350,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机执行器未在线"
           : (!executorAllowPublish
             ? "发布需要授权；用 --allow-publish 启动 executor"
-            : "先 dry-run，再输入 PUBLISH，把 OpenClaw 版本发布到中央仓库");
+            : "先预检，再输入 PUBLISH，把 OpenClaw 版本发布到中央仓库");
       });
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
@@ -5321,8 +5373,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const isPublish = mode === "publish";
       if (isPublish) {
         if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
-          showExecutorOutput("请先运行 dry-run，并确认 safe_to_push=true。");
-          setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认 safe_to_push=true 后再发布到中央仓库。");
+          showExecutorOutput("请先运行预检，并确认结果显示可以发布。");
+          setReviewFeedback("yellow", "还不能发布", "请先运行预检，确认结果显示可以发布后再写入中央仓库。");
           return;
         }
         const typed = window.prompt("发布会写入 WebDAV。请输入 PUBLISH 确认：");
@@ -5333,7 +5385,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
       }
       setExecutorButtons(false);
-      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行 dry-run，请稍等。", "yellow");
+      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行预检，请稍等。", "yellow");
       setReviewFeedback("yellow", isPublish ? "正在发布" : "正在预检", isPublish ? "正在写入中央仓库，请等待完成。" : "预检只读，不会写入中央仓库。");
       try {
         const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
@@ -5362,11 +5414,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             );
             return;
           }
-          setExecutorStatus(isPublish ? "published" : "dry-run ok", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "dry-run 通过：safe_to_push=true，可以继续确认发布。", "green");
+          setExecutorStatus(isPublish ? "published" : "预检通过", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "预检通过：可以继续确认发布。", "green");
           setReviewFeedback(
             "green",
             isPublish ? "发布完成" : "预检通过",
-            isPublish ? "中央仓库已更新，请等待 1-2 分钟后刷新状态。" : "safe_to_push=true，可以继续确认发布到中央仓库。",
+            isPublish ? "中央仓库已更新，请等待 1-2 分钟后刷新状态。" : "预检通过，可以继续确认发布到中央仓库。",
           );
           if (!isPublish) {
             actionSkills.forEach((skillId) => {
@@ -5610,9 +5662,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok && payload.safe_to_push) {
-          setExecutorStatus("dry-run ok", `${skillId} 预检通过：safe_to_push=true。`, "green");
+          setExecutorStatus("预检通过", `${skillId} 预检通过：可以发布。`, "green");
           updateReviewTaskResult(reviewItem || skillId, { label: "预检通过", kind: "green", publishReady: true });
-          setReviewFeedback("green", `${skillId} 预检通过`, "safe_to_push=true，可以继续确认发布到中央仓库。");
+          setReviewFeedback("green", `${skillId} 预检通过`, "可以继续确认发布到中央仓库。");
         } else if (payload.ok) {
           setExecutorStatus("needs review", `${skillId} 预检完成，但还不能发布，请看输出。`, "yellow");
           updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
@@ -5819,7 +5871,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (response.ok && payload.ok) {
           localWorkspaceFromExecutor = payload;
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
-          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布端点已开启。" : "Mac 本机执行器在线：本机扫描和 dry-run 可用，发布端点未开启。", "green");
+          setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布已开启。" : "Mac 本机执行器在线：本机扫描和预检可用，发布未开启。", "green");
           executorAvailable = true;
           executorAllowPublish = Boolean(payload.allow_publish);
           executorAllowLocalWrites = Boolean(payload.allow_local_writes);
@@ -5924,7 +5976,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
         setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "中央仓库已更新。" : "预检通过，可以发布中央。", "green");
-        $("local-skill-result").textContent = `${payload.skill_id} · ${payload.mode} · safe_to_push=${text(payload.safe_to_push)} · files=${text(payload.uploaded_files)} · snapshot=${text(payload.snapshot_id)}`;
+        $("local-skill-result").textContent = `${payload.skill_id} · ${modeLabel(payload.mode)} · ${payload.safe_to_push ? "可以发布" : "需要复核"} · 文件 ${text(payload.uploaded_files)} · 中央版本 ${text(payload.snapshot_id)}`;
       } catch (err) {
         renderLocalSkillError(String(err));
       } finally {
@@ -5970,7 +6022,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function setLocalSkillStatus(label, detail, kind) {
-      $("local-skill-pill").outerHTML = pill(label, kind).replace("<span", "<span id=\"local-skill-pill\"");
+      $("local-skill-pill").outerHTML = pill(statusPillLabel(label), kind).replace("<span", "<span id=\"local-skill-pill\"");
       $("local-skill-result").textContent = detail;
     }
 
@@ -5991,13 +6043,13 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="card-name">${escapeHtml(device.name)}</div>
               <div class="card-kind">${escapeHtml(device.kind)}</div>
             </div>
-            ${pill(device.health, deviceKind(device.health))}
+            ${pill(healthLabel(device.health), deviceKind(device.health))}
           </div>
           <div class="card-note">${escapeHtml(device.note)}</div>
           <div class="card-stats">
             <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(device.skills))}</div></div>
             <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
-            <div class="mini-stat"><div class="mini-label">策略</div><div class="mini-value">${escapeHtml(text(device.policy))}</div></div>
+            <div class="mini-stat"><div class="mini-label">策略</div><div class="mini-value">${escapeHtml(scopeLabel(device.policy))}</div></div>
             <div class="mini-stat"><div class="mini-label">本机例外</div><div class="mini-value">${escapeHtml(pretty(device.local_policy || []))}</div></div>
             <div class="mini-stat"><div class="mini-label">更新于</div><div class="mini-value subtle">${escapeHtml(formatDateTime(device.last_seen_at))}</div></div>
             <div class="mini-stat"><div class="mini-label">新鲜度</div><div class="mini-value">${freshnessPill(device.freshness)}</div></div>
@@ -6016,7 +6068,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="card-name">${escapeHtml(device.name)}</div>
               <div class="card-kind">${escapeHtml(device.kind)}</div>
             </div>
-            ${pill(device.policy || device.health, "")}
+            ${pill(scopeLabel(device.policy || device.health), "")}
           </div>
           <div class="card-note">${escapeHtml(device.note)}</div>
         </article>
@@ -6102,7 +6154,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (tool.state === "detected" || tool.installed === true) return pill("已发现", "green");
       if (tool.state === "unsupported") return pill("暂不支持", "");
       if (tool.installed === false) return pill("未发现", "");
-      return pill(text(tool.state || "unknown"), "");
+      return pill(statusLabel(tool.state || "unknown"), "");
     }
 
     function renderHubImport(hubImport) {
@@ -6117,7 +6169,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         row("无需导入", summary.already_in_hub || 0),
       ].join("");
       $("hub-import-plan").innerHTML = [
-        planCell("模式", actionPlan.mode || "dry_run"),
+        planCell("模式", modeLabel(actionPlan.mode || "dry_run")),
         planCell("预演导入", actionSummary.preview_import || 0),
         planCell("更新审查", actionSummary.review_update || 0),
         planCell("选择来源", actionSummary.review_duplicate_import || 0),
@@ -6158,7 +6210,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderHubImportPreview(payload) {
       const preview = payload.preview || {};
       const applyPlan = payload.apply_plan || {};
-      $("hub-import-preview-status").textContent = "预览包已生成，当前只展示 apply dry-run，不执行写入。";
+      $("hub-import-preview-status").textContent = "预览包已生成，当前只做预检，不执行写入。";
       $("hub-import-preview-result").innerHTML = [
         row("preview_json", preview.preview_json),
         row("preview_md", preview.preview_md),
@@ -6244,7 +6296,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (error) {
         $("error").textContent = error.message;
         $("error").style.display = "block";
-        $("updated").textContent = "Update failed";
+        $("updated").textContent = "更新失败";
       }
     }
 
