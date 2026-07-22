@@ -933,6 +933,10 @@ def _operator_issue_target(peer_id: Optional[str], peer_name: Optional[str], ski
 
 def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
     openclaw_push_items = [item for item in blocked_items if _is_openclaw_writer_policy_push(item)]
+    conflict_items = [
+        item for item in blocked_items
+        if item.get("category") == "conflict" or item.get("status_action") == "conflict"
+    ]
     if health == "green":
         return {
             "state": "green",
@@ -947,6 +951,38 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 }
             ],
             "note": "绿色表示没有需要你马上决断的同步工作。",
+        }
+    if health == "yellow" and conflict_items:
+        skill_ids = _operator_skill_ids(conflict_items)
+        skill_hint = "、".join(skill_ids[:3]) if skill_ids else "unknown-skill"
+        if len(skill_ids) > 3:
+            skill_hint += f" 等 {len(skill_ids)} 个"
+        command = "skill-sync conflict-package --skill-id " + (skill_ids[0] if skill_ids else "unknown-skill")
+        return {
+            "state": "yellow",
+            "title": "只剩冲突需要选择",
+            "summary": f"当前不是待预检；只剩 {len(conflict_items)} 个冲突：{skill_hint}。冲突表示 OpenClaw 和中央仓库都改过同一个 skill，需要选择保留哪边。",
+            "steps": [
+                {
+                    "title": "生成只读冲突包",
+                    "detail": "只把两边版本导出给你查看，不写 WebDAV，也不改 OpenClaw。",
+                    "command": command,
+                    "kind": "review",
+                },
+                {
+                    "title": "选择保留哪边",
+                    "detail": "OpenClaw 版正确就发布 OpenClaw 版；中央仓库版正确就恢复中央版到 OpenClaw；两边都有价值就手动合并。",
+                    "kind": "publish",
+                },
+                {
+                    "title": "刷新状态",
+                    "detail": "处理完成后刷新本页，待办数字下降才算闭环。",
+                    "command": "scripts/operator-status.sh",
+                    "kind": "verify",
+                },
+            ],
+            "skills": skill_ids,
+            "note": "黄色在这里表示安全暂停，不表示服务坏了。",
         }
     if health == "yellow" and openclaw_push_items:
         skill_ids = _operator_skill_ids(openclaw_push_items)
@@ -984,7 +1020,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "现在需要查看待审批队列",
-            "summary": f"当前有 {len(blocked_items)} 个待审批项，系统已暂停自动写入以避免误同步。",
+            "summary": f"当前有 {len(blocked_items)} 个需要确认的同步事项，系统已暂停自动写入以避免误同步。",
             "steps": [
                 {
                     "title": "先看待审批队列",
@@ -3910,19 +3946,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       const macBlocked = blockedItems.filter((item) => item.peer_id === "mac").length;
       const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
       const breakdown = blockedBreakdown(blockedItems);
-      $("strip-health").textContent = blocked > 0 ? "项待处理" : "项待办";
+      $("strip-health").textContent = blocked > 0 && breakdown.conflict === blocked ? "个冲突" : (blocked > 0 ? "项待处理" : "项待办");
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
-      $("strip-focus-note").textContent = blocked > 0
-        ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
-        : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
+      if (blocked > 0 && breakdown.conflict === blocked) {
+        const names = compactSkillList(blockedItems.map((item) => item.skill_id));
+        $("strip-focus-note").textContent = `只剩冲突：${names}。不是待预检，需要选择保留 OpenClaw 版还是中央版。`;
+      } else {
+        $("strip-focus-note").textContent = blocked > 0
+          ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
+          : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
+      }
       const actionNote = $("strip-action-note");
       if (actionNote) {
-        actionNote.textContent = blocked > 0
+        actionNote.textContent = blocked > 0 && breakdown.conflict === blocked
+          ? "先生成只读冲突包，再点一个保留选项。"
+          : (blocked > 0
           ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
-          : "只操作 Mac 本机。";
+          : "只操作 Mac 本机。");
       }
     }
 
@@ -3946,6 +3989,12 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function conciseOperatorNext(dashboard, operator, status) {
       const blocked = Number(dashboard.blocked || 0);
+      const items = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
+      const breakdown = blockedBreakdown(items);
+      if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.conflict === blocked) {
+        const names = compactSkillList(items.map((item) => item.skill_id));
+        return `只剩冲突：${names}。先生成只读冲突包，再选择保留 OpenClaw 版或中央版。`;
+      }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先审 ${blocked} 个待审批项；dry-run 只预览，确认后再发布到中央仓库。`;
       }
@@ -4259,7 +4308,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-choice">
             <strong>保留 OpenClaw 版</strong>
             <span>适合 OpenClaw 上的修改才是最新正确版本。下一步会把 OpenClaw 版本显式发布到中央仓库。</span>
-            <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'openclaw')">我要保留 OpenClaw 版</button>
+            <button type="button" class="openclaw-conflict-publish-button" data-skill-id="${escapeHtml(skillId)}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版到中央仓库</button>
           </div>
           <div class="conflict-choice">
             <strong>保留中央仓库版</strong>
@@ -4310,6 +4359,60 @@ DASHBOARD_HTML = r"""<!doctype html>
         `手动合并：${skillId}`,
         "打开诊断路径里的冲突包，对比 local 和 remote 两个目录；合并完成后，把最终版本作为一次明确变更发布。",
       );
+    }
+
+    async function publishOpenclawVersionForConflict(button) {
+      const skillId = button.dataset.skillId || "";
+      if (!skillId) return;
+      if (!executorAvailable || !executorAllowPublish) {
+        setReviewFeedback("yellow", "发布未开启", "发布 OpenClaw 版需要 Mac 本机 executor 在线，并启用 --allow-publish。");
+        return;
+      }
+      setExecutorButtons(false);
+      setExecutorStatus("conflict publish check", `正在预检发布 OpenClaw 版 ${skillId}。`, "yellow");
+      setReviewFeedback("yellow", `正在预检 OpenClaw 版：${skillId}`, "预检只读，不会写 WebDAV。");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], allow_conflict_local_wins: true }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_push || Number(dryRunPayload.approved || 0) === 0) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        const typed = window.prompt(`这会把 OpenClaw 上的 ${skillId} 发布为中央仓库版本。请输入 PUBLISH 确认：`);
+        if (typed !== "PUBLISH") {
+          setExecutorStatus("cancelled", "发布 OpenClaw 版已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入 WebDAV，冲突仍保留。");
+          return;
+        }
+        setExecutorStatus("publishing", `正在发布 OpenClaw 版：${skillId}。`, "yellow");
+        setReviewFeedback("yellow", `正在发布 OpenClaw 版：${skillId}`, "正在写入 WebDAV 中央仓库；完成后会刷新 OpenClaw 状态。");
+        const publishResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-approved-push-publish`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], confirm: "PUBLISH", allow_conflict_local_wins: true }),
+        });
+        const publishPayload = await publishResponse.json();
+        showExecutorOutput(formatExecutorResult(publishPayload));
+        if (!publishResponse.ok || !publishPayload.ok || Number(publishPayload.approved || 0) === 0) {
+          throw new Error(executorErrorDetail(publishPayload));
+        }
+        await refreshOpenclawPeerStatus();
+        await refresh(true);
+        setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到中央仓库。`, "green");
+        setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, "状态已刷新；如果待办数字下降，说明冲突已解决。");
+        hideConflictResolutionPanel();
+      } catch (err) {
+        setExecutorStatus("failed", "发布 OpenClaw 版失败，请查看输出。", "red");
+        setReviewFeedback("red", "发布 OpenClaw 版失败", String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
     }
 
     async function restoreCentralVersionForConflict(button) {
@@ -4563,6 +4666,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictTotal = Array.isArray(items) ? reviewConflictItems(items).length : 0;
       const executorState = executorAvailable ? "已连接" : "未连接";
       const executorKind = executorAvailable ? "green" : "yellow";
+      if (conflictTotal > 0) {
+        $("review-progress").innerHTML = [
+          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接生成只读冲突包。" : "先确认 Mac 本机执行器在线。"),
+          reviewStage("2", "生成冲突包", `${conflictTotal} 个待生成`, "yellow", "只读导出，不写 WebDAV，不改 OpenClaw。"),
+          reviewStage("3", "选择保留版本", "待选择", "yellow", "选择 OpenClaw 版、中央版，或手动合并。"),
+        ].join("");
+        return;
+      }
       const dryRunKind = checked > 0 ? "green" : "yellow";
       const publishKind = publishReady > 0 ? "green" : "yellow";
       const publishNote = deleteTotal > 0
@@ -4968,6 +5079,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!executorAllowLocalWrites
             ? "恢复需要本机写入授权；用 --allow-local-writes 启动 executor"
             : "先 dry-run，再输入 RESTORE，把中央版本恢复到 OpenClaw");
+      });
+      document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
+        button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
+        button.title = !available
+          ? "本机执行器未在线"
+          : (!executorAllowPublish
+            ? "发布需要授权；用 --allow-publish 启动 executor"
+            : "先 dry-run，再输入 PUBLISH，把 OpenClaw 版本发布到中央仓库");
       });
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }

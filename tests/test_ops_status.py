@@ -528,6 +528,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"conflict-resolution-panel\"", DASHBOARD_HTML)
             self.assertIn("renderConflictResolutionPanel", DASHBOARD_HTML)
             self.assertIn("保留 OpenClaw 版", DASHBOARD_HTML)
+            self.assertIn("发布 OpenClaw 版到中央仓库", DASHBOARD_HTML)
+            self.assertIn("publishOpenclawVersionForConflict", DASHBOARD_HTML)
+            self.assertIn("allow_conflict_local_wins", DASHBOARD_HTML)
+            self.assertIn("这会把 OpenClaw 上的", DASHBOARD_HTML)
             self.assertIn("保留中央仓库版", DASHBOARD_HTML)
             self.assertIn("恢复中央版到 OpenClaw", DASHBOARD_HTML)
             self.assertIn("restoreCentralVersionForConflict", DASHBOARD_HTML)
@@ -593,6 +597,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("查看 dry-run 命令", DASHBOARD_HTML)
             self.assertIn("确认缺失项是恢复还是删除", DASHBOARD_HTML)
             self.assertIn("reviewItemKey", DASHBOARD_HTML)
+            self.assertIn("只剩冲突", DASHBOARD_HTML)
+            self.assertIn("不是待预检", DASHBOARD_HTML)
             self.assertIn("reviewIsPublishCandidate", DASHBOARD_HTML)
             self.assertIn(".review-item > div:nth-child(2)", DASHBOARD_HTML)
             self.assertNotIn("完整队列在下方高级诊断", DASHBOARD_HTML)
@@ -1223,6 +1229,30 @@ class OpsStatusTest(unittest.TestCase):
 
             with self.assertRaises(OperatorExecutorError):
                 run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=True)
+
+    def test_operator_executor_allows_explicit_conflict_local_wins_preview(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-approved-push-batch.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"safe_to_push\":true,\"approved\":1,\"approved_skill_ids\":[\"%s\"],\"allow_conflict_local_wins\":true}\\n' \"${@: -1}\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+
+            result = run_openclaw_approved_push_batch(
+                repo,
+                ["finance-auto-bookkeeping"],
+                allow_conflict_local_wins=True,
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertTrue(result["allow_conflict_local_wins"])
+            self.assertIn("--allow-conflict-local-wins", result["command"])
+            self.assertEqual(result["approved_skill_ids"], ["finance-auto-bookkeeping"])
 
     def test_operator_executor_runs_openclaw_conflict_package(self):
         with TemporaryDirectory() as tmp:

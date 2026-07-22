@@ -31,6 +31,7 @@ def run_openclaw_approved_push_batch(
     yes: bool = False,
     timeout_seconds: int = 900,
     allow_publish: bool = False,
+    allow_conflict_local_wins: bool = False,
 ) -> dict:
     repo = repo_root.expanduser().resolve()
     script = repo / "scripts" / "openclaw-approved-push-batch.sh"
@@ -39,7 +40,10 @@ def run_openclaw_approved_push_batch(
     normalized = _normalize_skill_ids(skill_ids)
     if yes and not allow_publish:
         raise OperatorExecutorError("publish is disabled; set SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 to enable --yes")
-    command = [str(script), "--yes" if yes else "--dry-run", *normalized]
+    command = [str(script), "--yes" if yes else "--dry-run"]
+    if allow_conflict_local_wins:
+        command.append("--allow-conflict-local-wins")
+    command.extend(normalized)
     started_at = datetime.now(timezone.utc).isoformat()
     proc = subprocess.run(
         command,
@@ -62,6 +66,7 @@ def run_openclaw_approved_push_batch(
         "safe_to_push": bool(parsed.get("safe_to_push")) if isinstance(parsed, dict) else False,
         "approved": parsed.get("approved") if isinstance(parsed, dict) else None,
         "approved_skill_ids": parsed.get("approved_skill_ids") if isinstance(parsed, dict) else normalized,
+        "allow_conflict_local_wins": allow_conflict_local_wins,
         "result": parsed,
         "stdout_tail": _tail(proc.stdout),
         "stderr_tail": _tail(proc.stderr),
@@ -322,8 +327,14 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
             try:
                 payload = self._read_json()
                 skill_ids = payload.get("skill_ids") if isinstance(payload, dict) else None
+                allow_conflict_local_wins = bool(payload.get("allow_conflict_local_wins")) if isinstance(payload, dict) else False
                 if path == "/api/openclaw-approved-push-dry-run":
-                    result = run_openclaw_approved_push_batch(repo, skill_ids or [], yes=False)
+                    result = run_openclaw_approved_push_batch(
+                        repo,
+                        skill_ids or [],
+                        yes=False,
+                        allow_conflict_local_wins=allow_conflict_local_wins,
+                    )
                     self._send_json(200 if result["ok"] else 500, result)
                     return
                 if path == "/api/openclaw-approved-push-publish":
@@ -336,6 +347,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         skill_ids or [],
                         yes=True,
                         allow_publish=allow_publish,
+                        allow_conflict_local_wins=allow_conflict_local_wins,
                     )
                     self._send_json(200 if result["ok"] else 500, result)
                     return

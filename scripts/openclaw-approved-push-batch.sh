@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/openclaw-approved-push-batch.sh [--dry-run|--yes] [--no-allow-new] SKILL_ID...
+  scripts/openclaw-approved-push-batch.sh [--dry-run|--yes] [--no-allow-new] [--allow-conflict-local-wins] SKILL_ID...
 
 Safely publish explicitly reviewed OpenClaw-local skill changes to WebDAV.
 
@@ -28,6 +28,7 @@ USAGE
 
 mode="--dry-run"
 allow_new=1
+allow_conflict_local_wins=0
 skill_ids=()
 
 while [ "$#" -gt 0 ]; do
@@ -40,6 +41,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-allow-new)
       allow_new=0
+      ;;
+    --allow-conflict-local-wins)
+      allow_conflict_local_wins=1
       ;;
     -h|--help)
       usage
@@ -116,18 +120,26 @@ filter_file="$(mktemp "${TMPDIR:-/tmp}/skill-sync-approved-push-filter.XXXXXX")"
 trap 'rm -f "$filter_file"' EXIT
 run_remote cat /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json > "$filter_file"
 
-filtered_output="$(python3 - "$filter_file" "${skill_ids[@]}" <<'PY'
+filtered_output="$(python3 - "$filter_file" "$allow_conflict_local_wins" "${skill_ids[@]}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-requested = sys.argv[2:]
+allow_conflict_local_wins = sys.argv[2] == "1"
+requested = sys.argv[3:]
 present = {
     item.get("skill_id")
     for item in report.get("items", [])
-    if item.get("category") == "writer_policy"
-    and item.get("status_action") in {"push", "push_new", "local_new"}
+    if (
+        item.get("category") == "writer_policy"
+        and item.get("status_action") in {"push", "push_new", "local_new"}
+    )
+    or (
+        allow_conflict_local_wins
+        and item.get("category") == "conflict"
+        and item.get("status_action") == "conflict"
+    )
 }
 for skill_id in requested:
     if skill_id in present:
@@ -148,14 +160,15 @@ if [ "${#filtered_skill_ids[@]}" -ne "${#skill_ids[@]}" ]; then
 fi
 
 if [ "${#filtered_skill_ids[@]}" -eq 0 ]; then
-  python3 - "$filter_file" "$mode" "${skill_ids[@]}" <<'PY'
+  python3 - "$filter_file" "$mode" "$allow_conflict_local_wins" "${skill_ids[@]}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 mode = sys.argv[2].removeprefix("--")
-requested = sys.argv[3:]
+allow_conflict_local_wins = sys.argv[3] == "1"
+requested = sys.argv[4:]
 print(json.dumps({
     "ok": True,
     "mode": "publish" if mode == "yes" else "dry_run",
@@ -165,6 +178,7 @@ print(json.dumps({
     "requested_skill_ids": requested,
     "stale_skipped_skill_ids": requested,
     "blocked_report_total": report.get("total", 0),
+    "allow_conflict_local_wins": allow_conflict_local_wins,
     "reason": "none of the requested skills are currently blocked publish candidates",
 }, ensure_ascii=False, indent=2))
 PY
@@ -187,6 +201,10 @@ done
 
 if [ "$allow_new" = "1" ]; then
   approved_args+=(--allow-new)
+fi
+
+if [ "$allow_conflict_local_wins" = "1" ]; then
+  approved_args+=(--allow-conflict-local-wins)
 fi
 
 approved_args+=(
