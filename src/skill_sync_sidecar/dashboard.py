@@ -2597,6 +2597,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       border-left-color: var(--red);
       background: #fff8f8;
     }
+    .simple-action-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+      gap: 14px;
+      align-items: center;
+    }
+    .simple-action-plain {
+      display: grid;
+      gap: 8px;
+    }
     .simple-action-eyebrow {
       color: var(--muted);
       font-size: 12px;
@@ -2666,6 +2676,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px;
       margin-top: 10px;
     }
+    .simple-action-actions.single-primary {
+      justify-content: flex-end;
+      margin-top: 0;
+    }
+    .simple-action-actions.single-primary button {
+      min-width: 180px;
+      min-height: 42px;
+    }
     .simple-action-actions .primary {
       background: var(--ink);
       color: #fff;
@@ -2681,6 +2699,25 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: grid;
       gap: 6px;
       margin-top: 8px;
+    }
+    .simple-action-facts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .simple-action-fact {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-fact strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      margin-bottom: 2px;
     }
     .simple-task-list {
       display: grid;
@@ -3969,75 +4006,95 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
-      let title = "先处理需要人工判断的项目";
-      let summary = `当前有 ${blocked} 个待处理项：${blockedBreakdownText(breakdown)}。sidecar 已暂停自动写入，避免误覆盖。`;
-      if (publishItems.length > 0 && conflictItems.length === 0) {
-        title = `可以处理 ${publishItems.length} 个 OpenClaw 更新`;
-        summary = "先点预检；预检通过后再点发布。删除项不会被自动发布。";
-      } else if (conflictItems.length > 0) {
-        title = `先看 ${conflictItems.length} 个冲突项`;
-        summary = "冲突表示两边内容不同，不能自动猜哪边正确。先查看详情，再决定保留哪一侧。";
+      let title = `有 ${blocked} 个同步事项需要处理`;
+      let summary = `当前包含 ${blockedBreakdownText(breakdown)}。sidecar 已暂停自动写入，避免误覆盖。`;
+      let primaryActions = `<button type="button" onclick="openAdvancedDetails()">查看需要处理的项目</button>`;
+      let facts = [
+        ["不会自动覆盖", "有风险时 sidecar 会停下来。"],
+        ["先确认再写入", "发布或恢复都需要你输入确认词。"],
+        ["细节可展开", "技术信息放在下方，不影响主流程。"],
+      ];
+      let taskCards = "";
+      if (conflictItems.length > 0) {
+        const item = conflictItems[0];
+        const skill = text(item.skill_id || "unknown-skill");
+        const peerId = text(item.peer_id || "");
+        const reviewKey = reviewItemKey(item);
+        title = conflictItems.length === 1 ? `只剩 1 个需要选择：${skill}` : `有 ${conflictItems.length} 个需要选择的冲突`;
+        summary = "这不是故障，也不是待预检。它表示 OpenClaw 和中央仓库都改过同一个 skill，sidecar 不能替你猜哪边正确。";
+        primaryActions = `
+          <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读冲突包</button>
+          <button type="button" onclick="openAdvancedDetails()">展开详情</button>
+        `;
+        facts = [
+          ["现在要做", `生成 ${skill} 的冲突包。`],
+          ["不会发生", "不会写 WebDAV，也不会改 OpenClaw skill。"],
+          ["下一步", "看本地版和中央版，再选择保留哪边。"],
+        ];
+        taskCards = renderSimpleDecisionList(conflictItems, deleteItems);
+      } else if (restoreItems.length > 0 && publishItems.length === 0) {
+        const item = restoreItems[0];
+        const skill = text(item.skill_id || "unknown-skill");
+        const peerId = text(item.peer_id || "");
+        const reviewKey = reviewItemKey(item);
+        const restoreTarget = restoreDeviceLabel(item);
+        title = restoreItems.length === 1 ? `建议恢复缺失 skill：${skill}` : `建议恢复 ${restoreItems.length} 个缺失 skill`;
+        summary = "中央仓库仍有完整版本，缺失设备没有。默认安全动作是恢复，不删除中央仓库。";
+        primaryActions = `
+          <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">从中央恢复到 ${escapeHtml(restoreTarget)}</button>
+          <button type="button" onclick="openAdvancedDetails()">展开详情</button>
+        `;
+        facts = [
+          ["现在要做", `恢复 ${skill}。`],
+          ["不会发生", "不会删除中央仓库，也不会影响其他设备。"],
+          ["需要确认", "恢复前会要求输入 RESTORE。"],
+        ];
+        taskCards = renderSimpleDecisionList([], restoreItems);
+      } else if (publishItems.length > 0) {
+        title = `可以处理 ${publishItems.length} 个可发布更新`;
+        summary = "先预检，只检查不写入；全部通过后再发布到中央仓库。";
+        primaryActions = `
+          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>预检可发布更新</button>
+          <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布到中央仓库</button>
+        `;
+        facts = [
+          ["待处理", `${publishNames}。`],
+          ["第一步", "预检不会写 WebDAV。"],
+          ["第二步", "发布前会要求输入 PUBLISH。"],
+        ];
+        taskCards = `
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">发布队列</div>
+            <div class="simple-action-summary">${escapeHtml(publishNames)}</div>
+          </div>
+        `;
       } else if (deleteItems.length > 0) {
         title = `先确认 ${deleteItems.length} 个缺失项`;
         summary = "缺失项不会自动删除中央仓库。先确认是恢复本机，还是单独走删除审批。";
-      }
-      if (restoreItems.length > 0 && publishItems.length === 0) {
-        title = `建议恢复 ${restoreItems.length} 个缺失 skill`;
-        summary = "中央仓库仍保留这些 skill。默认安全动作是恢复到缺失设备，不删除中央仓库。";
+        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项</button>`;
+        facts = [
+          ["缺失项", `${deleteNames}。`],
+          ["默认动作", "先保留中央仓库。"],
+          ["高风险动作", "删除中央仓库不会一键执行。"],
+        ];
+        taskCards = renderSimpleDecisionList([], deleteItems);
       }
       panel.innerHTML = `
-        <div>
-          <div class="simple-action-eyebrow">现在建议</div>
-          <div class="simple-action-title">${escapeHtml(title)}</div>
-          <div class="simple-action-summary">${escapeHtml(summary)}</div>
-        </div>
-        <div class="simple-action-grid">
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">按这个顺序做</div>
-            <ol class="simple-action-steps">
-              ${simpleActionStep(1, judgmentCount > 0 ? `先看“需要判断”的卡片，不要让系统自动猜。` : "先运行预检，只检查不写入中央仓库。")}
-              ${simpleActionStep(2, publishItems.length > 0 ? `再处理可自动发布的 OpenClaw 更新。` : `确认缺失项是否需要恢复：${deleteNames}`)}
-              ${simpleActionStep(3, "处理完成后刷新状态；待办数字下降才算闭环。")}
-            </ol>
-            <div class="simple-action-actions">
-              <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检可发布项</button>
-              <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>确认发布</button>
-              <button type="button" onclick="openAdvancedDetails()">查看高级详情</button>
-            </div>
-            <div id="simple-action-note" class="simple-action-note">发布会要求输入 PUBLISH；不会静默写中央仓库。</div>
-            ${renderSimpleDecisionList(conflictItems, deleteItems)}
+        <div class="simple-action-hero">
+          <div class="simple-action-plain">
+            <div class="simple-action-eyebrow">现在只需要做这一件事</div>
+            <div class="simple-action-title">${escapeHtml(title)}</div>
+            <div class="simple-action-summary">${escapeHtml(summary)}</div>
           </div>
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">当前任务</div>
-            <div class="simple-task-list">
-              ${simpleTaskCard(
-                "必须判断",
-                judgmentCount,
-                judgmentCount > 0 ? `这些不会自动处理：${compactSkillList([...conflictItems, ...deleteItems].map((item) => item.skill_id))}` : "暂无必须人工判断的项目。",
-                "查看并决定",
-                "openAdvancedDetails()",
-                judgmentCount > 0 ? "yellow" : "green"
-              )}
-              ${simpleTaskCard(
-                "可以自动处理",
-                publishItems.length,
-                publishItems.length > 0 ? `OpenClaw 更新：${publishNames}` : "暂无可发布更新。",
-                "预检/发布",
-                "runExecutorAction('dry_run')",
-                publishItems.length > 0 ? "yellow" : "green",
-                "simple-task-dry-run"
-              )}
-              ${simpleTaskCard(
-                "不会自动删除",
-                deleteItems.length,
-                deleteItems.length > 0 ? `缺失项：${deleteNames}。中央仓库不会被静默删除。` : "暂无删除确认。",
-                "查看详情",
-                "openAdvancedDetails()",
-                deleteItems.length > 0 ? "yellow" : "green"
-              )}
-            </div>
+          <div class="simple-action-actions single-primary">
+            ${primaryActions}
           </div>
         </div>
+        <div class="simple-action-facts">
+          ${facts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}
+        </div>
+        ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
+        <div id="simple-action-note" class="simple-action-note">待办数字下降才算闭环；技术细节在下方“高级详情”。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -4648,7 +4705,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewPublishAll = $("review-publish-all");
       const simpleDryRun = $("simple-dry-run");
       const simplePublish = $("simple-publish");
-      const simpleTaskDryRun = $("simple-task-dry-run");
       if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
       if (reviewPublishAll) {
         reviewPublishAll.disabled = !canPublishApprovedPush;
@@ -4661,7 +4717,6 @@ DASHBOARD_HTML = r"""<!doctype html>
               : "写入 WebDAV 中央仓库"));
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
-      if (simpleTaskDryRun) simpleTaskDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
