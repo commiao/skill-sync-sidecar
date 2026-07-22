@@ -5392,7 +5392,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       currentReviewQueueItems = items;
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
-      const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       const deleteItems = reviewDeleteItems(items);
       const publishItems = reviewPublishItems(items);
       const conflictItems = reviewConflictItems(items);
@@ -5400,12 +5399,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
-      $("review-queue-label").textContent = conflictOnly ? "版本差异" : "待办任务";
-      $("review-queue-title").textContent = conflictOnly ? "版本确认" : "待审批清单";
+      const scope = reviewQueueScopeInfo(items, conflictOnly);
+      $("review-queue-label").textContent = scope.label;
+      $("review-queue-title").textContent = scope.title;
       $("review-progress").setAttribute("aria-label", conflictOnly ? "版本差异处理进度" : "待审批处理进度");
       $("review-queue-summary").textContent = conflictOnly
-        ? `${peers.join("、") || "其他设备"}：只剩 ${items.length} 个版本差异。这里不是批量发布队列；先生成只读报告，再按推荐处理。`
-        : `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${blockedBreakdownText(blockedBreakdown(items))}。`;
+        ? `${scope.peerText}：只剩 ${items.length} 个版本差异。这里不是批量发布队列；先生成只读报告，再按推荐处理。`
+        : `${scope.peerText}：${items.length} 个待确认。${blockedBreakdownText(blockedBreakdown(items))}。`;
       renderReviewRecommendation(items);
       renderReviewProgress(items);
       if (conflictOnly) {
@@ -5434,6 +5434,33 @@ DASHBOARD_HTML = r"""<!doctype html>
         ].filter(Boolean).join("");
       }
       setExecutorButtons(executorAvailable);
+    }
+
+    function reviewQueueScopeInfo(items, conflictOnly) {
+      const peerNames = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
+      const peerIds = [...new Set(items.map((item) => text(item.peer_id || item.peer_name)).filter(Boolean))];
+      const allOpenClaw = peerIds.length > 0 && peerIds.every((peer) => /openclaw|oc-vps/i.test(peer));
+      const allMac = peerIds.length > 0 && peerIds.every((peer) => /^mac$|mac 本机/i.test(peer));
+      const peerText = peerNames.join("、") || "其他设备";
+      if (allOpenClaw) {
+        return {
+          label: conflictOnly ? "OpenClaw 版本差异" : "OpenClaw 待确认",
+          title: conflictOnly ? "OpenClaw 版本确认" : "OpenClaw 待确认清单",
+          peerText,
+        };
+      }
+      if (allMac) {
+        return {
+          label: conflictOnly ? "本机版本差异" : "本机待确认",
+          title: conflictOnly ? "本机版本确认" : "本机待确认清单",
+          peerText,
+        };
+      }
+      return {
+        label: conflictOnly ? "多设备版本差异" : "多设备待确认",
+        title: conflictOnly ? "多设备版本确认" : "多设备待确认清单",
+        peerText,
+      };
     }
 
     function renderReviewRecommendation(items) {
@@ -6066,7 +6093,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (payload.ok) {
           if (isPublish && Number(payload.approved || 0) === 0) {
             lastDryRunSafe = false;
-            await refreshOpenclawPeerStatus();
+            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "发布已被拒绝；这里只重新读取 OpenClaw 最新队列。");
             await refresh(true);
             setExecutorStatus("no changes", "没有发布任何 skill；队列已变化或当前项已不再是可发布更新。", "yellow");
             setReviewFeedback(
@@ -6122,6 +6149,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             );
           }
         } else {
+          if (executorPayloadIsStaleSourceChange(payload)) {
+            lastDryRunSafe = false;
+            await refreshOpenclawPeerStatus();
+            await refresh(true);
+            const detail = staleSourceChangeDetail(payload);
+            setExecutorStatus("needs review", detail, "yellow");
+            setReviewFeedback("yellow", "OpenClaw 仍在修改，已拒绝发布", detail);
+            return;
+          }
           setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
           setReviewFeedback("red", "执行失败", executorErrorDetail(payload));
         }
@@ -6134,8 +6170,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    async function refreshOpenclawPeerStatus() {
-      setReviewFeedback("yellow", "发布完成，正在刷新状态", "正在刷新 OpenClaw 状态，让 NAS 面板看到最新队列。");
+    async function refreshOpenclawPeerStatus(
+      title = "发布完成，正在刷新状态",
+      detail = "正在刷新 OpenClaw 状态，让 NAS 面板看到最新队列。",
+    ) {
+      setReviewFeedback("yellow", title, detail);
       try {
         const response = await fetch(`${EXECUTOR_URL}/api/openclaw-peer-status-refresh`, {
           method: "POST",
@@ -6280,12 +6319,35 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function executorErrorDetail(payload) {
       if (!payload) return "请查看下方执行输出。";
+      if (executorPayloadIsStaleSourceChange(payload)) return staleSourceChangeDetail(payload);
       if (payload.error) return text(payload.error);
       const stderr = text(payload.stderr_tail || "").trim();
       if (stderr) return stderr.split("\n").slice(-2).join(" / ");
       const stdout = text(payload.stdout_tail || "").trim();
       if (stdout) return stdout.split("\n").slice(-2).join(" / ");
       return "请查看下方执行输出。";
+    }
+
+    function executorPayloadIsStaleSourceChange(payload) {
+      if (!payload) return false;
+      const detail = [
+        payload.error,
+        payload.stderr_tail,
+        payload.stdout_tail,
+      ].map((value) => text(value || "")).join("\n");
+      return detail.includes("skill changed since blocked report was generated")
+        || detail.includes("stale_or_non_publish_skills_skipped=true");
+    }
+
+    function staleSourceChangeDetail(payload) {
+      const detail = [
+        payload && payload.error,
+        payload && payload.stderr_tail,
+        payload && payload.stdout_tail,
+      ].map((value) => text(value || "")).join("\n");
+      const match = detail.match(/skill changed since blocked report was generated: ([^\s]+) \(([^)]+)\)/);
+      const skill = match ? match[1] : "这个 skill";
+      return `${skill} 在检查/发布期间又发生变化，sidecar 已保护性拒绝写入共享仓库。等 OpenClaw 这轮修改结束后，刷新状态并重新检查即可。`;
     }
 
     async function runExecutorActionForSkill(skillId, reviewKey) {
@@ -6340,6 +6402,15 @@ DASHBOARD_HTML = r"""<!doctype html>
           updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
           setReviewFeedback("yellow", `${skillId} 需要复核`, "检查完成但还不能发布，请查看执行输出。");
         } else {
+          if (executorPayloadIsStaleSourceChange(payload)) {
+            const detail = staleSourceChangeDetail(payload);
+            setExecutorStatus("needs review", detail, "yellow");
+            updateReviewTaskResult(reviewItem || skillId, { label: "源端仍在修改", kind: "yellow", publishReady: false });
+            setReviewFeedback("yellow", `${skillId} 仍在修改，已拒绝发布`, detail);
+            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "发布已被拒绝；这里只重新读取 OpenClaw 最新队列。");
+            await refresh(true);
+            return;
+          }
           setExecutorStatus("failed", payload.error || `${skillId} 检查失败，请查看输出。`, "red");
           updateReviewTaskResult(reviewItem || skillId, { label: "检查失败", kind: "red", publishReady: false });
           setReviewFeedback("red", `${skillId} 检查失败`, payload.error || "请查看执行输出。");
