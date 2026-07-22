@@ -920,7 +920,7 @@ def _operator_issue_action(
 ) -> str:
     target = _operator_issue_target(peer_id, peer_name, skill_id)
     if category == "conflict":
-        return f"先处理 {target} 冲突；生成只读差异报告后选择保留版本。"
+        return f"先处理 {target} 版本差异；生成只读差异报告后选择保留版本。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
         return f"先处理 {target}；确认后运行 approved-push。"
     return f"先处理 {target}；查看待审批队列。"
@@ -960,8 +960,8 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         command = "skill-sync conflict-package --skill-id " + (skill_ids[0] if skill_ids else "unknown-skill")
         return {
             "state": "yellow",
-            "title": "只剩冲突需要选择",
-            "summary": f"当前不是待预检；只剩 {len(conflict_items)} 个冲突：{skill_hint}。冲突表示 OpenClaw 和中央仓库都改过同一个 skill，需要选择保留哪边。",
+            "title": "只剩版本差异需要确认",
+            "summary": f"当前不是待预检；只剩 {len(conflict_items)} 个版本差异：{skill_hint}。先生成只读差异报告，报告会告诉你该恢复中央版、发布 OpenClaw 版，还是手动处理。",
             "steps": [
                 {
                     "title": "生成只读差异报告",
@@ -971,7 +971,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 },
                 {
                     "title": "选择保留哪边",
-                    "detail": "OpenClaw 版正确就发布 OpenClaw 版；中央仓库版正确就恢复中央版到 OpenClaw；两边都有价值就手动合并。",
+                    "detail": "报告会给出推荐动作：恢复中央版、发布 OpenClaw 版，或手动整理最终版本。",
                     "kind": "publish",
                 },
                 {
@@ -3695,7 +3695,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
-    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="冲突解决向导"></section>
+    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
         <div class="status-chip-label">同步待办</div>
@@ -4179,7 +4179,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
       const breakdown = blockedBreakdown(blockedItems);
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
-      $("strip-health").textContent = blocked > 0 && breakdown.conflict === blocked ? "个冲突" : (blocked > 0 ? "项待处理" : "项待办");
+      $("strip-health").textContent = blocked > 0 && breakdown.conflict === blocked ? "个版本差异" : (blocked > 0 ? "项待处理" : "项待办");
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
@@ -4191,7 +4191,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if (conflictOnly) {
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
-        $("strip-focus-note").textContent = `只剩冲突：${names}。不是待预检；如果不确定，先点“我不确定，先看差异”。`;
+        $("strip-focus-note").textContent = `只剩版本差异：${names}。不是待预检；先点“我不确定，先看差异”。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
@@ -4219,7 +4219,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function blockedBreakdownText(breakdown) {
       const parts = [];
       if (breakdown.publish) parts.push(`可发布更新 ${breakdown.publish} 个`);
-      if (breakdown.conflict) parts.push(`冲突 ${breakdown.conflict} 个`);
+      if (breakdown.conflict) parts.push(`版本差异 ${breakdown.conflict} 个`);
       if (breakdown.deleteReview) parts.push(`删除确认 ${breakdown.deleteReview} 个`);
       if (breakdown.other) parts.push(`其他 ${breakdown.other} 个`);
       return parts.length ? parts.join("，") : "没有待处理项";
@@ -4231,7 +4231,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const breakdown = blockedBreakdown(items);
       if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.conflict === blocked) {
         const names = compactSkillList(items.map((item) => item.skill_id));
-        return `只剩冲突：${names}。确定哪边正确就直接选；不确定就先看差异。`;
+        return `只剩版本差异：${names}。先看只读差异报告，报告会给出推荐动作。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先审 ${blocked} 个待审批项；预检只预览，确认后再发布到中央仓库。`;
@@ -4420,7 +4420,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         title = conflictItems.length === 1 ? `选择 ${skill} 保留哪一版` : `有 ${conflictItems.length} 个 skill 需要选择保留版本`;
-        summary = "两边都改过，系统不会自动覆盖。最安全的下一步是先看差异；只有确定哪边正确时，再选择写入。";
+        summary = "系统发现中央仓库和设备上的版本不一致，已暂停自动写入。最安全的下一步是先看只读差异报告。";
         primaryActions = `
           <div class="simple-choice-grid" aria-label="选择保留版本">
             <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">推荐：我不确定，先看差异<span>最安全，只读查看两边文件，不会改任何地方。</span></button>
@@ -4508,7 +4508,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function runFirstConflictPackage() {
       const button = document.querySelector(".conflict-package-button");
       if (!button) {
-        setReviewFeedback("yellow", "还没有可查看的冲突项", "状态已刷新；如果仍有冲突，上方会出现“推荐：我不确定，先看差异”。");
+        setReviewFeedback("yellow", "还没有可查看的版本差异", "状态已刷新；如果仍有版本差异，上方会出现“推荐：我不确定，先看差异”。");
         refresh(true);
         return;
       }
@@ -4535,7 +4535,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const isConflict = item.category === "conflict" || item.status_action === "conflict";
       const canRestore = reviewCanRestoreFromCentral(item);
       const reviewKey = reviewItemKey(item);
-      const title = isDelete ? `${skill}：本机缺失` : `${skill}：两边内容不一致`;
+      const title = isDelete ? `${skill}：本机缺失` : `${skill}：版本需要确认`;
       const restoreTarget = restoreDeviceLabel(item);
       const detail = canRestore
         ? `中央仓库里有完整版本，${restoreTarget} 当前缺失。推荐直接从中央恢复；这不会删除中央仓库，也不会覆盖其他设备。`
@@ -4546,7 +4546,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
       const secondaryDetail = isDelete
         ? "删除中央仓库属于高风险操作，当前面板不会一键执行。"
-        : "冲突不会自动合并，当前面板不会猜哪边正确。";
+        : "版本差异不会自动覆盖，当前面板不会猜哪边正确。";
       return `
         <div class="simple-decision-card warning">
           <div class="simple-decision-head">
@@ -4619,7 +4619,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-resolution-title">${escapeHtml(skillId)} 现在需要选一个版本</div>
           <div class="conflict-resolution-summary">${escapeHtml(summary)}</div>
         </div>
-        <div class="conflict-version-grid" aria-label="冲突版本摘要">
+        <div class="conflict-version-grid" aria-label="版本差异摘要">
           ${renderConflictVersionCard(review.local_label || "OpenClaw 版", review.local || {}, localHash)}
           ${renderConflictVersionCard(review.remote_label || "中央仓库版", review.remote || {}, remoteHash)}
           ${renderConflictVersionCard(review.base_label || "共同基线", review.base || {}, baseHash)}
@@ -4627,7 +4627,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         ${renderConflictChoiceGrid(skillId, review)}
         <details class="conflict-diagnostic">
           <summary>查看诊断路径和版本指纹</summary>
-          <div>冲突包：${escapeHtml(packagePath || "未返回路径")}</div>
+          <div>报告路径：${escapeHtml(packagePath || "未返回路径")}</div>
           <div>OpenClaw 版：${escapeHtml(localHash)} · 中央版：${escapeHtml(remoteHash)} · 共同基线：${escapeHtml(baseHash)}</div>
         </details>
       `;
@@ -4781,7 +4781,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const typed = window.prompt(`这会把 OpenClaw 上的 ${skillId} 发布为中央仓库版本。请输入 PUBLISH 确认：`);
         if (typed !== "PUBLISH") {
           setExecutorStatus("cancelled", "发布 OpenClaw 版已取消。", "yellow");
-          setReviewFeedback("yellow", "已取消", "没有写入 WebDAV，冲突仍保留。");
+          setReviewFeedback("yellow", "已取消", "没有写入 WebDAV，版本差异仍保留。");
           return;
         }
         setExecutorStatus("publishing", `正在发布 OpenClaw 版：${skillId}。`, "yellow");
@@ -4800,7 +4800,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         await refreshOpenclawPeerStatus();
         await refresh(true);
         setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到中央仓库。`, "green");
-        setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, "状态已刷新；如果待办数字下降，说明冲突已解决。");
+        setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, "状态已刷新；如果待办数字下降，说明版本差异已处理。");
         hideConflictResolutionPanel();
       } catch (err) {
         setExecutorStatus("failed", "发布 OpenClaw 版失败，请查看输出。", "red");
@@ -4854,7 +4854,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         await refreshOpenclawPeerStatus();
         await refresh(true);
         setExecutorStatus("restored", `${skillId} 已恢复为中央仓库版本。`, "green");
-        setReviewFeedback("green", `${skillId} 已恢复为中央版`, "状态已刷新；如果待办数字下降，说明冲突已解决。");
+        setReviewFeedback("green", `${skillId} 已恢复为中央版`, "状态已刷新；如果待办数字下降，说明版本差异已处理。");
         hideConflictResolutionPanel();
       } catch (err) {
         setExecutorStatus("failed", "恢复中央版失败，请查看输出。", "red");
@@ -4937,9 +4937,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           "逐项预检，结果显示可以发布后再显式发布到中央仓库。"
         ),
         renderReviewGroup(
-          "最后处理冲突/未知项",
+          "最后处理版本差异/未知项",
           conflictItems.length ? conflictItems : otherItems,
-          "冲突或未知项先看诊断，不进入一键发布。"
+          "版本差异或未知项先看只读报告，不进入一键发布。"
         ),
       ].filter(Boolean).join("");
       setExecutorButtons(executorAvailable);
@@ -4961,7 +4961,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const summary = conflictItems.length > 0
-        ? `有 ${conflictItems.length} 个真实冲突，不能一键发布。先生成冲突包，看清本地版、中央版和基线哈希，再选择保留哪边或人工合并。`
+        ? `有 ${conflictItems.length} 个版本差异，不能一键发布。先生成只读差异报告，报告会给出恢复、发布或手动处理的推荐。`
         : (publishItems.length > 0
           ? `有 ${publishItems.length} 个可发布更新。先预检，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
           : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留中央仓库，不静默删除。`);
@@ -4973,7 +4973,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <ol class="review-recommendation-steps">
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">1</span>
-            <span>${conflictItems.length ? `先生成冲突包：${escapeHtml(conflictNames)}。` : (deleteItems.length ? `确认缺失项是恢复还是删除：${escapeHtml(deleteNames)}。` : "当前没有缺失/删除确认。")}</span>
+            <span>${conflictItems.length ? `先生成只读差异报告：${escapeHtml(conflictNames)}。` : (deleteItems.length ? `确认缺失项是恢复还是删除：${escapeHtml(deleteNames)}。` : "当前没有缺失/删除确认。")}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">2</span>
@@ -4981,7 +4981,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
-            <span>${publishItems.length === 0 ? "不要点发布；先完成冲突/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
+            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个预检通过。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
           </li>
         </ol>
         <div class="review-recommendation-actions">
@@ -5063,7 +5063,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const executorKind = executorAvailable ? "green" : "yellow";
       if (conflictTotal > 0) {
         $("review-progress").innerHTML = [
-          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接处理冲突。" : "先确认 Mac 本机执行器在线。"),
+          reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接处理版本差异。" : "先确认 Mac 本机执行器在线。"),
           reviewStage("2", "选择保留版本", `${conflictTotal} 个待选择`, "yellow", "选择 OpenClaw 版、中央版，或手动对比。"),
           reviewStage("3", "确认后写入", "需确认词", "yellow", "发布输入 PUBLISH；恢复输入 RESTORE。"),
         ].join("");
@@ -5077,7 +5077,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
         reviewStage("2", "预检可发布更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, publishableTotal > 0 ? "预检只读，不会写 WebDAV。" : "当前没有可发布项；不要反复点发布。"),
-        reviewStage("3", conflictTotal > 0 ? "冲突决策" : "确认发布", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可发布`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成冲突包，再选择保留哪边。" : publishNote),
+        reviewStage("3", conflictTotal > 0 ? "版本确认" : "确认发布", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可发布`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
       ].join("");
     }
 
@@ -5169,7 +5169,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewActionText(item) {
       if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return "本机已删除，中央仓库仍保留。";
       if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "中央仓库已删除，本机仍保留。";
-      if (item.category === "conflict") return "冲突，先人工合并。";
+      if (item.category === "conflict") return "版本不一致，先看只读报告。";
       if (item.status_action === "local_new") return "远端新增，先预检。";
       if (item.status_action === "push_new") return "新 skill 待发布。";
       if (item.status_action === "push") return "已有 skill 待更新。";
@@ -5183,7 +5183,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewCategoryText(item) {
       if (item.category === "writer_policy") return "需要显式发布";
-      if (item.category === "conflict") return "冲突";
+      if (item.category === "conflict") return "版本差异";
       if (reviewIsDeleteItem(item)) return "删除确认";
       return text(item.category || item.status_action || "待审批");
     }
@@ -5197,7 +5197,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewNextStepText(item) {
-      if (item.category === "conflict") return "下一步：先生成冲突包并人工合并。";
+      if (item.category === "conflict") return "下一步：先生成只读差异报告，再按推荐恢复、发布或手动处理。";
       if (item.status_action === "local_deleted") return "下一步：决定是恢复本机，还是单独确认删除中央仓库里的这个 skill。";
       if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新发布，还是接受中央删除。";
       if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除中央仓库。";
@@ -5212,7 +5212,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.status_action === "local_new") return "新增";
       if (item.status_action === "push_new") return "新发布";
       if (item.status_action === "push") return "更新";
-      if (item.category === "conflict") return "冲突";
+      if (item.category === "conflict") return "版本差异";
       return statusLabel(item.status_action || item.category || "待处理");
     }
 
@@ -5247,7 +5247,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新发布；如果中央删除是正确的，再接受删除。`;
       }
       if (item.category === "conflict") {
-        return `<strong>需要人工合并</strong>冲突项不能一键发布，先查看冲突包再决定保留哪一侧。`;
+        return `<strong>需要确认版本</strong>不能一键发布；先查看只读差异报告，再按推荐恢复、发布或手动处理。`;
       }
       if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
         const result = reviewTaskResults[reviewItemKey(item)];
@@ -5267,7 +5267,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewControlLabel(item) {
       if (reviewIsDeleteItem(item)) return "说明";
-      if (item.category === "conflict") return "查看冲突";
+      if (item.category === "conflict") return "看差异";
       const result = reviewTaskResults[reviewItemKey(item)];
       if (result && result.publishReady) return "重新预检";
       return "预检";
@@ -5472,8 +5472,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         button.title = !available
           ? "本机执行器未在线"
           : (!endpoint
-            ? "这个设备还没有接入冲突包生成"
-            : "生成只读冲突包，不写中央仓库或设备 skill 目录");
+            ? "这个设备还没有接入差异报告生成"
+            : "生成只读差异报告，不写中央仓库或设备 skill 目录");
       });
       document.querySelectorAll(".central-conflict-restore-button").forEach((button) => {
         button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
@@ -5504,8 +5504,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (actionSkills.length === 0) {
-        showExecutorOutput("当前没有可发布更新。冲突和删除确认不会通过这个按钮自动处理。");
-        setReviewFeedback("yellow", "当前没有可发布更新", "状态已重新刷新；如果只剩冲突，请直接选择保留哪边，或先看差异。");
+        showExecutorOutput("当前没有可发布更新。版本差异和删除确认不会通过这个按钮自动处理。");
+        setReviewFeedback("yellow", "当前没有可发布更新", "状态已重新刷新；如果只剩版本差异，请点击上方推荐按钮先看差异。");
         await refresh(true);
         return;
       }
@@ -5549,7 +5549,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             setReviewFeedback(
               "yellow",
               "没有写入中央仓库",
-              "确认发布返回 approved=0。通常表示预检后状态变了：该项已发布、已恢复，或变成需要人工处理的冲突。请看当前待办分类。",
+              "确认发布返回 approved=0。通常表示预检后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前待办分类。",
             );
             return;
           }
@@ -5585,7 +5585,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             setExecutorStatus(
               remaining > 0 ? "published" : "done",
               remaining > 0
-                ? `发布已完成，但还有 ${remaining} 个冲突/删除确认类待办。`
+                ? `发布已完成，但还有 ${remaining} 个版本差异/删除确认类待办。`
                 : "发布已完成，待办已清空。",
               remaining > 0 ? "yellow" : "green",
             );
@@ -5696,7 +5696,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewKey = button.dataset.reviewKey || "";
       const endpoint = conflictPackageEndpoint(peerId);
       if (!endpoint) {
-        setReviewFeedback("yellow", `${skillId} 暂不能生成冲突包`, "这个设备还没有接入冲突包执行器。");
+        setReviewFeedback("yellow", `${skillId} 暂不能生成差异报告`, "这个设备还没有接入差异报告执行器。");
         return;
       }
       if (!executorAvailable) {
@@ -5784,8 +5784,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (reviewItem && reviewItem.category === "conflict") {
-        updateReviewTaskResult(reviewItem, { label: "冲突待选择", kind: "red", publishReady: false });
-        setReviewFeedback("red", `${skillId} 是冲突项`, "冲突项不能一键发布；先查看只读差异报告，再选择保留版本。");
+        updateReviewTaskResult(reviewItem, { label: "版本待确认", kind: "yellow", publishReady: false });
+        setReviewFeedback("yellow", `${skillId} 是版本差异项`, "不能一键发布；先查看只读差异报告，再按推荐恢复、发布或手动处理。");
         return;
       }
       setExecutorButtons(false);
@@ -5875,7 +5875,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
       const conflictItems = blockedItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
       const openclawAction = conflictItems.length > 0
-        ? `有 ${conflictItems.length} 个冲突，回到上方任务卡处理。`
+        ? `有 ${conflictItems.length} 个版本差异，回到上方任务卡处理。`
         : (Number(openclaw.blocked || 0) > 0 ? "有待处理项，回到上方任务卡处理。" : "不用操作。");
       const cards = [
         {
