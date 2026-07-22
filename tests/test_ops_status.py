@@ -20,7 +20,7 @@ from skill_sync_sidecar.dashboard import (
     build_hub_import_preview_response,
 )
 from skill_sync_sidecar.remote import FileRemote
-from skill_sync_sidecar.operator_executor import OperatorExecutorError, run_openclaw_approved_push_batch
+from skill_sync_sidecar.operator_executor import OperatorExecutorError, run_openclaw_approved_push_batch, run_openclaw_conflict_package
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -520,8 +520,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("showDecisionExplanation", DASHBOARD_HTML)
             self.assertIn("本机缺失", DASHBOARD_HTML)
             self.assertIn("两边内容不一致", DASHBOARD_HTML)
-            self.assertIn("保留中央，稍后恢复", DASHBOARD_HTML)
-            self.assertIn("查看差异再决定", DASHBOARD_HTML)
+            self.assertIn("从中央恢复到", DASHBOARD_HTML)
+            self.assertIn("restoreCentralSkill", DASHBOARD_HTML)
+            self.assertIn("centralRestoreEndpointBase", DASHBOARD_HTML)
+            self.assertIn("/api/mac-central-restore", DASHBOARD_HTML)
+            self.assertIn("/api/openclaw-central-restore", DASHBOARD_HTML)
+            self.assertIn("生成冲突包", DASHBOARD_HTML)
+            self.assertIn("generateConflictPackage", DASHBOARD_HTML)
+            self.assertIn("conflictPackageEndpoint", DASHBOARD_HTML)
+            self.assertIn("/api/openclaw-conflict-package", DASHBOARD_HTML)
+            self.assertIn("approved=0", DASHBOARD_HTML)
+            self.assertIn("没有写入中央仓库", DASHBOARD_HTML)
+            self.assertIn("RESTORE", DASHBOARD_HTML)
             self.assertIn("simple-task-dry-run", DASHBOARD_HTML)
             self.assertIn("const simpleTaskDryRun", DASHBOARD_HTML)
             self.assertIn("id=\"simple-dry-run\"", DASHBOARD_HTML)
@@ -547,10 +557,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderReviewRecommendation", DASHBOARD_HTML)
             self.assertIn("review-recommendation", DASHBOARD_HTML)
             self.assertIn("推荐操作", DASHBOARD_HTML)
-            self.assertIn("保留并恢复 Mac 缺失", DASHBOARD_HTML)
-            self.assertIn("预检 OpenClaw 更新", DASHBOARD_HTML)
-            self.assertIn("先保留/恢复 Mac 缺失项", DASHBOARD_HTML)
-            self.assertIn("再处理 OpenClaw 更新", DASHBOARD_HTML)
+            self.assertIn("确认缺失项是恢复还是删除", DASHBOARD_HTML)
+            self.assertIn("预检可发布更新", DASHBOARD_HTML)
+            self.assertIn("先处理缺失/删除确认", DASHBOARD_HTML)
+            self.assertIn("再处理可发布更新", DASHBOARD_HTML)
             self.assertIn("id=\"review-dry-run-all\"", DASHBOARD_HTML)
             self.assertIn("id=\"review-publish-all\"", DASHBOARD_HTML)
             self.assertIn("确认发布 ${publishItems.length} 个 OpenClaw 更新", DASHBOARD_HTML)
@@ -572,7 +582,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("预检", DASHBOARD_HTML)
             self.assertIn(".review-meta-item:not(:last-child)", DASHBOARD_HTML)
             self.assertIn("查看 dry-run 命令", DASHBOARD_HTML)
-            self.assertIn("建议先保留并恢复", DASHBOARD_HTML)
+            self.assertIn("确认缺失项是恢复还是删除", DASHBOARD_HTML)
             self.assertIn("reviewItemKey", DASHBOARD_HTML)
             self.assertIn("reviewIsPublishCandidate", DASHBOARD_HTML)
             self.assertIn(".review-item > div:nth-child(2)", DASHBOARD_HTML)
@@ -1204,6 +1214,27 @@ class OpsStatusTest(unittest.TestCase):
 
             with self.assertRaises(OperatorExecutorError):
                 run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=True)
+
+    def test_operator_executor_runs_openclaw_conflict_package(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-conflict-package.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"ok\":true,\"total_conflicts\":1,\"packages\":[{\"skill_id\":\"%s\",\"path\":\"/tmp/conflict\"}]}\\n' \"$1\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+
+            result = run_openclaw_conflict_package(repo, ["finance-auto-bookkeeping"])
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["mode"], "conflict_package")
+            self.assertEqual(result["total_conflicts"], 1)
+            self.assertEqual(result["packages"][0]["skill_id"], "finance-auto-bookkeeping")
+            self.assertIn("openclaw-conflict-package.sh finance-auto-bookkeeping", result["command"])
 
     def test_publish_peer_status_writes_remote_json(self):
         with TemporaryDirectory() as tmp:

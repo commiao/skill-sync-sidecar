@@ -13,6 +13,7 @@ from typing import Optional, Sequence
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .remote import open_remote
+from .restore import RestoreError, restore_from_central
 from .tool_status import build_device_tool_status
 
 
@@ -89,6 +90,135 @@ def run_openclaw_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 
         "finished_at": finished_at,
         "exit_code": proc.returncode,
         "command": str(script),
+        "stdout_tail": _tail(proc.stdout),
+        "stderr_tail": _tail(proc.stderr),
+    }
+
+
+def run_mac_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 300) -> dict:
+    repo = repo_root.expanduser().resolve()
+    script = repo / "scripts" / "publish-mac-peer-status.sh"
+    if not script.exists():
+        raise OperatorExecutorError(f"Mac peer status helper not found: {script}")
+    started_at = datetime.now(timezone.utc).isoformat()
+    proc = subprocess.run(
+        [str(script)],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    finished_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "ok": proc.returncode == 0,
+        "mode": "refresh_mac_peer_status",
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_code": proc.returncode,
+        "command": str(script),
+        "stdout_tail": _tail(proc.stdout),
+        "stderr_tail": _tail(proc.stderr),
+    }
+
+
+def run_mac_central_restore(
+    skill_ids: Sequence[str],
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+) -> dict:
+    if yes and not allow_local_writes:
+        raise OperatorExecutorError("local restore is disabled; start operator-executor with --allow-local-writes")
+    result = restore_from_central(
+        Path.home() / ".cc-switch" / "skills",
+        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+        skill_ids,
+        target="mixed-scope-root",
+        remote_prefix=os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac"),
+        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+        yes=yes,
+    )
+    return result
+
+
+def run_openclaw_central_restore(
+    repo_root: Path,
+    skill_ids: Sequence[str],
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+    timeout_seconds: int = 900,
+) -> dict:
+    if yes and not allow_local_writes:
+        raise OperatorExecutorError("OpenClaw restore is disabled; start operator-executor with --allow-local-writes")
+    repo = repo_root.expanduser().resolve()
+    script = repo / "scripts" / "openclaw-restore-from-central.sh"
+    if not script.exists():
+        raise OperatorExecutorError(f"OpenClaw restore helper not found: {script}")
+    normalized = _normalize_skill_ids(skill_ids)
+    command = [str(script), "--yes" if yes else "--dry-run", *normalized]
+    started_at = datetime.now(timezone.utc).isoformat()
+    proc = subprocess.run(
+        command,
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    finished_at = datetime.now(timezone.utc).isoformat()
+    parsed = _last_json_object(proc.stdout)
+    return {
+        "ok": proc.returncode == 0,
+        "mode": "restore" if yes else "dry_run",
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_code": proc.returncode,
+        "command": " ".join(command),
+        "skill_ids": normalized,
+        "safe_to_restore": bool(parsed.get("safe_to_restore")) if isinstance(parsed, dict) else False,
+        "restored": parsed.get("restored") if isinstance(parsed, dict) else None,
+        "result": parsed,
+        "stdout_tail": _tail(proc.stdout),
+        "stderr_tail": _tail(proc.stderr),
+    }
+
+
+def run_openclaw_conflict_package(
+    repo_root: Path,
+    skill_ids: Sequence[str],
+    *,
+    timeout_seconds: int = 900,
+) -> dict:
+    repo = repo_root.expanduser().resolve()
+    script = repo / "scripts" / "openclaw-conflict-package.sh"
+    if not script.exists():
+        raise OperatorExecutorError(f"OpenClaw conflict package helper not found: {script}")
+    normalized = _normalize_skill_ids(skill_ids)
+    command = [str(script), *normalized]
+    started_at = datetime.now(timezone.utc).isoformat()
+    proc = subprocess.run(
+        command,
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+    finished_at = datetime.now(timezone.utc).isoformat()
+    parsed = _last_json_object(proc.stdout)
+    return {
+        "ok": proc.returncode == 0,
+        "mode": "conflict_package",
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "exit_code": proc.returncode,
+        "command": " ".join(command),
+        "skill_ids": normalized,
+        "total_conflicts": parsed.get("total_conflicts") if isinstance(parsed, dict) else None,
+        "packages": parsed.get("packages") if isinstance(parsed, dict) else [],
+        "result": parsed,
         "stdout_tail": _tail(proc.stdout),
         "stderr_tail": _tail(proc.stderr),
     }
@@ -213,6 +343,51 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     result = run_openclaw_peer_status_refresh(repo)
                     self._send_json(200 if result["ok"] else 500, result)
                     return
+                if path == "/api/mac-peer-status-refresh":
+                    result = run_mac_peer_status_refresh(repo)
+                    self._send_json(200 if result["ok"] else 500, result)
+                    return
+                if path == "/api/mac-central-restore-dry-run":
+                    result = run_mac_central_restore(skill_ids or [], yes=False)
+                    self._send_json(200, result)
+                    return
+                if path == "/api/mac-central-restore":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "RESTORE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be RESTORE"})
+                        return
+                    result = run_mac_central_restore(
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
+                if path == "/api/openclaw-central-restore-dry-run":
+                    result = run_openclaw_central_restore(repo, skill_ids or [], yes=False)
+                    self._send_json(200 if result["ok"] else 500, result)
+                    return
+                if path == "/api/openclaw-central-restore":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "RESTORE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be RESTORE"})
+                        return
+                    result = run_openclaw_central_restore(
+                        repo,
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_openclaw_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
+                if path == "/api/openclaw-conflict-package":
+                    result = run_openclaw_conflict_package(repo, skill_ids or [])
+                    self._send_json(200 if result["ok"] else 500, result)
+                    return
                 if path == "/api/local-skill/analyze":
                     source_path = _payload_path(payload)
                     tool_ids = _payload_tool_ids(payload)
@@ -274,7 +449,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     self._send_json(200, result)
                     return
                 self._send_json(404, {"ok": False, "error": "not found"})
-            except (OperatorExecutorError, LocalSkillError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
+            except (OperatorExecutorError, LocalSkillError, RestoreError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
 
         def _read_json(self) -> dict:

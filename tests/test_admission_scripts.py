@@ -102,6 +102,47 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("service", text.lower().replace("long-running service", ""))
         self.assertIn("one-cycle writable", help_text)
 
+    def test_openclaw_restore_from_central_is_gated_and_non_destructive(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-restore-from-central.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+        self.assertIn("--dry-run", help_text)
+        self.assertIn("--yes", help_text)
+        self.assertIn("Restore selected skills", help_text)
+        self.assertIn("pull-cache", text)
+        self.assertIn("stage", text)
+        self.assertIn("apply", text)
+        self.assertIn("--target", text)
+        self.assertIn("mixed-scope-root", text)
+        self.assertIn("--target-root", text)
+        self.assertIn("/home/admin/clawd/skills", text)
+        self.assertNotIn("systemctl", text)
+        self.assertNotIn("rm -rf /home/admin/clawd/skills", text)
+
+    def test_openclaw_conflict_package_is_read_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-conflict-package.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+        self.assertIn("Generate read-only conflict", help_text)
+        self.assertIn("pull-cache", text)
+        self.assertIn("conflict-package", text)
+        self.assertIn("--local-root", text)
+        self.assertIn("/home/admin/clawd/skills", text)
+        self.assertIn("--remote-snapshot", text)
+        self.assertIn("--last-applied-record", text)
+        self.assertNotIn("approved-push", text)
+        self.assertNotIn("sync-apply", text)
+        self.assertNotIn("systemctl", text)
+        self.assertNotIn("rm -rf /home/admin/clawd/skills", text)
+
     def test_service_templates_make_writer_policy_explicit(self):
         repo_root = Path(__file__).resolve().parents[1]
         openclaw_unit = (repo_root / "examples" / "systemd" / "openclaw-skill-sync-sidecar-dryrun.service").read_text(encoding="utf-8")

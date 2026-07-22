@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import ast
+import json
 import re
 import unittest
 from zipfile import ZipFile
@@ -21,6 +22,7 @@ from skill_sync_sidecar.scanner import normalize_skill_id, scan_roots
 from skill_sync_sidecar.remote import Remote, RemoteEntry, RemoteError, WebDavRemote, download_snapshot, open_remote, upload_snapshot
 from skill_sync_sidecar.reconcile import build_reconcile_report, write_reconcile_outputs
 from skill_sync_sidecar.snapshot import write_snapshot
+from skill_sync_sidecar.restore import restore_from_central
 from skill_sync_sidecar.stage import StageError, stage_snapshot
 from skill_sync_sidecar.sync_apply import SyncApplyError, build_sync_apply_preview, execute_sync_apply
 from skill_sync_sidecar.sync_cycle import run_sync_cycle
@@ -975,6 +977,41 @@ class ScannerTest(unittest.TestCase):
             new_record = Path(result["apply_result"]["record_path"])
             status = build_sync_status(local_root, remote_snapshot, new_record)
             self.assertEqual(status["summary"], {"unchanged": 1})
+
+    def test_restore_from_central_restores_selected_missing_skill(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            base_record = base / "base-record.json"
+
+            local_root.mkdir()
+            remote_hash = self._write_demo_skill(remote_source, "central")
+            index = write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+
+            preview = restore_from_central(local_root, remote_snapshot, ["demo"])
+
+            self.assertTrue(preview["safe_to_restore"])
+            self.assertEqual(preview["planned"], 1)
+            self.assertFalse((local_root / "demo" / "SKILL.md").exists())
+
+            result = restore_from_central(
+                local_root,
+                remote_snapshot,
+                ["demo"],
+                base_record_out=base_record,
+                remote_prefix="snapshots/current",
+                yes=True,
+            )
+
+            self.assertEqual(result["restored"], 1)
+            self.assertIn("central", (local_root / "demo" / "SKILL.md").read_text(encoding="utf-8"))
+            self.assertTrue(base_record.exists())
+            record = json.loads(base_record.read_text(encoding="utf-8"))
+            self.assertEqual(record["snapshot_id"], index["snapshot_id"])
+            hashes = {item["skill_id"]: item["content_hash"] for item in record["applied"]}
+            self.assertEqual(hashes["demo"], remote_hash)
 
     def test_sync_apply_blocks_conflict(self):
         with TemporaryDirectory() as tmp:

@@ -3945,6 +3945,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishItems = reviewPublishItems(allItems);
       const deleteItems = reviewDeleteItems(allItems);
       const conflictItems = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
+      const restoreItems = allItems.filter((item) => reviewCanRestoreFromCentral(item));
       const blocked = Number(dashboard.blocked || allItems.length || 0);
       const breakdown = blockedBreakdown(allItems);
       const kind = blocked === 0 ? "green" : (conflictItems.length > 0 ? "yellow" : "yellow");
@@ -3979,6 +3980,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else if (deleteItems.length > 0) {
         title = `先确认 ${deleteItems.length} 个缺失项`;
         summary = "缺失项不会自动删除中央仓库。先确认是恢复本机，还是单独走删除审批。";
+      }
+      if (restoreItems.length > 0 && publishItems.length === 0) {
+        title = `建议恢复 ${restoreItems.length} 个缺失 skill`;
+        summary = "中央仓库仍保留这些 skill。默认安全动作是恢复到缺失设备，不删除中央仓库。";
       }
       panel.innerHTML = `
         <div>
@@ -4055,11 +4060,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       const peer = text(item.peer_name || item.peer_id || "未知设备");
       const isDelete = reviewIsDeleteItem(item);
       const isConflict = item.category === "conflict" || item.status_action === "conflict";
+      const canRestore = reviewCanRestoreFromCentral(item);
+      const reviewKey = reviewItemKey(item);
       const title = isDelete ? `${skill}：本机缺失` : `${skill}：两边内容不一致`;
-      const detail = isDelete
-        ? "推荐先保留中央仓库，不自动删除。确认这个 skill 还要用时，从中央恢复到本机；确认废弃时，再单独走删除审批。"
-        : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。";
-      const primaryLabel = isDelete ? "保留中央，稍后恢复" : "查看差异再决定";
+      const restoreTarget = restoreDeviceLabel(item);
+      const detail = canRestore
+        ? `中央仓库里有完整版本，${restoreTarget} 当前缺失。推荐直接从中央恢复；这不会删除中央仓库，也不会覆盖其他设备。`
+        : (isDelete
+          ? "推荐先保留中央仓库，不自动删除。确认这个 skill 还要用时，从中央恢复到本机；确认废弃时，再单独走删除审批。"
+          : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。");
+      const primaryLabel = canRestore ? `从中央恢复到 ${restoreTarget}` : (isDelete ? "保留中央，稍后恢复" : "生成冲突包");
       const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
       const secondaryDetail = isDelete
         ? "删除中央仓库属于高风险操作，当前面板不会一键执行。"
@@ -4075,11 +4085,29 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
           <div class="simple-decision-copy">${escapeHtml(detail)}</div>
           <div class="simple-decision-actions">
-            <button type="button" class="primary" onclick="openAdvancedDetails()">${escapeHtml(primaryLabel)}</button>
+            ${canRestore
+              ? `<button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(text(item.peer_id || ""))}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">${escapeHtml(primaryLabel)}</button>`
+              : (isConflict
+                ? `<button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(text(item.peer_id || ""))}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">${escapeHtml(primaryLabel)}</button>`
+                : `<button type="button" class="primary" onclick="openAdvancedDetails()">${escapeHtml(primaryLabel)}</button>`)}
             <button type="button" onclick="showDecisionExplanation('${escapeHtml(skill)}', '${escapeHtml(secondaryDetail)}')">${escapeHtml(secondaryLabel)}</button>
           </div>
         </div>
       `;
+    }
+
+    function reviewCanRestoreFromCentral(item) {
+      if (!item) return false;
+      const peerId = text(item.peer_id || "");
+      const supportedPeer = peerId === "mac" || peerId === "oc-vps" || peerId === "openclaw";
+      return supportedPeer && !item.local_hash && Boolean(item.remote_hash);
+    }
+
+    function restoreDeviceLabel(item) {
+      const peerId = text((item || {}).peer_id || "");
+      if (peerId === "mac") return "Mac";
+      if (peerId === "oc-vps" || peerId === "openclaw") return "OpenClaw";
+      return text((item || {}).peer_name || "本机");
     }
 
     function showDecisionExplanation(skillId, detail) {
@@ -4140,27 +4168,28 @@ DASHBOARD_HTML = r"""<!doctype html>
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
       const deleteItems = reviewDeleteItems(items);
       const publishItems = reviewPublishItems(items);
+      const conflictItems = reviewConflictItems(items);
       const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
       $("review-queue-summary").textContent =
-        `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${publishItems.length} 个 OpenClaw 更新可预检/发布，${deleteItems.length} 个 Mac 缺失项建议先保留并恢复。`;
+        `${peers.join("、") || "其他设备"}：${items.length} 个待处理。${blockedBreakdownText(blockedBreakdown(items))}。`;
       renderReviewRecommendation(items);
       renderReviewProgress(items);
       $("review-queue").innerHTML = [
         renderReviewGroup(
-          "先保留/恢复 Mac 缺失项",
+          "先处理缺失/删除确认",
           deleteItems,
           "这些不是发布按钮要处理的内容；当前面板不会删除中央仓库。"
         ),
         renderReviewGroup(
-          "再处理 OpenClaw 更新",
+          "再处理可发布更新",
           publishItems,
           "逐项预检，safe_to_push=true 后再显式发布到中央仓库。"
         ),
         renderReviewGroup(
-          "其他待处理",
-          otherItems,
+          "最后处理冲突/未知项",
+          conflictItems.length ? conflictItems : otherItems,
           "冲突或未知项先看诊断，不进入一键发布。"
         ),
       ].filter(Boolean).join("");
@@ -4172,6 +4201,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!target) return;
       const deleteItems = reviewDeleteItems(items);
       const publishItems = reviewPublishItems(items);
+      const conflictItems = reviewConflictItems(items);
       const checkedCount = publishItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
       const readyCount = publishItems.filter((item) => {
         const result = reviewTaskResults[reviewItemKey(item)];
@@ -4180,23 +4210,29 @@ DASHBOARD_HTML = r"""<!doctype html>
       const remainingPrecheck = Math.max(publishItems.length - checkedCount, 0);
       const remainingReady = Math.max(publishItems.length - readyCount, 0);
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
+      const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
+      const summary = conflictItems.length > 0
+        ? `有 ${conflictItems.length} 个真实冲突，不能一键发布。先生成冲突包，看清本地版、中央版和基线哈希，再选择保留哪边或人工合并。`
+        : (publishItems.length > 0
+          ? `有 ${publishItems.length} 个可发布更新。先预检，全部 safe_to_push=true 后再确认发布；缺失/删除项不会被发布按钮处理。`
+          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留中央仓库，不静默删除。`);
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
         <div class="review-recommendation-summary">
-          先不要删除中央仓库；保留并恢复 Mac 缺失的 ${deleteItems.length} 个 skill。继续预检 OpenClaw 的 ${publishItems.length} 个更新，全部通过后再发布。
+          ${escapeHtml(summary)}
         </div>
         <ol class="review-recommendation-steps">
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">1</span>
-            <span>${deleteItems.length ? `把 Mac 缺失项标为保留/恢复：${escapeHtml(deleteNames)}。` : "当前没有 Mac 删除决策。"}</span>
+            <span>${conflictItems.length ? `先生成冲突包：${escapeHtml(conflictNames)}。` : (deleteItems.length ? `确认缺失项是恢复还是删除：${escapeHtml(deleteNames)}。` : "当前没有缺失/删除确认。")}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">2</span>
-            <span>${remainingPrecheck > 0 ? `继续预检 OpenClaw 剩余 ${remainingPrecheck} 个更新。` : "OpenClaw 更新已完成预检。"}</span>
+            <span>${remainingPrecheck > 0 ? `预检剩余 ${remainingPrecheck} 个可发布更新。` : (publishItems.length ? "可发布更新已完成预检。" : "当前没有可发布更新。")}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
-            <span>${remainingReady > 0 ? `发布前还差 ${remainingReady} 个 safe_to_push=true。` : `可以确认发布 ${publishItems.length} 个 OpenClaw 更新到中央仓库。`}</span>
+            <span>${publishItems.length === 0 ? "不要点发布；先完成冲突/缺失决策。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个 safe_to_push=true。` : `可以确认发布 ${publishItems.length} 个更新到中央仓库。`)}</span>
           </li>
         </ol>
         <div class="review-recommendation-actions">
@@ -4204,7 +4240,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>确认发布 ${publishItems.length} 个 OpenClaw 更新</button>
         </div>
         <div id="review-recommendation-note" class="review-recommendation-note">
-          ${remainingReady > 0 ? "发布按钮会在所有 OpenClaw 更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。"}
+          ${publishItems.length === 0 ? "当前没有东西可发布；如果点确认发布，也不会写入中央仓库。" : (remainingReady > 0 ? "发布按钮会在所有更新预检通过后解锁。" : "下一步就是点“确认发布”，输入 PUBLISH 后写入 WebDAV 中央仓库。")}
         </div>
       `;
     }
@@ -4273,6 +4309,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return result && result.publishReady;
       }).length;
       const deleteTotal = Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)).length : 0;
+      const conflictTotal = Array.isArray(items) ? reviewConflictItems(items).length : 0;
       const executorState = executorAvailable ? "已连接" : "未连接";
       const executorKind = executorAvailable ? "green" : "yellow";
       const dryRunKind = checked > 0 ? "green" : "yellow";
@@ -4282,8 +4319,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "发布需要再次确认。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机执行器", executorState, executorKind, executorAvailable ? "可以直接在面板预检。" : "先确认 Mac 本机执行器在线。"),
-        reviewStage("2", "预检 OpenClaw 更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, "预检只读，不会写 WebDAV。"),
-        reviewStage("3", "确认发布", `${publishReady}/${publishableTotal} 可发布`, publishKind, publishNote),
+        reviewStage("2", "预检可发布更新", `${checked}/${publishableTotal} 已预检`, dryRunKind, publishableTotal > 0 ? "预检只读，不会写 WebDAV。" : "当前没有可发布项；不要反复点发布。"),
+        reviewStage("3", conflictTotal > 0 ? "冲突决策" : "确认发布", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可发布`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成冲突包，再选择保留哪边。" : publishNote),
       ].join("");
     }
 
@@ -4309,6 +4346,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewPublishItems(items) {
       return Array.isArray(items) ? items.filter((item) => reviewIsPublishCandidate(item)) : [];
+    }
+
+    function reviewConflictItems(items) {
+      return Array.isArray(items) ? items.filter((item) => item.category === "conflict" || item.status_action === "conflict") : [];
     }
 
     function compactSkillList(names) {
@@ -4420,7 +4461,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewIsPublishCandidate(item) {
-      return item && !reviewIsDeleteItem(item) && item.category !== "conflict";
+      return item && !reviewIsDeleteItem(item) && item.category !== "conflict" && item.status_action !== "conflict";
     }
 
     function reviewItemKey(item) {
@@ -4654,6 +4695,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
         button.disabled = !available || !button.dataset.skillId;
       });
+      document.querySelectorAll(".central-restore-button").forEach((button) => {
+        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        button.title = !available
+          ? "本机执行器未在线"
+          : (!executorAllowLocalWrites
+            ? "恢复需要本机写入权限；用 --allow-local-writes 启动 executor"
+            : "从中央仓库恢复到缺失设备");
+      });
+      document.querySelectorAll(".conflict-package-button").forEach((button) => {
+        const endpoint = conflictPackageEndpoint(button.dataset.peerId || "");
+        button.disabled = !available || !endpoint || !button.dataset.skillId;
+        button.title = !available
+          ? "本机执行器未在线"
+          : (!endpoint
+            ? "这个设备还没有接入冲突包生成"
+            : "生成只读冲突包，不写中央仓库或设备 skill 目录");
+      });
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
 
@@ -4692,6 +4750,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         lastDryRunSafe = !isPublish && Boolean(payload.ok && payload.safe_to_push);
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok) {
+          if (isPublish && Number(payload.approved || 0) === 0) {
+            lastDryRunSafe = false;
+            await refreshOpenclawPeerStatus();
+            await refresh(true);
+            setExecutorStatus("no changes", "没有发布任何 skill；队列已变化或当前项已不再是可发布更新。", "yellow");
+            setReviewFeedback(
+              "yellow",
+              "没有写入中央仓库",
+              "确认发布返回 approved=0。通常表示预检后状态变了：该项已发布、已恢复，或变成需要人工处理的冲突。请看当前待办分类。",
+            );
+            return;
+          }
           setExecutorStatus(isPublish ? "published" : "dry-run ok", isPublish ? "发布完成。请等待 1-2 分钟后刷新状态。" : "dry-run 通过：safe_to_push=true，可以继续确认发布。", "green");
           setReviewFeedback(
             "green",
@@ -4761,6 +4831,126 @@ DASHBOARD_HTML = r"""<!doctype html>
         setReviewFeedback("yellow", "发布已完成，状态刷新失败", String(err));
         return false;
       }
+    }
+
+    async function restoreCentralSkill(button) {
+      const skillId = button.dataset.skillId || "";
+      const peerId = button.dataset.peerId || "";
+      const reviewKey = button.dataset.reviewKey || "";
+      const endpointBase = centralRestoreEndpointBase(peerId);
+      if (!endpointBase) {
+        setReviewFeedback("yellow", `${skillId} 暂不能在此面板恢复`, "这个设备还没有接入本机恢复执行器。");
+        return;
+      }
+      if (!executorAvailable || !executorAllowLocalWrites) {
+        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机 executor 在线，并启用 --allow-local-writes。");
+        return;
+      }
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在预检恢复 ${skillId}`, "预检只读；先确认中央仓库里有可恢复版本。");
+      setExecutorStatus("restore check", `正在预检从中央恢复 ${skillId}。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}${endpointBase}-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId] }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        updateReviewTaskResult(reviewKey || skillId, { label: "可恢复", kind: "green", publishReady: false });
+        const typed = window.prompt(`将从中央仓库恢复 ${skillId}。请输入 RESTORE 确认：`);
+        if (typed !== "RESTORE") {
+          setReviewFeedback("yellow", "恢复已取消", "没有写入设备目录，中央仓库也没有变化。");
+          setExecutorStatus("cancelled", "恢复已取消。", "yellow");
+          return;
+        }
+        setReviewFeedback("yellow", `正在恢复 ${skillId}`, "正在写入缺失设备目录，并保留备份记录。");
+        setExecutorStatus("restoring", `正在从中央恢复 ${skillId}。`, "yellow");
+        const restoreResponse = await fetch(`${EXECUTOR_URL}${endpointBase}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], confirm: "RESTORE" }),
+        });
+        const restorePayload = await restoreResponse.json();
+        showExecutorOutput(formatExecutorResult(restorePayload));
+        if (!restoreResponse.ok || !restorePayload.ok) {
+          throw new Error(executorErrorDetail(restorePayload));
+        }
+        await refresh(true);
+        const stillBlocked = currentReviewQueueItems.some((item) => item.skill_id === skillId && reviewItemKey(item) === reviewKey);
+        setReviewFeedback(
+          stillBlocked ? "yellow" : "green",
+          stillBlocked ? `${skillId} 已恢复，等待状态收敛` : `${skillId} 已恢复`,
+          stillBlocked ? "设备状态可能还在刷新中，稍后再刷新一次。" : "待办已刷新；如果数字下降，说明闭环完成。",
+        );
+        setExecutorStatus("restored", `${skillId} 已从中央恢复。`, "green");
+      } catch (err) {
+        setReviewFeedback("red", "恢复失败", String(err));
+        setExecutorStatus("failed", "恢复失败，请查看执行输出。", "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function generateConflictPackage(button) {
+      const skillId = button.dataset.skillId || "";
+      const peerId = button.dataset.peerId || "";
+      const reviewKey = button.dataset.reviewKey || "";
+      const endpoint = conflictPackageEndpoint(peerId);
+      if (!endpoint) {
+        setReviewFeedback("yellow", `${skillId} 暂不能生成冲突包`, "这个设备还没有接入冲突包执行器。");
+        return;
+      }
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "执行器未连接", "请先让 Mac 本机 executor 在线。");
+        return;
+      }
+      setExecutorButtons(false);
+      setExecutorStatus("conflict package", `正在生成 ${skillId} 的冲突包。`, "yellow");
+      setReviewFeedback("yellow", `正在生成 ${skillId} 冲突包`, "这是只读诊断，不会写 WebDAV，也不会改设备 skill 目录。");
+      try {
+        const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId] }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (!response.ok || !payload.ok) throw new Error(executorErrorDetail(payload));
+        const packages = Array.isArray(payload.packages) ? payload.packages : [];
+        const packagePath = packages.length > 0 ? text(packages[0].path) : text((payload.result || {}).out || payload.out);
+        updateReviewTaskResult(reviewKey || skillId, { label: "冲突包已生成", kind: "yellow", publishReady: false });
+        setExecutorStatus("needs decision", `${skillId} 冲突包已生成。`, "yellow");
+        setReviewFeedback(
+          "yellow",
+          `${skillId} 需要选择版本`,
+          packagePath
+            ? `冲突包：${packagePath}。下一步选择保留 OpenClaw 版、中央版，或人工合并后再发布。`
+            : "冲突包已生成。下一步选择保留 OpenClaw 版、中央版，或人工合并后再发布。",
+        );
+      } catch (err) {
+        setExecutorStatus("failed", "冲突包生成失败，请查看输出。", "red");
+        setReviewFeedback("red", "冲突包生成失败", String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    function conflictPackageEndpoint(peerId) {
+      if (peerId === "oc-vps" || peerId === "openclaw") return "/api/openclaw-conflict-package";
+      return "";
+    }
+
+    function centralRestoreEndpointBase(peerId) {
+      if (peerId === "mac") return "/api/mac-central-restore";
+      if (peerId === "oc-vps" || peerId === "openclaw") return "/api/openclaw-central-restore";
+      return "";
     }
 
     function executorErrorDetail(payload) {
@@ -4845,7 +5035,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         `mode=${text(payload.mode)}`,
         `exit_code=${text(payload.exit_code)}`,
         `safe_to_push=${text(payload.safe_to_push)}`,
+        `safe_to_restore=${text(payload.safe_to_restore)}`,
         `approved=${text(payload.approved)}`,
+        `restored=${text(payload.restored)}`,
+        `conflicts=${text(payload.total_conflicts)}`,
         `skills=${Array.isArray(payload.approved_skill_ids) ? payload.approved_skill_ids.join(", ") : text(payload.approved_skill_ids)}`,
         `command=${text(payload.command)}`,
       ];
