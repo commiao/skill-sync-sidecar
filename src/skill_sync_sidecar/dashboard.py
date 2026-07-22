@@ -2809,6 +2809,64 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #fff;
       border-color: var(--ink);
     }
+    .conflict-resolution {
+      display: grid;
+      gap: 10px;
+      border: 1px solid #e8d29c;
+      border-radius: 8px;
+      background: #fffdf7;
+      padding: 12px;
+      margin-top: 10px;
+    }
+    .conflict-resolution-title {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 860;
+      overflow-wrap: anywhere;
+    }
+    .conflict-resolution-summary {
+      color: var(--muted);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .conflict-choice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .conflict-choice {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .conflict-choice strong {
+      color: var(--ink);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .conflict-choice span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .conflict-choice button {
+      margin-top: 2px;
+    }
+    .conflict-diagnostic {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .conflict-diagnostic summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-weight: 760;
+    }
     .simple-action-item {
       display: flex;
       justify-content: space-between;
@@ -3410,6 +3468,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </section>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
+    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="冲突解决向导"></section>
     <details class="advanced-workspace">
       <summary>高级详情：设备、中央仓库、完整待审清单</summary>
     <section class="workspace-overview" aria-labelledby="workspace-overview-title">
@@ -3978,6 +4037,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderSimpleActionPanel(dashboard, items) {
       const panel = $("simple-action-panel");
       if (!panel) return;
+      hideConflictResolutionPanel();
       const allItems = Array.isArray(items) ? items : [];
       const publishItems = reviewPublishItems(allItems);
       const deleteItems = reviewDeleteItems(allItems);
@@ -4170,6 +4230,86 @@ DASHBOARD_HTML = r"""<!doctype html>
     function showDecisionExplanation(skillId, detail) {
       setReviewFeedback("yellow", `${skillId} 需要人工确认`, detail);
       openAdvancedDetails();
+    }
+
+    function hideConflictResolutionPanel() {
+      const panel = $("conflict-resolution-panel");
+      if (!panel) return;
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
+
+    function renderConflictResolutionPanel(skillId, packages) {
+      const panel = $("conflict-resolution-panel");
+      if (!panel) return;
+      const list = Array.isArray(packages) ? packages : [];
+      const firstPackage = list.length > 0 ? list[0] : {};
+      const packagePath = text(firstPackage.path || "");
+      const localHash = shortPlainHash(firstPackage.local_hash);
+      const remoteHash = shortPlainHash(firstPackage.remote_hash);
+      const baseHash = shortPlainHash(firstPackage.base_hash);
+      panel.hidden = false;
+      panel.innerHTML = `
+        <div>
+          <div class="simple-action-eyebrow">冲突包已生成</div>
+          <div class="conflict-resolution-title">${escapeHtml(skillId)} 现在需要选一个版本</div>
+          <div class="conflict-resolution-summary">sidecar 已把 OpenClaw 版、中央仓库版和共同基线放在一个只读包里。下一步不是继续预检，而是选保留哪边。</div>
+        </div>
+        <div class="conflict-choice-grid">
+          <div class="conflict-choice">
+            <strong>保留 OpenClaw 版</strong>
+            <span>适合 OpenClaw 上的修改才是最新正确版本。下一步会把 OpenClaw 版本显式发布到中央仓库。</span>
+            <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'openclaw')">我要保留 OpenClaw 版</button>
+          </div>
+          <div class="conflict-choice">
+            <strong>保留中央仓库版</strong>
+            <span>适合中央仓库里的版本才是正确版本。下一步会把中央版本恢复到 OpenClaw。</span>
+            <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'central')">我要保留中央版</button>
+          </div>
+          <div class="conflict-choice">
+            <strong>我手动合并</strong>
+            <span>适合两边都有价值。先打开冲突包，合并后再作为一个明确版本发布。</span>
+            <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'manual')">打开手动合并说明</button>
+          </div>
+        </div>
+        <details class="conflict-diagnostic">
+          <summary>查看诊断路径和版本指纹</summary>
+          <div>冲突包：${escapeHtml(packagePath || "未返回路径")}</div>
+          <div>OpenClaw 版：${escapeHtml(localHash)} · 中央版：${escapeHtml(remoteHash)} · 共同基线：${escapeHtml(baseHash)}</div>
+        </details>
+      `;
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function shortPlainHash(value) {
+      const raw = text(value || "");
+      if (!raw) return "-";
+      return raw.length > 12 ? raw.slice(0, 12) : raw;
+    }
+
+    function explainConflictChoice(skillId, choice) {
+      if (choice === "openclaw") {
+        setReviewFeedback(
+          "yellow",
+          `准备保留 OpenClaw 版：${skillId}`,
+          "这是上行发布决策。为了安全，下一步需要在高级详情中确认该 skill 的 OpenClaw 版本，然后走 approved push；当前按钮不会直接写中央仓库。",
+        );
+        openAdvancedDetails();
+        return;
+      }
+      if (choice === "central") {
+        setReviewFeedback(
+          "yellow",
+          `准备保留中央版：${skillId}`,
+          "这是下行恢复决策。为了安全，下一步需要确认中央版本正确，再从中央恢复到 OpenClaw；当前按钮不会直接覆盖 OpenClaw。",
+        );
+        return;
+      }
+      setReviewFeedback(
+        "yellow",
+        `手动合并：${skillId}`,
+        "打开诊断路径里的冲突包，对比 local 和 remote 两个目录；合并完成后，把最终版本作为一次明确变更发布。",
+      );
     }
 
     function simpleActionStep(index, value) {
@@ -4982,12 +5122,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         const packagePath = packages.length > 0 ? text(packages[0].path) : text((payload.result || {}).out || payload.out);
         updateReviewTaskResult(reviewKey || skillId, { label: "冲突包已生成", kind: "yellow", publishReady: false });
         setExecutorStatus("needs decision", `${skillId} 冲突包已生成。`, "yellow");
+        renderConflictResolutionPanel(skillId, packages);
         setReviewFeedback(
           "yellow",
-          `${skillId} 需要选择版本`,
+          `${skillId} 冲突包已生成`,
           packagePath
-            ? `冲突包：${packagePath}。下一步选择保留 OpenClaw 版、中央版，或人工合并后再发布。`
-            : "冲突包已生成。下一步选择保留 OpenClaw 版、中央版，或人工合并后再发布。",
+            ? "下一步在上方选择：保留 OpenClaw 版、保留中央版，或手动合并。路径已折叠在诊断里。"
+            : "下一步在上方选择：保留 OpenClaw 版、保留中央版，或手动合并。",
         );
       } catch (err) {
         setExecutorStatus("failed", "冲突包生成失败，请查看输出。", "red");
