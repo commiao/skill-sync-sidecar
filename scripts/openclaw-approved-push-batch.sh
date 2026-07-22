@@ -112,11 +112,11 @@ run_remote "${python_cmd[@]}" sync-cycle \
   --dry-run \
   --json
 
-filter_file="$(mktemp "/tmp/skill-sync-approved-push-filter.XXXXXX.json")"
+filter_file="$(mktemp "${TMPDIR:-/tmp}/skill-sync-approved-push-filter.XXXXXX")"
 trap 'rm -f "$filter_file"' EXIT
 run_remote cat /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json > "$filter_file"
 
-mapfile -t filtered_skill_ids < <(python3 - "$filter_file" "${skill_ids[@]}" <<'PY'
+filtered_output="$(python3 - "$filter_file" "${skill_ids[@]}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -133,7 +133,13 @@ for skill_id in requested:
     if skill_id in present:
         print(skill_id)
 PY
-)
+)"
+filtered_skill_ids=()
+while IFS= read -r skill_id; do
+  if [ -n "$skill_id" ]; then
+    filtered_skill_ids+=("$skill_id")
+  fi
+done <<< "$filtered_output"
 
 if [ "${#filtered_skill_ids[@]}" -ne "${#skill_ids[@]}" ]; then
   echo "requested_skills=${skill_ids[*]}"
