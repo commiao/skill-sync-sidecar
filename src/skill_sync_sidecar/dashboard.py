@@ -4797,11 +4797,15 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!publishResponse.ok || !publishPayload.ok || Number(publishPayload.approved || 0) === 0) {
           throw new Error(executorErrorDetail(publishPayload));
         }
-        await refreshOpenclawPeerStatus();
-        await refresh(true);
-        setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到中央仓库。`, "green");
-        setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, "状态已刷新；如果待办数字下降，说明版本差异已处理。");
-        hideConflictResolutionPanel();
+        const resolution = await waitForSkillResolution(skillId, "发布 OpenClaw 版");
+        if (resolution.done) {
+          setExecutorStatus("published", `${skillId} 已按 OpenClaw 版发布到中央仓库。`, "green");
+          setReviewFeedback("green", `${skillId} 已保留 OpenClaw 版`, `版本差异已清空，用了 ${resolution.attempts} 次状态确认。`);
+          hideConflictResolutionPanel();
+        } else {
+          setExecutorStatus("needs decision", `${skillId} 已写入，仍在等待状态确认。`, "yellow");
+          setReviewFeedback("yellow", `${skillId} 已写入，但待办还没清空`, resolution.detail);
+        }
       } catch (err) {
         setExecutorStatus("failed", "发布 OpenClaw 版失败，请查看输出。", "red");
         setReviewFeedback("red", "发布 OpenClaw 版失败", String(err));
@@ -4851,17 +4855,54 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!restoreResponse.ok || !restorePayload.ok) {
           throw new Error(executorErrorDetail(restorePayload));
         }
-        await refreshOpenclawPeerStatus();
-        await refresh(true);
-        setExecutorStatus("restored", `${skillId} 已恢复为中央仓库版本。`, "green");
-        setReviewFeedback("green", `${skillId} 已恢复为中央版`, "状态已刷新；如果待办数字下降，说明版本差异已处理。");
-        hideConflictResolutionPanel();
+        const resolution = await waitForSkillResolution(skillId, "恢复中央版");
+        if (resolution.done) {
+          setExecutorStatus("restored", `${skillId} 已恢复为中央仓库版本。`, "green");
+          setReviewFeedback("green", `${skillId} 已恢复为中央版`, `版本差异已清空，用了 ${resolution.attempts} 次状态确认。`);
+          hideConflictResolutionPanel();
+        } else {
+          setExecutorStatus("needs decision", `${skillId} 已恢复，仍在等待状态确认。`, "yellow");
+          setReviewFeedback("yellow", `${skillId} 已恢复，但待办还没清空`, resolution.detail);
+        }
       } catch (err) {
         setExecutorStatus("failed", "恢复中央版失败，请查看输出。", "red");
         setReviewFeedback("red", "恢复中央版失败", String(err));
       } finally {
         setExecutorButtons(executorAvailable);
       }
+    }
+
+    async function waitForSkillResolution(skillId, actionLabel) {
+      const maxAttempts = 4;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        setExecutorStatus("checking", `${actionLabel}已提交，正在确认状态 ${attempt}/${maxAttempts}。`, "yellow");
+        setReviewFeedback("yellow", "正在确认是否完成", `第 ${attempt}/${maxAttempts} 次读取 OpenClaw 上报和 NAS 状态；这一步只读，不会再写入。`);
+        await refreshOpenclawPeerStatus();
+        await refresh(true);
+        const remaining = reviewItemsForSkill(skillId);
+        if (remaining.length === 0) {
+          return { done: true, attempts: attempt, detail: "待办已清空。" };
+        }
+        if (attempt < maxAttempts) {
+          await wait(4000);
+        }
+      }
+      const remaining = reviewItemsForSkill(skillId);
+      return {
+        done: false,
+        attempts: maxAttempts,
+        detail: remaining.length > 0
+          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关待办：${blockedBreakdownText(blockedBreakdown(remaining))}。通常是 OpenClaw 上报还没收敛；稍后点刷新再看。`
+          : "已完成写入请求，但状态刷新结果暂时不确定；稍后点刷新再看。",
+      };
+    }
+
+    function reviewItemsForSkill(skillId) {
+      return currentReviewQueueItems.filter((item) => item.skill_id === skillId);
+    }
+
+    function wait(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     function simpleActionStep(index, value) {
