@@ -4870,6 +4870,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       );
     }
 
+    function confirmProtectedWrite(options) {
+      const word = text(options.word || "");
+      const title = text(options.title || "确认写入");
+      const will = Array.isArray(options.will) ? options.will : [];
+      const willNot = Array.isArray(options.willNot) ? options.willNot : [];
+      const message = [
+        title,
+        "",
+        "将会：",
+        ...will.map((line) => `- ${line}`),
+        "",
+        "不会：",
+        ...willNot.map((line) => `- ${line}`),
+        "",
+        `确认继续请输入 ${word}`,
+        "直接取消或输入其他内容，不会写入。",
+      ].join("\n");
+      return window.prompt(message) === word;
+    }
+
     async function publishOpenclawVersionForConflict(button) {
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
@@ -4892,8 +4912,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_push || Number(dryRunPayload.approved || 0) === 0) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        const typed = window.prompt(`这会把 OpenClaw 上的 ${skillId} 发布为中央仓库版本。请输入 PUBLISH 确认：`);
-        if (typed !== "PUBLISH") {
+        setReviewFeedback("green", `预检通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
+        if (!confirmProtectedWrite({
+          word: "PUBLISH",
+          title: `确认发布 OpenClaw 版：${skillId}`,
+          will: [
+            `把 OpenClaw 上的 ${skillId} 发布为中央仓库版本。`,
+            "只处理这一个 skill。",
+            "完成后自动刷新状态，确认待办是否清空。",
+          ],
+          willNot: [
+            "不会删除中央仓库里的其他 skill。",
+            "不会修改 Mac 本机工具目录。",
+            "不会绕过 WebDAV 发布权限。",
+          ],
+        })) {
           setExecutorStatus("cancelled", "发布 OpenClaw 版已取消。", "yellow");
           setReviewFeedback("yellow", "已取消", "没有写入 WebDAV，版本差异仍保留。");
           return;
@@ -4950,8 +4983,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        const typed = window.prompt(`这会用中央仓库版本覆盖 OpenClaw 上的 ${skillId}，并保留备份。请输入 RESTORE 确认：`);
-        if (typed !== "RESTORE") {
+        setReviewFeedback("green", `预检通过：${skillId}`, "下一步需要你确认写入。确认窗口会列出会发生什么、不会发生什么。");
+        if (!confirmProtectedWrite({
+          word: "RESTORE",
+          title: `确认恢复中央版：${skillId}`,
+          will: [
+            `把中央仓库版本恢复到 OpenClaw 的 ${skillId}。`,
+            "执行前保留 OpenClaw 当前目录备份。",
+            "完成后自动刷新状态，确认待办是否清空。",
+          ],
+          willNot: [
+            "不会删除 WebDAV 中央仓库版本。",
+            "不会修改 Mac 本机工具目录。",
+            "不会处理其他 skill。",
+          ],
+        })) {
           setExecutorStatus("cancelled", "恢复中央版已取消。", "yellow");
           setReviewFeedback("yellow", "已取消", "没有写入 OpenClaw，也没有写入中央仓库。");
           return;
