@@ -2937,10 +2937,69 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.45;
       overflow-wrap: anywhere;
     }
+    .conflict-next-action {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+      gap: 14px;
+      align-items: center;
+      border: 1px solid #b8cef0;
+      border-radius: 8px;
+      background: #f8fbff;
+      padding: 14px;
+    }
+    .conflict-next-title {
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 860;
+      overflow-wrap: anywhere;
+    }
+    .conflict-next-copy {
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+    .conflict-next-action button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+      min-height: 44px;
+      width: 100%;
+    }
+    .conflict-alternatives {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .conflict-alternatives > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 11px 13px;
+      color: var(--blue);
+      font-weight: 820;
+    }
+    .conflict-alternatives > summary::-webkit-details-marker {
+      display: none;
+    }
+    .conflict-alternatives > summary::after {
+      content: "展开";
+      float: right;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .conflict-alternatives[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .conflict-alternatives[open] > summary::after {
+      content: "收起";
+    }
     .conflict-choice-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
+      padding: 10px;
     }
     .conflict-choice {
       border: 1px solid var(--line);
@@ -4631,9 +4690,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.innerHTML = `
         <div>
           <div class="simple-action-eyebrow">只读差异报告已生成</div>
-          <div class="conflict-resolution-title">${escapeHtml(skillId)} 现在需要选一个版本</div>
+          <div class="conflict-resolution-title">${escapeHtml(skillId)} 的报告已生成</div>
           <div class="conflict-resolution-summary">${escapeHtml(summary)}</div>
         </div>
+        ${renderConflictRecommendedAction(skillId, review)}
         <div class="conflict-version-grid" aria-label="版本差异摘要">
           ${renderConflictVersionCard(review.local_label || "OpenClaw 版", review.local || {}, localHash)}
           ${renderConflictVersionCard(review.remote_label || "中央仓库版", review.remote || {}, remoteHash)}
@@ -4649,18 +4709,55 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    function renderConflictRecommendedAction(skillId, review) {
+      const localMissing = (review.local || {}).state === "absent";
+      const remoteMissing = (review.remote || {}).state === "absent";
+      const escapedSkill = escapeHtml(skillId);
+      if (localMissing && !remoteMissing) {
+        return `
+          <div class="conflict-next-action">
+            <div>
+              <div class="simple-action-eyebrow">推荐下一步</div>
+              <div class="conflict-next-title">恢复中央版到 OpenClaw</div>
+              <div class="conflict-next-copy">报告判断：OpenClaw 当前缺失，中央仓库仍有完整版本。这一步会要求输入 RESTORE，执行前会备份 OpenClaw 现状。</div>
+            </div>
+            <button type="button" class="primary central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
+          </div>
+        `;
+      }
+      if (!localMissing && remoteMissing) {
+        return `
+          <div class="conflict-next-action">
+            <div>
+              <div class="simple-action-eyebrow">推荐下一步</div>
+              <div class="conflict-next-title">发布 OpenClaw 版到中央仓库</div>
+              <div class="conflict-next-copy">报告判断：中央仓库缺失，OpenClaw 仍有版本。这一步会要求输入 PUBLISH，只把这个 skill 发布到 WebDAV 中央仓库。</div>
+            </div>
+            <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapedSkill}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版</button>
+          </div>
+        `;
+      }
+      return `
+        <div class="conflict-next-action">
+          <div>
+            <div class="simple-action-eyebrow">推荐下一步</div>
+            <div class="conflict-next-title">先比较三块摘要，再选择版本</div>
+            <div class="conflict-next-copy">OpenClaw 和中央仓库都存在版本。sidecar 不猜哪边正确；先看摘要，再选发布、恢复或手动合并。</div>
+          </div>
+          <button type="button" onclick="openAdvancedDetails()">查看完整队列</button>
+        </div>
+      `;
+    }
+
     function renderConflictChoiceGrid(skillId, review) {
       const localMissing = (review.local || {}).state === "absent";
       const remoteMissing = (review.remote || {}).state === "absent";
       const escapedSkill = escapeHtml(skillId);
       if (localMissing && !remoteMissing) {
         return `
-          <div class="conflict-choice-grid">
-            <div class="conflict-choice">
-              <strong>推荐：恢复中央仓库版</strong>
-              <span>OpenClaw 当前缺失，中央仓库里仍有完整版本。恢复会写入 OpenClaw，并保留备份；需要输入 RESTORE。</span>
-              <button type="button" class="primary central-conflict-restore-button" data-skill-id="${escapedSkill}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
-            </div>
+          <details class="conflict-alternatives">
+            <summary>其他选择和风险说明</summary>
+            <div class="conflict-choice-grid">
             <div class="conflict-choice">
               <strong>我确认要删除中央仓库版</strong>
               <span>这是高风险操作。当前面板不会一键删除中央仓库，避免误删共享版本。</span>
@@ -4671,17 +4768,15 @@ DASHBOARD_HTML = r"""<!doctype html>
               <span>需要保留部分内容时，先看诊断路径里的只读差异报告，再整理最终版本。</span>
               <button type="button" onclick="explainConflictChoice('${escapedSkill}', 'manual')">打开手动处理说明</button>
             </div>
-          </div>
+            </div>
+          </details>
         `;
       }
       if (!localMissing && remoteMissing) {
         return `
-          <div class="conflict-choice-grid">
-            <div class="conflict-choice">
-              <strong>推荐：发布 OpenClaw 版</strong>
-              <span>中央仓库缺失，OpenClaw 仍有版本。发布会写入 WebDAV 中央仓库；需要输入 PUBLISH。</span>
-              <button type="button" class="primary openclaw-conflict-publish-button" data-skill-id="${escapedSkill}" onclick="publishOpenclawVersionForConflict(this)">发布 OpenClaw 版到中央仓库</button>
-            </div>
+          <details class="conflict-alternatives">
+            <summary>其他选择和风险说明</summary>
+            <div class="conflict-choice-grid">
             <div class="conflict-choice">
               <strong>我确认中央仓库缺失是正确的</strong>
               <span>这是删除/下架决策。当前面板不会自动删除 OpenClaw 本地版本。</span>
@@ -4692,11 +4787,14 @@ DASHBOARD_HTML = r"""<!doctype html>
               <span>需要保留部分内容时，先看诊断路径里的只读差异报告，再整理最终版本。</span>
               <button type="button" onclick="explainConflictChoice('${escapedSkill}', 'manual')">打开手动处理说明</button>
             </div>
-          </div>
+            </div>
+          </details>
         `;
       }
       return `
-        <div class="conflict-choice-grid">
+        <details class="conflict-alternatives" open>
+          <summary>选择要保留的版本</summary>
+          <div class="conflict-choice-grid">
           <div class="conflict-choice">
             <strong>保留 OpenClaw 版</strong>
             <span>OpenClaw 上的是你要的最新版。会写入 WebDAV 中央仓库；需要输入 PUBLISH。</span>
@@ -4712,7 +4810,8 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span>两边都有内容要保留。先看诊断路径里的只读差异报告，手动合并后再发布最终版本。</span>
             <button type="button" onclick="explainConflictChoice('${escapedSkill}', 'manual')">打开手动合并说明</button>
           </div>
-        </div>
+          </div>
+        </details>
       `;
     }
 
