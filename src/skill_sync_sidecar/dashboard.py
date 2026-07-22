@@ -4264,7 +4264,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="conflict-choice">
             <strong>保留中央仓库版</strong>
             <span>适合中央仓库里的版本才是正确版本。下一步会把中央版本恢复到 OpenClaw。</span>
-            <button type="button" onclick="explainConflictChoice('${escapeHtml(skillId)}', 'central')">我要保留中央版</button>
+            <button type="button" class="central-conflict-restore-button" data-skill-id="${escapeHtml(skillId)}" onclick="restoreCentralVersionForConflict(this)">恢复中央版到 OpenClaw</button>
           </div>
           <div class="conflict-choice">
             <strong>我手动合并</strong>
@@ -4310,6 +4310,60 @@ DASHBOARD_HTML = r"""<!doctype html>
         `手动合并：${skillId}`,
         "打开诊断路径里的冲突包，对比 local 和 remote 两个目录；合并完成后，把最终版本作为一次明确变更发布。",
       );
+    }
+
+    async function restoreCentralVersionForConflict(button) {
+      const skillId = button.dataset.skillId || "";
+      if (!skillId) return;
+      if (!executorAvailable || !executorAllowLocalWrites) {
+        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机 executor 在线，并启用 --allow-local-writes。");
+        return;
+      }
+      setExecutorButtons(false);
+      setExecutorStatus("restore check", `正在预检恢复中央版 ${skillId}。`, "yellow");
+      setReviewFeedback("yellow", `正在预检恢复中央版：${skillId}`, "预检只读，不会写 WebDAV，也不会改 OpenClaw。");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-central-restore-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId] }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        const typed = window.prompt(`这会用中央仓库版本覆盖 OpenClaw 上的 ${skillId}，并保留备份。请输入 RESTORE 确认：`);
+        if (typed !== "RESTORE") {
+          setExecutorStatus("cancelled", "恢复中央版已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入 OpenClaw，也没有写入中央仓库。");
+          return;
+        }
+        setExecutorStatus("restoring", `正在把中央版恢复到 OpenClaw：${skillId}。`, "yellow");
+        setReviewFeedback("yellow", `正在恢复中央版：${skillId}`, "正在写入 OpenClaw skill 目录；原 OpenClaw 版本会进入备份目录。");
+        const restoreResponse = await fetch(`${EXECUTOR_URL}/api/openclaw-central-restore`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], confirm: "RESTORE" }),
+        });
+        const restorePayload = await restoreResponse.json();
+        showExecutorOutput(formatExecutorResult(restorePayload));
+        if (!restoreResponse.ok || !restorePayload.ok) {
+          throw new Error(executorErrorDetail(restorePayload));
+        }
+        await refreshOpenclawPeerStatus();
+        await refresh(true);
+        setExecutorStatus("restored", `${skillId} 已恢复为中央仓库版本。`, "green");
+        setReviewFeedback("green", `${skillId} 已恢复为中央版`, "状态已刷新；如果待办数字下降，说明冲突已解决。");
+        hideConflictResolutionPanel();
+      } catch (err) {
+        setExecutorStatus("failed", "恢复中央版失败，请查看输出。", "red");
+        setReviewFeedback("red", "恢复中央版失败", String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
     }
 
     function simpleActionStep(index, value) {
@@ -4906,6 +4960,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!endpoint
             ? "这个设备还没有接入冲突包生成"
             : "生成只读冲突包，不写中央仓库或设备 skill 目录");
+      });
+      document.querySelectorAll(".central-conflict-restore-button").forEach((button) => {
+        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        button.title = !available
+          ? "本机执行器未在线"
+          : (!executorAllowLocalWrites
+            ? "恢复需要本机写入授权；用 --allow-local-writes 启动 executor"
+            : "先 dry-run，再输入 RESTORE，把中央版本恢复到 OpenClaw");
       });
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
