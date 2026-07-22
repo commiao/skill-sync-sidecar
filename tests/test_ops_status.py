@@ -449,17 +449,17 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("本机可操作；中央仓库与其他设备只读", DASHBOARD_HTML)
             self.assertIn("status-strip", DASHBOARD_HTML)
             self.assertIn("当前处理状态", DASHBOARD_HTML)
-            self.assertIn("本机待办", DASHBOARD_HTML)
+            self.assertIn("同步待办", DASHBOARD_HTML)
             self.assertIn("id=\"strip-health\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-blocked\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-focus-note\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-scan-local\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-dry-run\"", DASHBOARD_HTML)
             self.assertIn("id=\"strip-action-note\"", DASHBOARD_HTML)
-            self.assertIn("本机待办", DASHBOARD_HTML)
             self.assertIn("blocked > 0 ? \"项待处理\"", DASHBOARD_HTML)
             self.assertIn("待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个", DASHBOARD_HTML)
-            self.assertIn("这不是服务故障", DASHBOARD_HTML)
+            self.assertIn("blockedBreakdownText", DASHBOARD_HTML)
+            self.assertIn("发布只处理“可发布更新”；冲突和删除确认需要单独决策。", DASHBOARD_HTML)
             self.assertIn("同步范围摘要", DASHBOARD_HTML)
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertIn("scope-switchboard", DASHBOARD_HTML)
@@ -1055,6 +1055,33 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(second_payload["summary_cache"]["state"], "stale")
         self.assertEqual(second_payload["remote_snapshot"]["snapshot_id"], "snap-cache")
         self.assertTrue(second_payload["summary_cache"]["refresh_in_flight"])
+
+    def test_dashboard_summary_cache_force_refreshes_payload(self):
+        calls = {"count": 0}
+
+        def provider():
+            calls["count"] += 1
+            return {
+                "ok": True,
+                "health": "green",
+                "remote_snapshot": {"snapshot_id": f"snap-{calls['count']}", "total": 1},
+                "daemon_state": {},
+                "sync_plan": {},
+                "dashboard": {"health": "green", "blocked": 0, "operator": {"snapshot_id": f"snap-{calls['count']}"}},
+            }
+
+        cache = DashboardSummaryCache(provider, timeout_seconds=0.01, stale_after_seconds=120)
+        first_status, first_payload = cache.get_summary()
+        second_status, second_payload = cache.get_summary()
+        forced_status, forced_payload = cache.get_summary(force=True)
+
+        self.assertEqual(first_status, 200)
+        self.assertEqual(second_status, 200)
+        self.assertEqual(forced_status, 200)
+        self.assertEqual(first_payload["remote_snapshot"]["snapshot_id"], "snap-1")
+        self.assertEqual(second_payload["remote_snapshot"]["snapshot_id"], "snap-1")
+        self.assertEqual(forced_payload["remote_snapshot"]["snapshot_id"], "snap-2")
+        self.assertEqual(forced_payload["summary_cache"]["state"], "fresh")
 
     def test_gateway_parser_accepts_remote_arguments(self):
         parser = build_parser()

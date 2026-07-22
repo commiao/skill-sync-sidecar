@@ -86,7 +86,24 @@ class DashboardSummaryCache:
         self._last_attempt_at: Optional[str] = None
         self._inflight: Optional[Future] = None
 
-    def get_summary(self) -> tuple[int, dict]:
+    def get_summary(self, *, force: bool = False) -> tuple[int, dict]:
+        if force:
+            with self._lock:
+                self._last_attempt_at = datetime.now(timezone.utc).isoformat()
+            try:
+                payload = self._refresh()
+            except Exception as exc:  # pragma: no cover - defensive cache boundary
+                with self._lock:
+                    self._last_error = str(exc)
+                    if self._inflight is not None and self._inflight.done():
+                        self._inflight = None
+                return 500, self._miss_payload(str(exc))
+            with self._lock:
+                self._store_locked(payload)
+                if self._inflight is not None and self._inflight.done():
+                    self._inflight = None
+                return 200, self._payload_with_metadata("fresh", 0.0)
+
         now = time.monotonic()
         with self._lock:
             self._consume_finished_locked()
@@ -1396,7 +1413,9 @@ def _handler_factory(status_provider: Callable[[], dict], hub_import_preview_pro
                     self._send(500, "application/json; charset=utf-8", body)
                 return
             if path == "/api/summary":
-                status_code, payload = summary_cache.get_summary()
+                query = self.path.split("?", 1)[1] if "?" in self.path else ""
+                force = any(part in {"refresh=1", "refresh=true", "force=1", "force=true"} for part in query.split("&"))
+                status_code, payload = summary_cache.get_summary(force=force)
                 body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 self._send(status_code, "application/json; charset=utf-8", body)
                 return
@@ -3327,8 +3346,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div id="error" class="error"></div>
     <section class="status-strip" aria-label="当前处理状态">
       <div class="status-chip focus-main">
-        <div class="status-chip-label">本机待办</div>
-        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">项待预检</span></div>
+        <div class="status-chip-label">同步待办</div>
+        <div class="focus-title"><strong id="strip-blocked">-</strong><span id="strip-health">项待处理</span></div>
         <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
       </div>
       <div class="status-chip focus-side">
@@ -3794,20 +3813,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
       const macBlocked = blockedItems.filter((item) => item.peer_id === "mac").length;
       const openclawBlocked = blockedItems.filter((item) => item.peer_id === "oc-vps" || item.peer_id === "openclaw").length;
+      const breakdown = blockedBreakdown(blockedItems);
       $("strip-health").textContent = blocked > 0 ? "项待处理" : "项待办";
       $("strip-blocked").textContent = text(blocked);
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
       $("strip-focus-note").textContent = blocked > 0
-        ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；这不是服务故障。`
+        ? `待处理：OpenClaw ${openclawBlocked} 个，Mac ${macBlocked} 个；${blockedBreakdownText(breakdown)}。`
         : "当前没有待办项；可以扫描本机，或查看中央仓库和设备上报。";
       const actionNote = $("strip-action-note");
       if (actionNote) {
         actionNote.textContent = blocked > 0
-          ? "预检只读；发布会再次确认。"
+          ? "发布只处理“可发布更新”；冲突和删除确认需要单独决策。"
           : "只操作 Mac 本机。";
       }
+    }
+
+    function blockedBreakdown(items) {
+      const allItems = Array.isArray(items) ? items : [];
+      const publish = reviewPublishItems(allItems).length;
+      const conflict = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict").length;
+      const deleteReview = reviewDeleteItems(allItems).length;
+      const other = Math.max(allItems.length - publish - conflict - deleteReview, 0);
+      return { publish, conflict, deleteReview, other };
+    }
+
+    function blockedBreakdownText(breakdown) {
+      const parts = [];
+      if (breakdown.publish) parts.push(`可发布更新 ${breakdown.publish} 个`);
+      if (breakdown.conflict) parts.push(`冲突 ${breakdown.conflict} 个`);
+      if (breakdown.deleteReview) parts.push(`删除确认 ${breakdown.deleteReview} 个`);
+      if (breakdown.other) parts.push(`其他 ${breakdown.other} 个`);
+      return parts.length ? parts.join("，") : "没有待处理项";
     }
 
     function conciseOperatorNext(dashboard, operator, status) {
@@ -3908,6 +3946,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteItems = reviewDeleteItems(allItems);
       const conflictItems = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
       const blocked = Number(dashboard.blocked || allItems.length || 0);
+      const breakdown = blockedBreakdown(allItems);
       const kind = blocked === 0 ? "green" : (conflictItems.length > 0 ? "yellow" : "yellow");
       panel.className = `simple-action-panel panel ${kind}`;
       if (blocked === 0) {
@@ -3930,7 +3969,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
       let title = "先处理需要人工判断的项目";
-      let summary = `当前有 ${blocked} 个待处理项。sidecar 已暂停自动写入，避免误覆盖。`;
+      let summary = `当前有 ${blocked} 个待处理项：${blockedBreakdownText(breakdown)}。sidecar 已暂停自动写入，避免误覆盖。`;
       if (publishItems.length > 0 && conflictItems.length === 0) {
         title = `可以处理 ${publishItems.length} 个 OpenClaw 更新`;
         summary = "先点预检；预检通过后再点发布。删除项不会被自动发布。";
@@ -4671,7 +4710,22 @@ DASHBOARD_HTML = r"""<!doctype html>
           }
           if (isPublish) {
             await refreshOpenclawPeerStatus();
-            await refresh();
+            await refresh(true);
+            const remaining = currentReviewQueueItems.length;
+            setReviewFeedback(
+              remaining > 0 ? "yellow" : "green",
+              "发布完成，状态已刷新",
+              remaining > 0
+                ? `中央仓库已更新；还剩 ${remaining} 个待处理：${blockedBreakdownText(blockedBreakdown(currentReviewQueueItems))}。`
+                : "中央仓库已更新；当前没有待处理同步项。",
+            );
+            setExecutorStatus(
+              remaining > 0 ? "published" : "done",
+              remaining > 0
+                ? `发布已完成，但还有 ${remaining} 个冲突/删除确认类待办。`
+                : "发布已完成，待办已清空。",
+              remaining > 0 ? "yellow" : "green",
+            );
           }
         } else {
           setExecutorStatus("failed", payload.error || "执行失败，请查看输出。", "red");
@@ -5324,9 +5378,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       `).join("");
     }
 
-    async function refresh() {
+    async function refresh(force) {
       try {
-        const response = await fetch("/api/summary", { cache: "no-store" });
+        const endpoint = force ? "/api/summary?refresh=1" : "/api/summary";
+        const response = await fetch(endpoint, { cache: "no-store" });
         const status = await response.json();
         if (!response.ok) throw new Error(status.error || `HTTP ${response.status}`);
         render(status);
@@ -5337,10 +5392,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    $("refresh").addEventListener("click", refresh);
+    $("refresh").addEventListener("click", () => refresh(true));
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
-    refresh();
+    refresh(false);
     setInterval(refresh, 30000);
   </script>
 </body>
