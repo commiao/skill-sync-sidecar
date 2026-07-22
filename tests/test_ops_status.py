@@ -1058,6 +1058,7 @@ class OpsStatusTest(unittest.TestCase):
                 "--port",
                 "18765",
                 "--allow-publish",
+                "--allow-local-writes",
             ]
         )
 
@@ -1066,6 +1067,41 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(args.host, "127.0.0.1")
         self.assertEqual(args.port, 18765)
         self.assertTrue(args.allow_publish)
+        self.assertTrue(args.allow_local_writes)
+
+    def test_local_skill_publish_parser_accepts_selective_publish_arguments(self):
+        parser = build_parser()
+
+        args = parser.parse_args(
+            [
+                "local-skill-publish",
+                "--path",
+                "/tmp/read-wechat-article",
+                "--local-root",
+                "/tmp/local",
+                "--remote-snapshot",
+                "/tmp/cache",
+                "--last-applied-record",
+                "/tmp/base.json",
+                "--base-record-out",
+                "/tmp/base-next.json",
+                "--remote",
+                "file:///tmp/remote",
+                "--prefix",
+                "skill-sync-sidecar-dev/current-mac",
+                "--dry-run",
+            ]
+        )
+
+        self.assertEqual(args.command, "local-skill-publish")
+        self.assertEqual(args.path, "/tmp/read-wechat-article")
+        self.assertEqual(args.local_root, "/tmp/local")
+        self.assertEqual(args.remote_snapshot, "/tmp/cache")
+        self.assertEqual(args.last_applied_record, "/tmp/base.json")
+        self.assertEqual(args.base_record_out, "/tmp/base-next.json")
+        self.assertEqual(args.remote, "file:///tmp/remote")
+        self.assertEqual(args.prefix, "skill-sync-sidecar-dev/current-mac")
+        self.assertTrue(args.dry_run)
 
     def test_operator_executor_runs_dry_run_and_blocks_publish_by_default(self):
         with TemporaryDirectory() as tmp:

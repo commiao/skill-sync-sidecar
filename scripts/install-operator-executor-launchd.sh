@@ -5,12 +5,14 @@ label="${SKILL_SYNC_EXECUTOR_LABEL:-com.skill-sync-sidecar.operator-executor}"
 repo_root="${SKILL_SYNC_EXECUTOR_REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 host="${SKILL_SYNC_EXECUTOR_HOST:-127.0.0.1}"
 port="${SKILL_SYNC_EXECUTOR_PORT:-18765}"
+allow_local_writes="${SKILL_SYNC_EXECUTOR_ALLOW_LOCAL_WRITES:-1}"
+allow_publish="${SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH:-0}"
 logs_dir="${SKILL_SYNC_EXECUTOR_LOGS_DIR:-$HOME/Library/Logs}"
 plist="$HOME/Library/LaunchAgents/${label}.plist"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$logs_dir"
 
-python3 - "$plist" "$label" "$repo_root" "$host" "$port" "$logs_dir" <<'PY'
+python3 - "$plist" "$label" "$repo_root" "$host" "$port" "$allow_local_writes" "$allow_publish" "$logs_dir" <<'PY'
 import plistlib
 import sys
 from pathlib import Path
@@ -20,21 +22,28 @@ label = sys.argv[2]
 repo_root = Path(sys.argv[3]).resolve()
 host = sys.argv[4]
 port = sys.argv[5]
-logs_dir = Path(sys.argv[6]).expanduser()
+allow_local_writes = sys.argv[6] == "1"
+allow_publish = sys.argv[7] == "1"
+logs_dir = Path(sys.argv[8]).expanduser()
+program_arguments = [
+    "/usr/bin/python3",
+    "-c",
+    "from skill_sync_sidecar.cli import main; raise SystemExit(main())",
+    "operator-executor",
+    "--repo-root",
+    str(repo_root),
+    "--host",
+    host,
+    "--port",
+    port,
+]
+if allow_local_writes:
+    program_arguments.append("--allow-local-writes")
+if allow_publish:
+    program_arguments.append("--allow-publish")
 payload = {
     "Label": label,
-    "ProgramArguments": [
-        "/usr/bin/python3",
-        "-c",
-        "from skill_sync_sidecar.cli import main; raise SystemExit(main())",
-        "operator-executor",
-        "--repo-root",
-        str(repo_root),
-        "--host",
-        host,
-        "--port",
-        port,
-    ],
+    "ProgramArguments": program_arguments,
     "EnvironmentVariables": {
         "PYTHONPATH": str(repo_root / "src"),
     },
@@ -54,4 +63,6 @@ launchctl enable "gui/$(id -u)/$label"
 echo "operator_executor_launchd_ok=true"
 echo "label=$label"
 echo "url=http://$host:$port/healthz"
+echo "allow_local_writes=$allow_local_writes"
+echo "allow_publish=$allow_publish"
 echo "plist=$plist"

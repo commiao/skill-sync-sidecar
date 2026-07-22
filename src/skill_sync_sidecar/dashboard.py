@@ -2643,7 +2643,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workspace-tool-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr) auto auto auto auto;
       gap: 8px;
       align-items: center;
     }
@@ -2653,6 +2653,67 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .workspace-tool-count {
       font-weight: 800;
+    }
+    .local-skill-manager {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 0;
+      margin: 10px 0;
+      display: grid;
+      gap: 8px;
+    }
+    .local-skill-manager-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .local-skill-manager-title {
+      font-size: 13px;
+      font-weight: 820;
+    }
+    .local-skill-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .local-skill-input-row input {
+      min-width: 0;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 9px;
+      font: inherit;
+      font-size: 12px;
+      background: #fff;
+    }
+    .local-skill-result {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .local-skill-tools {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .local-skill-tool {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: #fff;
+      min-width: 0;
+    }
+    .local-skill-tool strong,
+    .local-skill-tool span {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .local-skill-tool span {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
     }
     .device-map-grid {
       display: grid;
@@ -2772,6 +2833,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .status-band { grid-template-columns: 1fr 1fr; }
       .status-band .panel { grid-column: 1 / -1; }
       .workbench-grid { grid-template-columns: 1fr; }
+      .local-skill-input-row { grid-template-columns: 1fr; }
+      .local-skill-tools { grid-template-columns: 1fr; }
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
@@ -2837,6 +2900,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workspace-subtitle { font-size: 12px; line-height: 1.35; margin-bottom: 8px; }
       .workspace-actions { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 6px 0 8px; }
       .workspace-actions button { padding: 7px 8px; }
+      .local-skill-manager { margin: 8px 0; padding: 8px 0; }
+      .local-skill-input-row { grid-template-columns: 1fr; gap: 6px; }
+      .local-skill-input-row input { height: 32px; }
+      .local-skill-tools { grid-template-columns: 1fr; max-height: 86px; overflow: hidden; }
       .local-action-note,
       #local-workspace-boundary,
       #central-repository-boundary,
@@ -3005,6 +3072,21 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
             <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>预检待推送</button>
             <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>推送到中央仓库</button>
+          </div>
+          <div class="local-skill-manager" aria-label="导入本地 Skill">
+            <div class="local-skill-manager-head">
+              <div class="local-skill-manager-title">导入本地 Skill</div>
+              <span id="local-skill-pill" class="pill">ready</span>
+            </div>
+            <div class="local-skill-input-row">
+              <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
+              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">分析</button>
+              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
+              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>预检发布</button>
+              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布中央</button>
+            </div>
+            <div id="local-skill-result" class="local-skill-result">粘贴目录后点击分析；sidecar 会自动生成同步元数据和安装计划。</div>
+            <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
           <div class="workspace-metrics">
             <div class="workspace-metric">
@@ -3269,8 +3351,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentGuideSkills = [];
     let executorAvailable = false;
     let executorAllowPublish = false;
+    let executorAllowLocalWrites = false;
     let lastDryRunSafe = false;
     let localWorkspaceFromExecutor = null;
+    let lastLocalSkillAnalysis = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -3753,12 +3837,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         executorAvailable = response.ok && payload.ok;
         executorAllowPublish = Boolean(payload.allow_publish);
+        executorAllowLocalWrites = Boolean(payload.allow_local_writes);
         if (executorAvailable) {
           setExecutorStatus(
             "online",
-            executorAllowPublish
-              ? "Mac 本机执行器在线：可以在面板内 dry-run；dry-run 安全后可确认发布。"
-              : "Mac 本机执行器在线：可以在面板内 dry-run；发布端点未开启，避免误写 WebDAV。",
+            executorAllowLocalWrites
+              ? "Mac 本机执行器在线：可以扫描、分析并安装本机 skill。"
+              : "Mac 本机执行器在线：可以扫描和分析本机 skill；本机写入未开启。",
             "green",
           );
           setExecutorButtons(true);
@@ -3774,9 +3859,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setExecutorOffline() {
       executorAvailable = false;
       executorAllowPublish = false;
+      executorAllowLocalWrites = false;
       setExecutorStatus(
         "offline",
-        "本机执行器未启动。请复制上面的命令执行，或在 Mac 上启动：skill-sync operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-publish",
+        "本机执行器未启动。请复制上面的命令执行，或在 Mac 上启动：skill-sync operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-local-writes",
         "yellow",
       );
       setExecutorButtons(false);
@@ -3798,6 +3884,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("scope-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
       $("local-workspace-dry-run").disabled = !available || currentGuideSkills.length === 0;
       $("local-workspace-publish").disabled = !available || !executorAllowPublish || !lastDryRunSafe;
+      const localSkillAnalyze = $("local-skill-analyze");
+      const localSkillInstall = $("local-skill-install");
+      const localSkillPublishCheck = $("local-skill-publish-check");
+      const localSkillPublish = $("local-skill-publish");
+      if (localSkillAnalyze) localSkillAnalyze.disabled = !available;
+      if (localSkillInstall) {
+        const willWrite = Number(((lastLocalSkillAnalysis || {}).summary || {}).will_write || 0);
+        localSkillInstall.disabled = !available || !executorAllowLocalWrites || !lastLocalSkillAnalysis || willWrite === 0;
+      }
+      if (localSkillPublishCheck) localSkillPublishCheck.disabled = !available || !lastLocalSkillAnalysis;
+      if (localSkillPublish) {
+        localSkillPublish.disabled = !available || !executorAllowPublish || !lastLocalSkillAnalysis;
+        localSkillPublish.title = !available
+          ? "本机执行器未在线"
+          : (!lastLocalSkillAnalysis
+            ? "请先分析一个本地 skill"
+            : (!executorAllowPublish
+              ? "中央发布未开启；用 SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 重新安装 executor"
+              : "发布到 WebDAV 中央仓库"));
+      }
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
         button.disabled = !available || !button.dataset.skillId;
       });
@@ -4033,6 +4139,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setExecutorStatus("online", payload.allow_publish ? "Mac 本机执行器在线：本机扫描可用，发布端点已开启。" : "Mac 本机执行器在线：本机扫描和 dry-run 可用，发布端点未开启。", "green");
           executorAvailable = true;
           executorAllowPublish = Boolean(payload.allow_publish);
+          executorAllowLocalWrites = Boolean(payload.allow_local_writes);
           setExecutorButtons(true);
         } else {
           throw new Error(payload.error || "local workspace scan failed");
@@ -4041,6 +4148,147 @@ DASHBOARD_HTML = r"""<!doctype html>
         localWorkspaceFromExecutor = null;
         setExecutorOffline();
       }
+    }
+
+    async function analyzeLocalSkill() {
+      if (!executorAvailable) return;
+      const path = $("local-skill-path").value.trim();
+      if (!path) {
+        renderLocalSkillError("请先填写 skill 目录或 SKILL.md 路径。");
+        return;
+      }
+      lastLocalSkillAnalysis = null;
+      setLocalSkillStatus("analyzing", "正在分析本地 skill。", "yellow");
+      setExecutorButtons(false);
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/local-skill/analyze`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "analyze failed");
+        lastLocalSkillAnalysis = payload;
+        setLocalSkillStatus("ready", payload.operator_action || "分析完成。", payload.risk && payload.risk.level === "ok" ? "green" : "yellow");
+        renderLocalSkillAnalysis(payload);
+        renderLocalSkillPublishHint();
+      } catch (err) {
+        renderLocalSkillError(String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function installLocalSkill() {
+      if (!executorAvailable || !lastLocalSkillAnalysis) return;
+      if (!executorAllowLocalWrites) {
+        renderLocalSkillError("本机写入未授权：请用 --allow-local-writes 启动 executor。");
+        return;
+      }
+      const writes = Number((lastLocalSkillAnalysis.summary || {}).will_write || 0);
+      if (writes <= 0) return;
+      const typed = window.prompt(`将安装 ${lastLocalSkillAnalysis.skill_id} 到 ${writes} 个本机工具。请输入 INSTALL 确认：`);
+      if (typed !== "INSTALL") {
+        setLocalSkillStatus("cancelled", "已取消安装，没有写入本机工具目录。", "yellow");
+        return;
+      }
+      setLocalSkillStatus("installing", "正在安装到本机工具目录。", "yellow");
+      setExecutorButtons(false);
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/local-skill/install`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: lastLocalSkillAnalysis.source_path, confirm: "INSTALL" }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "install failed");
+        setLocalSkillStatus("installed", "安装完成；已自动写入 manifest 和备份记录。", "green");
+        renderLocalSkillInstall(payload);
+        renderLocalSkillPublishHint();
+        await refreshLocalWorkspace();
+      } catch (err) {
+        renderLocalSkillError(String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function publishLocalSkill(realPublish) {
+      if (!executorAvailable || !lastLocalSkillAnalysis) return;
+      if (realPublish && !executorAllowPublish) {
+        renderLocalSkillError("中央发布未授权：请用 --allow-publish 启动 executor。");
+        return;
+      }
+      if (realPublish) {
+        const typed = window.prompt(`将 ${lastLocalSkillAnalysis.skill_id} 发布到中央仓库。请输入 PUBLISH 确认：`);
+        if (typed !== "PUBLISH") {
+          setLocalSkillStatus("cancelled", "已取消发布，没有写入中央仓库。", "yellow");
+          return;
+        }
+      }
+      setLocalSkillStatus(realPublish ? "publishing" : "checking", realPublish ? "正在发布到中央仓库。" : "正在预检发布。", "yellow");
+      setExecutorButtons(false);
+      try {
+        const endpoint = realPublish ? "/api/local-skill/publish" : "/api/local-skill/publish-dry-run";
+        const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: lastLocalSkillAnalysis.source_path, confirm: realPublish ? "PUBLISH" : undefined }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
+        setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "中央仓库已更新。" : "预检通过，可以发布中央。", "green");
+        $("local-skill-result").textContent = `${payload.skill_id} · ${payload.mode} · safe_to_push=${text(payload.safe_to_push)} · files=${text(payload.uploaded_files)} · snapshot=${text(payload.snapshot_id)}`;
+      } catch (err) {
+        renderLocalSkillError(String(err));
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    function renderLocalSkillAnalysis(payload) {
+      const summary = payload.summary || {};
+      const writes = Number(summary.will_write || 0);
+      $("local-skill-result").textContent = `${payload.skill_id} · ${payload.scope} · ${payload.manifest_source === "generated" ? "sidecar 自动生成元数据" : "读取 manifest"} · 可写入 ${writes} 个工具`;
+      renderLocalSkillTools(payload.tools || []);
+    }
+
+    function renderLocalSkillInstall(payload) {
+      const summary = payload.summary || {};
+      $("local-skill-result").textContent = `${payload.skill_id} 安装完成 · 写入 ${text(summary.will_write)} 个工具 · 记录 ${text(payload.record_path)}`;
+      renderLocalSkillTools(payload.items || []);
+    }
+
+    function renderLocalSkillPublishHint() {
+      if (!lastLocalSkillAnalysis) return;
+      if (!executorAllowPublish) {
+        $("local-skill-result").textContent += " · 中央发布未开启，可先点预检发布；真实发布需启用发布权限";
+      }
+    }
+
+    function renderLocalSkillTools(items) {
+      $("local-skill-tools").innerHTML = (Array.isArray(items) ? items : []).map((item) => `
+        <div class="local-skill-tool">
+          <strong>${escapeHtml(text(item.tool_name || item.tool_id))}</strong>
+          <span>${escapeHtml(text(item.action))}${item.reason ? " · " + escapeHtml(text(item.reason)) : ""}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderLocalSkillError(message) {
+      lastLocalSkillAnalysis = null;
+      $("local-skill-result").textContent = message;
+      $("local-skill-tools").innerHTML = "";
+      setLocalSkillStatus("error", message, "red");
+      setExecutorButtons(executorAvailable);
+    }
+
+    function setLocalSkillStatus(label, detail, kind) {
+      $("local-skill-pill").outerHTML = pill(label, kind).replace("<span", "<span id=\"local-skill-pill\"");
+      $("local-skill-result").textContent = detail;
     }
 
     function briefLine(label, value) {

@@ -9,6 +9,9 @@ The MVP keeps writes behind explicit confirmation flags:
 - `ops-status`: summarize daemon state, base record, remote snapshot, sync plan, and optional OpenClaw reconcile state.
 - `dashboard`: serve a read-only local web dashboard backed by `ops-status`, with device and tool inventory sections.
 - `gateway`: serve the same dashboard from WebDAV directly, for NAS or always-on observer hosts.
+- `local-skill-analyze`: analyze a local skill directory, infer manifest metadata, and preview local tool installs.
+- `local-skill-install`: install one local skill into selected local tool roots with generated manifest metadata and backup records.
+- `local-skill-publish`: publish one installed local skill to the central snapshot without applying unrelated conflicts.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
@@ -29,9 +32,49 @@ The MVP keeps writes behind explicit confirmation flags:
 - `sync-cycle`: run one safe remote download, status, plan, review-material, and optional apply cycle.
 - `sync-daemon`: run repeated `sync-cycle` passes with explicit dry-run/yes mode and blocked-state stop behavior.
 
-It does not modify tool databases. WebDAV uploads require `push --yes`, and local installs require `apply --yes`, `sync-apply --yes`, or `sync-cycle --yes`.
+It does not modify tool databases. WebDAV uploads require `push --yes`, and local installs require `apply --yes`, `sync-apply --yes`, `sync-cycle --yes`, or `local-skill-install --yes`.
 
 Peer-specific runtime edits and private skills can be declared locally with `<skill-root>/.skill-sync-local-overrides.json`. These overrides affect sync comparison only; they are not packaged into WebDAV snapshots.
+
+## Local Skill Manager
+
+For day-to-day use, open the dashboard and use **本地 Skill 工作区 -> 导入本地 Skill**. Paste a skill directory or `SKILL.md` path, click **分析**, then click **安装到本机工具** when the preview is safe. Sidecar infers the manifest, scope, targets, risk, and install destinations; users should not hand-write `manifest.json` or copy files between tool roots.
+
+The local browser executor must be running for dashboard actions:
+
+```bash
+python3 -m skill_sync_sidecar operator-executor \
+  --repo-root /Users/mac/workspace_codex/skill-sync-sidecar \
+  --allow-local-writes
+```
+
+`--allow-local-writes` only permits writes to local tool skill roots after the dashboard confirmation prompt. It does not enable WebDAV publishing. Start with `--allow-publish` separately when central writes are intended.
+
+The launchd helper enables local installs by default and keeps central publish disabled unless requested:
+
+```bash
+scripts/install-operator-executor-launchd.sh
+
+SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 \
+  scripts/install-operator-executor-launchd.sh
+```
+
+CLI equivalents remain available for automation:
+
+```bash
+python3 -m skill_sync_sidecar local-skill-analyze \
+  --path /Users/mac/.codex/skills/read-wechat-article
+
+python3 -m skill_sync_sidecar local-skill-install \
+  --path /Users/mac/.codex/skills/read-wechat-article \
+  --dry-run
+
+python3 -m skill_sync_sidecar local-skill-publish \
+  --path /Users/mac/.codex/skills/read-wechat-article \
+  --cc-switch-webdav \
+  --prefix skill-sync-sidecar-dev/current-mac \
+  --dry-run
+```
 
 ## Install
 
@@ -59,6 +102,9 @@ python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only -
 python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only --peer-status oc-vps=./openclaw-status.json
 python3 -m skill_sync_sidecar gateway --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --host 127.0.0.1 --port 8877
 python3 -m skill_sync_sidecar monitor-summary --brief
+python3 -m skill_sync_sidecar local-skill-analyze --path ~/.codex/skills/read-wechat-article
+python3 -m skill_sync_sidecar local-skill-install --path ~/.codex/skills/read-wechat-article --dry-run
+python3 -m skill_sync_sidecar local-skill-publish --path ~/.codex/skills/read-wechat-article --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --dry-run
 scripts/refresh-openclaw-peer-status.sh
 scripts/install-openclaw-peer-status-launchd.sh
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked

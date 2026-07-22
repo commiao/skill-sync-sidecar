@@ -29,6 +29,7 @@ from .hub_import import (
     render_hub_import_diagnosis_text,
     render_hub_import_preview_text,
 )
+from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .monitor import monitor_once, render_monitor_brief, render_monitor_report, run_monitor_loop
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .operator_executor import serve_operator_executor
@@ -162,7 +163,35 @@ def build_parser() -> argparse.ArgumentParser:
     operator_executor.add_argument("--host", default="127.0.0.1", help="Executor listen host.")
     operator_executor.add_argument("--port", type=int, default=18765, help="Executor listen port.")
     operator_executor.add_argument("--allow-publish", action="store_true", help="Allow the publish endpoint to run approved-push --yes after confirmation.")
+    operator_executor.add_argument("--allow-local-writes", action="store_true", help="Allow local skill install endpoints to write into local tool roots after confirmation.")
     operator_executor.set_defaults(func=cmd_operator_executor)
+
+    local_skill_analyze = subcommands.add_parser("local-skill-analyze", help="Analyze a local skill directory and infer one-click install metadata.")
+    local_skill_analyze.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
+    local_skill_analyze.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, or claude-code.")
+    local_skill_analyze.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    local_skill_analyze.set_defaults(func=cmd_local_skill_analyze)
+
+    local_skill_install = subcommands.add_parser("local-skill-install", help="Install a local skill into selected local tool roots with backups.")
+    local_skill_install.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
+    local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, or claude-code.")
+    local_skill_install.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    local_skill_install_mode = local_skill_install.add_mutually_exclusive_group(required=True)
+    local_skill_install_mode.add_argument("--dry-run", action="store_true", help="Only print the install plan.")
+    local_skill_install_mode.add_argument("--yes", action="store_true", help="Install into local tool roots and write backup records.")
+    local_skill_install.set_defaults(func=cmd_local_skill_install)
+
+    local_skill_publish = subcommands.add_parser("local-skill-publish", help="Publish one installed local skill to the central snapshot without applying unrelated conflicts.")
+    add_common_remote_args(local_skill_publish)
+    local_skill_publish.add_argument("--path", required=True, help="Skill directory or SKILL.md path used to determine the skill id.")
+    local_skill_publish.add_argument("--local-root", default="~/.cc-switch/skills", help="Local canonical tool root to publish from.")
+    local_skill_publish.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
+    local_skill_publish.add_argument("--last-applied-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used as common ancestor.")
+    local_skill_publish.add_argument("--base-record-out", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record path to update after --yes.")
+    local_skill_publish_mode = local_skill_publish.add_mutually_exclusive_group(required=True)
+    local_skill_publish_mode.add_argument("--dry-run", action="store_true", help="Only preview the selective publish.")
+    local_skill_publish_mode.add_argument("--yes", action="store_true", help="Upload the selected local skill and merged index.")
+    local_skill_publish.set_defaults(func=cmd_local_skill_publish)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
     tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
@@ -636,7 +665,89 @@ def cmd_gateway(args: argparse.Namespace) -> int:
 
 
 def cmd_operator_executor(args: argparse.Namespace) -> int:
-    serve_operator_executor(args.host, args.port, Path(args.repo_root).expanduser(), allow_publish=args.allow_publish)
+    serve_operator_executor(
+        args.host,
+        args.port,
+        Path(args.repo_root).expanduser(),
+        allow_publish=args.allow_publish,
+        allow_local_writes=args.allow_local_writes,
+    )
+    return 0
+
+
+def cmd_local_skill_analyze(args: argparse.Namespace) -> int:
+    try:
+        result = analyze_local_skill(Path(args.path), tool_ids=args.tool)
+    except LocalSkillError as exc:
+        print(f"local-skill-analyze failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"skill: {result['skill_id']}")
+        print(f"scope: {result['scope']}")
+        print(f"manifest: {result['manifest_source']}")
+        print(f"risk: {result['risk']['level']}")
+        print(result["operator_action"])
+        for item in result["tools"]:
+            print(f"{item['tool_id']}: {item['action']} -> {item['target_path']}")
+    return 0
+
+
+def cmd_local_skill_install(args: argparse.Namespace) -> int:
+    try:
+        result = install_local_skill(
+            Path(args.path),
+            tool_ids=args.tool,
+            yes=args.yes,
+            allow_local_writes=args.yes,
+        )
+    except LocalSkillError as exc:
+        print(f"local-skill-install failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"mode: {result['mode']}")
+        print(f"skill: {result['skill_id']}")
+        print(f"will_write: {result['summary'].get('will_write', 0)}")
+        for item in result["items"]:
+            status = "done" if item.get("executed") else "plan"
+            print(f"{status}\t{item['tool_id']}\t{item['action']}\t{item['target_path']}")
+        if result.get("record_path"):
+            print(f"record: {result['record_path']}")
+    return 0
+
+
+def cmd_local_skill_publish(args: argparse.Namespace) -> int:
+    try:
+        if args.yes:
+            guard_http_upload(args)
+        remote = open_remote_from_args(args)
+        analysis = analyze_local_skill(Path(args.path))
+        result = publish_local_skill(
+            Path(args.local_root).expanduser(),
+            Path(args.remote_snapshot).expanduser(),
+            str(analysis["skill_id"]),
+            remote,
+            remote_prefix=args.prefix,
+            last_applied_record=Path(args.last_applied_record).expanduser() if args.last_applied_record else None,
+            base_record_out=Path(args.base_record_out).expanduser() if args.base_record_out else None,
+            yes=args.yes,
+        )
+    except (LocalSkillError, RemoteError, SystemExit) as exc:
+        print(f"local-skill-publish failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"mode: {result['mode']}")
+        print(f"skill: {result['skill_id']}")
+        print(f"safe_to_push: {result.get('safe_to_push')}")
+        print(f"uploaded_files: {result.get('uploaded_files')}")
+        print(f"snapshot_id: {result.get('snapshot_id')}")
+        if result.get("base_record_path"):
+            print(f"base_record: {result['base_record_path']}")
     return 0
 
 

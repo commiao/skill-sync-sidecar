@@ -10,6 +10,9 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Optional, Sequence
 
+from .config import ConfigError, load_cc_switch_webdav_settings
+from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
+from .remote import open_remote
 from .tool_status import build_device_tool_status
 
 
@@ -105,7 +108,7 @@ def _tail(text: str, *, max_chars: int = 6000) -> str:
     return text[-max_chars:]
 
 
-def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publish: bool = False) -> None:
+def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publish: bool = False, allow_local_writes: bool = False) -> None:
     repo = repo_root.expanduser().resolve()
 
     class OperatorExecutorHandler(BaseHTTPRequestHandler):
@@ -124,6 +127,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         "service": "skill-sync-operator-executor",
                         "repo_root": str(repo),
                         "allow_publish": allow_publish,
+                        "allow_local_writes": allow_local_writes,
                         "time": datetime.now(timezone.utc).isoformat(),
                     },
                 )
@@ -139,12 +143,15 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         "scope": "local",
                         "authority": "本机 executor 只读取本机 skill 目录；默认只允许 dry-run，不默认发布。",
                         "allow_publish": allow_publish,
+                        "allow_local_writes": allow_local_writes,
                         "measured_at": datetime.now(timezone.utc).isoformat(),
                         "tools": tools,
                         "total_skills": sum(int(tool.get("skills") or 0) for tool in tools),
                         "operations": {
                             "scan_local": True,
                             "dry_run": True,
+                            "analyze_local_skill": True,
+                            "install_local_skill": allow_local_writes,
                             "publish_to_central": allow_publish,
                             "operate_other_devices": False,
                         },
@@ -175,8 +182,68 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     )
                     self._send_json(200 if result["ok"] else 500, result)
                     return
+                if path == "/api/local-skill/analyze":
+                    source_path = _payload_path(payload)
+                    tool_ids = _payload_tool_ids(payload)
+                    result = analyze_local_skill(source_path, tool_ids=tool_ids)
+                    result["allow_local_writes"] = allow_local_writes
+                    self._send_json(200, result)
+                    return
+                if path == "/api/local-skill/install":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "INSTALL":
+                        self._send_json(400, {"ok": False, "error": "confirm must be INSTALL"})
+                        return
+                    source_path = _payload_path(payload)
+                    tool_ids = _payload_tool_ids(payload)
+                    result = install_local_skill(
+                        source_path,
+                        tool_ids=tool_ids,
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    self._send_json(200, result)
+                    return
+                if path == "/api/local-skill/publish-dry-run":
+                    source_path = _payload_path(payload)
+                    skill_id = analyze_local_skill(source_path)["skill_id"]
+                    remote, prefix = _local_publish_remote()
+                    result = publish_local_skill(
+                        Path.home() / ".cc-switch" / "skills",
+                        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+                        skill_id,
+                        remote,
+                        remote_prefix=prefix,
+                        last_applied_record=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                    )
+                    self._send_json(200, result)
+                    return
+                if path == "/api/local-skill/publish":
+                    if not allow_publish:
+                        self._send_json(403, {"ok": False, "error": "publish is disabled; start operator-executor with --allow-publish"})
+                        return
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "PUBLISH":
+                        self._send_json(400, {"ok": False, "error": "confirm must be PUBLISH"})
+                        return
+                    source_path = _payload_path(payload)
+                    skill_id = analyze_local_skill(source_path)["skill_id"]
+                    remote, prefix = _local_publish_remote()
+                    result = publish_local_skill(
+                        Path.home() / ".cc-switch" / "skills",
+                        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+                        skill_id,
+                        remote,
+                        remote_prefix=prefix,
+                        last_applied_record=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                        yes=True,
+                    )
+                    self._send_json(200, result)
+                    return
                 self._send_json(404, {"ok": False, "error": "not found"})
-            except (OperatorExecutorError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
+            except (OperatorExecutorError, LocalSkillError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
 
         def _read_json(self) -> dict:
@@ -208,3 +275,30 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
         server.serve_forever()
     finally:
         server.server_close()
+
+
+def _payload_path(payload: object) -> Path:
+    if not isinstance(payload, dict):
+        raise OperatorExecutorError("payload must be a JSON object")
+    raw_path = str(payload.get("path") or "").strip()
+    if not raw_path:
+        raise OperatorExecutorError("path is required")
+    return Path(raw_path).expanduser()
+
+
+def _payload_tool_ids(payload: object) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    raw = payload.get("tool_ids")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise OperatorExecutorError("tool_ids must be a list")
+    return [str(item) for item in raw if str(item).strip()]
+
+
+def _local_publish_remote():
+    settings = load_cc_switch_webdav_settings()
+    remote = open_remote(settings.base_url, username=settings.username, password=settings.password)
+    prefix = os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac")
+    return remote, prefix
