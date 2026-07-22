@@ -2236,14 +2236,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       border-color: #efb8b8;
       background: #fff5f5;
     }
-    .review-more {
-      border: 1px dashed var(--line);
-      border-radius: 8px;
-      padding: 9px 12px;
-      color: var(--muted);
-      background: #fff;
-      font-weight: 700;
-    }
     .review-item {
       display: grid;
       grid-template-columns: minmax(180px, .9fr) minmax(0, 1fr) minmax(104px, auto);
@@ -2958,17 +2950,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         margin: 6px 0;
       }
       .review-item {
-        display: none;
-      }
-      .review-list::after {
-        content: "完整队列在下方高级诊断。";
-        border: 1px dashed var(--line);
-        border-radius: 8px;
-        padding: 7px 10px;
-        color: var(--muted);
-        background: #fff;
-        font-size: 12px;
-        font-weight: 700;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px;
+        padding: 7px 8px;
       }
       .review-source,
       .review-action {
@@ -2995,18 +2979,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         width: auto;
         padding: 6px 8px;
       }
-      .review-next-step {
-        grid-column: 1 / -1;
-        display: none;
-      }
       .review-item > div:nth-child(2) {
         grid-column: 1 / -1;
       }
       .review-command {
         margin-top: 0;
-      }
-      .review-more {
-        display: none;
       }
       .status-band { grid-template-columns: 1fr; }
       .kv { grid-template-columns: 1fr; }
@@ -3616,16 +3593,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       panel.hidden = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const peers = [...new Set(items.map((item) => text(item.peer_name || item.peer_id)).filter(Boolean))];
+      const deleteCount = items.filter((item) => reviewIsDeleteItem(item)).length;
+      const publishCount = items.filter((item) => reviewIsPublishCandidate(item)).length;
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;
-      $("review-queue-summary").textContent = mobileReview
-        ? `${peers.join("、") || "其他设备"}：${items.length} 个待审，先预检。`
-        : `${peers.join("、") || "其他设备"}：${items.length} 个待审。先在本机预检；通过后再显式推送到中央仓库。`;
+      $("review-queue-summary").textContent =
+        `${peers.join("、") || "其他设备"}：${items.length} 个待审，其中 ${publishCount} 个可走预检/发布，${deleteCount} 个是删除决策。每一项都在下方直接处理。`;
       renderReviewProgress(items);
-      const visibleItems = items.slice(0, mobileReview ? 0 : 1);
-      const hiddenCount = items.length - visibleItems.length;
+      const visibleItems = items;
       const rows = visibleItems.map((item) => {
         const command = item.operator_command || "";
+        const reviewKey = reviewItemKey(item);
         return `
           <div class="review-item">
             <div>
@@ -3658,26 +3636,24 @@ DASHBOARD_HTML = r"""<!doctype html>
                 type="button"
                 class="review-dry-run-button"
                 data-skill-id="${escapeHtml(text(item.skill_id))}"
+                data-review-key="${escapeHtml(reviewKey)}"
                 data-review-action="${escapeHtml(reviewControlAction(item))}"
-                onclick="runExecutorActionForSkill(this.dataset.skillId)"
+                onclick="runExecutorActionForSkill(this.dataset.skillId, this.dataset.reviewKey)"
                 disabled>${escapeHtml(reviewControlLabel(item))}</button>
             </div>
           </div>
         `;
       }).join("");
-      const more = hiddenCount > 0
-        ? `<div class="review-more">完整队列在下方高级诊断。</div>`
-        : "";
-      $("review-queue").innerHTML = `${rows}${more}`;
+      $("review-queue").innerHTML = rows;
       setExecutorButtons(executorAvailable);
     }
 
     function renderReviewProgress(items) {
       const total = Array.isArray(items) ? items.length : 0;
       const checked = Array.isArray(items)
-        ? items.filter((item) => reviewTaskResults[item.skill_id]).length
+        ? items.filter((item) => reviewTaskResults[reviewItemKey(item)]).length
         : 0;
-      const publishableTotal = Array.isArray(items) ? items.filter((item) => !reviewIsDeleteItem(item) && item.category !== "conflict").length : 0;
+      const publishableTotal = Array.isArray(items) ? items.filter((item) => reviewIsPublishCandidate(item)).length : 0;
       const publishReady = Object.values(reviewTaskResults).filter((result) => result && result.publishReady).length;
       const deleteTotal = Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)).length : 0;
       const executorState = executorAvailable ? "已连接" : "未连接";
@@ -3712,19 +3688,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-feedback-detail").textContent = detail;
     }
 
-    function updateReviewTaskResult(skillId, result) {
-      if (!skillId) return;
-      reviewTaskResults = { ...reviewTaskResults, [skillId]: result };
+    function updateReviewTaskResult(itemOrSkillId, result) {
+      const key = typeof itemOrSkillId === "object" ? reviewItemKey(itemOrSkillId) : String(itemOrSkillId || "");
+      if (!key) return;
+      reviewTaskResults = { ...reviewTaskResults, [key]: result };
       renderReviewQueue(currentReviewQueueItems);
     }
 
     function reviewResultText(item) {
-      const result = reviewTaskResults[item.skill_id];
+      const result = reviewTaskResults[reviewItemKey(item)];
       return result ? result.label : "等待预检";
     }
 
     function reviewResultKind(item) {
-      const result = reviewTaskResults[item.skill_id];
+      const result = reviewTaskResults[reviewItemKey(item)];
       return result ? result.kind : "yellow";
     }
 
@@ -3791,6 +3768,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         item.status_action === "local_deleted" ||
         item.status_action === "remote_deleted"
       );
+    }
+
+    function reviewIsPublishCandidate(item) {
+      return item && !reviewIsDeleteItem(item) && item.category !== "conflict";
+    }
+
+    function reviewItemKey(item) {
+      if (!item) return "";
+      return [
+        text(item.peer_id || item.peer_name || "unknown-peer"),
+        text(item.skill_id || "unknown-skill"),
+        text(item.category || "unknown-category"),
+        text(item.status_action || item.plan_action || "unknown-action"),
+      ].join("::");
     }
 
     function reviewDecisionHtml(item) {
@@ -4022,7 +4013,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           );
           if (!isPublish) {
             currentGuideSkills.forEach((skillId) => {
-              reviewTaskResults[skillId] = { label: "预检通过", kind: "green", publishReady: true };
+              currentReviewQueueItems
+                .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
+                .forEach((item) => {
+                  reviewTaskResults[reviewItemKey(item)] = { label: "预检通过", kind: "green", publishReady: true };
+                });
             });
             renderReviewQueue(currentReviewQueueItems);
           }
@@ -4039,11 +4034,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    async function runExecutorActionForSkill(skillId) {
+    async function runExecutorActionForSkill(skillId, reviewKey) {
       if (!executorAvailable || !skillId) return;
-      const reviewItem = currentReviewQueueItems.find((item) => item.skill_id === skillId);
+      const reviewItem = currentReviewQueueItems.find((item) => reviewItemKey(item) === reviewKey)
+        || currentReviewQueueItems.find((item) => item.skill_id === skillId);
       if (reviewIsDeleteItem(reviewItem)) {
-        updateReviewTaskResult(skillId, { label: "删除待决策", kind: "yellow", publishReady: false });
+        updateReviewTaskResult(reviewItem, { label: "删除待决策", kind: "yellow", publishReady: false });
         setReviewFeedback(
           "yellow",
           `${skillId} 是删除确认项`,
@@ -4065,7 +4061,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (reviewItem && reviewItem.category === "conflict") {
-        updateReviewTaskResult(skillId, { label: "冲突待合并", kind: "red", publishReady: false });
+        updateReviewTaskResult(reviewItem, { label: "冲突待合并", kind: "red", publishReady: false });
         setReviewFeedback("red", `${skillId} 是冲突项`, "冲突项不能一键发布；先查看冲突包并人工合并。");
         return;
       }
@@ -4083,21 +4079,21 @@ DASHBOARD_HTML = r"""<!doctype html>
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok && payload.safe_to_push) {
           setExecutorStatus("dry-run ok", `${skillId} 预检通过：safe_to_push=true。`, "green");
-          updateReviewTaskResult(skillId, { label: "预检通过", kind: "green", publishReady: true });
+          updateReviewTaskResult(reviewItem || skillId, { label: "预检通过", kind: "green", publishReady: true });
           setReviewFeedback("green", `${skillId} 预检通过`, "safe_to_push=true，可以继续确认发布到中央仓库。");
         } else if (payload.ok) {
           setExecutorStatus("needs review", `${skillId} 预检完成，但还不能发布，请看输出。`, "yellow");
-          updateReviewTaskResult(skillId, { label: "需复核", kind: "yellow", publishReady: false });
+          updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
           setReviewFeedback("yellow", `${skillId} 需要复核`, "预检完成但还不能发布，请查看执行输出。");
         } else {
           setExecutorStatus("failed", payload.error || `${skillId} 预检失败，请查看输出。`, "red");
-          updateReviewTaskResult(skillId, { label: "预检失败", kind: "red", publishReady: false });
+          updateReviewTaskResult(reviewItem || skillId, { label: "预检失败", kind: "red", publishReady: false });
           setReviewFeedback("red", `${skillId} 预检失败`, payload.error || "请查看执行输出。");
         }
       } catch (err) {
         showExecutorOutput(String(err));
         setExecutorStatus("failed", "执行器调用失败，请确认本机服务仍在线。", "red");
-        updateReviewTaskResult(skillId, { label: "调用失败", kind: "red", publishReady: false });
+        updateReviewTaskResult(reviewItem || skillId, { label: "调用失败", kind: "red", publishReady: false });
         setReviewFeedback("red", "执行器调用失败", "请确认 Mac 本机执行器仍在线。");
       } finally {
         setExecutorButtons(executorAvailable);
