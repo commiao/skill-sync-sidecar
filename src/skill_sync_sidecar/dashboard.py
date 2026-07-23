@@ -4883,8 +4883,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         const restoreTarget = restoreDeviceLabel(item);
-        title = restoreItems.length === 1 ? `有一个 skill 本机缺失：${skill}` : `有 ${restoreItems.length} 个 skill 本机缺失`;
-        summary = "共享仓库仍有完整版本，默认安全动作是恢复到本机，不删除共享仓库。";
+        title = restoreItems.length === 1 ? `${restoreTarget} 缺失一个 skill：${skill}` : `有 ${restoreItems.length} 个 skill 在设备上缺失`;
+        summary = "共享仓库仍有完整版本，默认安全动作是恢复到缺失设备，不删除共享仓库。";
         primaryActions = `
           <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">从共享仓库恢复到 ${escapeHtml(restoreTarget)}</button>
           <button type="button" onclick="openAdvancedDetails()">展开详情</button>
@@ -4932,8 +4932,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         `;
       } else if (deleteItems.length > 0) {
-        title = `有 ${deleteItems.length} 个 skill 在本机缺失`;
-        summary = "缺失不等于删除。sidecar 默认保留共享仓库，先让你决定恢复本机还是单独删除。";
+        title = `有 ${deleteItems.length} 个 skill 在设备上缺失`;
+        summary = "缺失不等于删除。sidecar 默认保留共享仓库，先让你决定恢复到缺失设备，还是单独删除共享仓库版本。";
         primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项<span>不会删除共享仓库。</span></button>`;
         facts = [
           ["缺失项", `${deleteNames}。`],
@@ -4996,12 +4996,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const isConflict = item.category === "conflict" || item.status_action === "conflict";
       const canRestore = reviewCanRestoreFromCentral(item);
       const reviewKey = reviewItemKey(item);
-      const title = isDelete ? `${skill}：本机缺失` : `${skill}：版本需要确认`;
       const restoreTarget = restoreDeviceLabel(item);
+      const title = isDelete ? `${skill}：${restoreTarget} 缺失` : `${skill}：版本需要确认`;
       const detail = canRestore
         ? `共享仓库里有完整版本，${restoreTarget} 当前缺失。推荐直接从共享仓库恢复；这不会删除共享仓库，也不会覆盖其他设备。`
         : (isDelete
-          ? "推荐先保留共享仓库，不自动删除。确认这个 skill 还要用时，从共享仓库恢复到本机；确认废弃时，再单独走删除审批。"
+          ? `推荐先保留共享仓库，不自动删除。确认这个 skill 还要用时，从共享仓库恢复到 ${restoreTarget}；确认废弃时，再单独走删除审批。`
           : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。");
       const primaryLabel = canRestore ? `从共享仓库恢复到 ${restoreTarget}` : (isDelete ? "保留共享仓库，稍后恢复" : "生成差异报告");
       const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
@@ -5778,7 +5778,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const dryRunKind = checked > 0 ? "green" : "yellow";
       const publishKind = publishReady > 0 ? "green" : "yellow";
       const publishNote = deleteTotal > 0
-        ? `${deleteTotal} 个删除项不会自动发布；需恢复本机或单独确认删除。`
+        ? `${deleteTotal} 个删除项不会自动发布；需恢复缺失设备或单独确认删除。`
         : "发布需要再次确认。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : "先确认 Mac 本机助手在线。"),
@@ -5908,7 +5908,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewActionText(item) {
-      if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return "本机已删除，共享仓库仍保留。";
+      if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return `${restoreDeviceLabel(item)} 缺失，共享仓库仍保留。`;
       if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "共享仓库已删除，本机仍保留。";
       if (reviewIsSourceChangedItem(item)) return "源端又产生了新版本。";
       if (item.category === "conflict") return "版本不一致，先看只读报告。";
@@ -5943,7 +5943,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewNextStepText(item) {
       if (reviewIsSourceChangedItem(item)) return "下一步：确认 OpenClaw 是否还在优化；如果还在改，先等，稳定后再检查发布。";
       if (item.category === "conflict") return "下一步：先生成只读差异报告，再按推荐恢复、发布或手动处理。";
-      if (item.status_action === "local_deleted") return "下一步：决定是恢复本机，还是单独确认删除共享仓库里的这个 skill。";
+      if (item.status_action === "local_deleted") return `下一步：决定是恢复到 ${restoreDeviceLabel(item)}，还是单独确认删除共享仓库里的这个 skill。`;
       if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新发布，还是接受共享仓库删除。";
       if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除共享仓库。";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：检查内容和目标工具，确认后再发布。";
@@ -5953,7 +5953,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewStatusText(item) {
       if (reviewIsSourceChangedItem(item)) return "源端新修改";
-      if (item.status_action === "local_deleted") return "本机缺失";
+      if (item.status_action === "local_deleted") return `${restoreDeviceLabel(item)} 缺失`;
       if (item.status_action === "remote_deleted") return "共享仓库缺失";
       if (item.status_action === "local_new") return "新增";
       if (item.status_action === "push_new") return "新发布";
@@ -5991,7 +5991,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewDecisionHtml(item) {
       if (item.status_action === "local_deleted") {
-        return `<strong>需要你决定</strong>如果这是误删，先从共享仓库/备份恢复到本机；如果确实废弃，走单独的删除审批。当前按钮不会删除共享仓库。`;
+        return `<strong>需要你决定</strong>如果这是误删，先从共享仓库/备份恢复到 ${escapeHtml(restoreDeviceLabel(item))}；如果确实废弃，走单独的删除审批。当前按钮不会删除共享仓库。`;
       }
       if (item.status_action === "remote_deleted") {
         return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新发布；如果共享仓库删除是正确的，再接受删除。`;
@@ -6617,11 +6617,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         || currentReviewQueueItems.find((item) => item.skill_id === skillId);
       if (reviewIsDeleteItem(reviewItem)) {
         updateReviewTaskResult(reviewItem, { label: "删除待决策", kind: "yellow", publishReady: false });
+        const restoreTarget = restoreDeviceLabel(reviewItem);
         setReviewFeedback(
           "yellow",
           `${skillId} 是删除确认项`,
           reviewItem.status_action === "local_deleted"
-            ? "本机已删除但共享仓库仍保留。下一步不是发布；请决定恢复本机，或单独确认删除共享仓库。"
+            ? `${restoreTarget} 缺失但共享仓库仍保留。下一步不是发布；请决定恢复到 ${restoreTarget}，或单独确认删除共享仓库。`
             : "共享仓库已删除但本机仍保留。请决定重新发布本机版本，或接受共享仓库删除。",
         );
         showExecutorOutput(
