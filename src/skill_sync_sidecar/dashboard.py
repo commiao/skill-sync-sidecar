@@ -3400,18 +3400,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 12px;
       align-items: start;
     }
-    .simple-action-card {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      padding: 12px;
-      min-width: 0;
-    }
-    .simple-action-card-title {
-      color: var(--ink);
-      font-weight: 840;
-      margin-bottom: 6px;
-    }
     .simple-action-steps {
       display: grid;
       gap: 8px;
@@ -3563,61 +3551,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       border-color: #efb1b1;
       background: #fff7f7;
     }
-    .simple-action-list {
-      display: grid;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .simple-action-more {
-      border-top: 1px solid var(--line);
-      padding-top: 8px;
-    }
-    .simple-action-more > summary {
-      cursor: pointer;
-      list-style: none;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 780;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .simple-action-more > summary::-webkit-details-marker {
-      display: none;
-    }
-    .simple-action-more > summary::after {
-      content: "展开";
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .simple-action-more[open] > summary::after {
-      content: "收起";
-    }
-    .simple-action-more-body {
-      display: grid;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .simple-action-facts {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .simple-action-fact {
-      border-top: 1px solid var(--line);
-      padding: 10px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-    .simple-action-fact strong {
-      display: block;
-      color: var(--ink);
-      font-size: 13px;
-      margin-bottom: 2px;
-    }
     .simple-action-done-line {
       border-top: 1px solid var(--line);
       padding-top: 10px;
@@ -3666,56 +3599,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px;
     }
     .simple-task-actions .primary {
-      background: var(--ink);
-      color: #fff;
-      border-color: var(--ink);
-    }
-    .simple-decision-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .simple-decision-card {
-      display: grid;
-      gap: 8px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      padding: 10px 12px;
-      min-width: 0;
-    }
-    .simple-decision-card.warning {
-      border-color: #e8d29c;
-      background: #fffdf7;
-    }
-    .simple-decision-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      align-items: flex-start;
-    }
-    .simple-decision-title {
-      color: var(--ink);
-      font-weight: 850;
-      overflow-wrap: anywhere;
-    }
-    .simple-decision-source {
-      color: var(--muted);
-      font-size: 12px;
-      overflow-wrap: anywhere;
-    }
-    .simple-decision-copy {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
-      overflow-wrap: anywhere;
-    }
-    .simple-decision-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .simple-decision-actions .primary {
       background: var(--ink);
       color: #fff;
       border-color: var(--ink);
@@ -6160,22 +6043,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         setExecutorButtons(executorAvailable);
         return;
       }
-      const publishNames = compactSkillList(publishItems.map((item) => item.skill_id));
-      const regularPublishNames = compactSkillList(regularPublishItems.map((item) => item.skill_id));
-      const sourceChangedNames = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
-      const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
-      const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
       let title = "有同步事项待处理";
       let summary = "先按右侧主按钮走；细节和原始队列放在“查看详情”里。";
       let primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看要处理什么<span>只打开确认清单，不会写入或删除。</span></button>`;
       let secondaryActions = `<div class="simple-action-secondary"><span>详情留在二级页面，需要时再看。</span><button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button></div>`;
-      let facts = [
-        ["不会自动覆盖", "有风险时会停下来等你确认。"],
-        ["先看再执行", "检查只读，发布前还要确认。"],
-        ["不懂也能用", "只需要按推荐按钮走。"],
-      ];
-      let taskCards = "";
       if (conflictItems.length > 0) {
         const item = conflictItems[0];
         const skill = text(item.skill_id || "unknown-skill");
@@ -6186,17 +6058,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         primaryActions = `
           <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
             <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成报告<span>只看差异，不会改文件。</span></button>
-          </div>
-        `;
-        facts = [
-          ["现在点这个", "生成只读报告。"],
-          ["不会发生", "不会自动发布、覆盖或删除。"],
-          ["报告出来后", "再选择恢复共享库版、发布 OpenClaw 版，或手动处理。"],
-        ];
-        taskCards = `
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">为什么停下来</div>
-            <div class="simple-action-summary">${escapeHtml(skill)} 在共享库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 上都被改过。需要你确认保留哪一版。</div>
           </div>
         `;
       } else if (restoreItems.length > 0) {
@@ -6210,12 +6071,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         primaryActions = `
           <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">找回到 ${escapeHtml(restoreTarget)}<span>会先检查，再要求确认。</span></button>
         `;
-        facts = [
-          ["推荐动作", `把 ${skill} 找回来。`],
-          ["不会发生", "不会删除共享库，也不会影响其他设备。"],
-          ["需要确认", "真正找回前会再次确认。"],
-        ];
-        taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (sourceChangedItems.length > 0) {
         const readySourceChangedItems = sourceChangedItems.filter((item) => {
           const result = reviewTaskResults[reviewItemKey(item)];
@@ -6248,27 +6103,6 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
           `;
         }
-        facts = allSourceChangedReady
-          ? (executorAllowPublish ? [
-            ["下一步", "点“保存到共享库”。"],
-            ["确认词", "输入 PUBLISH 后才会写入。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ] : [
-            ["当前限制", "本机助手未开启写共享库权限。"],
-            ["不会丢失", "检查结果还在；打开发布开关后可重新保存。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ])
-          : [
-            ["当前建议", "还在改就先不提醒。"],
-            ["改完之后", "点检查最新版本，通过后再保存。"],
-            ["安全边界", "先不提醒只影响当前浏览器首页。"],
-          ];
-        taskCards = `
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">涉及 skill</div>
-            <div class="simple-action-summary">${escapeHtml(sourceChangedNames)}</div>
-          </div>
-        `;
       } else if (publishItems.length > 0) {
         const readyPublishItems = regularPublishItems.filter((item) => {
           const result = reviewTaskResults[reviewItemKey(item)];
@@ -6290,37 +6124,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查一下<span>只读，不写入。</span></button>
           `;
-        facts = allPublishReady
-          ? (executorAllowPublish ? [
-            ["下一步", "点“保存到共享库”。"],
-            ["确认词", "输入 PUBLISH 后才会写入。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ] : [
-            ["当前限制", "本机助手未开启写共享库权限。"],
-            ["不会丢失", "检查结果还在；打开发布开关后可重新保存。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ])
-          : [
-            ["要检查", `${regularPublishNames || publishNames}。`],
-            ["第一步", "检查只读，不写共享库。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ];
-        taskCards = `
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">本次会处理</div>
-            <div class="simple-action-summary">${escapeHtml(regularPublishNames || publishNames)}</div>
-          </div>
-        `;
       } else if (deleteItems.length > 0) {
         title = "先处理缺失 skill";
         summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是以后单独删除共享库版本。";
         primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看少了什么<span>只打开确认清单，不会删除。</span></button>`;
-        facts = [
-          ["缺失项", `${deleteNames}。`],
-          ["默认安全", "保留共享库。"],
-          ["删除保护", "删除不会一键执行。"],
-        ];
-        taskCards = renderSimpleDecisionList([], deleteItems);
       }
       panel.innerHTML = `
         <div class="simple-action-hero">
@@ -6335,7 +6142,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         ${secondaryActions}
         <div id="simple-action-disabled-note" class="simple-action-disabled-note">正在确认当前按钮状态。</div>
       </div>
-        ${renderSimpleActionMore(facts, taskCards)}
         ${simpleActionFeedbackHtml()}
         <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前 Mac；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
@@ -6368,23 +6174,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         return null;
       }
       return lastOperationFeedback;
-    }
-
-    function renderSimpleActionMore(facts, taskCards) {
-      const safeFacts = Array.isArray(facts) ? facts : [];
-      if (safeFacts.length === 0 && !taskCards) return "";
-      const factHtml = safeFacts.length
-        ? `<div class="simple-action-facts">${safeFacts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}</div>`
-        : "";
-      return `
-        <details class="simple-action-more">
-          <summary>查看详情（可选）</summary>
-          <div class="simple-action-more-body">
-            ${factHtml}
-            ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
-          </div>
-        </details>
-      `;
     }
 
     function deferSourceChangedItems() {
@@ -6444,60 +6233,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       button.click();
-    }
-
-    function renderSimpleDecisionList(conflictItems, deleteItems) {
-      const decisions = [
-        ...(Array.isArray(conflictItems) ? conflictItems : []),
-        ...(Array.isArray(deleteItems) ? deleteItems : []),
-      ];
-      if (decisions.length === 0) return "";
-      return `
-        <div class="simple-decision-list">
-          ${decisions.map((item) => renderSimpleDecisionCard(item)).join("")}
-        </div>
-      `;
-    }
-
-    function renderSimpleDecisionCard(item) {
-      const skill = text(item.skill_id || "unknown-skill");
-      const peer = text(item.peer_name || item.peer_id || "未知设备");
-      const isDelete = reviewIsDeleteItem(item);
-      const isConflict = item.category === "conflict" || item.status_action === "conflict";
-      const canRestore = reviewCanRestoreFromCentral(item);
-      const reviewKey = reviewItemKey(item);
-      const restoreTarget = restoreDeviceLabel(item);
-      const title = isDelete ? `${skill}：${restoreTarget} 缺失` : `${skill}：版本需要确认`;
-      const detail = canRestore
-        ? `共享库里有完整版本，${restoreTarget} 当前缺失。推荐直接从共享库恢复；这不会删除共享库，也不会覆盖其他设备。`
-        : (isDelete
-          ? `推荐先保留共享库，不自动删除。确认这个 skill 还要用时，从共享库恢复到 ${restoreTarget}；确认废弃时，再单独走删除审批。`
-          : "推荐先不要覆盖。打开详情看来源设备；如果 OpenClaw 是新版本，先发布 OpenClaw 更新；如果 Mac 是正确版本，再恢复/重装 Mac 版本。");
-      const primaryLabel = canRestore ? `从共享库恢复到 ${restoreTarget}` : (isDelete ? "保留共享库，稍后恢复" : "生成差异报告");
-      const secondaryLabel = isDelete ? "我确认要删除" : "查看高级详情";
-      const secondaryDetail = isDelete
-        ? "删除共享库属于高风险操作，当前面板不会一键执行。"
-        : "版本差异不会自动覆盖，当前面板不会猜哪边正确。";
-      return `
-        <div class="simple-decision-card warning">
-          <div class="simple-decision-head">
-            <div>
-              <div class="simple-decision-title">${escapeHtml(title)}</div>
-              <div class="simple-decision-source">${escapeHtml(peer)}</div>
-            </div>
-            ${pill(isConflict ? "需选择" : "需确认", "yellow")}
-          </div>
-          <div class="simple-decision-copy">${escapeHtml(detail)}</div>
-          <div class="simple-decision-actions">
-            ${canRestore
-              ? `<button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(text(item.peer_id || ""))}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">${escapeHtml(primaryLabel)}</button>`
-              : (isConflict
-                ? `<button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(text(item.peer_id || ""))}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">${escapeHtml(primaryLabel)}</button>`
-                : `<button type="button" class="primary" onclick="openAdvancedDetails()">${escapeHtml(primaryLabel)}</button>`)}
-            <button type="button" onclick="showDecisionExplanation('${escapeHtml(skill)}', '${escapeHtml(secondaryDetail)}')">${escapeHtml(secondaryLabel)}</button>
-          </div>
-        </div>
-      `;
     }
 
     function reviewCanRestoreFromCentral(item) {

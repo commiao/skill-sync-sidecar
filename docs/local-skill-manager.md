@@ -57,8 +57,8 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 - `恢复发布` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
-The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit publish confirmation, and other devices are read-only status unless their own Agent acts.
-The first screen should prefer one primary action plus at most a few secondary shortcuts. It should not expose raw queues, tool matrices, hash/version details, long explanations, or diagnostic counts as the normal path. Put those details behind `查看详情`, `Skill 清单`, or advanced sections.
+The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit save confirmation, and other devices are read-only status unless their own Agent acts.
+The first screen should prefer one primary action plus at most a few secondary shortcuts. It should not expose raw queues, tool matrices, hash/version details, long explanations, diagnostic counts, or embedded detail drawers as the normal path. Put those details behind `查看确认清单`, `Skill 清单`, or advanced sections.
 Clicking a first-screen `查看确认清单` or `看看要处理什么` action should open every parent drawer needed to make the review queue visible, then scroll directly to that queue.
 Clicking permission/setup actions such as `开启保存权限` or `开启本机写入` should open the technical setup area only. It must not focus the local skill path input; that input is reserved for the explicit `管理本机 skill` workflow.
 
