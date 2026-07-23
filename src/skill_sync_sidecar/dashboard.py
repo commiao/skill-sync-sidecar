@@ -4581,7 +4581,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const breakdown = blockedBreakdown(blockedItems);
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
       $("strip-health").textContent = blocked > 0
-        ? (breakdown.conflict === blocked ? "个需要确认" : "个需要处理")
+        ? (breakdown.sourceChanged > 0 ? "个源端新修改" : (breakdown.conflict === blocked ? "个需要确认" : "个需要处理"))
         : "无待处理";
       $("strip-blocked").textContent = blocked > 0 ? text(blocked) : "正常";
       $("strip-local").textContent = text(local.total_skills);
@@ -4589,12 +4589,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-devices").textContent = text(deviceCount);
       const stripDryRun = $("strip-dry-run");
       if (stripDryRun) {
-        stripDryRun.textContent = conflictOnly ? "先看差异" : "检查待发布";
-        stripDryRun.onclick = conflictOnly ? runFirstConflictPackage : (() => runExecutorAction("dry_run"));
+        stripDryRun.textContent = conflictOnly ? "先看差异" : (breakdown.sourceChanged > 0 ? "刷新状态" : "检查待发布");
+        stripDryRun.onclick = conflictOnly ? runFirstConflictPackage : (breakdown.sourceChanged > 0 ? (() => refresh(true)) : (() => runExecutorAction("dry_run")));
       }
       if (conflictOnly) {
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
         $("strip-focus-note").textContent = `只剩版本差异：${names}。先看报告，不会自动覆盖。`;
+      } else if (breakdown.sourceChanged > 0) {
+        const names = compactSkillList(blockedItems.filter((item) => reviewIsSourceChangedItem(item)).map((item) => item.skill_id));
+        $("strip-focus-note").textContent = `OpenClaw 还在产生新修改：${names}。先等稳定，再检查发布。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
@@ -4604,23 +4607,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (actionNote) {
         actionNote.textContent = conflictOnly
           ? "先看报告，再决定保留哪一版。"
-          : (blocked > 0
-          ? "不会自动写入共享仓库；确认后才会发布。"
-          : "只操作当前 Mac，本页不会跨设备乱改。");
+          : (breakdown.sourceChanged > 0
+            ? "这不是发布失败；源端还在变，先别反复发布。"
+            : (blocked > 0
+            ? "不会自动写入共享仓库；确认后才会发布。"
+            : "只操作当前 Mac，本页不会跨设备乱改。"));
       }
     }
 
     function blockedBreakdown(items) {
       const allItems = Array.isArray(items) ? items : [];
-      const publish = reviewPublishItems(allItems).length;
+      const sourceChanged = allItems.filter((item) => reviewIsSourceChangedItem(item)).length;
+      const publish = reviewPublishItems(allItems).filter((item) => !reviewIsSourceChangedItem(item)).length;
       const conflict = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict").length;
       const deleteReview = reviewDeleteItems(allItems).length;
-      const other = Math.max(allItems.length - publish - conflict - deleteReview, 0);
-      return { publish, conflict, deleteReview, other };
+      const other = Math.max(allItems.length - publish - sourceChanged - conflict - deleteReview, 0);
+      return { publish, sourceChanged, conflict, deleteReview, other };
     }
 
     function blockedBreakdownText(breakdown) {
       const parts = [];
+      if (breakdown.sourceChanged) parts.push(`源端新修改 ${breakdown.sourceChanged} 个`);
       if (breakdown.publish) parts.push(`可发布更新 ${breakdown.publish} 个`);
       if (breakdown.conflict) parts.push(`版本差异 ${breakdown.conflict} 个`);
       if (breakdown.deleteReview) parts.push(`删除确认 ${breakdown.deleteReview} 个`);
@@ -4636,6 +4643,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         const names = compactSkillList(items.map((item) => item.skill_id));
         return `只剩版本差异：${names}。先看只读差异报告，报告会给出推荐动作。`;
       }
+      if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.sourceChanged > 0) {
+        const names = compactSkillList(items.filter((item) => reviewIsSourceChangedItem(item)).map((item) => item.skill_id));
+        return `OpenClaw 又产生了新修改：${names}。这不是发布失败；先等源端稳定，再检查发布。`;
+      }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先处理 ${blocked} 个待确认事项；检查只预览，确认后再发布到共享仓库。`;
       }
@@ -4644,6 +4655,9 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function conciseGuideSummary(guide) {
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
+      if ((guide.title || "") === "OpenClaw 还有新修改") {
+        return guide.summary || "OpenClaw 还在产生新修改；等稳定后再发布。";
+      }
       if ((guide.state || "") === "yellow" && skills.length > 0) {
         return `重点是 ${skills.length} 个待确认 skill。先看上方推荐动作，再检查。`;
       }
@@ -4781,7 +4795,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!panel) return;
       hideConflictResolutionPanel();
       const allItems = Array.isArray(items) ? items : [];
+      const sourceChangedItems = reviewSourceChangedItems(allItems);
       const publishItems = reviewPublishItems(allItems);
+      const regularPublishItems = publishItems.filter((item) => !reviewIsSourceChangedItem(item));
       const deleteItems = reviewDeleteItems(allItems);
       const conflictItems = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
       const restoreItems = allItems.filter((item) => reviewCanRestoreFromCentral(item));
@@ -4805,6 +4821,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       const publishNames = compactSkillList(publishItems.map((item) => item.skill_id));
+      const regularPublishNames = compactSkillList(regularPublishItems.map((item) => item.skill_id));
+      const sourceChangedNames = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
@@ -4859,23 +4877,41 @@ DASHBOARD_HTML = r"""<!doctype html>
           ["需要确认", "恢复前会再次确认。"],
         ];
         taskCards = renderSimpleDecisionList([], restoreItems);
+      } else if (sourceChangedItems.length > 0) {
+        title = sourceChangedItems.length === 1 ? `OpenClaw 还在改：${sourceChangedNames}` : `OpenClaw 还有 ${sourceChangedItems.length} 个新修改`;
+        summary = "这不是刚才发布失败，而是 OpenClaw 又产生了新版本。先别反复点发布；等那边停止修改后，再检查并发布最后一次。";
+        primaryActions = `
+          <button type="button" class="primary" onclick="refresh(true)">刷新，看是否稳定<span>只重新读取状态，不写共享仓库。</span></button>
+          <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>已稳定，先检查<span>检查只读，不会发布。</span></button>
+        `;
+        facts = [
+          ["发生了什么", "OpenClaw 本地版本又变了。"],
+          ["现在别做", "不要反复发布同一个正在修改的 skill。"],
+          ["什么时候发布", "等源端停止修改，再检查并发布。"],
+          ["完成标准", "顶部显示“无待处理”。"],
+        ];
+        taskCards = `
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">正在变化的 skill</div>
+            <div class="simple-action-summary">${escapeHtml(sourceChangedNames)}</div>
+          </div>
+        `;
       } else if (publishItems.length > 0) {
         title = `有 ${publishItems.length} 个更新可以发布`;
-        summary = "这些更新来自设备本地改动。先点检查，只看会改什么；通过后再发布到共享仓库。如果刚发布完又出现同一个 skill，说明源设备又产生了新修改。";
+        summary = "这些更新来自设备本地改动。先点检查，只看会改什么；通过后再发布到共享仓库。";
         primaryActions = `
           <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
           <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
         `;
         facts = [
-          ["要发布", `${publishNames}。`],
+          ["要发布", `${regularPublishNames || publishNames}。`],
           ["第一步", "检查只读，不写共享仓库。"],
           ["完成标准", "顶部显示“无待处理”。"],
-          ["反复出现", "说明源设备还在改，等改完再同步。"],
         ];
         taskCards = `
           <div class="simple-action-card">
             <div class="simple-action-card-title">本次会处理</div>
-            <div class="simple-action-summary">${escapeHtml(publishNames)}</div>
+            <div class="simple-action-summary">${escapeHtml(regularPublishNames || publishNames)}</div>
           </div>
         `;
       } else if (deleteItems.length > 0) {
@@ -5592,6 +5628,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const sourceChangedNames = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
+      const sourceChangedOnly = sourceChangedItems.length > 0 && sourceChangedItems.length === publishItems.length;
       const summary = conflictItems.length > 0
         ? `有 ${conflictItems.length} 个版本差异，不能一键发布。先生成只读差异报告，报告会给出恢复、发布或手动处理的推荐。`
         : (sourceChangedItems.length > 0
@@ -5601,14 +5638,16 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`));
       const publishActionLabel = !executorAvailable
         ? "等待本机助手"
-        : (!executorAllowPublish ? "发布开关未打开" : `确认发布 ${publishItems.length} 个 OpenClaw 更新`);
+        : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedItems.length > 0 ? `等稳定后发布 ${publishItems.length} 个更新` : `确认发布 ${publishItems.length} 个 OpenClaw 更新`));
       const publishActionNote = publishItems.length === 0
         ? "当前没有东西可发布；如果点确认发布，也不会写入共享仓库。"
         : (!executorAvailable
           ? "本机助手未在线，先启动本机助手。"
           : (!executorAllowPublish
             ? "当前只能检查，不能写入共享仓库；需要重新安装本机助手并打开发布开关。"
-            : (remainingReady > 0 ? "发布按钮会在所有更新检查通过后解锁。" : "下一步就是点“确认发布”，确认后写入共享仓库。")));
+            : (sourceChangedItems.length > 0 && remainingReady > 0
+              ? "先确认源端已经稳定，再检查；通过后才写入共享仓库。"
+              : (remainingReady > 0 ? "发布按钮会在所有更新检查通过后解锁。" : "下一步就是点“确认发布”，确认后写入共享仓库。"))));
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
         <div class="review-recommendation-summary">
@@ -5621,7 +5660,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">2</span>
-            <span>${remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。")}</span>
+            <span>${sourceChangedOnly ? "等 OpenClaw 停止修改后再检查。" : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。"))}</span>
           </li>
           <li class="review-recommendation-step">
             <span class="review-recommendation-index">3</span>
@@ -6099,6 +6138,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const actionSkills = currentActionSkillIds();
       const reviewReady = allReviewPublishCandidatesReady();
+      const sourceChangedCount = reviewSourceChangedItems(currentReviewQueueItems).length;
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
       $("executor-dry-run").disabled = !available || actionSkills.length === 0;
       $("executor-publish").disabled = !canPublishApprovedPush;
@@ -6117,7 +6157,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         easySyncEmpty.classList.toggle("has-work", showSyncActions);
         if (easySyncSteps) easySyncSteps.hidden = !showSyncActions;
         easySyncEmpty.textContent = showSyncActions
-          ? "检测到待确认更新。先检查，确认安全后再同步到其他设备。"
+          ? (sourceChangedCount > 0
+            ? "OpenClaw 还在产生新修改。先等源端稳定；确定稳定后再检查同步。"
+            : "检测到待确认更新。先检查，确认安全后再同步到其他设备。")
           : "当前没有待同步更新。页面顶部显示“无待处理”时，可以关闭页面或继续工作。";
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
@@ -6148,15 +6190,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (simplePublish) {
         simplePublish.textContent = !available
           ? "等待本机助手"
-          : (!executorAllowPublish ? "发布开关未打开" : "确认发布");
+          : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedCount > 0 ? "等稳定后发布" : "确认发布"));
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
             ? "发布开关未打开"
-            : (!reviewReady && !lastDryRunSafe
+            : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe
+              ? "源端还在变化；等稳定后先检查"
+              : (!reviewReady && !lastDryRunSafe
               ? "先检查，确认结果显示可以发布"
-              : "发布到共享仓库"));
+              : "发布到共享仓库")));
       }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");
