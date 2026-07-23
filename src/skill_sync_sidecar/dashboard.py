@@ -2705,13 +2705,31 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #fff;
     }
     .easy-workspace-head {
+      cursor: pointer;
+      list-style: none;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
       background: #fbfcff;
+    }
+    .easy-workspace-head::-webkit-details-marker {
+      display: none;
+    }
+    .easy-workspace-head::after {
+      content: "展开";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      margin-left: 4px;
+      flex: 0 0 auto;
+    }
+    .easy-workspace[open] .easy-workspace-head {
+      border-bottom: 1px solid var(--line);
+    }
+    .easy-workspace[open] .easy-workspace-head::after {
+      content: "收起";
     }
     .easy-workspace-title {
       display: grid;
@@ -4058,14 +4076,14 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
-    <section class="easy-workspace panel" aria-label="你想做什么">
-      <div class="easy-workspace-head">
+    <details id="easy-workspace" class="easy-workspace panel" aria-label="可选操作">
+      <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
-          <strong>你想做什么？</strong>
-          <span>选一个入口即可。本页默认只操作当前 Mac；同步到其他设备前会再次确认。</span>
+          <strong>可选：新增或同步 skill</strong>
+          <span>没有待办时不用展开。需要安装本机 skill 或主动同步时，再打开这里。</span>
         </div>
         <span class="pill green">只操作本机</span>
-      </div>
+      </summary>
       <div class="easy-workspace-grid">
         <div class="easy-card">
           <div class="easy-card-label">新增/安装</div>
@@ -4106,7 +4124,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </ol>
         </div>
       </div>
-    </section>
+    </details>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
     <details class="quick-status-details">
       <summary>可选：查看状态数字</summary>

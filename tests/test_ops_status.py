@@ -644,8 +644,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"simple-publish\"", DASHBOARD_HTML)
             self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
-            self.assertIn("你想做什么？", DASHBOARD_HTML)
-            self.assertIn("选一个入口即可", DASHBOARD_HTML)
+            self.assertIn("<details id=\"easy-workspace\" class=\"easy-workspace panel\"", DASHBOARD_HTML)
+            self.assertIn("<summary class=\"easy-workspace-head\">", DASHBOARD_HTML)
+            self.assertIn("可选：新增或同步 skill", DASHBOARD_HTML)
+            self.assertIn("没有待办时不用展开", DASHBOARD_HTML)
             self.assertNotIn("场景 1", DASHBOARD_HTML)
             self.assertNotIn("场景 2", DASHBOARD_HTML)
             self.assertIn("新增/安装", DASHBOARD_HTML)
@@ -766,7 +768,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("只操作本机", DASHBOARD_HTML)
             self.assertIn("这里只是高级明细；日常操作请回到页面顶部两个入口", DASHBOARD_HTML)
             self.assertIn("日常操作请用页面顶部两个入口", DASHBOARD_HTML)
-            self.assertIn("就用下面两个入口", DASHBOARD_HTML)
+            self.assertIn("以后要新增、安装或发布 skill", DASHBOARD_HTML)
             self.assertNotIn("常用操作", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
