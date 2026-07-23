@@ -5531,14 +5531,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       currentReviewQueueItems = items;
-      panel.hidden = false;
-      $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const deleteItems = reviewDeleteItems(items);
       const sourceChangedItems = reviewSourceChangedItems(items);
       const publishItems = reviewPublishItems(items);
       const regularPublishItems = publishItems.filter((item) => !reviewIsSourceChangedItem(item));
       const conflictItems = reviewConflictItems(items);
       const conflictOnly = conflictItems.length > 0 && conflictItems.length === items.length;
+      const sourceChangedOnly = sourceChangedItems.length > 0 && sourceChangedItems.length === items.length;
+      if (sourceChangedOnly) {
+        panel.hidden = true;
+        setExecutorButtons(executorAvailable);
+        return;
+      }
+      panel.hidden = false;
+      $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsSourceChangedItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
       currentReviewQueueIsMobile = mobileReview;

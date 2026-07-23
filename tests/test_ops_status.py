@@ -728,6 +728,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("刷新，看是否稳定", DASHBOARD_HTML)
             self.assertIn("个源端新修改", DASHBOARD_HTML)
             self.assertIn("等稳定后发布", DASHBOARD_HTML)
+            self.assertIn("sourceChangedOnly", DASHBOARD_HTML)
+            self.assertIn("panel.hidden = true", DASHBOARD_HTML)
             self.assertIn("保护性拒绝写入共享仓库", DASHBOARD_HTML)
             self.assertIn("发布已被拒绝；这里只重新读取 OpenClaw 最新队列。", DASHBOARD_HTML)
             self.assertIn("OpenClaw 待确认清单", DASHBOARD_HTML)
