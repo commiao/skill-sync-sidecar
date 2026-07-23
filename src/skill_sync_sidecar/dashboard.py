@@ -1166,15 +1166,15 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
             summary = f"OpenClaw 有 {source_changed_count} 个 skill 又产生新版本{skill_hint}。还在改可以先放着；改完后点检查最新版本。"
             first_step = "改完后检查最新版本"
             first_detail = "检查只读，不写共享库；如果检查期间 skill 又变化，系统会自动拒绝写入。"
-            second_detail = "检查结果显示可以发布后，再输入 PUBLISH 写入共享库。"
+            second_detail = "检查结果显示可以保存后，再输入 PUBLISH 写入共享库。"
             note = "反复出现同一个 skill 时，通常表示源端还在写文件；这只会保护该 skill，不应阻塞其他独立更新。"
         else:
             title = "OpenClaw 更新需要确认"
-            summary = f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再发布到共享库。刚发布过同一项又出现，表示 OpenClaw 又产生了新修改，不是按钮失效。"
+            summary = f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再保存到共享库。刚保存过同一项又出现，表示 OpenClaw 又产生了新修改，不是按钮失效。"
             first_step = "先检查，不上传"
             first_detail = "只看这次会改什么，不写共享库。"
-            second_detail = "只有检查结果显示可以发布，且这些 skill 不再继续编辑时，才确认发布。"
-            note = "如果 OpenClaw 上这些 skill 仍在被优化，可以先放着继续做；改完后重新检查并确认发布。反复出现同一个 skill 时，只保护该 skill，不应阻塞其他独立更新。"
+            second_detail = "只有检查结果显示可以保存，且这些 skill 不再继续编辑时，才保存到共享库。"
+            note = "如果 OpenClaw 上这些 skill 仍在被优化，可以先放着继续做；改完后重新检查并保存到共享库。反复出现同一个 skill 时，只保护该 skill，不应阻塞其他独立更新。"
         return {
             "state": "yellow",
             "title": title,
@@ -1719,7 +1719,7 @@ def _blocked_item_operator_action(item: dict) -> str:
     status_action = item.get("status_action")
     category = item.get("category")
     if item.get("operator_state") == "source_changed" or _is_openclaw_source_changed(item):
-        return f"OpenClaw 又产生了 {skill_id or 'unknown-skill'} 的新修改；改完后检查最新版本，再确认发布。"
+        return f"OpenClaw 又产生了 {skill_id or 'unknown-skill'} 的新修改；改完后检查最新版本，再保存到共享库。"
     if category == "conflict":
         return _operator_issue_action(peer_id, peer_name, skill_id, status_action, category)
     if _is_openclaw_writer_policy_push(item):
@@ -5554,7 +5554,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="executor-actions">
               <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
               <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键检查</button>
-              <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
+              <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>保存到共享库</button>
             </div>
             <pre id="executor-output" class="executor-output mono"></pre>
           </div>
@@ -6337,7 +6337,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
         ${simpleActionFeedbackHtml()}
-        <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前 Mac；共享库只有确认发布才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
+        <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前 Mac；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -7182,7 +7182,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           renderReviewGroup(
             "再处理可发布更新",
             regularPublishItems,
-            "逐项检查，结果显示可以发布后再显式发布到共享库。"
+            "逐项检查，结果显示可以保存后再保存到共享库。"
           ),
           renderReviewGroup(
             "最后处理版本差异/未知项",
@@ -7254,14 +7254,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? "等待本机助手"
         : (!executorAllowPublish ? "只能检查" : (sourceChangedItems.length > 0 && remainingReady > 0 ? "检查最新版本" : `保存 ${publishItems.length} 个更新`));
       const publishActionNote = publishItems.length === 0
-        ? "当前没有东西可发布；如果点确认发布，也不会写入共享库。"
+        ? "当前没有东西可保存；如果点保存到共享库，也不会写入共享库。"
         : (!executorAvailable
           ? "本机助手未在线，先启动本机助手。"
           : (!executorAllowPublish
-            ? "当前只能检查，不能写入共享库；需要重新安装本机助手并打开发布开关。"
+            ? "当前只能检查，不能写入共享库；需要重新安装本机助手并打开保存开关。"
             : (sourceChangedItems.length > 0 && remainingReady > 0
               ? "改完后先检查最新版本；检查期间又变化会自动拒绝写入。"
-              : (remainingReady > 0 ? "发布按钮会在所有更新检查通过后解锁。" : "下一步就是点“确认发布”，确认后写入共享库。"))));
+              : (remainingReady > 0 ? "保存按钮会在所有更新检查通过后解锁。" : "下一步就是点“保存到共享库”，确认后写入共享库。"))));
       const firstDetail = conflictItems.length
         ? `版本差异：${conflictNames}。先看只读报告。`
         : (deleteItems.length
@@ -7271,8 +7271,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? "点“检查”只会读取最新版本，不会写入共享库。"
         : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : (deferredItems.length ? "已搁置项不会进入批量检查/发布。" : "当前没有可发布更新。")));
       const thirdDetail = publishItems.length === 0
-        ? "不要点发布；先完成版本差异/缺失决策。"
-        : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享库。`));
+        ? "不要点保存；先完成版本差异/缺失决策。"
+        : (!executorAllowPublish ? "当前保存开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `保存前还差 ${remainingReady} 个检查通过。` : `可以保存 ${publishItems.length} 个更新到共享库。`));
       target.innerHTML = `
         <div class="review-recommendation-title">下一步</div>
         <div class="review-recommendation-summary">
@@ -7388,11 +7388,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishKind = publishReady > 0 ? "green" : "yellow";
       const publishNote = deleteTotal > 0
         ? `${deleteTotal} 个删除项不会自动发布；需恢复缺失设备或单独确认删除。`
-        : "发布需要再次确认。";
+        : "保存前会再次确认。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : "先确认 Mac 本机助手在线。"),
         reviewStage("2", "检查可发布更新", `${checked}/${publishableTotal} 已检查`, dryRunKind, publishableTotal > 0 ? "检查只读，不会写共享库。" : "当前没有可发布项；不要反复点发布。"),
-        reviewStage("3", conflictTotal > 0 ? "版本确认" : "确认发布", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可发布`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
+        reviewStage("3", conflictTotal > 0 ? "版本确认" : "保存共享库", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可保存`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
       ].join("");
     }
 
@@ -7427,12 +7427,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const unrelatedRemaining = allItems.filter((item) => !publishedSkills.includes(text(item.skill_id)));
       const publishedNames = compactSkillList(publishedSkills);
       if (relatedRemaining.length === 0 && allItems.length === 0) {
-        setReviewFeedback("green", "刚刚发布完成", `已发布 ${publishedNames}；当前没有确认项。`);
+        setReviewFeedback("green", "刚刚保存完成", `已保存 ${publishedNames}；当前没有确认项。`);
       } else if (relatedRemaining.length === 0) {
         setReviewFeedback(
           "yellow",
-          "发布完成，还有其他提醒",
-          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的确认项：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。这不是同一批发布失败。`,
+          "保存完成，还有其他提醒",
+          `已保存 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的确认项：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。这不是同一批保存失败。`,
         );
       } else {
         const result = publishRemainingFeedback(publishedNames, relatedRemaining);
@@ -7444,13 +7444,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const sourceChanged = relatedRemaining.filter((item) => reviewIsSourceChangedItem(item));
       if (sourceChanged.length > 0) {
         return {
-          title: "发布完成，OpenClaw 又有新修改",
-          detail: `已发布 ${publishedNames}；但 OpenClaw 又上报了新版本：${compactSkillList(sourceChanged.map((item) => item.skill_id))}。这不是发布失败；改完后点“检查最新版本”。`,
+          title: "保存完成，OpenClaw 又有新修改",
+          detail: `已保存 ${publishedNames}；但 OpenClaw 又上报了新版本：${compactSkillList(sourceChanged.map((item) => item.skill_id))}。这不是保存失败；改完后点“检查最新版本”。`,
         };
       }
       return {
-        title: "发布写入成功，等待设备上报",
-        detail: `已发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。通常是设备上报还没刷新，稍后点刷新再看。`,
+        title: "保存写入成功，等待设备上报",
+        detail: `已保存 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。通常是设备上报还没刷新，稍后点刷新再看。`,
       };
     }
 
@@ -7513,7 +7513,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function shouldRememberOperationFeedback(kind, title) {
       if (kind !== "green") return false;
-      return /发布完成|本次发布已完成|已发布|已安装|已从|已恢复|已标记|已恢复发布|状态已刷新/.test(text(title));
+      return /保存完成|本次保存已完成|发布完成|本次发布已完成|已保存|已发布|已安装|已从|已恢复|已标记|已恢复发布|状态已刷新/.test(text(title));
     }
 
     function setButtonLabel(button, label, subtext) {
@@ -7671,16 +7671,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (reviewIsSourceChangedItem(item)) {
         const result = reviewTaskResults[reviewItemKey(item)];
         if (result && result.publishReady) {
-          return `<strong>已通过检查</strong>如果 OpenClaw 已停止修改，可以确认发布。`;
+          return `<strong>已通过检查</strong>如果 OpenClaw 已停止修改，可以保存到共享库。`;
         }
         return `<strong>可重新检查</strong>这不是上次发布失败；OpenClaw 又产生了新版本。改完后点检查最新版本。`;
       }
       if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
         const result = reviewTaskResults[reviewItemKey(item)];
         if (result && result.publishReady) {
-          return `<strong>已通过检查</strong>等待上方“确认发布”写入共享库。`;
+          return `<strong>已通过检查</strong>等待上方“保存到共享库”写入共享库。`;
         }
-        return `<strong>可走发布流程</strong>先点检查；只有结果显示可以发布后，才会解锁显式发布。`;
+        return `<strong>可保存</strong>先点检查；只有结果显示可以保存后，才会解锁保存到共享库。`;
       }
       return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
     }
@@ -7874,18 +7874,18 @@ DASHBOARD_HTML = r"""<!doctype html>
         reviewPublishAll.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "发布开关未打开；当前只能检查，不能写入共享库"
+            ? "保存开关未打开；当前只能检查，不能写入共享库"
             : (!reviewReady && !lastDryRunSafe
-              ? "请先完成检查，确认结果显示可以发布"
+              ? "请先完成检查，确认结果显示可以保存"
               : "写入共享库"));
       }
       $("easy-publish").title = !available
         ? "本机助手未在线"
         : (!executorAllowPublish
-          ? "发布开关未打开；当前只能检查，不能写入共享库"
+          ? "保存开关未打开；当前只能检查，不能写入共享库"
           : (!reviewReady && !lastDryRunSafe
-            ? "没有已检查通过的待发布更新"
-            : "发布到共享库"));
+            ? "没有已检查通过的待保存更新"
+            : "保存到共享库"));
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         setButtonLabel(
@@ -7905,7 +7905,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe
               ? "改完后先检查最新版本；检查期间又变化会自动拒绝写入"
               : (!reviewReady && !lastDryRunSafe
-              ? "先检查，确认结果显示可以发布"
+              ? "先检查，确认结果显示可以保存"
               : "保存到共享库")));
       }
       if (simpleActionHint) {
@@ -8203,27 +8203,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       const isPublish = mode === "publish";
       if (isPublish) {
         if (!executorAllowPublish) {
-          showExecutorOutput("当前没有打开发布开关，所以只能检查，不能写入共享库。");
-          setReviewFeedback("yellow", "发布开关未打开", "当前只能检查，不能写入共享库。打开发布开关后，按钮会变成可发布。");
+          showExecutorOutput("当前没有打开保存开关，所以只能检查，不能写入共享库。");
+          setReviewFeedback("yellow", "保存开关未打开", "当前只能检查，不能写入共享库。打开保存开关后，按钮会变成可保存。");
           setExecutorButtons(executorAvailable);
           return;
         }
         if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
-          showExecutorOutput("请先运行检查，并确认结果显示可以发布。");
-          setReviewFeedback("yellow", "还不能发布", "请先运行检查，确认结果显示可以发布后再写入共享库。");
+          showExecutorOutput("请先运行检查，并确认结果显示可以保存。");
+          setReviewFeedback("yellow", "还不能保存", "请先运行检查，确认结果显示可以保存后再写入共享库。");
           return;
         }
-        const typed = window.prompt("发布会写入共享库。请输入 PUBLISH 确认：");
+        const typed = window.prompt("保存会写入共享库。请输入 PUBLISH 确认：");
         if (typed !== "PUBLISH") {
-          showExecutorOutput("已取消发布。");
-          setReviewFeedback("yellow", "发布已取消", "没有写入共享库，待确认项仍保留。");
+          showExecutorOutput("已取消保存。");
+          setReviewFeedback("yellow", "保存已取消", "没有写入共享库，待确认项仍保留。");
           return;
         }
       }
       executorBusy = true;
       setExecutorButtons(false);
-      setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
-      setReviewFeedback("yellow", isPublish ? "正在发布" : "正在检查", isPublish ? "正在写入共享库，请等待完成。" : "检查只读，不会写入共享库。");
+      setExecutorStatus(isPublish ? "saving" : "dry-run", isPublish ? "正在保存，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
+      setReviewFeedback("yellow", isPublish ? "正在保存" : "正在检查", isPublish ? "正在写入共享库，请等待完成。" : "检查只读，不会写入共享库。");
       try {
         const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
         const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
@@ -8241,20 +8241,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (payload.ok) {
           if (isPublish && Number(payload.approved || 0) === 0) {
             lastDryRunSafe = false;
-            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "发布已被拒绝；这里只重新读取 OpenClaw 最新队列。");
+            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
             await refresh(true);
             setExecutorStatus("no changes", "没有发布任何 skill；队列已变化或当前项已不再是可发布更新。", "yellow");
             setReviewFeedback(
               "yellow",
               "没有写入共享库",
-              "确认发布返回 approved=0。通常表示检查后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前确认分类。",
+              "保存返回 approved=0。通常表示检查后状态变了：该项已保存、已恢复，或变成需要确认的版本差异。请看当前确认分类。",
             );
             return;
           }
-          setExecutorStatus(isPublish ? "published" : "检查通过", isPublish ? "发布已写入，正在确认状态。" : "检查通过：可以继续确认发布。", "green");
+          setExecutorStatus(isPublish ? "saved" : "检查通过", isPublish ? "已写入共享库，正在确认状态。" : "检查通过：可以继续保存到共享库。", "green");
           setReviewFeedback(
             "green",
-            isPublish ? "发布完成" : "检查通过",
+            isPublish ? "保存完成" : "检查通过",
             isPublish ? "共享库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续保存到共享库。",
           );
           if (!isPublish) {
@@ -8276,7 +8276,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               approved_skill_ids: payload.approved_skill_ids,
               published_at: new Date().toISOString(),
             };
-            const resolution = await waitForSkillsResolution(actionSkills, "确认发布");
+            const resolution = await waitForSkillsResolution(actionSkills, "保存到共享库");
             lastDryRunSafe = false;
             reviewTaskResults = {};
             const remaining = currentReviewQueueItems.length;
@@ -8286,19 +8286,19 @@ DASHBOARD_HTML = r"""<!doctype html>
             const publishedCleanly = resolution.done && relatedRemaining.length === 0;
             const relatedFeedback = publishRemainingFeedback(requestedSkillsLabel, relatedRemaining);
             const detail = publishedCleanly && remaining === 0
-              ? `已发布 ${requestedSkillsLabel}，当前没有确认项。`
+              ? `已保存 ${requestedSkillsLabel}，当前没有确认项。`
               : (publishedCleanly
-                ? `已发布 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批发布失败。`
+                ? `已保存 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批保存失败。`
                 : relatedFeedback.detail);
             setReviewFeedback(
               publishedCleanly && remaining === 0 ? "green" : "yellow",
-              publishedCleanly ? "本次发布已完成" : relatedFeedback.title,
+              publishedCleanly ? "本次保存已完成" : relatedFeedback.title,
               detail,
             );
             setExecutorStatus(
-              publishedCleanly && remaining === 0 ? "done" : "published",
+              publishedCleanly && remaining === 0 ? "done" : "saved",
               publishedCleanly
-                ? (remaining === 0 ? "本次发布已完成，当前没有确认项。" : `本次发布已完成；还有 ${remaining} 个其他确认项。`)
+                ? (remaining === 0 ? "本次保存已完成，当前没有确认项。" : `本次保存已完成；还有 ${remaining} 个其他确认项。`)
                 : relatedFeedback.title,
               publishedCleanly && remaining === 0 ? "green" : "yellow",
             );
@@ -8327,7 +8327,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     async function refreshOpenclawPeerStatus(
-      title = "发布完成，正在刷新状态",
+      title = "保存完成，正在刷新状态",
       detail = "正在刷新 OpenClaw 状态，让 NAS 面板看到最新队列。",
     ) {
       setReviewFeedback("yellow", title, detail);
@@ -9119,20 +9119,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok && payload.safe_to_push) {
-          setExecutorStatus("检查通过", `${skillId} 检查通过：可以发布。`, "green");
+          setExecutorStatus("检查通过", `${skillId} 检查通过：可以保存。`, "green");
           updateReviewTaskResult(reviewItem || skillId, { label: "检查通过", kind: "green", publishReady: true });
           setReviewFeedback("green", `${skillId} 检查通过`, "可以继续保存到共享库。");
         } else if (payload.ok) {
-          setExecutorStatus("needs review", `${skillId} 检查完成，但还不能发布，请看输出。`, "yellow");
+          setExecutorStatus("needs review", `${skillId} 检查完成，但还不能保存，请看输出。`, "yellow");
           updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
-          setReviewFeedback("yellow", `${skillId} 需要复核`, "检查完成但还不能发布，请查看执行输出。");
+          setReviewFeedback("yellow", `${skillId} 需要复核`, "检查完成但还不能保存，请查看执行输出。");
         } else {
           if (executorPayloadIsStaleSourceChange(payload)) {
             const detail = staleSourceChangeDetail(payload);
             setExecutorStatus("needs review", detail, "yellow");
             updateReviewTaskResult(reviewItem || skillId, { label: "源端仍在修改", kind: "yellow", publishReady: false });
-            setReviewFeedback("yellow", `${skillId} 仍在修改，已拒绝发布`, detail);
-            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "发布已被拒绝；这里只重新读取 OpenClaw 最新队列。");
+            setReviewFeedback("yellow", `${skillId} 仍在修改，已拒绝保存`, detail);
+            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
             await refresh(true);
             return;
           }
