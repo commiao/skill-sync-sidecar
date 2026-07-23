@@ -53,6 +53,15 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
 
+When OpenClaw is actively changing a skill, the first screen may show `暂时搁置`.
+This is a browser-local UI deferral only:
+
+- It is stored in `localStorage` for the current browser.
+- It does not write WebDAV, OpenClaw, Mac tool roots, or central metadata.
+- It is tied to the current source hash, so a new OpenClaw edit shows up again.
+- The original item stays visible in the secondary confirmation list.
+- Use it when a skill is still being edited and the dashboard should not block other local management work.
+
 ## Permission Model
 
 Local actions and central writes are separate permissions:
