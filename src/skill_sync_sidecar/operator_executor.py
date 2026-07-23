@@ -11,6 +11,7 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Optional, Sequence
 
+from .central_lifecycle import CentralLifecycleError, build_central_deprecate_preview, execute_central_deprecate
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .remote import open_remote
@@ -267,6 +268,29 @@ def run_mac_tool_uninstall(
     record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     record["dry_run"] = False
     return record
+
+
+def run_central_deprecate(
+    skill_ids: Sequence[str],
+    *,
+    reason: str = "",
+    yes: bool = False,
+    allow_publish: bool = False,
+) -> dict:
+    snapshot_dir = Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
+    if yes and not allow_publish:
+        raise OperatorExecutorError("central deprecate is disabled; start operator-executor with --allow-publish")
+    if not yes:
+        return build_central_deprecate_preview(snapshot_dir, skill_ids, actor="mac", reason=reason)
+    remote, prefix = _local_publish_remote()
+    return execute_central_deprecate(
+        snapshot_dir,
+        skill_ids,
+        remote,
+        remote_prefix=prefix,
+        actor="mac",
+        reason=reason,
+    )
 
 
 def run_openclaw_central_restore(
@@ -670,6 +694,27 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     result["peer_status_refresh"] = refresh
                     self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
                     return
+                if path == "/api/central-deprecate-dry-run":
+                    reason = _payload_reason(payload)
+                    result = run_central_deprecate(skill_ids or [], reason=reason, yes=False)
+                    self._send_json(200, result)
+                    return
+                if path == "/api/central-deprecate":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "DEPRECATE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be DEPRECATE"})
+                        return
+                    reason = _payload_reason(payload)
+                    result = run_central_deprecate(
+                        skill_ids or [],
+                        reason=reason,
+                        yes=True,
+                        allow_publish=allow_publish,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
                 if path == "/api/openclaw-central-restore-dry-run":
                     result = run_openclaw_central_restore(repo, skill_ids or [], yes=False)
                     self._send_json(200 if result["ok"] else 500, result)
@@ -754,7 +799,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     self._send_json(200, result)
                     return
                 self._send_json(404, {"ok": False, "error": "not found"})
-            except (OperatorExecutorError, LocalSkillError, RestoreError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
+            except (OperatorExecutorError, LocalSkillError, RestoreError, CentralLifecycleError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
 
         def _read_json(self) -> dict:
@@ -812,6 +857,12 @@ def _payload_tool_id(payload: object) -> str:
     if not isinstance(payload, dict):
         raise OperatorExecutorError("payload must be a JSON object")
     return _normalize_tool_id(payload.get("tool_id"))
+
+
+def _payload_reason(payload: object) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    return str(payload.get("reason") or "").strip()[:500]
 
 
 def _local_publish_remote():

@@ -1229,6 +1229,8 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
 def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: list[dict], blocked_items: list[dict]) -> dict:
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     projection_total = sum(int((tool.get("projection") or {}).get("canonical_targeted") or 0) for tool in tools if isinstance(tool, dict))
+    skills = snapshot.get("skills") if isinstance(snapshot.get("skills"), list) else []
+    deprecated_total = sum(1 for skill in skills if isinstance(skill, dict) and _central_skill_state(skill) == "deprecated")
     return {
         "title": "共享仓库",
         "scope": "central",
@@ -1237,6 +1239,7 @@ def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: 
         "snapshot_id": snapshot.get("snapshot_id"),
         "created_at": snapshot.get("created_at"),
         "total_skills": snapshot.get("total"),
+        "deprecated_skills": deprecated_total,
         "protocol_version": snapshot.get("protocol_version"),
         "targeted_projection_total": projection_total,
         "blocked": len(blocked_items),
@@ -1270,6 +1273,8 @@ def _central_snapshot_skill_items(snapshot_dir: Path, *, index: Optional[dict] =
                 "scope": skill.get("scope") or "global",
                 "content_hash": skill.get("content_hash"),
                 "targets": skill.get("targets") or [],
+                "state": _central_skill_state(skill),
+                "lifecycle": skill.get("lifecycle") if isinstance(skill.get("lifecycle"), dict) else {},
             }
         )
     items.sort(key=lambda item: str(item.get("skill_id") or ""))
@@ -1292,9 +1297,10 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         entry["description"] = skill.get("description") or entry.get("description")
         entry["scope"] = skill.get("scope") or entry.get("scope") or "global"
         entry["central"] = {
-            "state": "published",
+            "state": skill.get("state") or "published",
             "content_hash": skill.get("content_hash"),
             "targets": skill.get("targets") or [],
+            "lifecycle": skill.get("lifecycle") if isinstance(skill.get("lifecycle"), dict) else {},
         }
 
     for group in device_tools:
@@ -1365,12 +1371,22 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         "total": len(items),
         "published": sum(1 for item in items if (item.get("central") or {}).get("state") == "published"),
         "unpublished": sum(1 for item in items if (item.get("central") or {}).get("state") == "unpublished"),
+        "deprecated": sum(1 for item in items if (item.get("central") or {}).get("state") == "deprecated"),
         "project": sum(1 for item in items if item.get("scope") == "project"),
         "global": sum(1 for item in items if item.get("scope") == "global"),
         "pending": sum(1 for item in items if int(item.get("pending") or 0) > 0),
         "visible_limit": len(visible),
         "items": visible,
     }
+
+
+def _central_skill_state(skill: dict) -> str:
+    lifecycle = skill.get("lifecycle")
+    if isinstance(lifecycle, dict) and lifecycle.get("state"):
+        return str(lifecycle["state"])
+    if skill.get("state"):
+        return str(skill["state"])
+    return "published"
 
 
 def _empty_skill_inventory_item(skill_id: str) -> dict:
@@ -4115,6 +4131,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #a16207;
       font-weight: 760;
     }
+    .central-deprecate-button,
     .tool-install-button,
     .tool-uninstall-button,
     .codex-install-button {
@@ -6803,6 +6820,14 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? `从 ${toolLabel} 移除需要打开本机写入开关`
             : `从当前 Mac 的 ${toolLabel} 移除，并保留备份`);
       });
+      document.querySelectorAll(".central-deprecate-button").forEach((button) => {
+        button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowPublish
+            ? "标记废弃需要打开发布开关"
+            : "标记中央仓库已废弃；保留原文件和历史版本");
+      });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7185,6 +7210,74 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (err) {
         setReviewFeedback("red", `从 ${toolLabel} 移除失败`, String(err));
         setExecutorStatus("failed", `从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function deprecateCentralSkill(button) {
+      const skillId = button.dataset.skillId || "";
+      if (!skillId) return;
+      if (!executorAvailable || !executorAllowPublish) {
+        setReviewFeedback("yellow", "还不能标记废弃", "需要 Mac 本机助手在线，并打开发布开关。");
+        setExecutorStatus("not ready", "本机助手还不能写入共享仓库。", "yellow");
+        return;
+      }
+      const reason = window.prompt(`为什么要废弃 ${skillId}？可留空。`, "") || "";
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查废弃 ${skillId}`, "检查只读；确认共享仓库当前版本仍是本机看到的版本。");
+      setExecutorStatus("deprecate check", `正在检查 ${skillId} 的中央仓库废弃操作。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/central-deprecate-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], reason }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_deprecate) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，只会标记中央仓库状态为已废弃；不会删除文件。");
+        if (!confirmProtectedWrite({
+          word: "DEPRECATE",
+          title: `确认标记废弃：${skillId}`,
+          will: [
+            `把共享仓库里的 ${skillId} 标记为已废弃。`,
+            "只上传新的 index.json。",
+            "保留原 skill archive，后续仍可恢复或审计。",
+          ],
+          willNot: [
+            "不会删除 WebDAV 上的 zip 或历史文件。",
+            "不会移除本机或其他设备已经安装的 skill。",
+            "不会修改 OpenClaw 服务。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", "标记废弃已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入共享仓库。");
+          return;
+        }
+        setReviewFeedback("yellow", `正在标记废弃 ${skillId}`, "正在上传新的中央仓库 index；原文件保留。");
+        setExecutorStatus("deprecating", `正在标记 ${skillId} 为已废弃。`, "yellow");
+        const response = await fetch(`${EXECUTOR_URL}/api/central-deprecate`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], reason, confirm: "DEPRECATE" }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (!response.ok || !payload.ok) {
+          throw new Error(executorErrorDetail(payload));
+        }
+        setReviewFeedback("green", `${skillId} 已标记废弃`, "共享仓库状态正在刷新；已安装设备不会被自动删除。");
+        setExecutorStatus("deprecated", `${skillId} 已标记为中央仓库废弃。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", "标记废弃失败", String(err));
+        setExecutorStatus("failed", "标记废弃失败，请查看执行输出。", "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -7577,6 +7670,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const uninstallAction = uninstallableTools.map((tool) => (
         `<button type="button" class="tool-uninstall-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="uninstallMacToolSkill(this)" disabled>从 ${escapeHtml(tool.label)} 移除</button>`
       )).join("");
+      const deprecateAction = centralState === "published"
+        ? `<button type="button" class="central-deprecate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="deprecateCentralSkill(this)" disabled>标记废弃</button>`
+        : "";
       return `
         <article class="skill-inventory-row">
           <div>
@@ -7589,6 +7685,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
             ${installAction}
             ${uninstallAction}
+            ${deprecateAction}
           </div>
         </article>
       `;
@@ -7727,6 +7824,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         row("更新时间", repo.created_at),
         row("协议版本", repo.protocol_version),
         row("目标覆盖", repo.targeted_projection_total),
+        row("已废弃", repo.deprecated_skills || 0),
       ].join("");
       $("central-repository-boundary").textContent = repo.boundary || "共享仓库只接受你确认后的发布。";
     }

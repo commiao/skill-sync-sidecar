@@ -20,6 +20,7 @@ from skill_sync_sidecar.dashboard import (
     build_gateway_status,
     build_hub_import_preview_response,
 )
+from skill_sync_sidecar.central_lifecycle import build_central_deprecate_preview, execute_central_deprecate
 from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
@@ -898,8 +899,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/mac-tool-install-from-central", DASHBOARD_HTML)
             self.assertIn("/api/mac-tool-uninstall-dry-run", DASHBOARD_HTML)
             self.assertIn("/api/mac-tool-uninstall", DASHBOARD_HTML)
+            self.assertIn("/api/central-deprecate-dry-run", DASHBOARD_HTML)
+            self.assertIn("/api/central-deprecate", DASHBOARD_HTML)
             self.assertIn("安装到 ${escapeHtml(tool.label)}", DASHBOARD_HTML)
             self.assertIn("从 ${escapeHtml(tool.label)} 移除", DASHBOARD_HTML)
+            self.assertIn("标记废弃", DASHBOARD_HTML)
+            self.assertIn("deprecateCentralSkill", DASHBOARD_HTML)
+            self.assertIn("不会删除 WebDAV 上的 zip 或历史文件", DASHBOARD_HTML)
+            self.assertIn("row(\"已废弃\"", DASHBOARD_HTML)
             self.assertIn("data-tool-id", DASHBOARD_HTML)
             self.assertIn("skillInventoryLocalInstallTools", DASHBOARD_HTML)
             self.assertIn("macInstallableTools", DASHBOARD_HTML)
@@ -1251,6 +1258,13 @@ class OpsStatusTest(unittest.TestCase):
 
             self._write_skill(source_skills / "demo", "Demo", "Demo skill")
             index = write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-gateway")
+            index["skills"][0]["lifecycle"] = {
+                "state": "deprecated",
+                "deprecated_at": "2026-07-23T00:00:00Z",
+                "deprecated_by": "mac",
+                "reason": "obsolete",
+            }
+            (remote_dir / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             peer_status.write_text(
                 json.dumps(
                     {
@@ -1282,6 +1296,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["mode"], "gateway")
             self.assertEqual(status["remote_snapshot"]["snapshot_id"], "snap-gateway")
             self.assertEqual(status["remote_snapshot"]["total"], index["total"])
+            self.assertEqual(status["dashboard"]["central_repository"]["deprecated_skills"], 1)
+            self.assertEqual(status["dashboard"]["skill_inventory"]["deprecated"], 1)
+            self.assertEqual(status["dashboard"]["skill_inventory"]["published"], 0)
+            self.assertEqual(status["dashboard"]["skill_inventory"]["items"][0]["central"]["state"], "deprecated")
             self.assertEqual(status["writer_policy"], "read-only")
             self.assertEqual(status["sync_plan"]["summary"], {"observed": 1})
             self.assertTrue((cache_dir / "index.json").exists())
@@ -1831,6 +1849,37 @@ class OpsStatusTest(unittest.TestCase):
             backup_path = Path(result["items"][0]["backup_path"])
             self.assertTrue((backup_path / "SKILL.md").exists())
             self.assertTrue(Path(result["record_path"]).exists())
+
+    def test_central_deprecate_marks_index_without_removing_archive(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            snapshot_dir = root / "snapshot"
+            remote_dir = root / "remote"
+            self._write_skill(source / "demo", "demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={source}"]), snapshot_dir, "snap-central")
+            FileRemote(remote_dir).put_bytes("index.json", (snapshot_dir / "index.json").read_bytes())
+            archive_rel = index["skills"][0]["archive"]
+            FileRemote(remote_dir).put_bytes(archive_rel, (snapshot_dir / archive_rel).read_bytes())
+
+            preview = build_central_deprecate_preview(snapshot_dir, ["demo"], actor="mac", reason="obsolete")
+
+            self.assertTrue(preview["safe_to_deprecate"])
+            self.assertEqual(preview["planned"], 1)
+            self.assertEqual(preview["items"][0]["action"], "mark_deprecated")
+
+            result = execute_central_deprecate(snapshot_dir, ["demo"], FileRemote(remote_dir), actor="mac", reason="obsolete")
+
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["dry_run"])
+            self.assertEqual(result["uploaded_files"], 1)
+            self.assertTrue((remote_dir / archive_rel).exists())
+            remote_index = json.loads((remote_dir / "index.json").read_text(encoding="utf-8"))
+            lifecycle = remote_index["skills"][0]["lifecycle"]
+            self.assertEqual(lifecycle["state"], "deprecated")
+            self.assertEqual(lifecycle["deprecated_by"], "mac")
+            self.assertEqual(lifecycle["reason"], "obsolete")
+            self.assertEqual(remote_index["skills"][0]["content_hash"], index["skills"][0]["content_hash"])
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
         with TemporaryDirectory() as tmp:
