@@ -4163,6 +4163,32 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: var(--soft);
       white-space: nowrap;
     }
+    .skill-tool-toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      background: var(--soft);
+      white-space: nowrap;
+    }
+    .skill-tool-toggle-label.installed {
+      border-color: #b8d8c8;
+      background: #ecfdf5;
+      color: #047857;
+    }
+    .skill-tool-toggle-label.disabled {
+      opacity: .68;
+    }
+    .skill-tool-toggle {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--green);
+    }
     .skill-tool-check.installed {
       border-color: #b8d8c8;
       background: #ecfdf5;
@@ -6904,6 +6930,19 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? `从 ${toolLabel} 移除需要打开本机写入开关`
             : `从当前 Mac 的 ${toolLabel} 移除，并保留备份`);
       });
+      document.querySelectorAll(".skill-tool-toggle").forEach((input) => {
+        const allowed = input.dataset.toggleAllowed === "true";
+        input.disabled = !available || !executorAllowLocalWrites || !input.dataset.skillId || !allowed;
+        const toolLabel = input.dataset.toolLabel || "工具";
+        const installed = input.dataset.installed === "true";
+        input.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowLocalWrites
+            ? `${toolLabel} 安装/移除需要打开本机写入开关`
+            : (allowed
+              ? (installed ? `从 ${toolLabel} 移除；执行前会确认` : `安装到 ${toolLabel}；执行前会确认`)
+              : `${toolLabel} 当前不能通过本机客户端操作`));
+      });
       document.querySelectorAll(".central-deprecate-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7236,6 +7275,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       } finally {
         setExecutorButtons(executorAvailable);
       }
+    }
+
+    async function toggleMacToolSkill(input) {
+      const wasInstalled = input.dataset.installed === "true";
+      input.checked = wasInstalled;
+      if (wasInstalled) {
+        return uninstallMacToolSkill(input);
+      }
+      return installCentralSkillToTool(input);
     }
 
     async function uninstallMacToolSkill(button) {
@@ -7883,22 +7931,36 @@ DASHBOARD_HTML = r"""<!doctype html>
       const centralState = text((item.central || {}).state || "unpublished");
       const toolChecks = skillInventoryTools().map((tool) => {
         const active = installed.has(tool.id);
-        const cls = active ? "installed" : "";
-        const mark = active ? "✓" : "□";
-        return `<span class="skill-tool-check ${cls}" title="${escapeHtml(active ? "已安装" : "未安装")}">${mark} ${escapeHtml(tool.label)}</span>`;
+        const canInstall = centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool);
+        const canToggle = tool.localInstall && (active || canInstall);
+        const labelClass = [
+          "skill-tool-toggle-label",
+          active ? "installed" : "",
+          canToggle ? "" : "disabled",
+        ].filter(Boolean).join(" ");
+        const title = !tool.localInstall
+          ? `${tool.label} 由对应设备客户端管理`
+          : (active
+            ? `${tool.label} 已安装；取消勾选会先检查并确认移除`
+            : (canInstall ? `勾选后安装到 ${tool.label}` : toolInstallStatus(item, installed, centralState)));
+        return `
+          <label class="${labelClass}" title="${escapeHtml(title)}">
+            <input
+              type="checkbox"
+              class="skill-tool-toggle"
+              data-skill-id="${escapeHtml(text(item.skill_id))}"
+              data-tool-id="${escapeHtml(tool.id)}"
+              data-tool-label="${escapeHtml(tool.label)}"
+              data-installed="${active ? "true" : "false"}"
+              data-toggle-allowed="${canToggle ? "true" : "false"}"
+              onchange="toggleMacToolSkill(this)"
+              ${active ? "checked" : ""}
+              disabled>
+            <span>${escapeHtml(tool.label)}</span>
+          </label>
+        `;
       }).join("");
       const stateClass = pending ? "pending" : (centralState === "published" ? "installed" : "");
-      const installableTools = macInstallableTools(item, installed, centralState);
-      const uninstallableTools = macUninstallableTools(item, installed);
-      const installAction = installableTools.length > 0
-        ? installableTools.map((tool) => {
-          const cls = tool.id === "codex" ? "tool-install-button codex-install-button" : "tool-install-button";
-          return `<button type="button" class="${cls}" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="installCentralSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`;
-        }).join("")
-        : `<span class="skill-tool-check">${escapeHtml(toolInstallStatus(item, installed, centralState))}</span>`;
-      const uninstallAction = uninstallableTools.map((tool) => (
-        `<button type="button" class="tool-uninstall-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="uninstallMacToolSkill(this)" disabled>从 ${escapeHtml(tool.label)} 移除</button>`
-      )).join("");
       const deprecateAction = centralState === "published"
         ? `<button type="button" class="central-deprecate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="deprecateCentralSkill(this)" disabled>标记废弃</button>`
         : "";
@@ -7915,8 +7977,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="skill-inventory-action-row">
             <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
-            ${installAction}
-            ${uninstallAction}
             ${deprecateAction}
             ${reactivateAction}
           </div>

@@ -43,8 +43,8 @@ The user should not need to edit manifest metadata or manually copy package file
 The secondary `Skill 清单` view is the per-skill management surface for the current client:
 
 - Search and filters are view-only helpers. Users can filter by skill name/description, central lifecycle state, scope, local tool, or pending sync state without changing files.
-- `安装到 <tool>` copies a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
-- `从 <tool> 移除` moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/`; it does not delete the backup or change the central snapshot.
+- Checking a local tool box installs a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
+- Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after dry-run and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
 - `标记废弃` updates the central snapshot lifecycle to `deprecated` after dry-run and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
 - `恢复发布` updates the central snapshot lifecycle from `deprecated` back to `published` after dry-run and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
