@@ -5683,11 +5683,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       const daemon = status.daemon_state || {};
       const blockedReport = status.blocked_report || {};
       $("health-card").className = `panel health ${health}`;
-      $("health").textContent = health;
+      $("health").textContent = dashboardHealthLabel({ ...status, health }, dashboard);
       $("next-action").textContent = operator.next_action || nextAction({ ...status, health });
       $("operator-headline").textContent = operator.headline || "同步状态未知";
       $("operator-panel").className = `panel decision-status ${deviceKind(health)}`;
-      $("operator-verdict").textContent = operatorVerdict(health);
+      $("operator-verdict").textContent = operatorVerdict(health, status);
       $("operator-verdict").className = `operator-verdict ${deviceKind(health)}`;
       renderOperatorBrief(dashboard, snapshot);
       renderActionGuide(operator.action_guide || {});
@@ -5766,9 +5766,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       return "";
     }
 
-    function operatorVerdict(health) {
+    function dashboardHealthLabel(status, dashboard) {
+      const health = status.health || "unknown";
+      if (health === "green") return "同步正常";
+      if (health === "yellow" && status.service_health === "green") return "服务正常，有同步提醒";
+      if (health === "yellow") return "有同步提醒";
+      if (health === "red") return "需要处理";
+      return "状态未知";
+    }
+
+    function operatorVerdict(health, status) {
       if (health === "green") return "正常";
-      if (health === "yellow") return "需要审核";
+      if (health === "yellow" && status && status.service_health === "green") return "服务正常";
+      if (health === "yellow") return "有提醒";
       if (health === "red") return "需要处理";
       return "未知";
     }
@@ -5894,7 +5904,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function statusLabel(value) {
       if (value === "green") return "正常";
-      if (value === "yellow") return "需处理";
+      if (value === "yellow") return "有提醒";
       if (value === "red") return "异常";
       if (value === "not_configured") return "未接入";
       if (value === "not_connected") return "未连接";
@@ -5919,7 +5929,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function healthLabel(value) {
       if (value === "green") return "正常";
-      if (value === "yellow") return "需处理";
+      if (value === "yellow") return "有提醒";
       if (value === "red") return "异常";
       if (value === "not_configured") return "未接入";
       if (value === "not_connected") return "未连接";
@@ -9126,7 +9136,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function plainHealthLabel(value) {
       if (value === "green") return "正常";
-      if (value === "yellow") return "需处理";
+      if (value === "yellow") return "有提醒";
       if (value === "red") return "异常";
       if (value === "not_configured") return "未接入";
       return "未知";
