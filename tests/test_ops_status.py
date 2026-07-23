@@ -716,6 +716,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("executorPayloadIsStaleSourceChange", DASHBOARD_HTML)
             self.assertIn("staleSourceChangeDetail", DASHBOARD_HTML)
             self.assertIn("源端仍在修改", DASHBOARD_HTML)
+            self.assertIn("如果刚发布完又出现同一个 skill", DASHBOARD_HTML)
+            self.assertIn("说明源设备还在改，等改完再同步", DASHBOARD_HTML)
             self.assertIn("保护性拒绝写入共享仓库", DASHBOARD_HTML)
             self.assertIn("发布已被拒绝；这里只重新读取 OpenClaw 最新队列。", DASHBOARD_HTML)
             self.assertIn("OpenClaw 待确认清单", DASHBOARD_HTML)

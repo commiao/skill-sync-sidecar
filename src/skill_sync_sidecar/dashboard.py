@@ -4795,7 +4795,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (publishItems.length > 0) {
         title = `有 ${publishItems.length} 个更新可以发布`;
-        summary = "这些更新来自设备本地改动。先点检查，只看会改什么；通过后再发布到共享仓库。";
+        summary = "这些更新来自设备本地改动。先点检查，只看会改什么；通过后再发布到共享仓库。如果刚发布完又出现同一个 skill，说明源设备又产生了新修改。";
         primaryActions = `
           <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
           <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>确认发布</button>
@@ -4803,7 +4803,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         facts = [
           ["要发布", `${publishNames}。`],
           ["第一步", "检查只读，不写共享仓库。"],
-          ["第二步", "发布前会要求你确认。"],
+          ["完成标准", "顶部显示“无待处理”。"],
+          ["反复出现", "说明源设备还在改，等改完再同步。"],
         ];
         taskCards = `
           <div class="simple-action-card">
