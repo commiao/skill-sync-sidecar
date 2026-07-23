@@ -58,6 +58,7 @@ The first dashboard screen should remain a simple "what should I do now" view. T
 The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit publish confirmation, and other devices are read-only status unless their own Agent acts.
 
 When OpenClaw is actively changing a skill, the first screen may show `暂时搁置`.
+The `先不提醒` action should be visible as a secondary first-screen action while editing is still in progress, so users can continue local skill management without opening technical details.
 This is a browser-local UI deferral only:
 
 - It is stored in `localStorage` for the current browser.

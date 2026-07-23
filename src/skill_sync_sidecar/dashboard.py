@@ -6239,6 +6239,15 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
           `;
+        if (!allSourceChangedReady) {
+          secondaryActions = `
+            <div class="simple-action-secondary">
+              <span>还在改？先隐藏首页提醒，不影响同步状态。</span>
+              <button type="button" onclick="deferSourceChangedItems()">先不提醒</button>
+              <button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button>
+            </div>
+          `;
+        }
         facts = allSourceChangedReady
           ? (executorAllowPublish ? [
             ["下一步", "点“保存到共享库”。"],

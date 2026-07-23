@@ -831,6 +831,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertNotIn("source-change-actions", DASHBOARD_HTML)
             self.assertNotIn("aria-label=\"OpenClaw 新修改处理\"", DASHBOARD_HTML)
             self.assertIn("先不提醒", DASHBOARD_HTML)
+            self.assertIn("还在改？先隐藏首页提醒，不影响同步状态。", DASHBOARD_HTML)
+            self.assertIn("<button type=\"button\" onclick=\"deferSourceChangedItems()\">先不提醒</button>", DASHBOARD_HTML)
             self.assertIn("只隐藏首页提醒", DASHBOARD_HTML)
             self.assertIn("检查期间又变化会自动拒绝写入", DASHBOARD_HTML)
             self.assertIn("allSourceChangedReady", DASHBOARD_HTML)
