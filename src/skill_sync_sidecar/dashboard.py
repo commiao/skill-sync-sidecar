@@ -6166,10 +6166,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
-      let title = `现在先处理 ${blocked} 件事`;
-      let summary = `按右侧推荐按钮走即可；真正写入、找回或删除前都会再次确认。`;
+      let title = "有同步事项待处理";
+      let summary = "先按右侧主按钮走；细节和原始队列放在“查看详情”里。";
       let primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看要处理什么<span>只打开确认清单，不会写入或删除。</span></button>`;
-      let secondaryActions = `<div class="simple-action-secondary"><span>不处理同步也可以继续本机工作。</span><button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button></div>`;
+      let secondaryActions = `<div class="simple-action-secondary"><span>详情留在二级页面，需要时再看。</span><button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button></div>`;
       let facts = [
         ["不会自动覆盖", "有风险时会停下来等你确认。"],
         ["先看再执行", "检查只读，发布前还要确认。"],
@@ -6181,8 +6181,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
-        title = conflictItems.length === 1 ? `先看看哪里不一样：${skill}` : `先看看 ${conflictItems.length} 个 skill 哪里不一样`;
-        summary = "两边都改过，系统已经停下来等你决定。现在只生成报告，不会改任何文件。";
+        title = conflictItems.length === 1 ? `先看版本差异：${skill}` : "先看版本差异";
+        summary = "两边都改过。现在只生成只读报告，不会改任何文件。";
         primaryActions = `
           <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
             <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成报告<span>只看差异，不会改文件。</span></button>
@@ -6205,8 +6205,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         const restoreTarget = restoreDeviceLabel(item);
-        title = restoreItems.length === 1 ? `建议找回：${skill}` : `建议先找回 ${restoreItems.length} 个 skill`;
-        summary = `${restoreTarget} 上少了这个 skill，共享库里还在。建议先找回来，不删除共享库里的版本。`;
+        title = restoreItems.length === 1 ? `建议找回：${skill}` : "建议先找回缺失 skill";
+        summary = `${restoreTarget} 上少了 skill，共享库里还在。建议先找回来，不删除共享库版本。`;
         primaryActions = `
           <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">找回到 ${escapeHtml(restoreTarget)}<span>会先检查，再要求确认。</span></button>
         `;
@@ -6223,13 +6223,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const allSourceChangedReady = sourceChangedItems.length > 0 && readySourceChangedItems.length === sourceChangedItems.length;
         title = allSourceChangedReady
-          ? (executorAllowPublish ? `检查通过，可以保存 ${sourceChangedItems.length} 个 OpenClaw 更新` : "检查通过，但保存开关未打开")
-          : "OpenClaw 仍在更新";
+          ? (executorAllowPublish ? "可以保存 OpenClaw 更新" : "检查通过，但保存开关未打开")
+          : "OpenClaw 还在改";
         summary = allSourceChangedReady
           ? (executorAllowPublish
-            ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词；保存后页面会自动回查。"
+            ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词。"
             : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
-          : `还在改可以先放着；改完后点“检查最新版本”。本次涉及：${sourceChangedNames}。`;
+          : "不用现在处理。改完后再检查并保存；想先做别的，点“先不提醒”。";
         primaryActions = allSourceChangedReady
           ? (executorAllowPublish ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
@@ -6237,13 +6237,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
           `)
           : `
-            <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
+            <button id="simple-defer-source" type="button" class="primary" onclick="deferSourceChangedItems()">先不提醒<span>只隐藏首页提醒。</span></button>
           `;
         if (!allSourceChangedReady) {
           secondaryActions = `
             <div class="simple-action-secondary">
-              <span>还在改？先隐藏首页提醒，不影响同步状态。</span>
-              <button type="button" onclick="deferSourceChangedItems()">先不提醒</button>
+              <span>改完后再回来检查；这两个按钮都不会写共享库。</span>
+              <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查最新版本</button>
               <button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button>
             </div>
           `;
@@ -6259,26 +6259,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             ["完成标准", "顶部显示“现在不用做任何事”。"],
           ])
           : [
-            ["发生了什么", "OpenClaw 本地版本不同于共享库，说明有人刚改过。"],
-            ["不会误发", "发布前会重新确认版本，变化中会拒绝写入。"],
-            ["下一步", "改完就检查；还在改就继续做你的事。"],
-            ["完成标准", "顶部显示“现在不用做任何事”。"],
+            ["当前建议", "还在改就先不提醒。"],
+            ["改完之后", "点检查最新版本，通过后再保存。"],
+            ["安全边界", "先不提醒只影响当前浏览器首页。"],
           ];
         taskCards = `
           <div class="simple-action-card">
-            <div class="simple-action-card-title">正在变化的 skill</div>
+            <div class="simple-action-card-title">涉及 skill</div>
             <div class="simple-action-summary">${escapeHtml(sourceChangedNames)}</div>
           </div>
-          ${allSourceChangedReady ? "" : `
-          <div class="simple-action-card">
-            <div class="simple-action-card-title">还没改完？</div>
-            <div class="simple-action-summary">可以先不提醒，或只刷新状态；这两个动作都不会写共享库。</div>
-            <div class="simple-decision-actions">
-              <button type="button" onclick="deferSourceChangedItems()">先不提醒<span>只隐藏首页提醒。</span></button>
-              <button type="button" onclick="refresh(true)">刷新状态</button>
-            </div>
-          </div>
-          `}
         `;
       } else if (publishItems.length > 0) {
         const readyPublishItems = regularPublishItems.filter((item) => {
@@ -6286,10 +6275,10 @@ DASHBOARD_HTML = r"""<!doctype html>
           return result && result.publishReady;
         });
         const allPublishReady = regularPublishItems.length > 0 && readyPublishItems.length === regularPublishItems.length;
-        title = allPublishReady ? (executorAllowPublish ? `检查通过，可以保存 ${regularPublishItems.length} 个更新` : "检查通过，但保存开关未打开") : `先检查 ${publishItems.length} 个更新`;
+        title = allPublishReady ? (executorAllowPublish ? "可以保存更新" : "检查通过，但保存开关未打开") : "先检查更新";
         summary = allPublishReady
           ? (executorAllowPublish
-            ? "现在只剩最后一步：保存到共享库。保存后页面会自动回查；如果又出现新修改，顶部会继续告诉你下一步。"
+            ? "现在只剩最后一步：保存到共享库。保存后页面会自动回查。"
             : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
           : "先检查会改哪些 skill。这一步只看结果，不会写入。检查通过后按钮会变成“保存到共享库”。";
         primaryActions = allPublishReady
@@ -6323,7 +6312,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         `;
       } else if (deleteItems.length > 0) {
-        title = `先看看 ${deleteItems.length} 个少掉的 skill`;
+        title = "先处理缺失 skill";
         summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是以后单独删除共享库版本。";
         primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看少了什么<span>只打开确认清单，不会删除。</span></button>`;
         facts = [
@@ -6389,7 +6378,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       return `
         <details class="simple-action-more">
-          <summary>详情：为什么这样建议</summary>
+          <summary>查看详情（可选）</summary>
           <div class="simple-action-more-body">
             ${factHtml}
             ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
@@ -7873,6 +7862,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewPublishAll = $("review-publish-all");
       const simpleDryRun = $("simple-dry-run");
       const simplePublish = $("simple-publish");
+      const simpleDeferSource = $("simple-defer-source");
       const simpleActionHint = $("simple-action-disabled-note");
       if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
       if (reviewPublishAll) {
@@ -7922,6 +7912,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           hintKind = "warn";
         } else if (actionSkills.length === 0) {
           hint = "当前没有可操作的同步更新。";
+        } else if (simpleDeferSource) {
+          hint = "下一步：还在改就点“先不提醒”；改完后再点“检查最新版本”。";
+          hintKind = "ready";
         } else if (simpleDryRun) {
           hint = `下一步：点“${primaryButtonText(simpleDryRun, "检查一下")}”；检查只读，不会写入共享库。`;
           hintKind = "ready";
