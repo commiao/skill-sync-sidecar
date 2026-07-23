@@ -5219,16 +5219,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     <details class="support-drawer">
       <summary>
         <span class="support-drawer-title">
-          <strong>详情和高级操作</strong>
-          <span>新增 skill、查看队列、排查问题时再打开。</span>
+          <strong>管理和查看 skill</strong>
+          <span>新增、安装、共享或查看明细时打开。</span>
         </span>
       </summary>
       <div class="support-drawer-body">
     <details id="easy-workspace" class="easy-workspace panel" aria-label="可选操作">
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
-          <strong>我要新增、安装或手动同步 skill</strong>
-          <span>日常不用展开；只有你主动要导入本机 skill，或想手动同步时再打开。</span>
+          <strong>添加或同步 skill</strong>
+          <span>粘贴本机路径，安装到工具；需要共享时再发布到共享库。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </summary>
