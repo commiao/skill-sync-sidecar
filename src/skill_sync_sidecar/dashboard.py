@@ -695,7 +695,7 @@ def _device_overview(status: dict, peers: Optional[Dict[str, dict]] = None) -> l
     daemon = status.get("daemon_state") if isinstance(status.get("daemon_state"), dict) else {}
     blocked = sync_plan.get("blocked")
     local_overrides = sync_plan.get("local_overrides") if isinstance(sync_plan.get("local_overrides"), dict) else {}
-    current_note = "同步正常，无待处理项" if status.get("health") == "green" else "需要查看待处理队列"
+    current_note = "同步已完成" if status.get("health") == "green" else "需要查看确认清单"
     last_seen_at = _status_last_seen_at(status)
     openclaw = peers.get("oc-vps") or peers.get("openclaw")
     openclaw_device = _peer_device(
@@ -818,9 +818,9 @@ def _peer_device(
     if status.get("error"):
         note = f"读取 peer status 失败：{status.get('error')}"
     elif health == "green":
-        note = "远端同步正常，无待处理项"
+        note = "远端同步已完成"
     elif health == "yellow":
-        note = "远端有待审批或待处理项"
+        note = "远端有需要确认的同步项"
     elif health == "red":
         note = "远端状态异常，需要检查 sidecar"
     else:
@@ -936,7 +936,7 @@ def _operator_issue_action(
         return f"先处理 {target} 版本差异；生成只读差异报告后选择保留版本。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
         return f"先处理 {target}；确认后发布。"
-    return f"先处理 {target}；查看待审批队列。"
+    return f"先处理 {target}；查看确认清单。"
 
 
 def _operator_issue_target(peer_id: Optional[str], peer_name: Optional[str], skill_id: Optional[str]) -> str:
@@ -989,7 +989,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 },
                 {
                     "title": "刷新状态",
-                    "detail": "处理完成后刷新本页，待办数字下降才算闭环。",
+                    "detail": "处理完成后刷新本页，确认项数字下降才算闭环。",
                     "command": "scripts/operator-status.sh",
                     "kind": "verify",
                 },
@@ -1009,7 +1009,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
             first_step = "先确认源端是否还在修改"
             first_detail = "如果对应 skill 还在被优化，不要反复发布；等最后一次修改结束后再检查。"
             second_detail = "源端稳定后，检查结果显示可以发布，再输入 PUBLISH 写入共享仓库。"
-            note = "反复出现同一个 skill 时，优先判断源端是否仍在写文件；只有稳定后发布才会真正清空待办。"
+            note = "反复出现同一个 skill 时，优先判断源端是否仍在写文件；只有稳定后发布才会真正清空确认项。"
         else:
             title = "OpenClaw 更新需要确认"
             summary = f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再发布到共享仓库。刚发布过同一项又出现，表示 OpenClaw 又产生了新修改，不是按钮失效。"
@@ -1051,13 +1051,13 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
             "summary": f"当前有 {len(blocked_items)} 个需要确认的同步事项，系统已暂停自动写入以避免误同步。",
             "steps": [
                 {
-                    "title": "先看待审批队列",
-                    "detail": "查看下面的待审批队列，确认每个 skill 的来源设备、原因和建议命令。",
+                    "title": "先看确认清单",
+                    "detail": "查看下面的确认清单，确认每个 skill 的来源设备、原因和建议命令。",
                     "kind": "review",
                 },
                 {
                     "title": "处理后刷新状态",
-                    "detail": "处理完成后刷新本页，确认待审批数量下降。",
+                    "detail": "处理完成后刷新本页，确认数量下降。",
                     "command": "scripts/operator-status.sh",
                     "kind": "verify",
                 },
@@ -1177,7 +1177,7 @@ def _local_workspace_model(devices: list[dict], device_tools: list[dict], blocke
         },
         "primary_action": "本机助手在线后，可扫描本机 skill，并在发布前做安全检查。",
         "boundary": "这里默认只操作浏览器所在 Mac；其他设备只读展示，除非该设备自己的 Agent 暴露受控操作。",
-        "remote_blocked_note": f"当前另有 {len(remote_blocked)} 个非本机待审批项，放在设备地图里处理。",
+        "remote_blocked_note": f"当前另有 {len(remote_blocked)} 个非本机确认项，放在设备地图里处理。",
     }
 
 
@@ -1270,9 +1270,9 @@ def _find_device(devices: list[dict], device_id: str) -> dict:
 
 def _headline_for_health(health: str) -> str:
     if health == "green":
-        return "同步正常，无待处理项"
+        return "同步已完成"
     if health == "yellow":
-        return "存在待审批同步项"
+        return "存在需要确认的同步项"
     if health == "red":
         return "同步链路异常"
     return "同步状态未知"
@@ -4080,7 +4080,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
           <strong>可选：新增或同步 skill</strong>
-          <span>没有待办时不用展开。需要安装本机 skill 或主动同步时，再打开这里。</span>
+          <span>没有需要确认的事项时不用展开。需要安装本机 skill 或主动同步时，再打开这里。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </summary>
@@ -4110,7 +4110,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">同步更新</div>
           <h2>把已确认的更新同步出去</h2>
-          <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有待办时不用点任何按钮。</p>
+          <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有需要确认的事项时不用点任何按钮。</p>
           <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“同步已完成”时，可以关闭页面或继续工作。</div>
           <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
@@ -4120,7 +4120,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <ol id="easy-sync-steps" class="easy-steps" aria-label="发布流程" hidden>
             <li><strong>1</strong><span>先检查会同步哪些 skill；这一步不会写入。</span></li>
             <li><strong>2</strong><span>确认同步；发布前还会要求输入确认词。</span></li>
-            <li><strong>3</strong><span>看到“无待处理”才算完成。</span></li>
+            <li><strong>3</strong><span>看到“同步已完成”才算完成。</span></li>
           </ol>
         </div>
       </div>
@@ -4244,7 +4244,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       <div id="review-queue-summary" class="review-queue-summary"></div>
       <div id="review-recommendation" class="review-recommendation"></div>
-      <div id="review-progress" class="review-progress" aria-label="待审批处理进度"></div>
+      <div id="review-progress" class="review-progress" aria-label="确认处理进度"></div>
       <div id="review-feedback" class="review-feedback" hidden>
         <strong id="review-feedback-title">等待操作</strong>
         <span id="review-feedback-detail">先检查。</span>
@@ -4359,7 +4359,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
       <div class="metric">
-        <div class="metric-label">待审批</div>
+        <div class="metric-label">需确认</div>
         <div id="blocked" class="metric-value">-</div>
       </div>
       <div class="metric">
@@ -4417,8 +4417,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="grid">
       <div class="stack">
         <div class="panel">
-          <h2>待审批队列</h2>
-          <div id="blocked-empty" class="empty">暂无待审批项。</div>
+          <h2>原始确认队列</h2>
+          <div id="blocked-empty" class="empty">暂无需要确认项。</div>
           <table id="blocked-table" hidden>
             <thead><tr><th>Skill</th><th>状态</th><th>分类</th><th>版本指纹</th><th>建议 / 下一步</th></tr></thead>
             <tbody id="blocked-body"></tbody>
@@ -4600,7 +4600,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
       $("strip-health").textContent = blocked > 0
         ? (breakdown.sourceChanged > 0 ? "个源端新修改" : (breakdown.conflict === blocked ? "个需要确认" : "个需要处理"))
-        : "无待处理";
+        : "同步完成";
       $("strip-blocked").textContent = blocked > 0 ? text(blocked) : "正常";
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
@@ -4650,7 +4650,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (breakdown.conflict) parts.push(`版本差异 ${breakdown.conflict} 个`);
       if (breakdown.deleteReview) parts.push(`删除确认 ${breakdown.deleteReview} 个`);
       if (breakdown.other) parts.push(`其他 ${breakdown.other} 个`);
-      return parts.length ? parts.join("，") : "没有待处理项";
+      return parts.length ? parts.join("，") : "没有确认项";
     }
 
     function conciseOperatorNext(dashboard, operator, status) {
@@ -4905,7 +4905,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ["发生了什么", "OpenClaw 本地版本又变了，旧更新大概率已发布。"],
           ["现在别做", "不要反复发布同一个正在修改的 skill。"],
           ["下一步", "只刷新状态；稳定后页面会重新给出检查/发布入口。"],
-          ["完成标准", "顶部显示“无待处理”。"],
+          ["完成标准", "顶部显示“同步已完成”。"],
         ];
         taskCards = `
           <div class="simple-action-card">
@@ -4923,7 +4923,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         facts = [
           ["要发布", `${regularPublishNames || publishNames}。`],
           ["第一步", "检查只读，不写共享仓库。"],
-          ["完成标准", "顶部显示“无待处理”。"],
+          ["完成标准", "顶部显示“同步已完成”。"],
         ];
         taskCards = `
           <div class="simple-action-card">
@@ -5306,7 +5306,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           will: [
             `把 OpenClaw 上的 ${skillId} 发布为共享仓库版本。`,
             "只处理这一个 skill。",
-            "完成后自动刷新状态，确认待办是否清空。",
+            "完成后自动刷新状态，确认项是否清空。",
           ],
           willNot: [
             "不会删除共享仓库里的其他 skill。",
@@ -5338,7 +5338,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           hideConflictResolutionPanel();
         } else {
           setExecutorStatus("needs decision", `${skillId} 已写入，仍在等待状态确认。`, "yellow");
-          setReviewFeedback("yellow", `${skillId} 已写入，但待办还没清空`, resolution.detail);
+          setReviewFeedback("yellow", `${skillId} 已写入，但确认项还没清空`, resolution.detail);
         }
       } catch (err) {
         setExecutorStatus("failed", "发布 OpenClaw 版失败，请查看输出。", "red");
@@ -5377,7 +5377,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           will: [
             `把共享仓库版本恢复到 OpenClaw 的 ${skillId}。`,
             "执行前保留 OpenClaw 当前目录备份。",
-            "完成后自动刷新状态，确认待办是否清空。",
+            "完成后自动刷新状态，确认项是否清空。",
           ],
           willNot: [
             "不会删除共享仓库版本。",
@@ -5409,7 +5409,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           hideConflictResolutionPanel();
         } else {
           setExecutorStatus("needs decision", `${skillId} 已恢复，仍在等待状态确认。`, "yellow");
-          setReviewFeedback("yellow", `${skillId} 已恢复，但待办还没清空`, resolution.detail);
+          setReviewFeedback("yellow", `${skillId} 已恢复，但确认项还没清空`, resolution.detail);
         }
       } catch (err) {
         setExecutorStatus("failed", "恢复共享仓库版失败，请查看输出。", "red");
@@ -5428,7 +5428,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         await refresh(true);
         const remaining = reviewItemsForSkill(skillId);
         if (remaining.length === 0) {
-          return { done: true, attempts: attempt, detail: "待办已清空。" };
+          return { done: true, attempts: attempt, detail: "确认项已清空。" };
         }
         if (attempt < maxAttempts) {
           await wait(4000);
@@ -5439,7 +5439,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         done: false,
         attempts: maxAttempts,
         detail: remaining.length > 0
-          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关待办：${blockedBreakdownText(blockedBreakdown(remaining))}。通常是 OpenClaw 上报还没收敛；稍后点刷新再看。`
+          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(remaining))}。通常是 OpenClaw 上报还没收敛；稍后点刷新再看。`
           : "已完成写入请求，但状态刷新结果暂时不确定；稍后点刷新再看。",
       };
     }
@@ -5449,12 +5449,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const maxAttempts = 4;
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         setExecutorStatus("checking", `${actionLabel}已提交，正在确认状态 ${attempt}/${maxAttempts}。`, "yellow");
-        setReviewFeedback("yellow", "正在确认待办是否下降", `第 ${attempt}/${maxAttempts} 次读取 OpenClaw 上报和 NAS 状态；这一步只读，不会再写入。`);
+        setReviewFeedback("yellow", "正在确认结果是否收敛", `第 ${attempt}/${maxAttempts} 次读取 OpenClaw 上报和 NAS 状态；这一步只读，不会再写入。`);
         await refreshOpenclawPeerStatus();
         await refresh(true);
         const remaining = reviewItemsForSkills(uniqueSkillIds);
         if (remaining.length === 0) {
-          return { done: true, attempts: attempt, detail: "相关待办已清空。" };
+          return { done: true, attempts: attempt, detail: "相关确认项已清空。" };
         }
         if (attempt < maxAttempts) {
           await wait(4000);
@@ -5466,7 +5466,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         done: false,
         attempts: maxAttempts,
         detail: remaining.length > 0
-          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关待办：${names}。`
+          ? `已完成写入请求，但面板仍看到 ${remaining.length} 个相关确认项：${names}。`
           : "已完成写入请求，但状态刷新结果暂时不确定。",
       };
     }
@@ -5568,7 +5568,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const scope = reviewQueueScopeInfo(items, conflictOnly);
       $("review-queue-label").textContent = scope.label;
       $("review-queue-title").textContent = scope.title;
-      $("review-progress").setAttribute("aria-label", conflictOnly ? "版本差异处理进度" : "待审批处理进度");
+      $("review-progress").setAttribute("aria-label", conflictOnly ? "版本差异处理进度" : "确认处理进度");
       $("review-queue-summary").textContent = conflictOnly
         ? `${scope.peerText}：只剩 ${items.length} 个版本差异。这里不是批量发布队列；先生成只读报告，再按推荐处理。`
         : `${scope.peerText}：${items.length} 个待确认。${blockedBreakdownText(blockedBreakdown(items))}。`;
@@ -5771,7 +5771,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("review-progress").innerHTML = [
           reviewStage("1", "生成只读报告", `${conflictTotal} 个版本差异`, "yellow", "只读取 OpenClaw 和共享仓库，不写入。"),
           reviewStage("2", "按推荐处理", "报告给出建议", "yellow", "推荐动作会显示在报告最上方。"),
-          reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认待办是否清空。" : "需要 Mac 本机助手在线。"),
+        reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认项是否清空。" : "需要 Mac 本机助手在线。"),
         ].join("");
         return;
       }
@@ -5818,18 +5818,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const unrelatedRemaining = allItems.filter((item) => !publishedSkills.includes(text(item.skill_id)));
       const publishedNames = compactSkillList(publishedSkills);
       if (relatedRemaining.length === 0 && allItems.length === 0) {
-        setReviewFeedback("green", "刚刚发布完成", `已发布 ${publishedNames}；当前无待处理。`);
+        setReviewFeedback("green", "刚刚发布完成", `已发布 ${publishedNames}；当前没有确认项。`);
       } else if (relatedRemaining.length === 0) {
         setReviewFeedback(
           "yellow",
-          "刚刚发布完成，还有新的待办",
-          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的待办：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。`,
+          "刚刚发布完成，还有新的确认项",
+          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的确认项：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。`,
         );
       } else {
         setReviewFeedback(
           "yellow",
           "发布已提交，等待状态收敛",
-          `已请求发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关待办：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。稍后刷新，或继续按当前队列处理。`,
+          `已请求发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。稍后刷新，或继续按当前队列处理。`,
         );
       }
     }
@@ -5928,7 +5928,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.category === "writer_policy") return "需要显式发布";
       if (item.category === "conflict") return "版本差异";
       if (reviewIsDeleteItem(item)) return "删除确认";
-      return text(item.category || item.status_action || "待审批");
+      return text(item.category || item.status_action || "需确认");
     }
 
     function reviewRiskText(item) {
@@ -5959,7 +5959,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.status_action === "push_new") return "新发布";
       if (item.status_action === "push") return "更新";
       if (item.category === "conflict") return "版本差异";
-      return statusLabel(item.status_action || item.category || "待处理");
+      return statusLabel(item.status_action || item.category || "需确认");
     }
 
     function reviewIsDeleteItem(item) {
@@ -6353,7 +6353,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             setReviewFeedback(
               "yellow",
               "没有写入共享仓库",
-              "确认发布返回 approved=0。通常表示检查后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前待办分类。",
+              "确认发布返回 approved=0。通常表示检查后状态变了：该项已发布、已恢复，或变成需要确认的版本差异。请看当前确认分类。",
             );
             return;
           }
@@ -6391,10 +6391,10 @@ DASHBOARD_HTML = r"""<!doctype html>
             const unrelatedNames = compactSkillList(unrelatedRemaining.map((item) => item.skill_id));
             const publishedCleanly = resolution.done && relatedRemaining.length === 0;
             const detail = publishedCleanly && remaining === 0
-              ? `已发布 ${requestedSkillsLabel}，当前无待处理。`
+              ? `已发布 ${requestedSkillsLabel}，当前没有确认项。`
               : (publishedCleanly
-                ? `已发布 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的待处理项：${unrelatedNames}。这不是同一批发布失败。`
-                : `${resolution.detail} 当前剩余 ${remaining} 个：${remainingNames}；其中相关待处理：${relatedNames}。`);
+                ? `已发布 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批发布失败。`
+                : `${resolution.detail} 当前剩余 ${remaining} 个：${remainingNames}；其中相关确认项：${relatedNames}。`);
             setReviewFeedback(
               publishedCleanly && remaining === 0 ? "green" : "yellow",
               publishedCleanly ? "本次发布已完成" : "发布已提交，仍需确认状态",
@@ -6403,8 +6403,8 @@ DASHBOARD_HTML = r"""<!doctype html>
             setExecutorStatus(
               publishedCleanly && remaining === 0 ? "done" : "published",
               publishedCleanly
-                ? (remaining === 0 ? "本次发布已完成，当前无待处理。" : `本次发布已完成；还有 ${remaining} 个其他待处理项。`)
-                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关待处理项。`,
+                ? (remaining === 0 ? "本次发布已完成，当前没有确认项。" : `本次发布已完成；还有 ${remaining} 个其他确认项。`)
+                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关确认项。`,
               publishedCleanly && remaining === 0 ? "green" : "yellow",
             );
           }
@@ -6449,7 +6449,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           showExecutorOutput(formatExecutorResult(payload));
           return false;
         }
-        setReviewFeedback("green", "状态已刷新", "OpenClaw peer status 已重新发布；NAS 缓存刷新后待办会下降。");
+        setReviewFeedback("green", "状态已刷新", "OpenClaw peer status 已重新发布；NAS 缓存刷新后确认项会下降。");
         return true;
       } catch (err) {
         setReviewFeedback("yellow", "发布已完成，状态刷新失败", String(err));
@@ -6510,7 +6510,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         setReviewFeedback(
           stillBlocked ? "yellow" : "green",
           stillBlocked ? `${skillId} 已恢复，等待状态收敛` : `${skillId} 已恢复`,
-          stillBlocked ? "设备状态可能还在刷新中，稍后再刷新一次。" : "待办已刷新；如果数字下降，说明闭环完成。",
+          stillBlocked ? "设备状态可能还在刷新中，稍后再刷新一次。" : "确认项已刷新；如果数字下降，说明闭环完成。",
         );
         setExecutorStatus("restored", `${skillId} 已从共享仓库恢复。`, "green");
       } catch (err) {
@@ -6739,7 +6739,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictItems = blockedItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
       const openclawAction = conflictItems.length > 0
         ? `有 ${conflictItems.length} 个版本差异，回到上方任务卡处理。`
-        : (Number(openclaw.blocked || 0) > 0 ? "有待处理项，回到上方任务卡处理。" : "不用操作。");
+        : (Number(openclaw.blocked || 0) > 0 ? "有确认项，回到上方任务卡处理。" : "不用操作。");
       const cards = [
         {
           title: "Mac 本机",
@@ -6858,7 +6858,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ${pill(statusLabel(device.health || device.operation_scope), deviceKind(device.health))}
           </div>
           <div class="device-map-meta">
-            <div>技能 ${escapeHtml(text(device.skills))} · 待处理 ${escapeHtml(text(device.blocked))}</div>
+            <div>技能 ${escapeHtml(text(device.skills))} · 需确认 ${escapeHtml(text(device.blocked))}</div>
             <div>权限 ${escapeHtml(scopeLabel(device.operation_scope))} · ${freshnessPill(device.freshness)}</div>
           </div>
         </div>
@@ -7053,7 +7053,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="card-note">${escapeHtml(device.note)}</div>
           <div class="card-stats">
             <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(device.skills))}</div></div>
-            <div class="mini-stat"><div class="mini-label">待处理</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
+            <div class="mini-stat"><div class="mini-label">需确认</div><div class="mini-value">${escapeHtml(text(device.blocked))}</div></div>
             <div class="mini-stat"><div class="mini-label">策略</div><div class="mini-value">${escapeHtml(scopeLabel(device.policy))}</div></div>
             <div class="mini-stat"><div class="mini-label">本机例外</div><div class="mini-value">${escapeHtml(pretty(device.local_policy || []))}</div></div>
             <div class="mini-stat"><div class="mini-label">更新于</div><div class="mini-value subtle">${escapeHtml(formatDateTime(device.last_seen_at))}</div></div>
