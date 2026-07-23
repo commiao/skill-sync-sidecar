@@ -6339,7 +6339,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
         ${simpleActionFeedbackHtml()}
-        <div id="simple-action-note" class="simple-action-note">日常只需要按顶部主按钮走；原因、队列和命令都放在详情里。</div>
+        <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前 Mac；共享库只有确认发布才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
       setExecutorButtons(executorAvailable);
     }

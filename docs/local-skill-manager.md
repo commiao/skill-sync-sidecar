@@ -55,6 +55,7 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 - `恢复发布` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
+The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit publish confirmation, and other devices are read-only status unless their own Agent acts.
 
 When OpenClaw is actively changing a skill, the first screen may show `暂时搁置`.
 This is a browser-local UI deferral only:
