@@ -4375,6 +4375,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorAllowPublish = false;
     let executorAllowLocalWrites = false;
     let lastDryRunSafe = false;
+    let lastPublishReceipt = null;
+    let executorBusy = false;
     let localWorkspaceFromExecutor = null;
     let lastLocalSkillAnalysis = null;
     let currentReviewQueueItems = [];
@@ -4441,6 +4443,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
       renderSimpleActionPanel(dashboard, blockedItems);
       renderReviewQueue(blockedItems);
+      renderLastPublishReceipt(blockedItems);
       $("blocked-empty").hidden = blockedItems.length > 0;
       $("blocked-table").hidden = blockedItems.length === 0;
       $("blocked-body").innerHTML = blockedItems.map((item) => `
@@ -5660,6 +5663,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       return [...new Set(skillIds)];
     }
 
+    function currentActionSkillIds() {
+      const queueSkillIds = publishCandidateSkillIds();
+      if (queueSkillIds.length > 0) return queueSkillIds;
+      return [...new Set((currentGuideSkills || []).map((skillId) => text(skillId)).filter(Boolean))];
+    }
+
+    function renderLastPublishReceipt(items) {
+      if (!lastPublishReceipt || executorBusy) return;
+      const publishedSkills = Array.isArray(lastPublishReceipt.skill_ids) ? lastPublishReceipt.skill_ids : [];
+      if (publishedSkills.length === 0) return;
+      const allItems = Array.isArray(items) ? items : [];
+      const relatedRemaining = allItems.filter((item) => publishedSkills.includes(text(item.skill_id)));
+      const unrelatedRemaining = allItems.filter((item) => !publishedSkills.includes(text(item.skill_id)));
+      const publishedNames = compactSkillList(publishedSkills);
+      if (relatedRemaining.length === 0 && allItems.length === 0) {
+        setReviewFeedback("green", "刚刚发布完成", `已发布 ${publishedNames}；当前无待处理。`);
+      } else if (relatedRemaining.length === 0) {
+        setReviewFeedback(
+          "yellow",
+          "刚刚发布完成，还有新的待办",
+          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的待办：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。`,
+        );
+      } else {
+        setReviewFeedback(
+          "yellow",
+          "发布已提交，等待状态收敛",
+          `已请求发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关待办：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。稍后刷新，或继续按当前队列处理。`,
+        );
+      }
+    }
+
     function reviewDeleteItems(items) {
       return Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)) : [];
     }
@@ -5965,7 +5999,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (currentReviewQueueItems.length > 0) {
         renderReviewRecommendation(currentReviewQueueItems);
       }
-      const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
+      const actionSkills = currentActionSkillIds();
       const reviewReady = allReviewPublishCandidatesReady();
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
       $("executor-dry-run").disabled = !available || actionSkills.length === 0;
@@ -6090,7 +6124,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     async function runExecutorAction(mode) {
-      const actionSkills = currentGuideSkills.length ? currentGuideSkills : publishCandidateSkillIds();
+      const actionSkills = currentActionSkillIds();
       const requestedSkillsLabel = compactSkillList(actionSkills);
       if (!executorAvailable) {
         showExecutorOutput("本机助手未连接，无法执行检查或发布。按钮没有真正执行，请先确认本机助手在线。");
@@ -6125,6 +6159,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           return;
         }
       }
+      executorBusy = true;
       setExecutorButtons(false);
       setExecutorStatus(isPublish ? "publishing" : "dry-run", isPublish ? "正在发布，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
       setReviewFeedback("yellow", isPublish ? "正在发布" : "正在检查", isPublish ? "正在写入共享仓库，请等待完成。" : "检查只读，不会写入共享仓库。");
@@ -6172,6 +6207,12 @@ DASHBOARD_HTML = r"""<!doctype html>
             renderReviewQueue(currentReviewQueueItems);
           }
           if (isPublish) {
+            lastPublishReceipt = {
+              skill_ids: actionSkills,
+              approved: payload.approved,
+              approved_skill_ids: payload.approved_skill_ids,
+              published_at: new Date().toISOString(),
+            };
             const resolution = await waitForSkillsResolution(actionSkills, "确认发布");
             lastDryRunSafe = false;
             reviewTaskResults = {};
@@ -6218,6 +6259,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         setExecutorStatus("failed", "本机助手调用失败，请确认本机服务仍在线。", "red");
         setReviewFeedback("red", "本机助手调用失败", "请确认 Mac 本机助手仍在线。");
       } finally {
+        executorBusy = false;
         setExecutorButtons(executorAvailable);
       }
     }
