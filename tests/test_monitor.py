@@ -83,6 +83,36 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertEqual(report["health"], "red")
         self.assertTrue(any(item["code"] == "blocked_item" for item in report["alerts"]))
 
+    def test_monitor_report_explains_delete_review_as_restore_first(self):
+        summary = _summary(health="yellow", blocked=1)
+        summary["dashboard"]["operator"]["top_issue"] = {
+            "peer_id": "oc-vps",
+            "peer_name": "oc-vps / OpenClaw",
+            "skill_id": "session-knowledge-manager",
+            "status_action": "local_deleted",
+            "category": "delete_review",
+            "reason": "local deletion requires --allow-delete before remote deletion",
+            "action": "先处理 oc-vps / OpenClaw / session-knowledge-manager 缺失项；建议先从共享仓库找回，确认废弃时再单独删除。",
+        }
+        summary["dashboard"]["blocked_items"] = [
+            {
+                "peer_id": "oc-vps",
+                "peer_name": "oc-vps / OpenClaw",
+                "skill_id": "session-knowledge-manager",
+                "status_action": "local_deleted",
+                "category": "delete_review",
+                "reason": "local deletion requires --allow-delete before remote deletion",
+            }
+        ]
+
+        report = build_monitor_report(summary)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["health"], "red")
+        actions = [item.get("action") for item in report["alerts"] if item.get("code") == "blocked_item"]
+        self.assertTrue(any("先从共享仓库找回" in action for action in actions))
+        self.assertFalse(any("Inspect the item" in action for action in actions))
+
     def test_monitor_report_detects_stale_and_snapshot_mismatch(self):
         summary = _summary()
         summary["dashboard"]["devices"][1]["freshness"] = {"state": "stale", "label": "2 小时前", "age_seconds": 7200}
