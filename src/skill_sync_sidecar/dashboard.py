@@ -3342,6 +3342,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       margin-top: 2px;
     }
+    .simple-action-disabled-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .simple-action-disabled-note.ready {
+      color: #166534;
+      font-weight: 760;
+    }
+    .simple-action-disabled-note.warn {
+      color: #8a5a00;
+      font-weight: 760;
+    }
     .simple-choice-grid {
       display: grid;
       gap: 8px;
@@ -5935,6 +5949,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="simple-action-actions single-primary">
           ${primaryActions}
         </div>
+        <div id="simple-action-disabled-note" class="simple-action-disabled-note">正在确认当前按钮状态。</div>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
         <div id="simple-action-feedback" class="simple-action-feedback" hidden>
@@ -6985,6 +7000,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
+    function setButtonLabel(button, label, subtext) {
+      if (!button) return;
+      button.innerHTML = `${escapeHtml(label)}${subtext ? `<span>${escapeHtml(subtext)}</span>` : ""}`;
+    }
+
+    function primaryButtonText(button, fallback) {
+      if (!button) return fallback || "按钮";
+      for (const node of button.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const value = text(node.textContent);
+          if (value) return value;
+        }
+      }
+      return fallback || text(button.textContent || "按钮");
+    }
+
     function updateReviewTaskResult(itemOrSkillId, result) {
       const key = typeof itemOrSkillId === "object" ? reviewItemKey(itemOrSkillId) : String(itemOrSkillId || "");
       if (!key) return;
@@ -7319,6 +7350,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewPublishAll = $("review-publish-all");
       const simpleDryRun = $("simple-dry-run");
       const simplePublish = $("simple-publish");
+      const simpleActionHint = $("simple-action-disabled-note");
       if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
       if (reviewPublishAll) {
         reviewPublishAll.disabled = !canPublishApprovedPush;
@@ -7339,9 +7371,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "发布到共享库"));
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
-        simplePublish.textContent = !available
-          ? "等待本机助手"
-          : (!executorAllowPublish ? "保存开关未打开" : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe ? "先检查最新版本" : "保存到共享库"));
+        setButtonLabel(
+          simplePublish,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowPublish ? "保存开关未打开" : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe ? "先检查最新版本" : "保存到共享库")),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowPublish ? "当前只能检查。" : "会要求输入 PUBLISH。"),
+        );
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
           ? "本机助手未在线"
@@ -7352,6 +7390,30 @@ DASHBOARD_HTML = r"""<!doctype html>
               : (!reviewReady && !lastDryRunSafe
               ? "先检查，确认结果显示可以发布"
               : "保存到共享库")));
+      }
+      if (simpleActionHint) {
+        let hint = "";
+        let hintKind = "";
+        if (!available) {
+          hint = "下一步：先让 Mac 本机助手在线；在线后这里会自动解锁。";
+          hintKind = "warn";
+        } else if (actionSkills.length === 0) {
+          hint = "当前没有可操作的同步更新。";
+        } else if (simpleDryRun) {
+          hint = `下一步：点“${primaryButtonText(simpleDryRun, "检查一下")}”；检查只读，不会写入共享库。`;
+          hintKind = "ready";
+        } else if (!executorAllowPublish) {
+          hint = "已检查通过，但保存开关未打开；当前只能检查，不能写共享库。";
+          hintKind = "warn";
+        } else if (canPublishApprovedPush) {
+          hint = "下一步：点“保存到共享库”；输入 PUBLISH 后才会写入。";
+          hintKind = "ready";
+        } else {
+          hint = "先完成检查；通过后这里会提示可以保存。";
+          hintKind = "warn";
+        }
+        simpleActionHint.textContent = hint;
+        simpleActionHint.className = `simple-action-disabled-note ${hintKind}`;
       }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");
