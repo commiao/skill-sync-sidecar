@@ -5593,6 +5593,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let lastOperationFeedback = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
+    let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
     let staleRefreshTimer = null;
     const SOURCE_CHANGE_DEFERRALS_KEY = "skill-sync-source-change-deferrals-v1";
@@ -6115,10 +6116,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
           `)
           : `
-            <div class="simple-choice-grid source-change-actions" aria-label="OpenClaw 新修改处理">
-              <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
-              <button type="button" onclick="deferSourceChangedItems()">先不提醒<span>还在改时点这里；只隐藏首页提醒。</span></button>
-            </div>
+            <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
           `;
         facts = allSourceChangedReady
           ? (executorAllowPublish ? [
@@ -6144,8 +6142,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${allSourceChangedReady ? "" : `
           <div class="simple-action-card">
             <div class="simple-action-card-title">还没改完？</div>
-            <div class="simple-action-summary">顶部可以直接点“先不提醒”，或只刷新状态；这两个动作都不会写共享库。</div>
+            <div class="simple-action-summary">可以先不提醒，或只刷新状态；这两个动作都不会写共享库。</div>
             <div class="simple-decision-actions">
+              <button type="button" onclick="deferSourceChangedItems()">先不提醒<span>只隐藏首页提醒。</span></button>
               <button type="button" onclick="refresh(true)">刷新状态</button>
             </div>
           </div>
@@ -6218,7 +6217,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
         ${simpleActionFeedbackHtml()}
-        <div id="simple-action-note" class="simple-action-note">只需要按顶部推荐按钮走；下面的数字、设备、版本信息都是排查时才看的详情。</div>
+        <div id="simple-action-note" class="simple-action-note">日常只需要按顶部主按钮走；原因、队列和命令都放在详情里。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -6259,7 +6258,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       return `
         <details class="simple-action-more">
-          <summary>查看原因和涉及的 skill</summary>
+          <summary>详情：为什么这样建议</summary>
           <div class="simple-action-more-body">
             ${factHtml}
             ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
@@ -6880,6 +6879,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openReviewDetails() {
+      reviewDetailsUserOpened = true;
       openSupportDrawer();
       const target = $("review-queue-panel");
       if (!target) return;
@@ -7020,6 +7020,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictItems = reviewConflictItems(items);
       const conflictOnly = conflictItems.length > 0 && conflictItems.length === items.length;
       panel.hidden = false;
+      if (!reviewDetailsUserOpened) panel.open = false;
       $("review-queue-count").outerHTML = pill(`${items.length} 项`, "yellow").replace("<span", "<span id=\"review-queue-count\"");
       const otherItems = items.filter((item) => !reviewIsDeleteItem(item) && !reviewIsSourceChangedItem(item) && !reviewIsPublishCandidate(item));
       const mobileReview = window.matchMedia("(max-width: 560px)").matches;
