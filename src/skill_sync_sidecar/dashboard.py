@@ -4132,10 +4132,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
     }
     .skill-inventory-metric span,
-    .skill-inventory-note {
+    .skill-inventory-note,
+    .skill-inventory-project-note {
       color: var(--muted);
       font-size: 12px;
       line-height: 1.35;
+    }
+    .skill-inventory-project-note {
+      margin: 6px 0 8px;
+    }
+    .skill-inventory-project-note summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .skill-inventory-project-note p {
+      margin: 6px 0 0;
+      max-width: 920px;
     }
     .skill-inventory-filters {
       display: grid;
@@ -4921,6 +4934,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
       <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或发布到共享库。</div>
+      <details class="skill-inventory-project-note">
+        <summary>项目级 skill 怎么处理</summary>
+        <p>项目级 skill 随项目仓维护，不从全局清单一键安装，也不直接发布成公用 skill。需要跨设备使用时，在项目仓的 skills/ 目录和根级 AGENTS.md 里声明，由项目自己的同步策略处理。</p>
+      </details>
       <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未发布整理"></div>
       <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
@@ -8424,7 +8441,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       });
       $("skill-inventory-triage").innerHTML = [
         triageButton("publishable", counts.publishable, "可发布公用", "逐个检查后发布共享库"),
-        triageButton("project", counts.project, "项目级", "暂不从全局清单一键发布"),
+        triageButton("project", counts.project, "项目级", "随项目仓维护，不装全局"),
         triageButton("private", counts.private, "设备私有", "只保留在当前设备"),
         triageButton("waiting_path", counts.waiting_path, "缺本机路径", "等待对应设备上报或恢复到 Mac"),
       ].join("");
@@ -8651,7 +8668,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishPath = macPublishSourcePath(item);
       const publishAction = centralState === "unpublished"
         ? (item.scope === "project"
-          ? `<span class="skill-tool-check">项目级随项目维护</span>`
+          ? `<span class="skill-tool-check">项目级随项目仓维护</span>`
           : (publishPath
             ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到共享库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
@@ -8701,8 +8718,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (item.scope === "project") {
           return {
             kind: "muted",
-            title: "项目级 skill，随项目维护",
-            detail: "暂不发布成全局共享；在对应项目里使用和同步。",
+            title: "项目级：随项目仓维护",
+            detail: "不从全局清单一键安装；在项目仓声明和同步。",
           };
         }
         if (macPublishSourcePath(item)) {
