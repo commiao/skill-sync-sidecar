@@ -687,6 +687,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("review-recommendation", DASHBOARD_HTML)
             self.assertIn("推荐操作", DASHBOARD_HTML)
             self.assertIn("确认缺失项是恢复还是删除", DASHBOARD_HTML)
+            self.assertIn("先判断源端是否还在修改", DASHBOARD_HTML)
+            self.assertIn("源端又产生了新版本", DASHBOARD_HTML)
+            self.assertIn("reviewSourceChangedItems", DASHBOARD_HTML)
+            self.assertIn("reviewIsSourceChangedItem", DASHBOARD_HTML)
             self.assertIn("先检查", DASHBOARD_HTML)
             self.assertIn("先处理缺失/删除确认", DASHBOARD_HTML)
             self.assertIn("再处理可发布更新", DASHBOARD_HTML)
@@ -973,6 +977,9 @@ class OpsStatusTest(unittest.TestCase):
                                     "category": "writer_policy",
                                     "reason": "writer policy pull-only blocks push",
                                     "recommendation": "Review before approved-push.",
+                                    "base_hash": "hash-before",
+                                    "local_hash": "hash-after",
+                                    "remote_hash": "hash-before",
                                 }
                             ],
                         },
@@ -995,6 +1002,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["dashboard"]["blocked"], 1)
             self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "hebei-recruitment")
             self.assertEqual(status["dashboard"]["blocked_items"][0]["source"], "live_sync_plan")
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["operator_state"], "source_changed")
+            self.assertIn("不是上次发布失败", status["dashboard"]["blocked_items"][0]["status_description"])
+            self.assertEqual(status["dashboard"]["operator"]["action_guide"]["title"], "OpenClaw 还有新修改")
+            self.assertIn("不是刚才的发布按钮失效", status["dashboard"]["operator"]["action_guide"]["summary"])
+            self.assertIn("只有稳定后发布才会真正清空待办", status["dashboard"]["operator"]["action_guide"]["note"])
 
     def test_dashboard_hub_import_preview_response_is_non_writing_dry_run(self):
         with TemporaryDirectory() as tmp:
