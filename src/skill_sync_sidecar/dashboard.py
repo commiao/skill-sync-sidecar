@@ -2700,10 +2700,28 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px;
       align-items: center;
     }
+    .easy-action-row.pending {
+      display: none;
+    }
+    .easy-action-row.pending.ready {
+      display: flex;
+    }
     .easy-action-row button.primary {
       background: var(--ink);
       color: #fff;
       border-color: var(--ink);
+    }
+    .easy-sync-empty {
+      border: 1px solid #cce4d6;
+      background: #f5fbf7;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--green);
+      font-weight: 760;
+      line-height: 1.35;
+    }
+    .easy-sync-empty.has-work {
+      display: none;
     }
     .easy-steps {
       display: grid;
@@ -4008,8 +4026,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">场景 2</div>
           <h2>把已确认的更新同步出去</h2>
-          <p>先检查，只读预览；没问题再同步到其他设备。完成后面板会自动确认是否还有待处理。</p>
-          <div class="easy-action-row">
+          <p>有待确认更新时，这里会出现“先检查”和“同步到其他设备”。没有待办时不用点任何按钮。</p>
+          <div id="easy-sync-empty" class="easy-sync-empty">当前无需同步。页面顶部显示“无待处理”时，可以关闭页面或继续工作。</div>
+          <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
             <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
             <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>同步到其他设备</button>
@@ -5956,6 +5975,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("scope-publish").disabled = !canPublishApprovedPush;
       $("easy-dry-run").disabled = !available || actionSkills.length === 0;
       $("easy-publish").disabled = !canPublishApprovedPush;
+      const easySyncActions = $("easy-sync-actions");
+      const easySyncEmpty = $("easy-sync-empty");
+      if (easySyncActions && easySyncEmpty) {
+        const showSyncActions = actionSkills.length > 0;
+        easySyncActions.hidden = !showSyncActions;
+        easySyncActions.classList.toggle("ready", showSyncActions);
+        easySyncEmpty.classList.toggle("has-work", showSyncActions);
+        easySyncEmpty.textContent = showSyncActions
+          ? "检测到待确认更新。先检查，确认安全后再同步到其他设备。"
+          : "当前无需同步。页面顶部显示“无待处理”时，可以关闭页面或继续工作。";
+      }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
       const reviewDryRunAll = $("review-dry-run-all");
