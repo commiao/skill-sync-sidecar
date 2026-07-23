@@ -5977,7 +5977,10 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
           `
           : `
-            <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
+            <div class="simple-choice-grid source-change-actions" aria-label="OpenClaw 新修改处理">
+              <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
+              <button type="button" onclick="deferSourceChangedItems()">先不提醒<span>还在改时点这里；只隐藏首页提醒。</span></button>
+            </div>
           `;
         facts = allSourceChangedReady
           ? (executorAllowPublish ? [
@@ -6003,9 +6006,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${allSourceChangedReady ? "" : `
           <div class="simple-action-card">
             <div class="simple-action-card-title">还没改完？</div>
-            <div class="simple-action-summary">可以先搁置首页提醒，或只刷新状态；这两个动作都不会写共享库。</div>
+            <div class="simple-action-summary">顶部可以直接点“先不提醒”，或只刷新状态；这两个动作都不会写共享库。</div>
             <div class="simple-decision-actions">
-              <button type="button" onclick="deferSourceChangedItems()">暂时搁置</button>
               <button type="button" onclick="refresh(true)">刷新状态</button>
             </div>
           </div>
