@@ -4378,6 +4378,64 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 13px;
       font-weight: 820;
     }
+    .local-skill-guide {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 2px 0 4px;
+    }
+    .local-skill-step {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 7px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      min-width: 0;
+    }
+    .local-skill-step strong {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8f1ff;
+      color: #1f4f8a;
+      font-size: 11px;
+      font-weight: 860;
+    }
+    .local-skill-step span {
+      display: block;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 760;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .local-skill-step em {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-style: normal;
+      line-height: 1.3;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
+    .local-skill-step.active {
+      border-color: #b8cef0;
+      background: #f7fbff;
+    }
+    .local-skill-step.done {
+      border-color: #b8d8c8;
+      background: #ecfdf5;
+    }
+    .local-skill-step.done strong {
+      background: #d1fae5;
+      color: #047857;
+    }
     .local-skill-input-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -4651,6 +4709,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
       .local-skill-input-row { grid-template-columns: 1fr; gap: 6px; }
+      .local-skill-guide { grid-template-columns: 1fr; gap: 5px; }
       .local-skill-followup.ready { grid-template-columns: 1fr; gap: 6px; }
       .local-skill-input-row input { height: 32px; }
       .local-skill-tools { grid-template-columns: 1fr; max-height: 86px; overflow: hidden; }
@@ -4784,31 +4843,36 @@ DASHBOARD_HTML = r"""<!doctype html>
           <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
-              <div class="local-skill-manager-title">本地 skill 路径</div>
+              <div class="local-skill-manager-title">三步添加到本机</div>
               <span id="local-skill-pill" class="pill">待分析</span>
             </div>
+            <div class="local-skill-guide" aria-label="新增本地 skill 流程">
+              <div id="local-skill-step-pick" class="local-skill-step active"><strong>1</strong><span>粘贴路径<em>目录或 SKILL.md 都可以。</em></span></div>
+              <div id="local-skill-step-install" class="local-skill-step"><strong>2</strong><span>安装本机<em>只写当前 Mac 的工具。</em></span></div>
+              <div id="local-skill-step-publish" class="local-skill-step"><strong>3</strong><span>共享出去<em>发布前会再次确认。</em></span></div>
+            </div>
             <div class="local-skill-input-row">
-              <input id="local-skill-path" type="text" value="" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
-              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">一键分析</button>
+              <input id="local-skill-path" type="text" value="" placeholder="粘贴 skill 文件夹或 SKILL.md 路径" />
+              <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">开始</button>
             </div>
             <div id="local-skill-followup" class="local-skill-followup" hidden aria-label="分析后的下一步">
-              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机</button>
-              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查同步</button>
-              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>同步到其他设备</button>
+              <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机工具</button>
+              <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查共享</button>
+              <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布到共享库</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">等待输入一个 skill 目录或 SKILL.md 路径。</div>
+            <div id="local-skill-result" class="local-skill-result">粘贴路径后点“开始”；检查只读，安装和发布都会再次确认。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
         </div>
         <div class="easy-card">
           <div class="easy-card-label">同步更新</div>
           <h2>把已确认的更新同步出去</h2>
-          <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有需要确认的事项时不用点任何按钮。</p>
+          <p>有设备更新时，这里会出现“先检查”和“保存到共享库”。没有需要确认的事项时不用点任何按钮。</p>
           <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。</div>
           <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
             <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
-            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>同步到其他设备</button>
+            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>保存到共享库</button>
           </div>
           <ol id="easy-sync-steps" class="easy-steps" aria-label="发布流程" hidden>
             <li><strong>1</strong><span>先检查会同步哪些 skill；这一步不会写入。</span></li>
@@ -5650,7 +5714,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">现在不用做任何事</div>
-              <div class="simple-action-summary">当前没有需要你处理的同步事项。要新增、安装或整理本机 skill，点右侧入口即可。</div>
+              <div class="simple-action-summary">当前没有需要你处理的同步事项。要新增、安装或整理本机 skill，展开下面的本机工作区即可。</div>
             </div>
             <div class="simple-action-actions single-primary">
               <button type="button" class="primary" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、发布共享。</span></button>
@@ -5749,7 +5813,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ])
           : [
             ["发生了什么", "OpenClaw 本地版本不同于共享库，说明有人刚改过。"],
-            ["不会误发", "发布前会重新校验 hash，变化中会拒绝写入。"],
+            ["不会误发", "发布前会重新确认版本，变化中会拒绝写入。"],
             ["下一步", "改完就检查；还在改就继续做你的事。"],
             ["完成标准", "顶部显示“现在不用做任何事”。"],
           ];
@@ -7203,7 +7267,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         easySyncEmpty.textContent = showSyncActions
           ? (sourceChangedCount > 0
             ? "OpenClaw 有新修改。还在改可以先放着；改完后点检查最新版本。"
-            : "检测到待确认更新。先检查，确认安全后再同步到其他设备。")
+            : "检测到待确认更新。先检查，确认安全后再保存到共享库。")
           : (deferredCount > 0
             ? "当前可操作更新已搁置；取消搁置后才能检查或同步。"
             : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。");
@@ -8878,7 +8942,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "analyze failed");
         lastLocalSkillAnalysis = payload;
-        setLocalSkillStatus("ready", payload.operator_action || "分析完成。", payload.risk && payload.risk.level === "ok" ? "green" : "yellow");
+        setLocalSkillStatus("ready", payload.operator_action || "分析完成。下一步可以安装到本机工具。", payload.risk && payload.risk.level === "ok" ? "green" : "yellow");
         renderLocalSkillAnalysis(payload);
         renderLocalSkillPublishHint();
       } catch (err) {
@@ -8912,7 +8976,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "install failed");
-        setLocalSkillStatus("installed", "安装完成；已自动写入配置和备份记录。", "green");
+        setLocalSkillStatus("installed", "安装完成；已写入本机工具目录并保留备份。下一步可选择发布到共享库。", "green");
         renderLocalSkillInstall(payload);
         renderLocalSkillPublishHint();
         await refreshLocalWorkspace();
@@ -8948,8 +9012,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
-        setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "共享仓库已更新。" : "检查通过，可以发布到共享仓库。", "green");
-        $("local-skill-result").textContent = `${payload.skill_id} · ${modeLabel(payload.mode)} · ${payload.safe_to_push ? "可以发布" : "需要复核"} · 文件 ${text(payload.uploaded_files)} · 共享仓库版本 ${text(payload.snapshot_id)}`;
+        setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "共享库已更新。" : "检查通过，可以发布到共享库。", "green");
+        $("local-skill-result").textContent = `${payload.skill_id}：${realPublish ? "已发布到共享库" : (payload.safe_to_push ? "检查通过，可以发布" : "需要复核")}。文件 ${text(payload.uploaded_files)}，版本 ${text(payload.snapshot_id)}。`;
       } catch (err) {
         renderLocalSkillError(String(err));
       } finally {
@@ -8960,20 +9024,21 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderLocalSkillAnalysis(payload) {
       const summary = payload.summary || {};
       const writes = Number(summary.will_write || 0);
-      $("local-skill-result").textContent = `${payload.skill_id} · ${payload.scope} · ${payload.manifest_source === "generated" ? "sidecar 自动生成元数据" : "读取配置文件"} · 可写入 ${writes} 个工具`;
+      const scopeText = payload.scope === "project" ? "项目级" : "公用";
+      $("local-skill-result").textContent = `${payload.skill_id}：识别为${scopeText} skill，可安装到 ${writes} 个本机工具。`;
       renderLocalSkillTools(payload.tools || []);
     }
 
     function renderLocalSkillInstall(payload) {
       const summary = payload.summary || {};
-      $("local-skill-result").textContent = `${payload.skill_id} 安装完成 · 写入 ${text(summary.will_write)} 个工具 · 记录 ${text(payload.record_path)}`;
+      $("local-skill-result").textContent = `${payload.skill_id} 已安装到本机工具，写入 ${text(summary.will_write)} 处；已保留安装记录和备份。`;
       renderLocalSkillTools(payload.items || []);
     }
 
     function renderLocalSkillPublishHint() {
       if (!lastLocalSkillAnalysis) return;
       if (!executorAllowPublish) {
-        $("local-skill-result").textContent += " · 发布开关未打开，可先检查发布；真实发布需启用发布权限";
+        $("local-skill-result").textContent += " 发布开关未打开时，可以先检查共享；真实发布需要启用发布权限。";
       }
     }
 
@@ -8997,6 +9062,30 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setLocalSkillStatus(label, detail, kind) {
       $("local-skill-pill").outerHTML = pill(statusPillLabel(label), kind).replace("<span", "<span id=\"local-skill-pill\"");
       $("local-skill-result").textContent = detail;
+      updateLocalSkillGuide(label);
+    }
+
+    function updateLocalSkillGuide(label) {
+      const states = { pick: "", install: "", publish: "" };
+      if (["ready", "installing", "installed", "publish ok", "publishing", "published"].includes(label)) {
+        states.pick = "done";
+      } else {
+        states.pick = "active";
+      }
+      if (["ready", "installing"].includes(label)) states.install = "active";
+      if (["installed", "publish ok", "publishing", "published"].includes(label)) states.install = "done";
+      if (["installed", "publish ok", "publishing"].includes(label)) states.publish = "active";
+      if (label === "published") states.publish = "done";
+      [
+        ["local-skill-step-pick", states.pick],
+        ["local-skill-step-install", states.install],
+        ["local-skill-step-publish", states.publish],
+      ].forEach(([id, state]) => {
+        const element = $(id);
+        if (!element) return;
+        element.classList.remove("active", "done");
+        if (state) element.classList.add(state);
+      });
     }
 
     function briefLine(label, value) {
