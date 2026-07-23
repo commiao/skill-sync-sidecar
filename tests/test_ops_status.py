@@ -965,6 +965,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"skill-inventory-sync-filter\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-result-note\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-bulk-actions\"", DASHBOARD_HTML)
+            self.assertIn("skill-inventory-filter-panel", DASHBOARD_HTML)
+            self.assertIn("高级筛选和搜索", DASHBOARD_HTML)
             self.assertIn("当前筛选结果批量安装", DASHBOARD_HTML)
             self.assertIn("批量安装/移除当前筛选结果", DASHBOARD_HTML)
             self.assertIn("inventory-bulk-install-button", DASHBOARD_HTML)

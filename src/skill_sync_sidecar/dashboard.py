@@ -4175,11 +4175,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 6px 0 0;
       max-width: 920px;
     }
+    .skill-inventory-filter-panel {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      margin-top: 10px;
+    }
+    .skill-inventory-filter-panel > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 760;
+    }
+    .skill-inventory-filter-panel > summary::-webkit-details-marker {
+      display: none;
+    }
+    .skill-inventory-filter-panel > summary::after {
+      content: "+";
+      float: right;
+      color: var(--muted);
+    }
+    .skill-inventory-filter-panel[open] > summary::after {
+      content: "-";
+    }
     .skill-inventory-filters {
       display: grid;
       grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(120px, .75fr)) auto;
       gap: 8px;
-      margin: 10px 0;
+      margin: 0;
+      padding: 0 12px 12px;
       align-items: center;
     }
     .skill-inventory-filters input,
@@ -5039,36 +5065,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       </details>
       <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未发布整理"></div>
-      <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
-        <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
-        <select id="skill-inventory-central-filter" aria-label="共享库状态">
-          <option value="all">全部状态</option>
-          <option value="published">已发布</option>
-          <option value="unpublished">未发布</option>
-          <option value="deprecated">已废弃</option>
-        </select>
-        <select id="skill-inventory-scope-filter" aria-label="Skill 范围">
-          <option value="all">全部范围</option>
-          <option value="global">公用</option>
-          <option value="project">项目级</option>
-          <option value="device-private">设备私有</option>
-        </select>
-        <select id="skill-inventory-tool-filter" aria-label="本机工具">
-          <option value="all">全部工具</option>
-          <option value="codex">Codex 已安装</option>
-          <option value="claude-code">Claude 已安装</option>
-          <option value="cursor">Cursor 已安装</option>
-          <option value="cc-switch">cc-switch 已安装</option>
-          <option value="skillshub">skillshub 已安装</option>
-          <option value="mac-none">本机未安装</option>
-        </select>
-        <select id="skill-inventory-sync-filter" aria-label="同步状态">
-          <option value="all">全部同步状态</option>
-          <option value="pending">只看待处理</option>
-          <option value="clean">只看正常</option>
-        </select>
-        <button id="skill-inventory-reset" type="button">清空</button>
-      </div>
+      <details class="skill-inventory-filter-panel">
+        <summary>高级筛选和搜索</summary>
+        <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
+          <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
+          <select id="skill-inventory-central-filter" aria-label="共享库状态">
+            <option value="all">全部状态</option>
+            <option value="published">已发布</option>
+            <option value="unpublished">未发布</option>
+            <option value="deprecated">已废弃</option>
+          </select>
+          <select id="skill-inventory-scope-filter" aria-label="Skill 范围">
+            <option value="all">全部范围</option>
+            <option value="global">公用</option>
+            <option value="project">项目级</option>
+            <option value="device-private">设备私有</option>
+          </select>
+          <select id="skill-inventory-tool-filter" aria-label="本机工具">
+            <option value="all">全部工具</option>
+            <option value="codex">Codex 已安装</option>
+            <option value="claude-code">Claude 已安装</option>
+            <option value="cursor">Cursor 已安装</option>
+            <option value="cc-switch">cc-switch 已安装</option>
+            <option value="skillshub">skillshub 已安装</option>
+            <option value="mac-none">本机未安装</option>
+          </select>
+          <select id="skill-inventory-sync-filter" aria-label="同步状态">
+            <option value="all">全部同步状态</option>
+            <option value="pending">只看待处理</option>
+            <option value="clean">只看正常</option>
+          </select>
+          <button id="skill-inventory-reset" type="button">清空</button>
+        </div>
+      </details>
       <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
       <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
       <div id="skill-inventory-list" class="skill-inventory-list"></div>
