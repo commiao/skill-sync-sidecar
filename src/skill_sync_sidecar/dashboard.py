@@ -7337,16 +7337,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else if (relatedRemaining.length === 0) {
         setReviewFeedback(
           "yellow",
-          "刚刚发布完成，还有新的确认项",
-          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的确认项：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。`,
+          "发布完成，还有其他提醒",
+          `已发布 ${publishedNames}；剩余 ${unrelatedRemaining.length} 个是其他或新检测到的确认项：${compactSkillList(unrelatedRemaining.map((item) => item.skill_id))}。这不是同一批发布失败。`,
         );
       } else {
-        setReviewFeedback(
-          "yellow",
-          "发布已提交，等待状态收敛",
-          `已请求发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。稍后刷新，或继续按当前队列处理。`,
-        );
+        const result = publishRemainingFeedback(publishedNames, relatedRemaining);
+        setReviewFeedback("yellow", result.title, result.detail);
       }
+    }
+
+    function publishRemainingFeedback(publishedNames, relatedRemaining) {
+      const sourceChanged = relatedRemaining.filter((item) => reviewIsSourceChangedItem(item));
+      if (sourceChanged.length > 0) {
+        return {
+          title: "发布完成，OpenClaw 又有新修改",
+          detail: `已发布 ${publishedNames}；但 OpenClaw 又上报了新版本：${compactSkillList(sourceChanged.map((item) => item.skill_id))}。这不是发布失败；改完后点“检查最新版本”。`,
+        };
+      }
+      return {
+        title: "发布写入成功，等待设备上报",
+        detail: `已发布 ${publishedNames}；仍看到 ${relatedRemaining.length} 个相关确认项：${blockedBreakdownText(blockedBreakdown(relatedRemaining))}。通常是设备上报还没刷新，稍后点刷新再看。`,
+      };
     }
 
     function reviewDeleteItems(items) {
@@ -8173,25 +8184,24 @@ DASHBOARD_HTML = r"""<!doctype html>
             const remaining = currentReviewQueueItems.length;
             const relatedRemaining = reviewItemsForSkills(actionSkills);
             const unrelatedRemaining = currentReviewQueueItems.filter((item) => !actionSkills.includes(text(item.skill_id)));
-            const remainingNames = compactSkillList(currentReviewQueueItems.map((item) => item.skill_id));
-            const relatedNames = compactSkillList(relatedRemaining.map((item) => item.skill_id));
             const unrelatedNames = compactSkillList(unrelatedRemaining.map((item) => item.skill_id));
             const publishedCleanly = resolution.done && relatedRemaining.length === 0;
+            const relatedFeedback = publishRemainingFeedback(requestedSkillsLabel, relatedRemaining);
             const detail = publishedCleanly && remaining === 0
               ? `已发布 ${requestedSkillsLabel}，当前没有确认项。`
               : (publishedCleanly
                 ? `已发布 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批发布失败。`
-                : `${resolution.detail} 当前剩余 ${remaining} 个：${remainingNames}；其中相关确认项：${relatedNames}。`);
+                : relatedFeedback.detail);
             setReviewFeedback(
               publishedCleanly && remaining === 0 ? "green" : "yellow",
-              publishedCleanly ? "本次发布已完成" : "发布已提交，仍需确认状态",
+              publishedCleanly ? "本次发布已完成" : relatedFeedback.title,
               detail,
             );
             setExecutorStatus(
               publishedCleanly && remaining === 0 ? "done" : "published",
               publishedCleanly
                 ? (remaining === 0 ? "本次发布已完成，当前没有确认项。" : `本次发布已完成；还有 ${remaining} 个其他确认项。`)
-                : `发布已写入；仍看到 ${relatedRemaining.length} 个相关确认项。`,
+                : relatedFeedback.title,
               publishedCleanly && remaining === 0 ? "green" : "yellow",
             );
           }
