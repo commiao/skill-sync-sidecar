@@ -147,6 +147,26 @@ def run_mac_central_restore(
     return result
 
 
+def run_mac_codex_install_from_central(
+    skill_ids: Sequence[str],
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+) -> dict:
+    if yes and not allow_local_writes:
+        raise OperatorExecutorError("Codex install is disabled; start operator-executor with --allow-local-writes")
+    result = restore_from_central(
+        Path.home() / ".codex" / "skills",
+        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+        skill_ids,
+        target="codex-global",
+        remote_prefix=os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac"),
+        yes=yes,
+    )
+    result["operation"] = "mac-codex-install-from-central"
+    return result
+
+
 def run_openclaw_central_restore(
     repo_root: Path,
     skill_ids: Sequence[str],
@@ -471,6 +491,24 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         self._send_json(400, {"ok": False, "error": "confirm must be RESTORE"})
                         return
                     result = run_mac_central_restore(
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
+                if path == "/api/mac-codex-install-from-central-dry-run":
+                    result = run_mac_codex_install_from_central(skill_ids or [], yes=False)
+                    self._send_json(200, result)
+                    return
+                if path == "/api/mac-codex-install-from-central":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "INSTALL":
+                        self._send_json(400, {"ok": False, "error": "confirm must be INSTALL"})
+                        return
+                    result = run_mac_codex_install_from_central(
                         skill_ids or [],
                         yes=True,
                         allow_local_writes=allow_local_writes,

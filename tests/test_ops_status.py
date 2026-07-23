@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 import unittest
 
 from skill_sync_sidecar.cli import build_parser, parse_peer_status_files, parse_remote_peer_status_paths
@@ -20,7 +21,12 @@ from skill_sync_sidecar.dashboard import (
     build_hub_import_preview_response,
 )
 from skill_sync_sidecar.remote import FileRemote
-from skill_sync_sidecar.operator_executor import OperatorExecutorError, run_openclaw_approved_push_batch, run_openclaw_conflict_package
+from skill_sync_sidecar.operator_executor import (
+    OperatorExecutorError,
+    run_mac_codex_install_from_central,
+    run_openclaw_approved_push_batch,
+    run_openclaw_conflict_package,
+)
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -881,6 +887,16 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderSkillInventory", DASHBOARD_HTML)
             self.assertIn("inventoryWithLiveLocal", DASHBOARD_HTML)
             self.assertIn("按 skill 查看", DASHBOARD_HTML)
+            self.assertIn("安装到 Codex", DASHBOARD_HTML)
+            self.assertIn("Codex 已安装", DASHBOARD_HTML)
+            self.assertIn("项目级不装全局", DASHBOARD_HTML)
+            self.assertIn("installCentralSkillToCodex", DASHBOARD_HTML)
+            self.assertIn("/api/mac-codex-install-from-central-dry-run", DASHBOARD_HTML)
+            self.assertIn("/api/mac-codex-install-from-central", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"skill-inventory-list\""),
+                DASHBOARD_HTML.index("installCentralSkillToCodex"),
+            )
             self.assertIn("renderLocalToolSummary", DASHBOARD_HTML)
             self.assertIn("toolSummaryItem", DASHBOARD_HTML)
             self.assertIn("已检测工具", DASHBOARD_HTML)
@@ -1732,6 +1748,36 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIsInstance(payload["tools"], list)
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in payload["tools"]))
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
+
+    def test_mac_codex_install_from_central_uses_home_scoped_paths(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            remote_source = root / "remote-source"
+            remote_snapshot = root / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
+            codex_root = root / ".codex" / "skills"
+            self._write_skill(remote_source / "demo", "demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+
+            with patch("skill_sync_sidecar.operator_executor.Path.home", return_value=root):
+                preview = run_mac_codex_install_from_central(["demo"], yes=False)
+
+                self.assertTrue(preview["ok"])
+                self.assertTrue(preview["safe_to_restore"])
+                self.assertEqual(preview["target"], "codex-global")
+                self.assertEqual(preview["target_root"], str(codex_root.resolve()))
+                self.assertEqual(preview["planned"], 1)
+                self.assertFalse((codex_root / "demo" / "SKILL.md").exists())
+
+                with self.assertRaises(OperatorExecutorError):
+                    run_mac_codex_install_from_central(["demo"], yes=True, allow_local_writes=False)
+
+                result = run_mac_codex_install_from_central(["demo"], yes=True, allow_local_writes=True)
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["operation"], "mac-codex-install-from-central")
+            self.assertEqual(result["target"], "codex-global")
+            self.assertEqual(result["restored"], 1)
+            self.assertTrue((codex_root / "demo" / "SKILL.md").exists())
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
         with TemporaryDirectory() as tmp:
