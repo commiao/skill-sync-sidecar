@@ -6219,7 +6219,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewControlLabel(item) {
-      if (reviewIsDeleteItem(item)) return "说明";
+      if (reviewIsDeleteItem(item) && reviewCanRestoreFromCentral(item)) return `找回到 ${restoreDeviceLabel(item)}`;
+      if (reviewIsDeleteItem(item)) return "看处理方式";
       if (item.category === "conflict") return "看差异";
       const result = reviewTaskResults[reviewItemKey(item)];
       if (result && result.publishReady) return "重新检查";
@@ -6663,7 +6664,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机 executor 在线，并启用 --allow-local-writes。");
+        setReviewFeedback("yellow", "还不能找回", "本机助手在线后，还需要打开“允许写入本机/设备”的开关；未打开前只会检查，不会写入。");
         return;
       }
       setExecutorButtons(false);
@@ -6812,8 +6813,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewItem = currentReviewQueueItems.find((item) => reviewItemKey(item) === reviewKey)
         || currentReviewQueueItems.find((item) => item.skill_id === skillId);
       if (reviewIsDeleteItem(reviewItem)) {
-        updateReviewTaskResult(reviewItem, { label: "删除待决策", kind: "yellow", publishReady: false });
         const restoreTarget = restoreDeviceLabel(reviewItem);
+        if (reviewCanRestoreFromCentral(reviewItem)) {
+          updateReviewTaskResult(reviewItem, { label: "准备找回", kind: "yellow", publishReady: false });
+          await restoreCentralSkill({
+            dataset: {
+              skillId,
+              peerId: text(reviewItem.peer_id || ""),
+              reviewKey: reviewItemKey(reviewItem),
+            },
+          });
+          return;
+        }
+        updateReviewTaskResult(reviewItem, { label: "删除待决策", kind: "yellow", publishReady: false });
         setReviewFeedback(
           "yellow",
           `${skillId} 是删除确认项`,
