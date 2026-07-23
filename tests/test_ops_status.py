@@ -450,6 +450,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/summary", DASHBOARD_HTML)
             self.assertIn("Skill 管理", DASHBOARD_HTML)
             self.assertIn("只看顶部卡片即可：它会告诉你现在要不要点按钮。下面都是可选详情。", DASHBOARD_HTML)
+            self.assertIn("<details class=\"support-drawer\">", DASHBOARD_HTML)
+            self.assertIn("更多操作和详情", DASHBOARD_HTML)
+            self.assertIn("日常只看上方任务卡", DASHBOARD_HTML)
+            self.assertIn("support-drawer-body", DASHBOARD_HTML)
             self.assertIn("quick-status-details", DASHBOARD_HTML)
             self.assertIn("一般不用看：状态数字", DASHBOARD_HTML)
             self.assertIn("status-strip", DASHBOARD_HTML)
@@ -473,6 +477,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderStatusStrip", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
+                DASHBOARD_HTML.index("class=\"support-drawer\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"support-drawer\""),
                 DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
             )
             self.assertLess(
@@ -649,6 +661,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("检查通过后按钮会变成“同步到中央库”", DASHBOARD_HTML)
             self.assertIn("renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems)", DASHBOARD_HTML)
             self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
+            self.assertIn("openSupportDrawer", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
             self.assertIn("<details id=\"easy-workspace\" class=\"easy-workspace panel\"", DASHBOARD_HTML)
             self.assertIn("<summary class=\"easy-workspace-head\">", DASHBOARD_HTML)
@@ -779,6 +792,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertNotIn("常用操作", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
+                DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
+                DASHBOARD_HTML.index("class=\"support-drawer\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("class=\"support-drawer\""),
                 DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
             )
             self.assertLess(

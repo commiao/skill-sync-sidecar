@@ -2731,8 +2731,66 @@ DASHBOARD_HTML = r"""<!doctype html>
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    .support-drawer {
+      margin: 10px 0 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .support-drawer > summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 780;
+      background: #fbfcfe;
+    }
+    .support-drawer > summary::-webkit-details-marker {
+      display: none;
+    }
+    .support-drawer > summary::after {
+      content: "打开";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+      flex: 0 0 auto;
+    }
+    .support-drawer[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .support-drawer[open] > summary::after {
+      content: "收起";
+    }
+    .support-drawer-title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .support-drawer-title strong {
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 850;
+    }
+    .support-drawer-title span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .support-drawer-body {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      background: #f8fafc;
+    }
     .easy-workspace {
-      margin: 10px 0 8px;
+      margin: 0;
       padding: 0;
       overflow: hidden;
       background: #fff;
@@ -4109,6 +4167,15 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
+    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
+    <details class="support-drawer">
+      <summary>
+        <span class="support-drawer-title">
+          <strong>更多操作和详情</strong>
+          <span>新增 skill、查看设备状态、排查问题时再打开；日常只看上方任务卡。</span>
+        </span>
+      </summary>
+      <div class="support-drawer-body">
     <details id="easy-workspace" class="easy-workspace panel" aria-label="可选操作">
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
@@ -4158,7 +4225,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </details>
-    <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
     <details class="quick-status-details">
       <summary>一般不用看：状态数字</summary>
       <section class="status-strip" aria-label="状态摘要">
@@ -4481,6 +4547,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </div>
     </section>
+      </div>
+    </details>
       </div>
     </details>
   </main>
@@ -5569,6 +5637,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openAdvancedDetails() {
+      openSupportDrawer();
       const target = document.querySelector(".advanced-workspace");
       if (!target) return;
       target.open = true;
@@ -5576,6 +5645,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openTechnicalWorkspace() {
+      openSupportDrawer();
       const advanced = document.querySelector(".advanced-workspace");
       const technical = document.querySelector(".technical-workspace");
       if (advanced) advanced.open = true;
@@ -5589,6 +5659,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (input) {
         window.setTimeout(() => input.focus(), 250);
       }
+    }
+
+    function openSupportDrawer() {
+      const drawer = document.querySelector(".support-drawer");
+      if (drawer) drawer.open = true;
     }
 
     function renderReviewQueue(items) {
