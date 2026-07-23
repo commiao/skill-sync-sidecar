@@ -257,8 +257,11 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     planned_devices = _planned_device_overview()
     device_tools = _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers})
     tool_projection = _merge_tool_projection(local_tools, projection)
+    dashboard_health = _aggregate_health([status.get("health")] + [device.get("health") for device in devices])
+    status["service_health"] = status.get("health")
+    status["health"] = dashboard_health
     status["dashboard"] = {
-        "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
+        "health": dashboard_health,
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
@@ -337,8 +340,11 @@ def build_gateway_status(
     planned_devices = _planned_device_overview()
     tools = _gateway_tool_overview(projection)
     device_tools = _device_tool_overview(devices, peers)
+    dashboard_health = _aggregate_health([status.get("health")] + [device.get("health") for device in devices])
+    status["service_health"] = status.get("health")
+    status["health"] = dashboard_health
     status["dashboard"] = {
-        "health": _aggregate_health([status.get("health")] + [device.get("health") for device in devices]),
+        "health": dashboard_health,
         "blocked": len(blocked_items),
         "operator": operator,
         "blocked_items": blocked_items,
@@ -365,7 +371,8 @@ def build_dashboard_summary(status: dict) -> dict:
     base_record = status.get("base_record") if isinstance(status.get("base_record"), dict) else {}
     return {
         "ok": status.get("ok"),
-        "health": status.get("health"),
+        "health": dashboard.get("health") or status.get("health"),
+        "service_health": status.get("service_health"),
         "mode": status.get("mode"),
         "local_root": status.get("local_root"),
         "writer_policy": status.get("writer_policy"),
@@ -998,7 +1005,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         return {
             "state": "yellow",
             "title": "OpenClaw 更新需要确认",
-            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再发布到共享仓库。",
+            "summary": f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再发布到共享仓库。刚发布过同一项又出现，表示 OpenClaw 又产生了新修改，不是按钮失效。",
             "steps": [
                 {
                     "title": "先检查，不上传",
@@ -1020,7 +1027,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                 },
             ],
             "skills": skill_ids,
-            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再检查并确认发布。",
+            "note": "如果 OpenClaw 上这些 skill 仍在被优化，先不要发布；等那边改完再检查并确认发布。反复出现同一个 skill 时，优先等源端停止修改。",
         }
     if health == "yellow":
         return {

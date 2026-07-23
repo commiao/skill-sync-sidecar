@@ -385,7 +385,8 @@ class OpsStatusTest(unittest.TestCase):
             )
             devices = {device["id"]: device for device in status["dashboard"]["devices"]}
 
-            self.assertEqual(status["health"], "green")
+            self.assertEqual(status["health"], "yellow")
+            self.assertEqual(status["service_health"], "green")
             self.assertEqual(status["sync_plan"]["summary"], {"noop": 1})
             self.assertIn("dashboard", status)
             self.assertEqual(status["dashboard"]["health"], "yellow")
@@ -400,6 +401,8 @@ class OpsStatusTest(unittest.TestCase):
             guide = status["dashboard"]["operator"]["action_guide"]
             self.assertEqual(guide["title"], "OpenClaw 更新需要确认")
             self.assertIn("OpenClaw 有 1 个本地 skill 变更", guide["summary"])
+            self.assertIn("不是按钮失效", guide["summary"])
+            self.assertIn("反复出现同一个 skill", guide["note"])
             self.assertEqual(guide["skills"], ["beijing-recruitment"])
             self.assertEqual(
                 guide["steps"][0]["command"],
