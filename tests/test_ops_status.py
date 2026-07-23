@@ -965,6 +965,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("const input = $(\"local-skill-path\");", DASHBOARD_HTML)
             self.assertIn("input.focus()", DASHBOARD_HTML)
             self.assertIn("document.querySelector(\".local-skill-manager\")", DASHBOARD_HTML)
+            technical_start = DASHBOARD_HTML.index("function openTechnicalWorkspace()")
+            technical_end = DASHBOARD_HTML.index("function openSupportDrawer()", technical_start)
+            technical_block = DASHBOARD_HTML[technical_start:technical_end]
+            self.assertNotIn("local-skill-path", technical_block)
+            self.assertNotIn("input.focus()", technical_block)
             self.assertIn("value=\"\" placeholder=\"粘贴 skill 文件夹或 SKILL.md 路径\"", DASHBOARD_HTML)
             self.assertNotIn("value=\"/Users/mac/.codex/skills/read-wechat-article\"", DASHBOARD_HTML)
             self.assertIn("id=\"local-skill-followup\"", DASHBOARD_HTML)

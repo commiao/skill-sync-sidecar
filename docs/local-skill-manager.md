@@ -60,6 +60,7 @@ The first dashboard screen should remain a simple "what should I do now" view. T
 The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit publish confirmation, and other devices are read-only status unless their own Agent acts.
 The first screen should prefer one primary action plus at most a few secondary shortcuts. It should not expose raw queues, tool matrices, hash/version details, long explanations, or diagnostic counts as the normal path. Put those details behind `查看详情`, `Skill 清单`, or advanced sections.
 Clicking a first-screen `查看确认清单` or `看看要处理什么` action should open every parent drawer needed to make the review queue visible, then scroll directly to that queue.
+Clicking permission/setup actions such as `开启保存权限` or `开启本机写入` should open the technical setup area only. It must not focus the local skill path input; that input is reserved for the explicit `管理本机 skill` workflow.
 
 When OpenClaw is actively changing a skill, the first screen may show `暂时搁置`.
 The `先不提醒` action should be the easiest first-screen action while editing is still in progress, so users can continue local skill management without opening technical details.

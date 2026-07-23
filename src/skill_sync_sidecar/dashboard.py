@@ -7078,10 +7078,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else if (advanced) {
         advanced.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-      const input = $("local-skill-path");
-      if (input) {
-        window.setTimeout(() => input.focus(), 250);
-      }
     }
 
     function openSupportDrawer() {
