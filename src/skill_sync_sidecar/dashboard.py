@@ -2818,6 +2818,22 @@ DASHBOARD_HTML = r"""<!doctype html>
     .review-result {
       margin-top: 6px;
     }
+    .review-deferred-note {
+      border: 1px solid #c8d7ef;
+      border-radius: 8px;
+      background: #f7fbff;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      margin-top: 7px;
+      padding: 7px 8px;
+      overflow-wrap: anywhere;
+    }
+    .review-deferred-note strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 2px;
+    }
     .review-controls {
       display: grid;
       justify-items: end;
@@ -5761,6 +5777,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       setReviewFeedback("yellow", "已取消搁置", "首页会重新显示 OpenClaw 待确认项。");
     }
 
+    function clearSourceChangeDeferral(reviewKey) {
+      const item = currentReviewQueueItems.find((candidate) => reviewItemKey(candidate) === reviewKey);
+      if (!item) {
+        clearSourceChangeDeferrals();
+        return;
+      }
+      const key = sourceChangeDeferralKey(item);
+      if (key) delete sourceChangeDeferrals[key];
+      saveSourceChangeDeferrals();
+      renderReviewQueue(currentReviewQueueItems);
+      if (window.lastDashboard) {
+        renderStatusStrip(window.lastDashboard, window.lastDashboard.health || "yellow");
+        renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems);
+      }
+      setReviewFeedback("yellow", "已取消搁置", `${text(item.skill_id)} 会重新显示在首页任务卡。`);
+    }
+
     function runFirstConflictPackage() {
       const button = document.querySelector(".conflict-package-button");
       if (!button) {
@@ -6524,6 +6557,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderReviewItem(item) {
       const command = item.operator_command || "";
       const reviewKey = reviewItemKey(item);
+      const deferred = isDeferredSourceChange(item);
       return `
         <div class="review-item">
           <div>
@@ -6533,6 +6567,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <span class="review-meta-item">${escapeHtml(reviewSourceText(item))}</span>
               <span class="review-meta-item">${escapeHtml(reviewCategoryText(item))}</span>
               <span class="review-meta-item">${escapeHtml(reviewRiskText(item))}</span>
+              ${deferred ? `<span class="review-meta-item">首页已搁置</span>` : ""}
             </div>
           </div>
           <div>
@@ -6540,6 +6575,12 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="review-next-step">${escapeHtml(reviewNextStepText(item))}</div>
             <div class="review-decision">${reviewDecisionHtml(item)}</div>
             <div class="review-result">${pill(reviewResultText(item), reviewResultKind(item))}</div>
+            ${deferred ? `
+              <div class="review-deferred-note">
+                <strong>首页已暂时搁置</strong>
+                这只影响当前浏览器首页；确认清单仍保留原始待处理项。OpenClaw 出现新版本时会重新提醒。
+              </div>
+            ` : ""}
             ${command ? `
               <details class="review-command">
                 <summary>查看检查命令</summary>
@@ -6551,7 +6592,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ` : ""}
           </div>
           <div class="review-controls">
-            ${pill(reviewStatusText(item), "yellow")}
+            ${pill(deferred ? "首页已搁置" : reviewStatusText(item), deferred ? "green" : "yellow")}
             <button
               type="button"
               class="review-dry-run-button"
@@ -6560,6 +6601,13 @@ DASHBOARD_HTML = r"""<!doctype html>
               data-review-action="${escapeHtml(reviewControlAction(item))}"
               onclick="runExecutorActionForSkill(this.dataset.skillId, this.dataset.reviewKey)"
               disabled>${escapeHtml(reviewControlLabel(item))}</button>
+            ${deferred ? `
+              <button
+                type="button"
+                class="review-clear-deferral-button"
+                data-review-key="${escapeHtml(reviewKey)}"
+                onclick="clearSourceChangeDeferral(this.dataset.reviewKey)">取消搁置</button>
+            ` : ""}
           </div>
         </div>
       `;
@@ -6849,6 +6897,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewControlLabel(item) {
+      if (isDeferredSourceChange(item)) return "先取消搁置";
       if (reviewIsDeleteItem(item) && reviewCanRestoreFromCentral(item)) return `找回到 ${restoreDeviceLabel(item)}`;
       if (reviewIsDeleteItem(item)) return "看处理方式";
       if (item.category === "conflict") return "看差异";
