@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-url="${SKILL_SYNC_MONITOR_URL:-http://100.123.208.32:8765/api/summary}"
+url="${SKILL_SYNC_MONITOR_URL:-http://100.123.208.32:8765/api/overview}"
 timeout_seconds="${SKILL_SYNC_MONITOR_TIMEOUT_SECONDS:-60}"
 summary_file="${SKILL_SYNC_BLOCKED_QUEUE_SUMMARY_FILE:-}"
 

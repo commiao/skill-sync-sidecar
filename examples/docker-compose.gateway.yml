@@ -52,7 +52,7 @@ services:
     command:
       - monitor-loop
       - --url
-      - "${SKILL_SYNC_MONITOR_URL:-http://skill-sync-gateway:8765/api/summary}"
+      - "${SKILL_SYNC_MONITOR_URL:-http://skill-sync-gateway:8765/api/overview}"
       - --out-dir
       - /cache/monitor
       - --interval-seconds

@@ -257,7 +257,7 @@ class AdmissionScriptsTest(unittest.TestCase):
 
         self.assertIn("monitor-summary", text)
         self.assertIn("--brief", text)
-        self.assertIn("/api/summary", text)
+        self.assertIn("/api/overview", text)
         self.assertNotIn("approved-push", text)
         self.assertNotIn("sync-cycle", text)
         self.assertNotIn("sync-apply", text)
@@ -269,7 +269,7 @@ class AdmissionScriptsTest(unittest.TestCase):
         text = script.read_text(encoding="utf-8")
 
         subprocess.check_call(["bash", "-n", str(script)])
-        self.assertIn("/api/summary", text)
+        self.assertIn("/api/overview", text)
         self.assertIn("blocked_items", text)
         self.assertNotIn("approved-push --yes", text)
         self.assertNotIn("sync-cycle", text)

@@ -167,6 +167,9 @@ class MonitorSummaryTest(unittest.TestCase):
 
     def test_monitor_summary_parser_and_fetch_failure_output(self):
         parser = build_parser()
+        default_args = parser.parse_args(["monitor-summary"])
+        self.assertEqual(default_args.url, "http://100.123.208.32:8765/api/overview")
+
         args = parser.parse_args(["monitor-summary", "--url", "http://127.0.0.1:1/missing", "--timeout-seconds", "0.01", "--json"])
         output = StringIO()
 
@@ -222,6 +225,9 @@ class MonitorSummaryTest(unittest.TestCase):
 
     def test_monitor_loop_parser_accepts_runtime_arguments(self):
         parser = build_parser()
+        default_args = parser.parse_args(["monitor-loop"])
+        self.assertEqual(default_args.url, "http://100.123.208.32:8765/api/overview")
+
         args = parser.parse_args(
             [
                 "monitor-loop",

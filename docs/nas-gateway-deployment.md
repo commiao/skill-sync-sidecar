@@ -84,7 +84,7 @@ scripts/monitor-nas-summary.sh
 SKILL_SYNC_MONITOR_FAIL_ON_ALERT=1 scripts/monitor-nas-summary.sh
 ```
 
-The monitor reads `/api/summary` and turns it into an operator report. Routine
+The monitor reads `/api/overview` and turns it into an operator report. Routine
 review work, source-side edits, and missing optional tool reports are recorded as
 `info` so external mail integrations do not repeatedly notify for normal sync
 work. It should alert only on incident-like conditions: red dashboard health,

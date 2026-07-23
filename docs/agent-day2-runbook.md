@@ -144,7 +144,7 @@ Check from any machine that can reach Tailscale/NAS:
 
 ```bash
 curl -sS http://100.123.208.32:8765/healthz
-curl -sS http://100.123.208.32:8765/api/summary
+curl -sS http://100.123.208.32:8765/api/overview
 ```
 
 Operator summary from the repo:
@@ -156,7 +156,7 @@ scripts/blocked-queue.sh
 scripts/ops-watch.sh
 ```
 
-`operator-status.sh` is the shortest "do I need to do anything right now?" view. `/healthz` checks process health and cache freshness. `/api/summary` is the operator source of truth for device health, blocked queue, and planned devices.
+`operator-status.sh` is the shortest "do I need to do anything right now?" view. `/healthz` checks process health and cache freshness. `/api/overview` is the operator source of truth for device health, blocked queue, and planned devices.
 
 ## Recovery Checklist
 
@@ -199,7 +199,7 @@ Use this order when the dashboard is yellow or stale:
      --json
    ```
 
-6. Wait one Gateway refresh interval or re-read `/api/summary`.
+6. Wait one Gateway refresh interval or re-read `/api/overview`.
 
 Stop and review instead of applying when:
 

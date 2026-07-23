@@ -6071,9 +6071,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
           : "如果还在改，可以先不管；如果这轮已经改完，点“检查最新版本”。检查只读，不会写入；检查期间又变化会自动拒绝发布。";
         primaryActions = allSourceChangedReady
-          ? `
+          ? (executorAllowPublish ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
-          `
+          ` : `
+            <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
+          `)
           : `
             <div class="simple-choice-grid source-change-actions" aria-label="OpenClaw 新修改处理">
               <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>已经改完时点这里；只读，不写入。</span></button>
@@ -6124,9 +6126,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
           : "先检查会改哪些 skill。这一步只看结果，不会写入。检查通过后按钮会变成“保存到共享库”。";
         primaryActions = allPublishReady
-          ? `
+          ? (executorAllowPublish ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
-          `
+          ` : `
+            <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
+          `)
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查一下<span>只读，不写入。</span></button>
           `;
@@ -6843,6 +6847,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!target) return;
       target.open = true;
       target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function showPublishGateHelp() {
+      setReviewFeedback(
+        "yellow",
+        "还不能保存到共享库",
+        "本机助手当前只允许检查。需要开启保存权限后，首页才会出现可执行的保存按钮。",
+      );
+      showExecutorOutput([
+        "保存到共享库需要重新安装 Mac 本机助手，并显式打开发布权限：",
+        "",
+        "SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 scripts/install-operator-executor-launchd.sh",
+        "",
+        "开启后刷新页面。真正保存前仍会要求输入 PUBLISH。",
+      ].join("\n"));
+      openTechnicalWorkspace();
     }
 
     function openTechnicalWorkspace() {

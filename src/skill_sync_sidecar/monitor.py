@@ -167,7 +167,7 @@ def build_monitor_report(
                 "Dashboard summary cache has no usable successful payload.",
                 state=cache_state,
                 last_error=summary_cache.get("last_error"),
-                action="Check gateway logs and WebDAV connectivity; /healthz should remain fast while /api/summary recovers.",
+                action="Check gateway logs and WebDAV connectivity; /healthz should remain fast while /api/overview recovers.",
             )
         )
     elif cache_state == "stale":

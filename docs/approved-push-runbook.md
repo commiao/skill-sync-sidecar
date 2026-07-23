@@ -125,7 +125,7 @@ scripts/publish-mac-peer-status.sh
 
 ```bash
 PYTHONPATH=src python3 -m skill_sync_sidecar monitor-summary \
-  --url http://100.123.208.32:8765/api/summary \
+  --url http://100.123.208.32:8765/api/overview \
   --timeout-seconds 60
 
 scripts/blocked-queue.sh

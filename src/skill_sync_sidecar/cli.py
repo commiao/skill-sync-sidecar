@@ -137,8 +137,8 @@ def build_parser() -> argparse.ArgumentParser:
     gateway.add_argument("--remote-peer-status", action="append", default=[], help="Peer status JSON on the same WebDAV remote as id=path/status.json. Repeat for multiple peers.")
     gateway.set_defaults(func=cmd_gateway)
 
-    monitor_summary = subcommands.add_parser("monitor-summary", help="Check a dashboard /api/summary endpoint and print operator actions.")
-    monitor_summary.add_argument("--url", default="http://100.123.208.32:8765/api/summary", help="Dashboard summary endpoint URL.")
+    monitor_summary = subcommands.add_parser("monitor-summary", help="Check a dashboard /api/overview endpoint and print operator actions.")
+    monitor_summary.add_argument("--url", default="http://100.123.208.32:8765/api/overview", help="Dashboard overview endpoint URL.")
     monitor_summary.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
     monitor_summary.add_argument("--stale-after-seconds", type=int, default=2 * 60 * 60, help="Mark active devices stale after this many seconds.")
     monitor_summary.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
@@ -147,8 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     monitor_summary.set_defaults(func=cmd_monitor_summary)
 
-    monitor_loop = subcommands.add_parser("monitor-loop", help="Continuously monitor a dashboard /api/summary endpoint and write report artifacts.")
-    monitor_loop.add_argument("--url", default="http://100.123.208.32:8765/api/summary", help="Dashboard summary endpoint URL.")
+    monitor_loop = subcommands.add_parser("monitor-loop", help="Continuously monitor a dashboard /api/overview endpoint and write report artifacts.")
+    monitor_loop.add_argument("--url", default="http://100.123.208.32:8765/api/overview", help="Dashboard overview endpoint URL.")
     monitor_loop.add_argument("--out-dir", default="~/.cache/skill-sync-sidecar/monitor", help="Directory for last-report.json, last-report.txt, and events.jsonl.")
     monitor_loop.add_argument("--interval-seconds", type=float, default=30 * 60, help="Seconds between monitor checks.")
     monitor_loop.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
