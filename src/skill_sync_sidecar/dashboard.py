@@ -3432,6 +3432,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       white-space: normal;
       text-align: center;
     }
+    .simple-action-secondary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .simple-action-secondary button {
+      min-height: 34px;
+      font-size: 12px;
+      padding: 6px 9px;
+    }
     .simple-action-actions.single-primary button span {
       display: block;
       font-size: 12px;
@@ -4994,6 +5009,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       .simple-action-title { font-size: 18px; }
       .simple-action-grid { grid-template-columns: 1fr; gap: 8px; }
       .simple-action-actions { display: grid; grid-template-columns: 1fr; }
+      .simple-action-secondary {
+        justify-content: stretch;
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .simple-action-secondary button { width: 100%; }
       .simple-choice-grid { min-width: 0; }
       .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
@@ -6049,6 +6070,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       let title = `现在先处理 ${blocked} 件事`;
       let summary = `按右侧推荐按钮走即可；真正写入、找回或删除前都会再次确认。`;
       let primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看要处理什么<span>只打开确认清单，不会写入或删除。</span></button>`;
+      let secondaryActions = `<div class="simple-action-secondary"><span>不处理同步也可以继续本机工作。</span><button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button></div>`;
       let facts = [
         ["不会自动覆盖", "有风险时会停下来等你确认。"],
         ["先看再执行", "检查只读，发布前还要确认。"],
@@ -6213,6 +6235,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="simple-action-actions single-primary">
           ${primaryActions}
         </div>
+        ${secondaryActions}
         <div id="simple-action-disabled-note" class="simple-action-disabled-note">正在确认当前按钮状态。</div>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
