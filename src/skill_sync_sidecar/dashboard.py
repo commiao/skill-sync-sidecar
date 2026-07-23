@@ -4027,6 +4027,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-top: 2px;
       overflow-wrap: anywhere;
     }
+    .local-client-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 10px;
+    }
+    .local-client-actions button,
+    .workspace-tool-manage {
+      min-height: 34px;
+      font-size: 12px;
+    }
     .workspace-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5067,6 +5078,10 @@ DASHBOARD_HTML = r"""<!doctype html>
               </div>
             </div>
             <div id="local-workspace-tool-summary" class="workspace-tool-summary"></div>
+            <div class="local-client-actions" aria-label="本机 skill 管理入口">
+              <button type="button" class="primary" onclick="openLocalSkillInventory()">按 skill 管理安装/移除</button>
+              <button type="button" onclick="refreshLocalWorkspace()">重新扫描本机</button>
+            </div>
             <details class="workspace-tool-details">
               <summary>工具目录明细</summary>
               <div id="local-workspace-tools" class="workspace-tools"></div>
@@ -6631,6 +6646,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
       const target = $("skill-inventory-workbench") || inventory || workspace;
+      if (target && target.scrollIntoView) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    function openLocalSkillInventory(toolId) {
+      openSupportDrawer();
+      const inventory = document.querySelector(".skill-inventory-panel");
+      if (inventory) inventory.open = true;
+      currentSkillInventoryQuick = toolId ? "all" : "local_installed";
+      currentSkillInventoryTriage = "all";
+      $("skill-inventory-search").value = "";
+      $("skill-inventory-central-filter").value = "all";
+      $("skill-inventory-scope-filter").value = "all";
+      $("skill-inventory-sync-filter").value = "all";
+      $("skill-inventory-tool-filter").value = toolId || "all";
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryFiltered();
+      const target = $("skill-inventory-list") || inventory;
       if (target && target.scrollIntoView) {
         target.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -8934,6 +8969,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="workspace-tool-name">${escapeHtml(text(tool.name))}</div>
             <div class="workspace-tool-count">${escapeHtml(text(tool.skills))}</div>
             ${toolStatePill(tool)}
+            ${localToolInventoryButton(tool)}
           </div>
         </div>
       `).join("");
@@ -8941,6 +8977,25 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? ` ${workspace.remote_blocked_note}`
         : "";
       $("local-workspace-boundary").textContent = (workspace.boundary || "这里不会跨设备改 OpenClaw 或 Windows；其他设备只看状态。") + remoteNote;
+    }
+
+    function localToolInventoryButton(tool) {
+      const toolId = localWorkspaceToolInventoryId(tool);
+      if (!toolId) return "";
+      return `<button type="button" class="workspace-tool-manage" onclick="openLocalSkillInventory('${escapeHtml(toolId)}')">查看 skill</button>`;
+    }
+
+    function localWorkspaceToolInventoryId(tool) {
+      const raw = text(tool.id || tool.tool_id || "").toLowerCase();
+      const known = new Set(skillInventoryTools().map((item) => item.id));
+      if (known.has(raw)) return raw;
+      const name = text(tool.name || "").toLowerCase();
+      if (name.includes("codex")) return "codex";
+      if (name.includes("claude")) return "claude-code";
+      if (name.includes("cursor")) return "cursor";
+      if (name.includes("cc-switch")) return "cc-switch";
+      if (name.includes("skillshub")) return "skillshub";
+      return "";
     }
 
     function renderLocalToolSummary(tools) {
