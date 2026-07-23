@@ -1,16 +1,16 @@
 # Local Skill Manager
 
-Local Skill Manager is the user-facing path for managing one skill across the current device's tool roots. It exists so users do not need to hand-write `manifest.json`, copy directories between tools, or understand low-level sync flags.
+Local Skill Manager is the user-facing path for managing one skill across the current device's tool roots. It exists so users do not need to hand-write metadata files, copy directories between tools, or understand low-level sync flags.
 
 ## Goal
 
 Given a local skill directory or `SKILL.md`, sidecar should:
 
-1. Detect the skill package.
-2. Infer scope, targets, metadata, and risk.
-3. Generate sidecar manifest metadata when missing.
-4. Install the skill into selected local tool roots with backups.
-5. Preview publishing the installed skill to the WebDAV central snapshot.
+1. Let the user paste a skill folder or `SKILL.md` path.
+2. Detect the package and decide whether it is public, project-level, or device-private.
+3. Show the local tools where the skill can be installed.
+4. Install it into selected local tool roots with backups after confirmation.
+5. Check whether it can be shared without writing WebDAV.
 6. Publish only the selected skill after explicit central publish authorization.
 
 The sync unit is the skill package. Sidecar does not modify tool databases, API keys, accounts, provider settings, or runtime caches.
@@ -23,33 +23,34 @@ Open the local dashboard:
 http://127.0.0.1:8765
 ```
 
-Use:
+On the first screen, use the top recommendation card first. If it says `现在不用做任何事`, there is no required sync action.
+
+To add or share one local skill, open:
 
 ```text
-本地 Skill 工作区 -> 导入本地 Skill
+管理本机 skill -> 我要新增、安装或手动同步 skill
 ```
 
 The normal user flow is:
 
 1. Paste a skill directory or `SKILL.md` path.
-2. Click `分析`.
-3. Review the summary and target tools.
-4. Click `安装到本机工具`.
-5. Click `预检发布`.
-6. Click `发布中央` only when central publishing is authorized.
+2. Click `开始`.
+3. If the result looks right, click `安装到本机工具`.
+4. Optional: click `检查共享` to verify what would be published.
+5. Click `发布到共享库` only when central publishing is authorized.
 
-The user should not need to edit manifest metadata or manually copy package files.
+The user should not need to edit metadata, understand technical check output, or manually copy package files. The dashboard should phrase the action in plain language; detailed paths, versions, generated metadata, and raw queues belong in the secondary details views.
 
 The secondary `Skill 清单` view is the per-skill management surface for the current client:
 
-- Search and filters are view-only helpers. Users can filter by skill name/description, central lifecycle state, scope, local tool, or pending sync state without changing files.
+- Search and filters are view-only helpers. Users can filter by skill name/description, shared-library state, scope, local tool, or pending sync state without changing files.
 - The unpublished triage chips split local-only skills into `可发布公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
-- Checking a local tool box installs a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
-- Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after dry-run and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
-- `发布中央仓库` appears for unpublished public skills that have a current Mac source path. It runs a dry-run first, then requires `PUBLISH`; it does not install the skill onto other devices.
+- Checking a local tool box installs a shared-library skill into that Mac tool root after a read-only check and `INSTALL` confirmation.
+- Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after a read-only check and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
+- `发布到共享库` appears for unpublished public skills that have a current Mac source path. It checks first, then requires `PUBLISH`; it does not directly install the skill onto other devices.
 - Project-scoped skills are shown in the inventory but are not one-click published from the global list yet. They need a project-level policy before distribution.
-- `标记废弃` updates the central snapshot lifecycle to `deprecated` after dry-run and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
-- `恢复发布` updates the central snapshot lifecycle from `deprecated` back to `published` after dry-run and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
+- `标记废弃` updates the shared-library lifecycle to `deprecated` after a read-only check and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
+- `恢复发布` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
 
@@ -58,7 +59,7 @@ This is a browser-local UI deferral only:
 
 - It is stored in `localStorage` for the current browser.
 - It does not write WebDAV, OpenClaw, Mac tool roots, or central metadata.
-- It is tied to the current source hash, so a new OpenClaw edit shows up again.
+- It is tied to the current source version, so a new OpenClaw edit shows up again.
 - The original item stays visible in the secondary confirmation list.
 - Use it when a skill is still being edited and the dashboard should not block other local management work.
 
@@ -87,11 +88,11 @@ SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 \
   scripts/install-operator-executor-launchd.sh
 ```
 
-When publishing is disabled, the dashboard still allows `预检发布` and disables `发布中央` with an explanation.
+When publishing is disabled, the dashboard still allows `检查共享` and disables `发布到共享库` with an explanation.
 
 ## CLI Equivalents
 
-Analyze:
+Start/check a local skill:
 
 ```bash
 python3 -m skill_sync_sidecar local-skill-analyze \
@@ -106,7 +107,7 @@ python3 -m skill_sync_sidecar local-skill-install \
   --dry-run
 ```
 
-Preview central publish:
+Check shared-library publish:
 
 ```bash
 python3 -m skill_sync_sidecar local-skill-publish \

@@ -38,7 +38,15 @@ Peer-specific runtime edits and private skills can be declared locally with `<sk
 
 ## Local Skill Manager
 
-For day-to-day use, open the dashboard and use **本地 Skill 工作区 -> 导入本地 Skill**. Paste a skill directory or `SKILL.md` path, click **分析**, then click **安装到本机工具** when the preview is safe. Sidecar infers the manifest, scope, targets, risk, and install destinations; users should not hand-write `manifest.json` or copy files between tool roots.
+For day-to-day use, open the dashboard and start from the first card:
+
+1. If the card says **现在不用做任何事**, leave it alone.
+2. To add a local skill, click **管理本机 skill**, paste a skill folder or `SKILL.md` path, then follow the three visible steps: **开始** -> **安装到本机工具** -> **发布到共享库**.
+3. To publish a device update, click the card's recommended button. The dashboard first runs a read-only check, then asks for confirmation before writing to the shared library.
+
+Sidecar infers metadata, scope, targets, risk, and install destinations. Users should not hand-write metadata files, copy files between tool roots, or remember low-level flags.
+
+The first screen is intentionally simple. Tool matrices, version details, raw queues, and diagnostics live behind **详情和高级操作**.
 
 The local browser executor must be running for dashboard actions:
 
