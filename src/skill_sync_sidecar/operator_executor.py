@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -187,6 +188,85 @@ def run_mac_tool_install_from_central(
     result["tool_id"] = normalized_tool_id
     result["tool_name"] = label
     return result
+
+
+def run_mac_tool_uninstall(
+    tool_id: str,
+    skill_ids: Sequence[str],
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+) -> dict:
+    normalized_tool_id = _normalize_tool_id(tool_id)
+    _, root_parts, label = MAC_TOOL_INSTALL_TARGETS[normalized_tool_id]
+    normalized_skill_ids = _normalize_skill_ids(skill_ids)
+    if yes and not allow_local_writes:
+        raise OperatorExecutorError(f"{label} uninstall is disabled; start operator-executor with --allow-local-writes")
+    target_root = Path.home().joinpath(*root_parts)
+    uninstall_id = _timestamp_id()
+    backup_root = target_root / ".skill-sync-removed" / uninstall_id
+    items = []
+    blocked = []
+    planned = 0
+    for skill_id in normalized_skill_ids:
+        target = target_root / skill_id
+        item = {
+            "skill_id": skill_id,
+            "tool_id": normalized_tool_id,
+            "tool_name": label,
+            "target_path": str(target.expanduser()),
+            "backup_path": str((backup_root / skill_id).expanduser()),
+            "action": "move_to_removed_backup",
+            "exists": target.exists(),
+            "allowed": False,
+            "reason": None,
+        }
+        if not target.exists():
+            item["action"] = "skip_missing"
+            item["reason"] = "skill is not installed in this tool root"
+        elif not target.is_dir() or not (target / "SKILL.md").is_file():
+            item["action"] = "blocked"
+            item["reason"] = "target is not a skill directory with SKILL.md"
+            blocked.append(item)
+        else:
+            item["allowed"] = True
+            planned += 1
+        items.append(item)
+    safe_to_uninstall = len(blocked) == 0
+    result = {
+        "ok": safe_to_uninstall,
+        "record_type": "skill-sync-mac-tool-uninstall",
+        "mode": "uninstall" if yes else "dry_run",
+        "dry_run": not yes,
+        "safe_to_uninstall": safe_to_uninstall,
+        "skill_ids": normalized_skill_ids,
+        "tool_id": normalized_tool_id,
+        "tool_name": label,
+        "target_root": str(target_root.expanduser().resolve()),
+        "backup_root": str(backup_root.expanduser()),
+        "planned": planned,
+        "blocked": len(blocked),
+        "items": items,
+    }
+    if not safe_to_uninstall or not yes:
+        return result
+    backup_root.mkdir(parents=True, exist_ok=True)
+    removed = 0
+    for item in items:
+        if not item["allowed"]:
+            continue
+        source = Path(str(item["target_path"]))
+        backup = Path(str(item["backup_path"]))
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        if backup.exists():
+            raise OperatorExecutorError(f"backup path already exists: {backup}")
+        shutil.move(str(source), str(backup))
+        removed += 1
+    record_path = backup_root / "uninstall-record.json"
+    record = {**result, "removed": removed, "record_path": str(record_path)}
+    record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    record["dry_run"] = False
+    return record
 
 
 def run_openclaw_central_restore(
@@ -399,6 +479,10 @@ def _normalize_tool_id(tool_id: object) -> str:
     return normalized
 
 
+def _timestamp_id() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+
+
 def _last_json_object(text: str) -> Optional[dict]:
     decoder = JSONDecoder()
     found: Optional[dict] = None
@@ -558,6 +642,25 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         self._send_json(400, {"ok": False, "error": "confirm must be INSTALL"})
                         return
                     result = run_mac_tool_install_from_central(
+                        _payload_tool_id(payload),
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
+                if path == "/api/mac-tool-uninstall-dry-run":
+                    result = run_mac_tool_uninstall(_payload_tool_id(payload), skill_ids or [], yes=False)
+                    self._send_json(200 if result["ok"] else 500, result)
+                    return
+                if path == "/api/mac-tool-uninstall":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "REMOVE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be REMOVE"})
+                        return
+                    result = run_mac_tool_uninstall(
                         _payload_tool_id(payload),
                         skill_ids or [],
                         yes=True,

@@ -25,6 +25,7 @@ from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
     run_mac_codex_install_from_central,
     run_mac_tool_install_from_central,
+    run_mac_tool_uninstall,
     run_openclaw_approved_push_batch,
     run_openclaw_conflict_package,
 )
@@ -895,10 +896,16 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("installCentralSkillToTool", DASHBOARD_HTML)
             self.assertIn("/api/mac-tool-install-from-central-dry-run", DASHBOARD_HTML)
             self.assertIn("/api/mac-tool-install-from-central", DASHBOARD_HTML)
+            self.assertIn("/api/mac-tool-uninstall-dry-run", DASHBOARD_HTML)
+            self.assertIn("/api/mac-tool-uninstall", DASHBOARD_HTML)
             self.assertIn("安装到 ${escapeHtml(tool.label)}", DASHBOARD_HTML)
+            self.assertIn("从 ${escapeHtml(tool.label)} 移除", DASHBOARD_HTML)
             self.assertIn("data-tool-id", DASHBOARD_HTML)
             self.assertIn("skillInventoryLocalInstallTools", DASHBOARD_HTML)
             self.assertIn("macInstallableTools", DASHBOARD_HTML)
+            self.assertIn("macUninstallableTools", DASHBOARD_HTML)
+            self.assertIn("macInstalledToolIds", DASHBOARD_HTML)
+            self.assertIn("uninstallMacToolSkill", DASHBOARD_HTML)
             self.assertIn("toolInstallStatus", DASHBOARD_HTML)
             self.assertIn("本机兼容工具已安装", DASHBOARD_HTML)
             self.assertLess(
@@ -1796,6 +1803,34 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(result["target"], "cursor-global")
             self.assertEqual(result["restored"], 1)
             self.assertTrue((cursor_root / "demo" / "SKILL.md").exists())
+
+    def test_mac_tool_uninstall_moves_skill_to_removed_backup(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cursor_root = root / ".cursor" / "skills-cursor"
+            self._write_skill(cursor_root / "demo", "demo", "Demo skill")
+
+            with patch("skill_sync_sidecar.operator_executor.Path.home", return_value=root):
+                preview = run_mac_tool_uninstall("cursor", ["demo"], yes=False)
+
+                self.assertTrue(preview["ok"])
+                self.assertTrue(preview["safe_to_uninstall"])
+                self.assertEqual(preview["tool_id"], "cursor")
+                self.assertEqual(preview["planned"], 1)
+                self.assertTrue((cursor_root / "demo" / "SKILL.md").exists())
+
+                with self.assertRaises(OperatorExecutorError):
+                    run_mac_tool_uninstall("cursor", ["demo"], yes=True, allow_local_writes=False)
+
+                result = run_mac_tool_uninstall("cursor", ["demo"], yes=True, allow_local_writes=True)
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["record_type"], "skill-sync-mac-tool-uninstall")
+            self.assertEqual(result["removed"], 1)
+            self.assertFalse((cursor_root / "demo").exists())
+            backup_path = Path(result["items"][0]["backup_path"])
+            self.assertTrue((backup_path / "SKILL.md").exists())
+            self.assertTrue(Path(result["record_path"]).exists())
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
         with TemporaryDirectory() as tmp:

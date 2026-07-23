@@ -27,6 +27,7 @@ DEFAULT_EXCLUDED_DIRS = {
     ".svn",
     ".skill-sync-backups",
     ".skill-sync-bases",
+    ".skill-sync-removed",
     ".tox",
     ".venv",
     "__pycache__",

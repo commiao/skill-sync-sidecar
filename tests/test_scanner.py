@@ -244,9 +244,11 @@ class ScannerTest(unittest.TestCase):
             skill = root / "demo"
             backup_skill = root / ".skill-sync-backups" / "apply-1" / "demo"
             base_skill = root / ".skill-sync-bases" / "base-1" / "demo"
+            removed_skill = root / ".skill-sync-removed" / "remove-1" / "demo"
             skill.mkdir(parents=True)
             backup_skill.mkdir(parents=True)
             base_skill.mkdir(parents=True)
+            removed_skill.mkdir(parents=True)
             (skill / "SKILL.md").write_text(
                 "---\nname: demo\ndescription: Demo skill\n---\n",
                 encoding="utf-8",
@@ -257,6 +259,10 @@ class ScannerTest(unittest.TestCase):
             )
             (base_skill / "SKILL.md").write_text(
                 "---\nname: demo base\ndescription: Base should not scan\n---\n",
+                encoding="utf-8",
+            )
+            (removed_skill / "SKILL.md").write_text(
+                "---\nname: demo removed\ndescription: Removed backup should not scan\n---\n",
                 encoding="utf-8",
             )
 

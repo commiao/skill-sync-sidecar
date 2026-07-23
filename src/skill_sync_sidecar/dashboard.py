@@ -4115,6 +4115,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #a16207;
       font-weight: 760;
     }
+    .tool-install-button,
+    .tool-uninstall-button,
     .codex-install-button {
       padding: 5px 9px;
       font-size: 12px;
@@ -6792,6 +6794,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? `安装到 ${toolLabel} 需要打开本机写入开关`
             : `从共享仓库安装到当前 Mac 的 ${toolLabel}`);
       });
+      document.querySelectorAll(".tool-uninstall-button").forEach((button) => {
+        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        const toolLabel = button.dataset.toolLabel || "工具";
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowLocalWrites
+            ? `从 ${toolLabel} 移除需要打开本机写入开关`
+            : `从当前 Mac 的 ${toolLabel} 移除，并保留备份`);
+      });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7105,6 +7116,75 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (err) {
         setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
         setExecutorStatus("failed", `安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function uninstallMacToolSkill(button) {
+      const skillId = button.dataset.skillId || "";
+      const toolId = button.dataset.toolId || "";
+      const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      if (!skillId || !toolId) return;
+      if (!executorAvailable || !executorAllowLocalWrites) {
+        setReviewFeedback("yellow", `还不能从 ${toolLabel} 移除`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
+        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+        return;
+      }
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查移除 ${skillId}`, `检查只读；先确认 ${skillId} 当前在 Mac 的 ${toolLabel} 目录里。`);
+      setExecutorStatus("remove check", `正在检查从 ${toolLabel} 移除 ${skillId}。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], tool_id: toolId }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_uninstall || Number(dryRunPayload.planned || 0) <= 0) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会从当前 Mac 的 ${toolLabel} 移走，并保留备份。共享仓库不会变化。`);
+        if (!confirmProtectedWrite({
+          word: "REMOVE",
+          title: `确认从 ${toolLabel} 移除：${skillId}`,
+          will: [
+            `把 ${skillId} 从当前 Mac 的 ${toolLabel} 可发现目录移走。`,
+            "把原目录放进 .skill-sync-removed 备份目录。",
+            "完成后自动刷新本机工具状态。",
+          ],
+          willNot: [
+            "不会删除共享仓库内容。",
+            "不会修改其他设备。",
+            "不会修改其他工具目录。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", `从 ${toolLabel} 移除已取消。`, "yellow");
+          setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
+          return;
+        }
+        setReviewFeedback("yellow", `正在移除 ${skillId}`, `正在从当前 Mac 的 ${toolLabel} 移走，并保留备份。`);
+        setExecutorStatus("removing", `正在从 ${toolLabel} 移除 ${skillId}。`, "yellow");
+        const uninstallResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], tool_id: toolId, confirm: "REMOVE" }),
+        });
+        const uninstallPayload = await uninstallResponse.json();
+        showExecutorOutput(formatExecutorResult(uninstallPayload));
+        if (!uninstallResponse.ok || !uninstallPayload.ok) {
+          throw new Error(executorErrorDetail(uninstallPayload));
+        }
+        setReviewFeedback("green", `${skillId} 已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。");
+        setExecutorStatus("removed", `${skillId} 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", `从 ${toolLabel} 移除失败`, String(err));
+        setExecutorStatus("failed", `从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -7476,7 +7556,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderSkillInventoryRow(item) {
-      const installed = new Set(Array.isArray(item.installed_tools) ? item.installed_tools : []);
+      const installed = macInstalledToolIds(item);
       const pending = Number(item.pending || 0) > 0;
       const centralState = text((item.central || {}).state || "unpublished");
       const toolChecks = skillInventoryTools().map((tool) => {
@@ -7487,12 +7567,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       }).join("");
       const stateClass = pending ? "pending" : (centralState === "published" ? "installed" : "");
       const installableTools = macInstallableTools(item, installed, centralState);
+      const uninstallableTools = macUninstallableTools(item, installed);
       const installAction = installableTools.length > 0
         ? installableTools.map((tool) => {
           const cls = tool.id === "codex" ? "tool-install-button codex-install-button" : "tool-install-button";
           return `<button type="button" class="${cls}" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="installCentralSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`;
         }).join("")
         : `<span class="skill-tool-check">${escapeHtml(toolInstallStatus(item, installed, centralState))}</span>`;
+      const uninstallAction = uninstallableTools.map((tool) => (
+        `<button type="button" class="tool-uninstall-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="uninstallMacToolSkill(this)" disabled>从 ${escapeHtml(tool.label)} 移除</button>`
+      )).join("");
       return `
         <article class="skill-inventory-row">
           <div>
@@ -7504,6 +7588,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
             ${installAction}
+            ${uninstallAction}
           </div>
         </article>
       `;
@@ -7529,6 +7614,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (centralState !== "published" || item.scope === "project") return [];
       return skillInventoryLocalInstallTools()
         .filter((tool) => !installed.has(tool.id) && skillTargetsTool(item, tool));
+    }
+
+    function macUninstallableTools(item, installed) {
+      return skillInventoryLocalInstallTools()
+        .filter((tool) => installed.has(tool.id));
+    }
+
+    function macInstalledToolIds(item) {
+      const installations = Array.isArray(item.installations) ? item.installations : [];
+      return new Set(installations
+        .filter((installed) => text(installed.device_id) === "mac")
+        .map((installed) => text(installed.tool_id))
+        .filter(Boolean));
     }
 
     function skillTargetsTool(item, tool) {
