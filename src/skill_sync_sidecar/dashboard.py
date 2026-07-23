@@ -4162,6 +4162,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .skill-inventory-workbench {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .skill-inventory-workbench button {
+      display: grid;
+      gap: 3px;
+      justify-items: start;
+      text-align: left;
+      padding: 9px 10px;
+      background: #fff;
+    }
+    .skill-inventory-workbench button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .skill-inventory-workbench strong {
+      font-size: 17px;
+      line-height: 1.1;
+    }
+    .skill-inventory-workbench span {
+      font-size: 12px;
+      line-height: 1.25;
+      color: var(--muted);
+    }
+    .skill-inventory-workbench button.primary span {
+      color: #dbe7f5;
+    }
     .skill-inventory-triage {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4478,6 +4509,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .plain-detail-grid { grid-template-columns: 1fr; }
       .skill-inventory-row { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
+      .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-followup.ready { grid-template-columns: 1fr; }
@@ -4750,7 +4782,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-unpublished">-</strong><span>本机/设备独有</span></div>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
-      <div class="skill-inventory-note">这里只展示安装矩阵；首页仍只显示下一步。安装/卸载会在当前设备客户端执行，不跨设备直接写文件。</div>
+      <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或发布到共享仓库。</div>
+      <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未发布整理"></div>
       <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
         <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
@@ -5131,6 +5164,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let lastLocalSkillAnalysis = null;
     let currentSkillInventoryModel = null;
     let currentSkillInventoryTriage = "all";
+    let currentSkillInventoryQuick = "all";
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -8150,6 +8184,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-published").textContent = text(model.published);
       $("skill-inventory-unpublished").textContent = text(model.unpublished);
       $("skill-inventory-project").textContent = text(model.project);
+      renderSkillInventoryWorkbench(model.items || []);
       renderSkillInventoryTriage(model.items || []);
       renderSkillInventoryFiltered();
     }
@@ -8160,9 +8195,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const filtered = filterSkillInventoryItems(items, skillInventoryFilters());
       const displayLimit = 160;
       const visible = filtered.slice(0, displayLimit);
+      const quickNote = currentSkillInventoryQuick === "all" ? "" : `当前工作区：${skillInventoryQuickLabel(currentSkillInventoryQuick)}。`;
       const triageNote = currentSkillInventoryTriage === "all" ? "" : `当前整理视图：${skillInventoryTriageLabel(currentSkillInventoryTriage)}。`;
       $("skill-inventory-result-note").textContent = items.length > 0
-        ? `${triageNote}显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
+        ? `${quickNote}${triageNote}显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
         : "等待中央仓库或本机客户端上报 skill 清单。";
       $("skill-inventory-list").innerHTML = items.length > 0
         ? (visible.length > 0
@@ -8170,6 +8206,56 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderSkillInventoryWorkbench(items) {
+      const counts = { local_installable: 0, local_installed: 0, publishable: 0, pending: 0 };
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        const installed = macInstalledToolIds(item);
+        const centralState = text((item.central || {}).state || "unpublished");
+        if (macInstallableTools(item, installed, centralState).length > 0) counts.local_installable += 1;
+        if (installed.size > 0) counts.local_installed += 1;
+        if (unpublishedTriageKind(item) === "publishable") counts.publishable += 1;
+        if (Number(item.pending || 0) > 0) counts.pending += 1;
+      });
+      $("skill-inventory-workbench").innerHTML = [
+        workbenchButton("local_installable", counts.local_installable, "可安装到本机", "勾选 Codex / Cursor 等工具"),
+        workbenchButton("local_installed", counts.local_installed, "本机已安装", "查看并可确认移除"),
+        workbenchButton("publishable", counts.publishable, "可发布共享", "本机已有路径，可先检查"),
+        workbenchButton("pending", counts.pending, "待确认同步", "先处理同步队列"),
+      ].join("");
+    }
+
+    function workbenchButton(kind, count, label, note) {
+      const active = currentSkillInventoryQuick === kind ? "primary" : "";
+      return `
+        <button type="button" class="${active}" onclick="setSkillInventoryQuick('${escapeHtml(kind)}')">
+          <strong>${escapeHtml(text(count))}</strong>
+          <span>${escapeHtml(label)}</span>
+          <span>${escapeHtml(note)}</span>
+        </button>
+      `;
+    }
+
+    function skillInventoryQuickLabel(kind) {
+      if (kind === "local_installable") return "可安装到本机";
+      if (kind === "local_installed") return "本机已安装";
+      if (kind === "publishable") return "可发布共享";
+      if (kind === "pending") return "待确认同步";
+      return "全部";
+    }
+
+    function setSkillInventoryQuick(kind) {
+      currentSkillInventoryQuick = currentSkillInventoryQuick === kind ? "all" : kind;
+      currentSkillInventoryTriage = "all";
+      $("skill-inventory-search").value = "";
+      $("skill-inventory-central-filter").value = "all";
+      $("skill-inventory-scope-filter").value = "all";
+      $("skill-inventory-tool-filter").value = "all";
+      $("skill-inventory-sync-filter").value = "all";
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryFiltered();
     }
 
     function renderSkillInventoryTriage(items) {
@@ -8207,12 +8293,14 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function setSkillInventoryTriage(kind) {
       currentSkillInventoryTriage = currentSkillInventoryTriage === kind ? "all" : kind;
+      currentSkillInventoryQuick = "all";
       $("skill-inventory-central-filter").value = kind === "all" ? "all" : "unpublished";
       if (kind === "project") $("skill-inventory-scope-filter").value = "project";
       else if (kind === "private") $("skill-inventory-scope-filter").value = "device-private";
       else if (kind === "publishable" || kind === "waiting_path") $("skill-inventory-scope-filter").value = "global";
       else $("skill-inventory-scope-filter").value = "all";
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
     }
 
@@ -8223,6 +8311,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         scope: selectValue("skill-inventory-scope-filter"),
         tool: selectValue("skill-inventory-tool-filter"),
         sync: selectValue("skill-inventory-sync-filter"),
+        quick: currentSkillInventoryQuick,
         triage: currentSkillInventoryTriage,
       };
     }
@@ -8231,6 +8320,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       return items.filter((item) => {
         const installed = macInstalledToolIds(item);
         const centralState = text((item.central || {}).state || "unpublished");
+        if (filters.quick === "local_installable" && macInstallableTools(item, installed, centralState).length === 0) return false;
+        if (filters.quick === "local_installed" && installed.size === 0) return false;
+        if (filters.quick === "publishable" && unpublishedTriageKind(item) !== "publishable") return false;
+        if (filters.quick === "pending" && Number(item.pending || 0) <= 0) return false;
         if (filters.triage !== "all" && unpublishedTriageKind(item) !== filters.triage) return false;
         if (filters.central !== "all" && centralState !== filters.central) return false;
         if (filters.scope !== "all" && text(item.scope || "global") !== filters.scope) return false;
@@ -8255,12 +8348,14 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function resetSkillInventoryFilters() {
       currentSkillInventoryTriage = "all";
+      currentSkillInventoryQuick = "all";
       $("skill-inventory-search").value = "";
       $("skill-inventory-central-filter").value = "all";
       $("skill-inventory-scope-filter").value = "all";
       $("skill-inventory-tool-filter").value = "all";
       $("skill-inventory-sync-filter").value = "all";
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
     }
 
