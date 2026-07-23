@@ -4668,7 +4668,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 管理</h1>
-      <div class="brand-subtitle">只看顶部卡片即可：它会告诉你现在要不要点按钮。下面都是可选详情。</div>
+      <div class="brand-subtitle">日常只看第一张卡片：它会告诉你现在要不要操作。</div>
     </div>
     <div class="toolbar">
       <span id="updated">读取中</span>
@@ -4682,8 +4682,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <details class="support-drawer">
       <summary>
         <span class="support-drawer-title">
-          <strong>更多操作和详情</strong>
-          <span>新增 skill、查看设备状态、排查问题时再打开；日常只看上方任务卡。</span>
+          <strong>详情和高级操作</strong>
+          <span>新增 skill、查看队列、排查问题时再打开。</span>
         </span>
       </summary>
       <div class="support-drawer-body">
@@ -4910,7 +4910,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <span id="review-feedback-detail">先检查。</span>
       </div>
       <details class="review-detail-drawer">
-        <summary>查看处理进度和详细清单</summary>
+        <summary>查看详细清单和技术状态</summary>
         <div id="review-progress" class="review-progress" aria-label="确认处理进度"></div>
         <div id="review-queue" class="review-list"></div>
       </details>
@@ -5636,10 +5636,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         });
         const allSourceChangedReady = sourceChangedItems.length > 0 && readySourceChangedItems.length === sourceChangedItems.length;
         title = allSourceChangedReady
-          ? `检查通过，可以保存 ${sourceChangedItems.length} 个 OpenClaw 更新`
+          ? (executorAllowPublish ? `检查通过，可以保存 ${sourceChangedItems.length} 个 OpenClaw 更新` : "检查通过，但保存开关未打开")
           : (sourceChangedItems.length === 1 ? `OpenClaw 有新修改：${sourceChangedNames}` : `OpenClaw 有 ${sourceChangedItems.length} 个 skill 在更新`);
         summary = allSourceChangedReady
-          ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词；保存后页面会自动回查。"
+          ? (executorAllowPublish
+            ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词；保存后页面会自动回查。"
+            : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
           : "如果还在改，可以先不管；如果这轮已经改完，点“检查最新版本”。检查只读，不会写入；检查期间又变化会自动拒绝发布。";
         primaryActions = allSourceChangedReady
           ? `
@@ -5649,11 +5651,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
           `;
         facts = allSourceChangedReady
-          ? [
+          ? (executorAllowPublish ? [
             ["下一步", "点“保存到共享库”。"],
             ["确认词", "输入 PUBLISH 后才会写入。"],
             ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ]
+          ] : [
+            ["当前限制", "本机助手未开启写共享库权限。"],
+            ["不会丢失", "检查结果还在；打开发布开关后可重新保存。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
+          ])
           : [
             ["发生了什么", "OpenClaw 本地版本不同于共享库，说明有人刚改过。"],
             ["不会误发", "发布前会重新校验 hash，变化中会拒绝写入。"],
@@ -5682,9 +5688,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           return result && result.publishReady;
         });
         const allPublishReady = regularPublishItems.length > 0 && readyPublishItems.length === regularPublishItems.length;
-        title = allPublishReady ? `检查通过，可以保存 ${regularPublishItems.length} 个更新` : `先检查 ${publishItems.length} 个更新`;
+        title = allPublishReady ? (executorAllowPublish ? `检查通过，可以保存 ${regularPublishItems.length} 个更新` : "检查通过，但保存开关未打开") : `先检查 ${publishItems.length} 个更新`;
         summary = allPublishReady
-          ? "现在只剩最后一步：保存到共享库。保存后页面会自动回查；如果又出现新修改，顶部会继续告诉你下一步。"
+          ? (executorAllowPublish
+            ? "现在只剩最后一步：保存到共享库。保存后页面会自动回查；如果又出现新修改，顶部会继续告诉你下一步。"
+            : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
           : "先检查会改哪些 skill。这一步只看结果，不会写入。检查通过后按钮会变成“保存到共享库”。";
         primaryActions = allPublishReady
           ? `
@@ -5694,11 +5702,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查一下<span>只读，不写入。</span></button>
           `;
         facts = allPublishReady
-          ? [
+          ? (executorAllowPublish ? [
             ["下一步", "点“保存到共享库”。"],
             ["确认词", "输入 PUBLISH 后才会写入。"],
             ["完成标准", "顶部显示“现在不用做任何事”。"],
-          ]
+          ] : [
+            ["当前限制", "本机助手未开启写共享库权限。"],
+            ["不会丢失", "检查结果还在；打开发布开关后可重新保存。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
+          ])
           : [
             ["要检查", `${regularPublishNames || publishNames}。`],
             ["第一步", "检查只读，不写共享库。"],
@@ -6372,10 +6384,6 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function openReviewDetails() {
       openSupportDrawer();
-      const advanced = document.querySelector(".advanced-workspace");
-      const technical = document.querySelector(".technical-workspace");
-      if (advanced) advanced.open = true;
-      if (technical) technical.open = true;
       const target = $("review-queue-panel");
       if (!target) return;
       target.open = true;
@@ -6545,7 +6553,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? "不要点发布；先完成版本差异/缺失决策。"
         : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享仓库。`));
       target.innerHTML = `
-        <div class="review-recommendation-title">推荐操作</div>
+        <div class="review-recommendation-title">下一步</div>
         <div class="review-recommendation-summary">
           ${escapeHtml(summary)}
         </div>
@@ -6553,11 +6561,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查` : `检查一下`}</button>
           <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
         </div>
-        <div id="review-recommendation-note" class="review-recommendation-note">
-          ${escapeHtml(publishActionNote)}
-        </div>
         <details class="review-recommendation-detail">
-          <summary>为什么这样建议</summary>
+          <summary>查看原因</summary>
+          <div>${escapeHtml(publishActionNote)}</div>
           <div>${escapeHtml(firstDetail)}</div>
           <div>${escapeHtml(secondDetail)}</div>
           <div>${escapeHtml(thirdDetail)}</div>
