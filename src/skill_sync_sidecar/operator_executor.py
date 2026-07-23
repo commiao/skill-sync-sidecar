@@ -11,7 +11,13 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Optional, Sequence
 
-from .central_lifecycle import CentralLifecycleError, build_central_deprecate_preview, execute_central_deprecate
+from .central_lifecycle import (
+    CentralLifecycleError,
+    build_central_deprecate_preview,
+    build_central_reactivate_preview,
+    execute_central_deprecate,
+    execute_central_reactivate,
+)
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .remote import open_remote
@@ -284,6 +290,29 @@ def run_central_deprecate(
         return build_central_deprecate_preview(snapshot_dir, skill_ids, actor="mac", reason=reason)
     remote, prefix = _local_publish_remote()
     return execute_central_deprecate(
+        snapshot_dir,
+        skill_ids,
+        remote,
+        remote_prefix=prefix,
+        actor="mac",
+        reason=reason,
+    )
+
+
+def run_central_reactivate(
+    skill_ids: Sequence[str],
+    *,
+    reason: str = "",
+    yes: bool = False,
+    allow_publish: bool = False,
+) -> dict:
+    snapshot_dir = Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
+    if yes and not allow_publish:
+        raise OperatorExecutorError("central reactivate is disabled; start operator-executor with --allow-publish")
+    if not yes:
+        return build_central_reactivate_preview(snapshot_dir, skill_ids, actor="mac", reason=reason)
+    remote, prefix = _local_publish_remote()
+    return execute_central_reactivate(
         snapshot_dir,
         skill_ids,
         remote,
@@ -706,6 +735,27 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         return
                     reason = _payload_reason(payload)
                     result = run_central_deprecate(
+                        skill_ids or [],
+                        reason=reason,
+                        yes=True,
+                        allow_publish=allow_publish,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
+                if path == "/api/central-reactivate-dry-run":
+                    reason = _payload_reason(payload)
+                    result = run_central_reactivate(skill_ids or [], reason=reason, yes=False)
+                    self._send_json(200, result)
+                    return
+                if path == "/api/central-reactivate":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "REACTIVATE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be REACTIVATE"})
+                        return
+                    reason = _payload_reason(payload)
+                    result = run_central_reactivate(
                         skill_ids or [],
                         reason=reason,
                         yes=True,

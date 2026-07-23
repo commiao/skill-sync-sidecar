@@ -45,6 +45,7 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 - `安装到 <tool>` copies a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
 - `从 <tool> 移除` moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/`; it does not delete the backup or change the central snapshot.
 - `标记废弃` updates the central snapshot lifecycle to `deprecated` after dry-run and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
+- `恢复发布` updates the central snapshot lifecycle from `deprecated` back to `published` after dry-run and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
 
@@ -153,3 +154,4 @@ After explicit data-export approval, `read-wechat-article` was published to the 
 - Existing identical skills with missing metadata only receive `manifest.json`; they are not replaced.
 - Selective publish merges only the selected skill into the central snapshot and leaves unrelated conflicts untouched.
 - Central deprecation changes lifecycle metadata only; it does not delete WebDAV archives or uninstall devices.
+- Central reactivation changes lifecycle metadata only; it does not rewrite WebDAV archives or install devices.

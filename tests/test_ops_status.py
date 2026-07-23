@@ -20,7 +20,12 @@ from skill_sync_sidecar.dashboard import (
     build_gateway_status,
     build_hub_import_preview_response,
 )
-from skill_sync_sidecar.central_lifecycle import build_central_deprecate_preview, execute_central_deprecate
+from skill_sync_sidecar.central_lifecycle import (
+    build_central_deprecate_preview,
+    build_central_reactivate_preview,
+    execute_central_deprecate,
+    execute_central_reactivate,
+)
 from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
@@ -753,7 +758,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("再处理可发布更新", DASHBOARD_HTML)
             self.assertIn("id=\"review-dry-run-all\"", DASHBOARD_HTML)
             self.assertIn("id=\"review-publish-all\"", DASHBOARD_HTML)
-            self.assertIn("确认发布 ${publishItems.length} 个 OpenClaw 更新", DASHBOARD_HTML)
+            self.assertIn("发布 ${publishItems.length} 个更新", DASHBOARD_HTML)
             self.assertIn("下一步就是点“确认发布”", DASHBOARD_HTML)
             self.assertIn("allReviewPublishCandidatesReady", DASHBOARD_HTML)
             self.assertIn("publishCandidateSkillIds", DASHBOARD_HTML)
@@ -785,7 +790,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("检查最新版本", DASHBOARD_HTML)
             self.assertIn("检查期间又变化会自动拒绝写入", DASHBOARD_HTML)
             self.assertIn("个源端新修改", DASHBOARD_HTML)
-            self.assertIn("检查后再保存", DASHBOARD_HTML)
+            self.assertIn("先检查更新", DASHBOARD_HTML)
             self.assertIn("sourceChangedOnly", DASHBOARD_HTML)
             self.assertNotIn("sourceChangedOnly) {\\n        panel.hidden = true", DASHBOARD_HTML)
             self.assertIn("保护性拒绝写入共享仓库", DASHBOARD_HTML)
@@ -901,12 +906,21 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/mac-tool-uninstall", DASHBOARD_HTML)
             self.assertIn("/api/central-deprecate-dry-run", DASHBOARD_HTML)
             self.assertIn("/api/central-deprecate", DASHBOARD_HTML)
+            self.assertIn("/api/central-reactivate-dry-run", DASHBOARD_HTML)
+            self.assertIn("/api/central-reactivate", DASHBOARD_HTML)
             self.assertIn("安装到 ${escapeHtml(tool.label)}", DASHBOARD_HTML)
             self.assertIn("从 ${escapeHtml(tool.label)} 移除", DASHBOARD_HTML)
             self.assertIn("标记废弃", DASHBOARD_HTML)
+            self.assertIn("恢复发布", DASHBOARD_HTML)
             self.assertIn("deprecateCentralSkill", DASHBOARD_HTML)
+            self.assertIn("reactivateCentralSkill", DASHBOARD_HTML)
+            self.assertIn("REACTIVATE", DASHBOARD_HTML)
             self.assertIn("不会删除 WebDAV 上的 zip 或历史文件", DASHBOARD_HTML)
+            self.assertIn("不会自动安装到 Mac、OpenClaw 或其他设备", DASHBOARD_HTML)
             self.assertIn("row(\"已废弃\"", DASHBOARD_HTML)
+            self.assertIn("查看详细清单", DASHBOARD_HTML)
+            self.assertIn("为什么这样建议", DASHBOARD_HTML)
+            self.assertNotIn("<ol class=\"review-recommendation-steps\">", DASHBOARD_HTML)
             self.assertIn("data-tool-id", DASHBOARD_HTML)
             self.assertIn("skillInventoryLocalInstallTools", DASHBOARD_HTML)
             self.assertIn("macInstallableTools", DASHBOARD_HTML)
@@ -1880,6 +1894,41 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(lifecycle["deprecated_by"], "mac")
             self.assertEqual(lifecycle["reason"], "obsolete")
             self.assertEqual(remote_index["skills"][0]["content_hash"], index["skills"][0]["content_hash"])
+
+            reactivate_preview = build_central_reactivate_preview(
+                snapshot_dir,
+                ["demo"],
+                actor="mac",
+                reason="needed again",
+            )
+
+            self.assertTrue(reactivate_preview["safe_to_reactivate"])
+            self.assertEqual(reactivate_preview["planned"], 1)
+            self.assertEqual(reactivate_preview["items"][0]["action"], "mark_published")
+
+            reactivate_result = execute_central_reactivate(
+                snapshot_dir,
+                ["demo"],
+                FileRemote(remote_dir),
+                actor="mac",
+                reason="needed again",
+            )
+
+            self.assertTrue(reactivate_result["ok"])
+            self.assertFalse(reactivate_result["dry_run"])
+            self.assertEqual(reactivate_result["uploaded_files"], 1)
+            self.assertTrue((remote_dir / archive_rel).exists())
+            reactivated_index = json.loads((remote_dir / "index.json").read_text(encoding="utf-8"))
+            reactivated_lifecycle = reactivated_index["skills"][0]["lifecycle"]
+            self.assertEqual(reactivated_lifecycle["state"], "published")
+            self.assertEqual(reactivated_lifecycle["reactivated_by"], "mac")
+            self.assertEqual(reactivated_lifecycle["reactivate_reason"], "needed again")
+            self.assertEqual(reactivated_index["skills"][0]["content_hash"], index["skills"][0]["content_hash"])
+
+            noop = execute_central_reactivate(snapshot_dir, ["demo"], FileRemote(remote_dir), actor="mac")
+            self.assertTrue(noop["ok"])
+            self.assertEqual(noop["uploaded_files"], 0)
+            self.assertEqual(noop["noop_reason"], "selected skills are already published")
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
         with TemporaryDirectory() as tmp:

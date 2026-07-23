@@ -111,6 +111,104 @@ def execute_central_deprecate(
     }
 
 
+def build_central_reactivate_preview(
+    snapshot_dir: Path,
+    skill_ids: Sequence[str],
+    *,
+    actor: str = "mac",
+    reason: str = "",
+) -> dict:
+    normalized = _normalize_skill_ids(skill_ids)
+    index = _load_index(snapshot_dir)
+    by_id = _skills_by_id(index)
+    missing = [skill_id for skill_id in normalized if skill_id not in by_id]
+    if missing:
+        raise CentralLifecycleError(f"skill is not present in central snapshot: {', '.join(missing)}")
+
+    reactivated_at = datetime.now(timezone.utc).isoformat()
+    items = []
+    planned = 0
+    for skill_id in normalized:
+        skill = by_id[skill_id]
+        current_state = _skill_lifecycle_state(skill)
+        action = "mark_published" if current_state == "deprecated" else "noop"
+        if action == "mark_published":
+            planned += 1
+        items.append(
+            {
+                "skill_id": skill_id,
+                "current_state": current_state,
+                "next_state": "published",
+                "action": action,
+                "content_hash": skill.get("content_hash"),
+                "archive": skill.get("archive"),
+                "allowed": True,
+            }
+        )
+
+    new_index = _reactivate_index(index, set(normalized), actor=actor, reason=reason, reactivated_at=reactivated_at)
+    return {
+        "ok": True,
+        "record_type": "skill-sync-central-reactivate",
+        "mode": "dry_run",
+        "dry_run": True,
+        "safe_to_reactivate": True,
+        "skill_ids": normalized,
+        "actor": actor,
+        "reason": reason,
+        "snapshot_id": index.get("snapshot_id"),
+        "new_snapshot_id": new_index.get("snapshot_id"),
+        "planned": planned,
+        "items": items,
+        "index_sha256": _index_sha256(index),
+        "new_index_sha256": _index_sha256(new_index),
+    }
+
+
+def execute_central_reactivate(
+    snapshot_dir: Path,
+    skill_ids: Sequence[str],
+    remote: Remote,
+    *,
+    remote_prefix: str = "",
+    actor: str = "mac",
+    reason: str = "",
+    require_remote_match: bool = True,
+) -> dict:
+    preview = build_central_reactivate_preview(snapshot_dir, skill_ids, actor=actor, reason=reason)
+    index = _load_index(snapshot_dir)
+    if int(preview.get("planned") or 0) == 0:
+        return {
+            **preview,
+            "mode": "reactivate",
+            "dry_run": False,
+            "uploaded_files": 0,
+            "noop_reason": "selected skills are already published",
+        }
+    if require_remote_match:
+        _assert_remote_index_matches_cache(remote, remote_prefix, index)
+    new_index = _reactivate_index(
+        index,
+        set(preview["skill_ids"]),
+        actor=actor,
+        reason=reason,
+        reactivated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    data = json.dumps(new_index, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    remote.put_bytes(join_remote_path(remote_prefix, "index.json"), data)
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    (snapshot_dir / "index.json").write_bytes(data)
+    return {
+        **preview,
+        "mode": "reactivate",
+        "dry_run": False,
+        "snapshot_id": index.get("snapshot_id"),
+        "new_snapshot_id": new_index.get("snapshot_id"),
+        "new_index_sha256": _index_sha256(new_index),
+        "uploaded_files": 1,
+    }
+
+
 def _load_index(snapshot_dir: Path) -> dict:
     index_path = snapshot_dir.expanduser() / "index.json"
     if not index_path.exists():
@@ -161,13 +259,42 @@ def _deprecate_index(index: dict, skill_ids: set[str], *, actor: str, reason: st
     }
 
 
+def _reactivate_index(index: dict, skill_ids: set[str], *, actor: str, reason: str, reactivated_at: str) -> dict:
+    skills = []
+    for skill in index.get("skills", []):
+        if not isinstance(skill, dict):
+            continue
+        updated = dict(skill)
+        if str(updated.get("skill_id")) in skill_ids:
+            if _skill_lifecycle_state(updated) == "deprecated":
+                lifecycle = dict(updated.get("lifecycle") or {})
+                lifecycle.update(
+                    {
+                        "state": "published",
+                        "reactivated_at": reactivated_at,
+                        "reactivated_by": actor,
+                    }
+                )
+                if reason:
+                    lifecycle["reactivate_reason"] = reason
+                updated["lifecycle"] = lifecycle
+        skills.append(updated)
+    return {
+        **index,
+        "snapshot_id": f"central-reactivate-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "total": len(skills),
+        "skills": skills,
+    }
+
+
 def _assert_remote_index_matches_cache(remote: Remote, remote_prefix: str, cache_index: dict) -> None:
     try:
         remote_index = json.loads(remote.get_bytes(join_remote_path(remote_prefix, "index.json")).decode("utf-8"))
     except (json.JSONDecodeError, RemoteError) as exc:
-        raise CentralLifecycleError(f"cannot verify remote snapshot before deprecate: {exc}") from exc
+        raise CentralLifecycleError(f"cannot verify remote snapshot before lifecycle update: {exc}") from exc
     if _index_sha256(remote_index) != _index_sha256(cache_index):
-        raise CentralLifecycleError("remote index changed since the local cache was pulled; refresh before deprecating")
+        raise CentralLifecycleError("remote index changed since the local cache was pulled; refresh before lifecycle update")
 
 
 def _skill_lifecycle_state(skill: dict) -> str:

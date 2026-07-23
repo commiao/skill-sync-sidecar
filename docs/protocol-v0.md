@@ -144,6 +144,8 @@ Lifecycle states:
 
 Deprecation is not deletion. A deprecate operation updates `index.json` only and must keep the referenced `skills/.../<content-hash>.zip` object intact. Existing devices are not auto-uninstalled; removal from a local tool root is a separate current-device action with its own confirmation and backup.
 
+Reactivation is also metadata-only. A reactivate operation changes `lifecycle.state` from `deprecated` back to `published`, records `reactivated_at` / `reactivated_by`, and uploads `index.json` only after dry-run plus explicit `REACTIVATE` confirmation. It does not rewrite archives or auto-install the skill onto Mac, OpenClaw, Windows, or any tool root.
+
 ## Peer Status
 
 Peer devices publish operational status documents to WebDAV for read-only gateways. Peer status v1 adds device metadata, capability flags, and per-device `tools[]` measurements so the Gateway does not infer Mac/OpenClaw/Windows tool installs from the NAS container.

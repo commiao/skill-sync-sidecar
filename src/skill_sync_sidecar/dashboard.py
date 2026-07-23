@@ -2631,9 +2631,29 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .review-recommendation-detail {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .review-recommendation-detail summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 750;
+    }
+    .review-detail-drawer {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .review-detail-drawer summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 800;
+    }
     .review-list {
       display: grid;
       gap: 6px;
+      margin-top: 8px;
     }
     .review-group {
       display: grid;
@@ -4132,6 +4152,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 760;
     }
     .central-deprecate-button,
+    .central-reactivate-button,
     .tool-install-button,
     .tool-uninstall-button,
     .codex-install-button {
@@ -4733,7 +4754,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         <strong id="review-feedback-title">等待操作</strong>
         <span id="review-feedback-detail">先检查。</span>
       </div>
-      <div id="review-queue" class="review-list"></div>
+      <details class="review-detail-drawer">
+        <summary>查看详细清单</summary>
+        <div id="review-queue" class="review-list"></div>
+      </details>
     </section>
     </details>
     </details>
@@ -6180,7 +6204,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`));
       const publishActionLabel = !executorAvailable
         ? "等待本机助手"
-        : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedItems.length > 0 && remainingReady > 0 ? `检查后再保存 ${publishItems.length} 个更新` : `确认发布 ${publishItems.length} 个 OpenClaw 更新`));
+        : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedItems.length > 0 && remainingReady > 0 ? "先检查更新" : `发布 ${publishItems.length} 个更新`));
       const publishActionNote = publishItems.length === 0
         ? "当前没有东西可发布；如果点确认发布，也不会写入共享仓库。"
         : (!executorAvailable
@@ -6190,25 +6214,22 @@ DASHBOARD_HTML = r"""<!doctype html>
             : (sourceChangedItems.length > 0 && remainingReady > 0
               ? "改完后先检查最新版本；检查期间又变化会自动拒绝写入。"
               : (remainingReady > 0 ? "发布按钮会在所有更新检查通过后解锁。" : "下一步就是点“确认发布”，确认后写入共享仓库。"))));
+      const firstDetail = conflictItems.length
+        ? `版本差异：${conflictNames}。先看只读报告。`
+        : (deleteItems.length
+          ? `确认缺失项是恢复还是删除：${deleteNames}。默认保留共享仓库，不会自动删除。`
+          : (sourceChangedItems.length ? `源端仍有新改动：${sourceChangedNames}。` : "当前没有缺失/删除确认。"));
+      const secondDetail = sourceChangedOnly
+        ? "点“检查”只会读取最新版本，不会写入共享库。"
+        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。"));
+      const thirdDetail = publishItems.length === 0
+        ? "不要点发布；先完成版本差异/缺失决策。"
+        : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享仓库。`));
       target.innerHTML = `
         <div class="review-recommendation-title">推荐操作</div>
         <div class="review-recommendation-summary">
           ${escapeHtml(summary)}
         </div>
-        <ol class="review-recommendation-steps">
-          <li class="review-recommendation-step">
-            <span class="review-recommendation-index">1</span>
-            <span>${conflictItems.length ? `先生成只读差异报告：${escapeHtml(conflictNames)}。` : (deleteItems.length ? `确认缺失项是恢复还是删除：${escapeHtml(deleteNames)}。` : (sourceChangedItems.length ? `改完后检查最新版本：${escapeHtml(sourceChangedNames)}。` : "当前没有缺失/删除确认。"))}</span>
-          </li>
-          <li class="review-recommendation-step">
-            <span class="review-recommendation-index">2</span>
-            <span>${sourceChangedOnly ? "点“检查”只会读取最新版本，不会写入共享库。" : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。"))}</span>
-          </li>
-          <li class="review-recommendation-step">
-            <span class="review-recommendation-index">3</span>
-            <span>${publishItems.length === 0 ? "不要点发布；先完成版本差异/缺失决策。" : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享仓库。`))}</span>
-          </li>
-        </ol>
         <div class="review-recommendation-actions">
           <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查 ${publishItems.length} 个更新` : `检查 ${publishItems.length} 个更新`}</button>
           <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
@@ -6216,6 +6237,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="review-recommendation-note" class="review-recommendation-note">
           ${escapeHtml(publishActionNote)}
         </div>
+        <details class="review-recommendation-detail">
+          <summary>为什么这样建议</summary>
+          <div>${escapeHtml(firstDetail)}</div>
+          <div>${escapeHtml(secondDetail)}</div>
+          <div>${escapeHtml(thirdDetail)}</div>
+        </details>
       `;
     }
 
@@ -6828,6 +6855,14 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "标记废弃需要打开发布开关"
             : "标记中央仓库已废弃；保留原文件和历史版本");
       });
+      document.querySelectorAll(".central-reactivate-button").forEach((button) => {
+        button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowPublish
+            ? "恢复发布需要打开发布开关"
+            : "恢复中央仓库发布状态；不自动安装到设备");
+      });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7283,6 +7318,74 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
+    async function reactivateCentralSkill(button) {
+      const skillId = button.dataset.skillId || "";
+      if (!skillId) return;
+      if (!executorAvailable || !executorAllowPublish) {
+        setReviewFeedback("yellow", "还不能恢复发布", "需要 Mac 本机助手在线，并打开发布开关。");
+        setExecutorStatus("not ready", "本机助手还不能写入共享仓库。", "yellow");
+        return;
+      }
+      const reason = window.prompt(`为什么要恢复发布 ${skillId}？可留空。`, "") || "";
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查恢复发布 ${skillId}`, "检查只读；确认共享仓库当前版本仍是本机看到的版本。");
+      setExecutorStatus("reactivate check", `正在检查 ${skillId} 的中央仓库恢复发布操作。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/central-reactivate-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], reason }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_reactivate) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，只会恢复中央仓库发布状态；不会自动安装到设备。");
+        if (!confirmProtectedWrite({
+          word: "REACTIVATE",
+          title: `确认恢复发布：${skillId}`,
+          will: [
+            `把共享仓库里的 ${skillId} 从已废弃恢复为可发布状态。`,
+            "只上传新的 index.json。",
+            "恢复后可再次选择安装到本机工具。",
+          ],
+          willNot: [
+            "不会修改 WebDAV 上的 zip 或历史文件。",
+            "不会自动安装到 Mac、OpenClaw 或其他设备。",
+            "不会修改 OpenClaw 服务。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", "恢复发布已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入共享仓库。");
+          return;
+        }
+        setReviewFeedback("yellow", `正在恢复发布 ${skillId}`, "正在上传新的中央仓库 index；原文件保持不变。");
+        setExecutorStatus("reactivating", `正在恢复 ${skillId} 的发布状态。`, "yellow");
+        const response = await fetch(`${EXECUTOR_URL}/api/central-reactivate`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: [skillId], reason, confirm: "REACTIVATE" }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (!response.ok || !payload.ok) {
+          throw new Error(executorErrorDetail(payload));
+        }
+        setReviewFeedback("green", `${skillId} 已恢复发布`, "共享仓库状态正在刷新；需要安装到工具时再在清单中选择。");
+        setExecutorStatus("reactivated", `${skillId} 已恢复中央仓库发布状态。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", "恢复发布失败", String(err));
+        setExecutorStatus("failed", "恢复发布失败，请查看执行输出。", "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
     async function generateConflictPackage(button) {
       const skillId = button.dataset.skillId || "";
       const peerId = button.dataset.peerId || "";
@@ -7673,6 +7776,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deprecateAction = centralState === "published"
         ? `<button type="button" class="central-deprecate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="deprecateCentralSkill(this)" disabled>标记废弃</button>`
         : "";
+      const reactivateAction = centralState === "deprecated"
+        ? `<button type="button" class="central-reactivate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="reactivateCentralSkill(this)" disabled>恢复发布</button>`
+        : "";
       return `
         <article class="skill-inventory-row">
           <div>
@@ -7686,6 +7792,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ${installAction}
             ${uninstallAction}
             ${deprecateAction}
+            ${reactivateAction}
           </div>
         </article>
       `;
