@@ -5113,6 +5113,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
     let staleRefreshTimer = null;
+    const SOURCE_CHANGE_DEFERRALS_KEY = "skill-sync-source-change-deferrals-v1";
+    let sourceChangeDeferrals = loadSourceChangeDeferrals();
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
     const pretty = (value) => {
       if (value === undefined || value === null) return "-";
@@ -5126,6 +5128,38 @@ DASHBOARD_HTML = r"""<!doctype html>
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+
+    function loadSourceChangeDeferrals() {
+      try {
+        const raw = window.localStorage.getItem(SOURCE_CHANGE_DEFERRALS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function saveSourceChangeDeferrals() {
+      try {
+        window.localStorage.setItem(SOURCE_CHANGE_DEFERRALS_KEY, JSON.stringify(sourceChangeDeferrals));
+      } catch (err) {
+        // Browser storage can be unavailable in private mode; the UI still works without persistence.
+      }
+    }
+
+    function sourceChangeDeferralKey(item) {
+      if (!item) return "";
+      return [
+        text(item.peer_id || item.peer_name || "unknown-peer"),
+        text(item.skill_id || "unknown-skill"),
+        text(item.status_action || item.plan_action || "unknown-action"),
+        text(item.local_hash || item.source_hash || item.remote_hash || item.base_hash || "unknown-version"),
+      ].join("::");
+    }
+
+    function isDeferredSourceChange(item) {
+      return reviewIsSourceChangedItem(item) && Boolean(sourceChangeDeferrals[sourceChangeDeferralKey(item)]);
+    }
 
     function nextAction(status) {
       if (status.health === "green") return "当前没有需要审核的同步项。";
@@ -5240,19 +5274,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      const blocked = Number(dashboard.blocked || 0);
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
-      const breakdown = blockedBreakdown(blockedItems);
+      const deferredSourceChangedItems = blockedItems.filter((item) => isDeferredSourceChange(item));
+      const actionableItems = blockedItems.filter((item) => !isDeferredSourceChange(item));
+      const blocked = blockedItems.length > 0 ? actionableItems.length : Number(dashboard.blocked || 0);
+      const breakdown = blockedBreakdown(actionableItems);
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
-      const sourceChangedItems = blockedItems.filter((item) => reviewIsSourceChangedItem(item));
+      const sourceChangedItems = actionableItems.filter((item) => reviewIsSourceChangedItem(item));
       const sourceChangedReady = sourceChangedItems.length > 0 && sourceChangedItems.every((item) => {
         const result = reviewTaskResults[reviewItemKey(item)];
         return result && result.publishReady;
       });
       $("strip-health").textContent = blocked > 0
         ? (breakdown.sourceChanged > 0 ? "个源端新修改" : (breakdown.conflict === blocked ? "个需要确认" : "个需要处理"))
-        : "同步完成";
-      $("strip-blocked").textContent = blocked > 0 ? text(blocked) : "正常";
+        : (deferredSourceChangedItems.length > 0 ? "项已搁置" : "同步完成");
+      $("strip-blocked").textContent = blocked > 0 ? text(blocked) : (deferredSourceChangedItems.length > 0 ? text(deferredSourceChangedItems.length) : "正常");
       $("strip-local").textContent = text(local.total_skills);
       $("strip-central").textContent = text(central.total_skills);
       $("strip-devices").textContent = text(deviceCount);
@@ -5272,7 +5308,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
-          : "同步正常。需要导入或更新本机 skill 时，再点扫描本机。";
+          : (deferredSourceChangedItems.length > 0
+            ? `已搁置 ${compactSkillList(deferredSourceChangedItems.map((item) => item.skill_id))}；这只影响当前浏览器首页。`
+            : "同步正常。需要导入或更新本机 skill 时，再点扫描本机。");
       }
       const actionNote = $("strip-action-note");
       if (actionNote) {
@@ -5282,7 +5320,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? (sourceChangedReady ? "现在可以保存；保存前仍需要确认词。" : "这不是发布失败；源端还在变，先别反复发布。")
             : (blocked > 0
             ? "不会自动写入共享仓库；确认后才会发布。"
-            : "只操作当前 Mac，本页不会跨设备乱改。"));
+            : (deferredSourceChangedItems.length > 0
+              ? "搁置不会写入任何位置；取消搁置后可继续检查。"
+              : "只操作当前 Mac，本页不会跨设备乱改。")));
       }
     }
 
@@ -5466,18 +5506,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!panel) return;
       hideConflictResolutionPanel();
       const allItems = Array.isArray(items) ? items : [];
-      const sourceChangedItems = reviewSourceChangedItems(allItems);
-      const publishItems = reviewPublishItems(allItems);
+      const deferredSourceChangedItems = allItems.filter((item) => isDeferredSourceChange(item));
+      const actionableItems = allItems.filter((item) => !isDeferredSourceChange(item));
+      const sourceChangedItems = reviewSourceChangedItems(actionableItems);
+      const publishItems = reviewPublishItems(actionableItems);
       const regularPublishItems = publishItems.filter((item) => !reviewIsSourceChangedItem(item));
-      const deleteItems = reviewDeleteItems(allItems);
-      const conflictItems = allItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
-      const restoreItems = allItems.filter((item) => reviewCanRestoreFromCentral(item));
-      const blocked = Number(dashboard.blocked || allItems.length || 0);
-      const breakdown = blockedBreakdown(allItems);
+      const deleteItems = reviewDeleteItems(actionableItems);
+      const conflictItems = actionableItems.filter((item) => item.category === "conflict" || item.status_action === "conflict");
+      const restoreItems = actionableItems.filter((item) => reviewCanRestoreFromCentral(item));
+      const blocked = allItems.length > 0 ? actionableItems.length : Number(dashboard.blocked || 0);
+      const breakdown = blockedBreakdown(actionableItems);
       const conflictOnly = blocked > 0 && conflictItems.length === blocked;
       const kind = blocked === 0 ? "green" : (conflictOnly ? "version-difference" : "yellow");
       panel.className = `simple-action-panel panel ${kind}`;
       if (blocked === 0) {
+        if (deferredSourceChangedItems.length > 0) {
+          const deferredNames = compactSkillList(deferredSourceChangedItems.map((item) => item.skill_id));
+          panel.innerHTML = `
+            <div class="simple-action-hero">
+              <div class="simple-action-plain">
+                <div class="simple-action-eyebrow">现在状态</div>
+                <div class="simple-action-title">已暂时搁置 OpenClaw 修改</div>
+                <div class="simple-action-summary">${escapeHtml(deferredNames)} 还在等待你之后处理；首页先不再用它挡住其他操作。</div>
+              </div>
+              <div class="simple-action-actions single-primary">
+                <button type="button" class="primary" onclick="clearSourceChangeDeferrals()">取消搁置<span>回到正常待确认状态。</span></button>
+                <button type="button" onclick="openReviewDetails()">查看确认清单<span>只打开详情，不写入。</span></button>
+              </div>
+            </div>
+            <div class="simple-action-done-line"><strong>安全边界：</strong>搁置只保存在当前浏览器，不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
+          `;
+          setExecutorButtons(executorAvailable);
+          return;
+        }
         panel.innerHTML = `
           <div class="simple-action-hero">
             <div class="simple-action-plain">
@@ -5564,6 +5625,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           `
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
+            <button type="button" onclick="deferSourceChangedItems()">暂时搁置<span>仅隐藏首页提醒。</span></button>
             <button type="button" onclick="refresh(true)">刷新状态<span>只重新读取，不写入。</span></button>
           `;
         facts = allSourceChangedReady
@@ -5665,6 +5727,38 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </details>
       `;
+    }
+
+    function deferSourceChangedItems() {
+      const sourceChangedItems = reviewSourceChangedItems(currentReviewQueueItems);
+      if (sourceChangedItems.length === 0) {
+        setReviewFeedback("yellow", "没有可搁置项", "当前没有 OpenClaw 正在修改的待确认项。");
+        return;
+      }
+      sourceChangedItems.forEach((item) => {
+        const key = sourceChangeDeferralKey(item);
+        if (key) sourceChangeDeferrals[key] = true;
+      });
+      saveSourceChangeDeferrals();
+      if (window.lastDashboard) {
+        renderStatusStrip(window.lastDashboard, window.lastDashboard.health || "yellow");
+        renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems);
+      }
+      setReviewFeedback(
+        "green",
+        "已暂时搁置",
+        `${compactSkillList(sourceChangedItems.map((item) => item.skill_id))} 暂时不再占用首页；确认清单里仍保留原始状态。`,
+      );
+    }
+
+    function clearSourceChangeDeferrals() {
+      sourceChangeDeferrals = {};
+      saveSourceChangeDeferrals();
+      if (window.lastDashboard) {
+        renderStatusStrip(window.lastDashboard, window.lastDashboard.health || "yellow");
+        renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems);
+      }
+      setReviewFeedback("yellow", "已取消搁置", "首页会重新显示 OpenClaw 待确认项。");
     }
 
     function runFirstConflictPackage() {
