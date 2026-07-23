@@ -4336,11 +4336,43 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-detail[open] > summary::after {
       content: "收起";
     }
+    .skill-tool-matrix {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .skill-tool-matrix-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
     .skill-tool-checks {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+    }
+    .skill-installation-list {
+      display: grid;
+      gap: 5px;
       margin-top: 8px;
+    }
+    .skill-installation-row {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: #fff;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .skill-installation-row strong {
+      color: var(--ink);
     }
     .skill-tool-check {
       border: 1px solid var(--line);
@@ -4674,6 +4706,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workbench-grid { grid-template-columns: 1fr; }
       .plain-detail-grid { grid-template-columns: 1fr; }
       .skill-inventory-row { grid-template-columns: 1fr; }
+      .skill-tool-matrix { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -8787,12 +8820,30 @@ DASHBOARD_HTML = r"""<!doctype html>
             ${deprecateAction}
             ${reactivateAction}
           </div>
-          <details class="skill-inventory-detail">
-            <summary>选择本机工具和查看状态</summary>
+          <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
+            <div class="skill-tool-matrix-title">本机工具</div>
             <div class="skill-tool-checks">${toolChecks}</div>
+          </div>
+          <details class="skill-inventory-detail">
+            <summary>查看路径和状态</summary>
+            ${skillInventoryInstallationRows(item)}
           </details>
         </article>
       `;
+    }
+
+    function skillInventoryInstallationRows(item) {
+      const installations = Array.isArray(item.installations) ? item.installations : [];
+      const local = installations.filter((installed) => text(installed.device_id) === "mac");
+      if (local.length === 0) {
+        return `<div class="empty">当前 Mac 还没有安装这个 skill。发布到共享库后，可在上方勾选安装到本机工具。</div>`;
+      }
+      return `<div class="skill-installation-list">${local.map((installed) => `
+        <div class="skill-installation-row">
+          <strong>${escapeHtml(text(installed.tool_name || installed.tool_id || "工具"))}</strong>
+          <span>${escapeHtml(text(installed.path || "未上报路径"))}</span>
+        </div>
+      `).join("")}</div>`;
     }
 
     function skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools) {
