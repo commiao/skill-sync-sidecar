@@ -6919,6 +6919,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       showPublishGateHelp(`${skillId || "这个 skill"} 当前不会${actionLabel || "修改共享库"}；开启保存权限后再点操作，仍会先检查并要求输入确认词。`);
     }
 
+    function showLocalWriteGateHelp(targetLabel) {
+      const target = text(targetLabel || "当前 Mac 的工具目录");
+      setReviewFeedback(
+        "yellow",
+        "还不能写入本机工具",
+        `${target} 当前不会被修改；开启本机写入权限后再点操作，仍会先检查并要求确认词。`,
+      );
+      setExecutorStatus("write locked", "本机写入权限未开启；当前只能扫描和检查。", "yellow");
+      showExecutorOutput([
+        "安装、移除或恢复到本机工具目录需要本机助手显式允许本机写入：",
+        "",
+        "scripts/install-operator-executor-launchd.sh",
+        "",
+        "手动启动时使用：",
+        "python3 -m skill_sync_sidecar operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-local-writes",
+        "",
+        "这只允许当前设备工具目录写入，不会开启共享库发布权限。",
+      ].join("\n"));
+      openTechnicalWorkspace();
+    }
+
     function openTechnicalWorkspace() {
       openSupportDrawer();
       const advanced = document.querySelector(".advanced-workspace");
@@ -7784,7 +7805,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (localSkillAnalyze) localSkillAnalyze.disabled = !available;
       if (localSkillInstall) {
         const willWrite = Number(((lastLocalSkillAnalysis || {}).summary || {}).will_write || 0);
-        localSkillInstall.disabled = !available || !executorAllowLocalWrites || !lastLocalSkillAnalysis || willWrite === 0;
+        setButtonLabel(
+          localSkillInstall,
+          !available
+            ? "等待本机助手"
+            : (!lastLocalSkillAnalysis
+              ? "安装到本机工具"
+              : (!executorAllowLocalWrites ? "开启本机写入" : "安装到本机工具")),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!lastLocalSkillAnalysis
+              ? ""
+              : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : "会要求输入 INSTALL。")),
+        );
+        localSkillInstall.disabled = !available || !lastLocalSkillAnalysis || willWrite === 0;
       }
       if (localSkillPublishCheck) localSkillPublishCheck.disabled = !available || !lastLocalSkillAnalysis;
       if (localSkillPublish) {
@@ -7818,11 +7852,20 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!available ? "本机助手未在线" : "检查只读，不写共享库");
       });
       document.querySelectorAll(".central-restore-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : "找回"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? "恢复需要打开本机写入开关"
+            ? "本机写入权限未开启；点击查看开启方法"
             : "从共享库恢复到缺失设备");
       });
       document.querySelectorAll(".conflict-package-button").forEach((button) => {
@@ -7835,29 +7878,56 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "生成只读差异报告，不写共享库或设备 skill 目录");
       });
       document.querySelectorAll(".central-conflict-restore-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : "恢复共享库版"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? "恢复需要打开本机写入开关"
+            ? "本机写入权限未开启；点击查看开启方法"
             : "先检查，再确认，把共享库版本恢复到 OpenClaw");
       });
       document.querySelectorAll(".tool-install-button, .codex-install-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
         const toolLabel = button.dataset.toolLabel || "工具";
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : `安装到 ${toolLabel}`),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? `安装到 ${toolLabel} 需要打开本机写入开关`
+            ? "本机写入权限未开启；点击查看开启方法"
             : `从共享库安装到当前 Mac 的 ${toolLabel}`);
       });
       document.querySelectorAll(".tool-uninstall-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
         const toolLabel = button.dataset.toolLabel || "工具";
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : "移除"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? `从 ${toolLabel} 移除需要打开本机写入开关`
+            ? "本机写入权限未开启；点击查看开启方法"
             : `从当前 Mac 的 ${toolLabel} 移除，并保留备份`);
       });
       document.querySelectorAll(".skill-tool-toggle").forEach((input) => {
@@ -7908,21 +7978,39 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "先检查，再确认，把这个本机 skill 发布到共享库");
       });
       document.querySelectorAll(".inventory-bulk-install-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || Number(button.dataset.count || 0) <= 0;
         const toolLabel = button.dataset.toolLabel || "工具";
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : `安装到 ${toolLabel} (${text(button.dataset.count || 0)})`),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || Number(button.dataset.count || 0) <= 0;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? `批量安装到 ${toolLabel} 需要打开本机写入开关`
+            ? "本机写入权限未开启；点击查看开启方法"
             : `先检查，再确认，把当前筛选结果安装到 ${toolLabel}`);
       });
       document.querySelectorAll(".inventory-bulk-remove-button").forEach((button) => {
-        button.disabled = !available || !executorAllowLocalWrites || Number(button.dataset.count || 0) <= 0;
         const toolLabel = button.dataset.toolLabel || "工具";
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : `从 ${toolLabel} 移除 (${text(button.dataset.count || 0)})`),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || Number(button.dataset.count || 0) <= 0;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? `批量从 ${toolLabel} 移除需要打开本机写入开关`
+            ? "本机写入权限未开启；点击查看开启方法"
             : `先检查，再确认，把当前筛选结果从 ${toolLabel} 移除并保留备份`);
       });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
@@ -8131,8 +8219,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         setReviewFeedback("yellow", `${skillId} 暂不能在此面板恢复`, "这个设备还没有接入本机恢复执行器。");
         return;
       }
-      if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", "还不能找回", "本机助手在线后，还需要打开“允许写入本机/设备”的开关；未打开前只会检查，不会写入。");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp("缺失设备的 skill 目录");
         return;
       }
       setExecutorButtons(false);
@@ -8198,9 +8290,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       if (!skillId) return;
       if (!toolId) return;
-      if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", `还不能安装到 ${toolLabel}`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
-        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行安装检查。", "yellow");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp(`${toolLabel} skill 目录`);
         return;
       }
       setExecutorButtons(false);
@@ -8277,9 +8373,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         setExecutorStatus("no changes", `没有可安装到 ${toolLabel} 的 skill。`, "yellow");
         return;
       }
-      if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", `还不能批量安装到 ${toolLabel}`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
-        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行批量安装检查。", "yellow");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp(`${toolLabel} skill 目录`);
         return;
       }
       const names = compactSkillList(skillIds);
@@ -8357,9 +8457,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         setExecutorStatus("no changes", `没有可从 ${toolLabel} 移除的 skill。`, "yellow");
         return;
       }
-      if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", `还不能批量从 ${toolLabel} 移除`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
-        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行批量移除检查。", "yellow");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp(`${toolLabel} skill 目录`);
         return;
       }
       const names = compactSkillList(skillIds);
@@ -8438,9 +8542,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       if (!skillId || !toolId) return;
-      if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", `还不能从 ${toolLabel} 移除`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
-        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行移除检查。", "yellow");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp(`${toolLabel} skill 目录`);
         return;
       }
       setExecutorButtons(false);
@@ -9785,7 +9893,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function installLocalSkill() {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (!executorAllowLocalWrites) {
-        renderLocalSkillError("本机写入未授权：请打开本机写入开关后再安装。");
+        showLocalWriteGateHelp("当前 Mac 的工具目录");
         return;
       }
       const writes = Number((lastLocalSkillAnalysis.summary || {}).will_write || 0);
