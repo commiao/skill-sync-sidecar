@@ -44,6 +44,7 @@ The user should not need to edit metadata, understand technical check output, or
 The secondary `Skill 清单` view is the per-skill management surface for the current client:
 
 - The top `推荐操作` strip chooses one plain next action from the current state: pending sync review, installable local tools, publishable local skills, installed local skills, or the full list. It is the first thing a non-technical user should follow.
+- After a recommended action opens the list, the `正在看` strip explains the current view and the next safe operation, such as checking a tool box, publishing one skill, or leaving project skills in the project repository.
 - Search and filters are view-only helpers. Users can filter by skill name/description, shared-library state, scope, local tool, or pending sync state without changing files.
 - The unpublished triage chips split local-only skills into `可发布公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
 - Checking a local tool box installs a shared-library skill into that Mac tool root after a read-only check and `INSTALL` confirmation.

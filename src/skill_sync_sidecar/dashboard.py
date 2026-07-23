@@ -4392,6 +4392,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .skill-inventory-active-view {
+      border: 1px solid #d6e3f7;
+      background: #fbfdff;
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-active-view strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 840;
+      margin-bottom: 2px;
+    }
     .skill-inventory-bulk-actions {
       display: flex;
       flex-wrap: wrap;
@@ -5324,6 +5341,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <details id="skill-inventory-list-panel" class="skill-inventory-list-panel">
         <summary>查看 skill 列表和安装勾选</summary>
         <div class="skill-inventory-list-body">
+          <div id="skill-inventory-active-view" class="skill-inventory-active-view"></div>
           <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
           <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
           <div id="skill-inventory-list" class="skill-inventory-list"></div>
@@ -9249,6 +9267,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const visible = filtered.slice(0, displayLimit);
       const quickNote = currentSkillInventoryQuick === "all" ? "" : `当前工作区：${skillInventoryQuickLabel(currentSkillInventoryQuick)}。`;
       const triageNote = currentSkillInventoryTriage === "all" ? "" : `当前整理视图：${skillInventoryTriageLabel(currentSkillInventoryTriage)}。`;
+      renderSkillInventoryActiveView(skillInventoryActiveViewModel(skillInventoryFilters(), filtered.length, items.length));
       $("skill-inventory-result-note").textContent = items.length > 0
         ? `${quickNote}${triageNote}显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
         : "等待共享库或本机客户端上报 skill 清单。";
@@ -9259,6 +9278,72 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderSkillInventoryActiveView(view) {
+      const target = $("skill-inventory-active-view");
+      if (!target) return;
+      target.innerHTML = `<strong>${escapeHtml(view.title)}</strong>${escapeHtml(view.detail)}`;
+    }
+
+    function skillInventoryActiveViewModel(filters, count, total) {
+      const quick = (filters || {}).quick || "all";
+      const triage = (filters || {}).triage || "all";
+      const query = (filters || {}).query || "";
+      const filtered = Number(count || 0);
+      const all = Number(total || 0);
+      if (quick === "local_installable") {
+        return {
+          title: `正在看：可安装到本机 (${filtered})`,
+          detail: "下一步：在每个 skill 行里勾选 Codex、Cursor 等工具；真正安装前会再次确认。",
+        };
+      }
+      if (quick === "local_installed") {
+        return {
+          title: `正在看：本机已安装 (${filtered})`,
+          detail: "下一步：保持勾选表示继续可用；取消勾选会先检查并要求 REMOVE。",
+        };
+      }
+      if (quick === "publishable" || triage === "publishable") {
+        return {
+          title: `正在看：可发布共享 (${filtered})`,
+          detail: "下一步：逐个点“发布到共享库”；会先检查并要求 PUBLISH。",
+        };
+      }
+      if (quick === "pending") {
+        return {
+          title: `正在看：待确认同步 (${filtered})`,
+          detail: "下一步：先处理确认清单；这些项不会自动写入或删除。",
+        };
+      }
+      if (triage === "project") {
+        return {
+          title: `正在看：项目级 skill (${filtered})`,
+          detail: "下一步：随项目仓维护；不要从全局清单一键发布或安装。",
+        };
+      }
+      if (triage === "private") {
+        return {
+          title: `正在看：设备私有 skill (${filtered})`,
+          detail: "下一步：默认只保留在当前设备；确认要共享时再改成公用流程。",
+        };
+      }
+      if (triage === "waiting_path") {
+        return {
+          title: `正在看：缺本机路径 (${filtered})`,
+          detail: "下一步：等待对应设备上报，或先恢复到当前 Mac 后再处理。",
+        };
+      }
+      if (query || (filters || {}).central !== "all" || (filters || {}).scope !== "all" || (filters || {}).tool !== "all" || (filters || {}).sync !== "all") {
+        return {
+          title: `正在看：筛选结果 (${filtered}/${all})`,
+          detail: "下一步：筛选只影响显示；需要安装、移除或发布时，再用每行按钮确认。",
+        };
+      }
+      return {
+        title: `正在看：全部 skill (${all})`,
+        detail: "下一步：先用上方推荐操作；清单里的路径、状态和矩阵可稍后再看。",
+      };
     }
 
     function renderSkillInventoryBulkActions(filtered) {
