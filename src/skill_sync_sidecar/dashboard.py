@@ -4727,7 +4727,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">现在不用处理</div>
-              <div class="simple-action-summary">同步已完成，可以关闭页面或继续工作。Mac、OpenClaw 和共享仓库已对齐；以后要新增、安装或发布 skill，再用下面的“常用操作”。</div>
+              <div class="simple-action-summary">同步已完成，可以关闭页面或继续工作。Mac、OpenClaw 和共享仓库已对齐；以后要新增、安装或发布 skill，就从下面两个场景开始。</div>
             </div>
           </div>
           <div class="simple-action-done-line"><strong>安全边界：</strong>本页默认只操作当前 Mac；发布或跨设备写入前会再次确认。</div>
@@ -6517,7 +6517,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      $("workspace-overview-summary").textContent = `这里只是高级明细；常用操作请回到页面顶部。共享仓库和 ${text(deviceCount)} 台其他设备只读展示。`;
+      $("workspace-overview-summary").textContent = `这里只是高级明细；日常操作请回到页面顶部两个场景。共享仓库和 ${text(deviceCount)} 台其他设备只读展示。`;
     }
 
     function renderPlainDetails(dashboard) {
@@ -6581,7 +6581,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。普通操作请用页面顶部的“常用操作”。`;
+      $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。日常操作请用页面顶部两个场景。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");

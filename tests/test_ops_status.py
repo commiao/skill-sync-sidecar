@@ -739,7 +739,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("高级：工具目录、版本号、原始队列", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("这里只是高级明细；常用操作请回到页面顶部", DASHBOARD_HTML)
+            self.assertIn("这里只是高级明细；日常操作请回到页面顶部两个场景", DASHBOARD_HTML)
+            self.assertIn("日常操作请用页面顶部两个场景", DASHBOARD_HTML)
+            self.assertIn("就从下面两个场景开始", DASHBOARD_HTML)
+            self.assertNotIn("常用操作", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
                 DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
