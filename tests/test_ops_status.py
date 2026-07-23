@@ -995,6 +995,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("按下方推荐按钮走；详情可以稍后再看。", DASHBOARD_HTML)
             self.assertIn("检查一下", DASHBOARD_HTML)
             self.assertIn("保存 ${publishItems.length} 个更新", DASHBOARD_HTML)
+            self.assertIn("rerenderTopActionPanel", DASHBOARD_HTML)
+            self.assertIn("现在可以点“保存到共享库”完成同步", DASHBOARD_HTML)
             self.assertIn("还没改完？", DASHBOARD_HTML)
             self.assertIn("<button type=\"button\" onclick=\"deferSourceChangedItems()\">暂时搁置</button>", DASHBOARD_HTML)
             self.assertNotIn("暂时搁置<span>仅隐藏首页提醒。</span>", DASHBOARD_HTML)

@@ -6775,7 +6775,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!key) return;
       reviewTaskResults = { ...reviewTaskResults, [key]: result };
       renderReviewQueue(currentReviewQueueItems);
+      rerenderTopActionPanel();
+    }
+
+    function rerenderTopActionPanel() {
       if (window.lastDashboard) {
+        renderStatusStrip(window.lastDashboard, window.lastDashboard.health || "yellow");
         renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems);
       }
     }
@@ -7339,6 +7344,8 @@ DASHBOARD_HTML = r"""<!doctype html>
                 });
             });
             renderReviewQueue(currentReviewQueueItems);
+            rerenderTopActionPanel();
+            setReviewFeedback("green", "检查通过", "现在可以点“保存到共享库”完成同步。");
           }
           if (isPublish) {
             lastPublishReceipt = {
