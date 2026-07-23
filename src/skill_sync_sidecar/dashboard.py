@@ -4223,9 +4223,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .skill-inventory-row {
       display: grid;
-      grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.2fr) minmax(160px, .8fr);
+      grid-template-columns: minmax(200px, .9fr) minmax(260px, 1.1fr) minmax(170px, auto);
       gap: 10px;
-      align-items: center;
+      align-items: start;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
@@ -4250,10 +4250,59 @@ DASHBOARD_HTML = r"""<!doctype html>
       justify-items: start;
       min-width: 0;
     }
+    .skill-inventory-primary-action {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .skill-inventory-primary-action strong {
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-primary-action span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-primary-action.pending strong {
+      color: #a16207;
+    }
+    .skill-inventory-primary-action.ready strong {
+      color: #047857;
+    }
+    .skill-inventory-detail {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .skill-inventory-detail > summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-weight: 760;
+      list-style: none;
+    }
+    .skill-inventory-detail > summary::-webkit-details-marker {
+      display: none;
+    }
+    .skill-inventory-detail > summary::after {
+      content: "展开";
+      margin-left: 6px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .skill-inventory-detail[open] > summary::after {
+      content: "收起";
+    }
     .skill-tool-checks {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+      margin-top: 8px;
     }
     .skill-tool-check {
       border: 1px solid var(--line);
@@ -4302,6 +4351,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #a16207;
       font-weight: 760;
     }
+    .inventory-publish-button,
     .central-deprecate-button,
     .central-reactivate-button,
     .tool-install-button,
@@ -8469,6 +8519,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const installed = macInstalledToolIds(item);
       const pending = Number(item.pending || 0) > 0;
       const centralState = text((item.central || {}).state || "unpublished");
+      const installableTools = macInstallableTools(item, installed, centralState);
+      const uninstallableTools = macUninstallableTools(item, installed);
+      const recommendation = skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools);
       const toolChecks = skillInventoryTools().map((tool) => {
         const active = installed.has(tool.id);
         const canInstall = centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool);
@@ -8510,9 +8563,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishPath = macPublishSourcePath(item);
       const publishAction = centralState === "unpublished"
         ? (item.scope === "project"
-          ? `<span class="skill-tool-check">项目级暂不一键发布</span>`
+          ? `<span class="skill-tool-check">项目级随项目维护</span>`
           : (publishPath
-            ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布中央仓库</button>`
+            ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到共享库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
         : "";
       return `
@@ -8521,7 +8574,10 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
             <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
           </div>
-          <div class="skill-tool-checks">${toolChecks}</div>
+          <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
+            <strong>${escapeHtml(recommendation.title)}</strong>
+            <span>${escapeHtml(recommendation.detail)}</span>
+          </div>
           <div class="skill-inventory-action-row">
             <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
@@ -8529,8 +8585,70 @@ DASHBOARD_HTML = r"""<!doctype html>
             ${deprecateAction}
             ${reactivateAction}
           </div>
+          <details class="skill-inventory-detail">
+            <summary>选择本机工具和查看状态</summary>
+            <div class="skill-tool-checks">${toolChecks}</div>
+          </details>
         </article>
       `;
+    }
+
+    function skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools) {
+      const pending = Number(item.pending || 0);
+      if (pending > 0) {
+        return {
+          kind: "pending",
+          title: "先处理同步确认",
+          detail: `${pending} 项待确认；回到顶部任务卡，按推荐按钮走。`,
+        };
+      }
+      if (centralState === "deprecated") {
+        return {
+          kind: "muted",
+          title: "已废弃，默认不再安装",
+          detail: "需要重新使用时，先恢复发布状态。",
+        };
+      }
+      if (centralState === "unpublished") {
+        if (item.scope === "project") {
+          return {
+            kind: "muted",
+            title: "项目级 skill，随项目维护",
+            detail: "暂不发布成全局共享；在对应项目里使用和同步。",
+          };
+        }
+        if (macPublishSourcePath(item)) {
+          return {
+            kind: "ready",
+            title: "可发布到共享库",
+            detail: "先检查，再确认发布；发布后其他工具和设备才可安装。",
+          };
+        }
+        return {
+          kind: "muted",
+          title: "等待本机来源路径",
+          detail: "先让本机客户端扫描到这个 skill，再决定是否发布共享。",
+        };
+      }
+      if (Array.isArray(installableTools) && installableTools.length > 0) {
+        return {
+          kind: "ready",
+          title: "可安装到本机工具",
+          detail: `可安装到 ${installableTools.map((tool) => tool.label).join("、")}；展开后勾选即可。`,
+        };
+      }
+      if (Array.isArray(uninstallableTools) && uninstallableTools.length > 0) {
+        return {
+          kind: "ready",
+          title: "本机已可用",
+          detail: `已安装在 ${uninstallableTools.map((tool) => tool.label).join("、")}；展开后可取消勾选移除。`,
+        };
+      }
+      return {
+        kind: "muted",
+        title: "当前不用处理",
+        detail: "共享库已有版本；本机暂无可执行安装动作。",
+      };
     }
 
     function codexInstallStatus(item, installed, centralState) {
@@ -8626,7 +8744,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function inventoryActionText(item) {
       if (item.sync_state === "source_changed") return "改完后检查最新版本。";
       if (item.sync_state === "pending_publish") return "检查通过后可发布中央仓库。";
-      if ((item.central || {}).state === "unpublished") return "可选择发布到中央仓库。";
+      if ((item.central || {}).state === "unpublished") return "可选择发布到共享库。";
       return "可选择安装到本机工具。";
     }
 
