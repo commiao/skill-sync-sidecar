@@ -358,10 +358,10 @@ def _action_for_blocked_item(item: JsonDict) -> str:
     status_action = item.get("status_action")
     if category in {"delete", "delete_review"} or status_action == "local_deleted":
         if status_action == "local_deleted":
-            return "先从共享仓库找回到缺失设备；确认废弃时，再走单独删除审批。"
+            return "先从共享库找回到缺失设备；确认废弃时，再走单独删除审批。"
         if status_action == "remote_deleted":
-            return "先确认是否保留本机版本；需要保留时重新发布，需要废弃时接受共享仓库删除。"
-        return "先确认这是误删还是废弃；未确认前不要删除共享仓库版本。"
+            return "先确认是否保留本机版本；需要保留时重新发布，需要废弃时接受共享库删除。"
+        return "先确认这是误删还是废弃；未确认前不要删除共享库版本。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
         return "Review the local device change, then run approved-push for this skill if it should publish."
     if category == "writer_policy" and status_action in {"pull", "pull_new"}:

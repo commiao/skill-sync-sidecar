@@ -438,12 +438,12 @@ def _enrich_conflict_packages(packages: object) -> list[dict]:
         if package_path.exists() and package_path.is_dir():
             package["review"] = {
                 "local_label": "OpenClaw 版",
-                "remote_label": "共享仓库版",
+                "remote_label": "共享库版",
                 "base_label": "共同基线",
                 "local": _summarize_conflict_material(package_path / "local"),
                 "remote": _summarize_conflict_material(package_path / "remote"),
                 "base": _summarize_conflict_material(package_path / "base"),
-                "decision_hint": "先比较 OpenClaw 版和共享仓库版；确定哪边正确后，再选择写入动作。",
+                "decision_hint": "先比较 OpenClaw 版和共享库版；确定哪边正确后，再选择写入动作。",
             }
         enriched.append(package)
     return enriched
