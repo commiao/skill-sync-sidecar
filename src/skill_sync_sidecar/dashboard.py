@@ -7621,6 +7621,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? `批量安装到 ${toolLabel} 需要打开本机写入开关`
             : `先检查，再确认，把当前筛选结果安装到 ${toolLabel}`);
       });
+      document.querySelectorAll(".inventory-bulk-remove-button").forEach((button) => {
+        button.disabled = !available || !executorAllowLocalWrites || Number(button.dataset.count || 0) <= 0;
+        const toolLabel = button.dataset.toolLabel || "工具";
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowLocalWrites
+            ? `批量从 ${toolLabel} 移除需要打开本机写入开关`
+            : `先检查，再确认，把当前筛选结果从 ${toolLabel} 移除并保留备份`);
+      });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -8023,6 +8032,86 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (err) {
         setReviewFeedback("red", `批量安装到 ${toolLabel} 失败`, String(err));
         setExecutorStatus("failed", `批量安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function uninstallFilteredSkillsFromTool(button) {
+      const toolId = button.dataset.toolId || "";
+      const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
+      if (!tool) return;
+      const model = currentSkillInventoryModel || { items: [] };
+      const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
+      const candidates = bulkUninstallCandidatesForTool(filtered, tool);
+      const skillIds = candidates.map((item) => text(item.skill_id)).filter(Boolean);
+      if (skillIds.length === 0) {
+        setReviewFeedback("yellow", `没有可从 ${toolLabel} 移除的 skill`, "当前筛选结果里没有已安装到这个工具的 skill。");
+        setExecutorStatus("no changes", `没有可从 ${toolLabel} 移除的 skill。`, "yellow");
+        return;
+      }
+      if (!executorAvailable || !executorAllowLocalWrites) {
+        setReviewFeedback("yellow", `还不能批量从 ${toolLabel} 移除`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
+        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+        return;
+      }
+      const names = compactSkillList(skillIds);
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查批量从 ${toolLabel} 移除`, `检查只读；当前筛选结果会移除 ${names}。`);
+      setExecutorStatus("remove check", `正在检查从 ${toolLabel} 移除 ${skillIds.length} 个 skill。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: skillIds, tool_id: toolId }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_uninstall || Number(dryRunPayload.planned || 0) <= 0) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只从当前 Mac 的 ${toolLabel} 移走，并保留备份。共享库不会变化。`);
+        if (!confirmProtectedWrite({
+          word: "REMOVE",
+          title: `确认批量从 ${toolLabel} 移除`,
+          will: [
+            `把当前筛选结果里的 ${skillIds.length} 个 skill 从当前 Mac 的 ${toolLabel} 可发现目录移走。`,
+            `本次包括：${names}。`,
+            "把原目录放进 .skill-sync-removed 备份目录。",
+            "完成后自动刷新本机工具状态。",
+          ],
+          willNot: [
+            "不会删除共享库内容。",
+            "不会修改其他设备。",
+            `不会修改 ${toolLabel} 之外的其他工具目录。`,
+          ],
+        })) {
+          setExecutorStatus("cancelled", `批量从 ${toolLabel} 移除已取消。`, "yellow");
+          setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
+          return;
+        }
+        setReviewFeedback("yellow", `正在批量从 ${toolLabel} 移除`, `正在从当前 Mac 的 ${toolLabel} 移走，并保留备份。`);
+        setExecutorStatus("removing", `正在从 ${toolLabel} 移除 ${skillIds.length} 个 skill。`, "yellow");
+        const uninstallResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: skillIds, tool_id: toolId, confirm: "REMOVE" }),
+        });
+        const uninstallPayload = await uninstallResponse.json();
+        showExecutorOutput(formatExecutorResult(uninstallPayload));
+        if (!uninstallResponse.ok || !uninstallPayload.ok) {
+          throw new Error(executorErrorDetail(uninstallPayload));
+        }
+        setReviewFeedback("green", `已从 ${toolLabel} 移除`, `已处理 ${names}；文件已保留在移除备份目录，本机状态正在刷新。`);
+        setExecutorStatus("removed", `${skillIds.length} 个 skill 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", `批量从 ${toolLabel} 移除失败`, String(err));
+        setExecutorStatus("failed", `批量从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -8630,18 +8719,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       const target = $("skill-inventory-bulk-actions");
       if (!target) return;
       const items = Array.isArray(filtered) ? filtered : [];
-      const tools = skillInventoryLocalInstallTools()
+      const installTools = skillInventoryLocalInstallTools()
         .map((tool) => ({ tool, candidates: bulkInstallCandidatesForTool(items, tool) }))
         .filter((entry) => entry.candidates.length > 0);
-      if (tools.length === 0) {
+      const removeTools = skillInventoryLocalInstallTools()
+        .map((tool) => ({ tool, candidates: bulkUninstallCandidatesForTool(items, tool) }))
+        .filter((entry) => entry.candidates.length > 0);
+      if (installTools.length === 0 && removeTools.length === 0) {
         target.hidden = true;
         target.innerHTML = "";
         return;
       }
       target.hidden = false;
       target.innerHTML = [
-        `<span class="skill-inventory-bulk-label">批量安装当前筛选结果</span>`,
-        ...tools.map(({ tool, candidates }) => `
+        `<span class="skill-inventory-bulk-label">批量安装/移除当前筛选结果</span>`,
+        ...installTools.map(({ tool, candidates }) => `
           <button
             type="button"
             class="inventory-bulk-install-button"
@@ -8650,6 +8742,16 @@ DASHBOARD_HTML = r"""<!doctype html>
             data-count="${escapeHtml(text(candidates.length))}"
             onclick="installFilteredSkillsToTool(this)"
             disabled>安装到 ${escapeHtml(tool.label)} (${escapeHtml(text(candidates.length))})</button>
+        `),
+        ...removeTools.map(({ tool, candidates }) => `
+          <button
+            type="button"
+            class="inventory-bulk-remove-button"
+            data-tool-id="${escapeHtml(tool.id)}"
+            data-tool-label="${escapeHtml(tool.label)}"
+            data-count="${escapeHtml(text(candidates.length))}"
+            onclick="uninstallFilteredSkillsFromTool(this)"
+            disabled>从 ${escapeHtml(tool.label)} 移除 (${escapeHtml(text(candidates.length))})</button>
         `),
       ].join("");
     }
@@ -8662,6 +8764,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           && item.scope !== "project"
           && !installed.has(tool.id)
           && skillTargetsTool(item, tool);
+      });
+    }
+
+    function bulkUninstallCandidatesForTool(items, tool) {
+      return (Array.isArray(items) ? items : []).filter((item) => {
+        const installed = macInstalledToolIds(item);
+        return installed.has(tool.id);
       });
     }
 
