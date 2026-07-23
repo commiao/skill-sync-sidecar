@@ -4897,15 +4897,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (sourceChangedItems.length > 0) {
         title = sourceChangedItems.length === 1 ? `OpenClaw 还在改：${sourceChangedNames}` : `OpenClaw 还有 ${sourceChangedItems.length} 个新修改`;
-        summary = "这不是刚才发布失败，而是 OpenClaw 又产生了新版本。先别反复点发布；等那边停止修改后，再检查并发布最后一次。";
+        summary = "刚点过发布还剩它，通常表示发布已处理旧更新，但 OpenClaw 随后又产生了新版本；这不是按钮没反应。先别反复发布，等那边停止修改后再检查最后一次。";
         primaryActions = `
           <button type="button" class="primary" onclick="refresh(true)">刷新，看是否稳定<span>只重新读取状态，不写共享仓库。</span></button>
-          <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>已稳定，先检查<span>检查只读，不会发布。</span></button>
         `;
         facts = [
-          ["发生了什么", "OpenClaw 本地版本又变了。"],
+          ["发生了什么", "OpenClaw 本地版本又变了，旧更新大概率已发布。"],
           ["现在别做", "不要反复发布同一个正在修改的 skill。"],
-          ["什么时候发布", "等源端停止修改，再检查并发布。"],
+          ["下一步", "只刷新状态；稳定后页面会重新给出检查/发布入口。"],
           ["完成标准", "顶部显示“无待处理”。"],
         ];
         taskCards = `
