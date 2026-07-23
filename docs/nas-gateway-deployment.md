@@ -42,13 +42,18 @@ Health check:
 
 ```bash
 curl -sS http://<nas-ip>:8765/healthz
+curl -sS http://<nas-ip>:8765/api/overview
 curl -sS http://<nas-ip>:8765/api/summary
 curl -sS http://<nas-ip>:8765/api/status
 ```
 
-The browser dashboard refreshes from `/api/summary`, which keeps only the fields
-needed for the UI and avoids returning the full projection/debug payload on every
-poll. Use `/api/status` when you need the complete diagnostic JSON.
+Use `/api/overview` when you only need the current operator answer: health,
+blocked count, top issue, device status, and skill/tool counts. It deliberately
+omits per-skill inventories and per-tool `skill_items`.
+
+The browser dashboard refreshes from `/api/summary`, which keeps the fields
+needed for the UI workbench. Use `/api/status` when you need the complete
+diagnostic JSON.
 
 `/healthz` is intentionally lightweight: it reports process health and summary
 cache metadata without reading WebDAV. Docker health checks should use

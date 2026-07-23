@@ -451,6 +451,96 @@ def build_dashboard_summary(status: dict) -> dict:
     }
 
 
+def build_dashboard_overview(summary: dict) -> dict:
+    """Return a small operator overview without per-skill inventories."""
+    dashboard = summary.get("dashboard") if isinstance(summary.get("dashboard"), dict) else {}
+    remote_snapshot = summary.get("remote_snapshot") if isinstance(summary.get("remote_snapshot"), dict) else {}
+    sync_plan = summary.get("sync_plan") if isinstance(summary.get("sync_plan"), dict) else {}
+    daemon_state = summary.get("daemon_state") if isinstance(summary.get("daemon_state"), dict) else {}
+    inventory = dashboard.get("skill_inventory") if isinstance(dashboard.get("skill_inventory"), dict) else {}
+    return {
+        "ok": summary.get("ok"),
+        "health": summary.get("health"),
+        "service_health": summary.get("service_health"),
+        "mode": summary.get("mode"),
+        "writer_policy": summary.get("writer_policy"),
+        "remote_snapshot": {
+            "snapshot_id": remote_snapshot.get("snapshot_id"),
+            "created_at": remote_snapshot.get("created_at"),
+            "total": remote_snapshot.get("total"),
+        },
+        "daemon_state": {
+            "status": daemon_state.get("status"),
+            "daemon_status": daemon_state.get("daemon_status"),
+            "target": daemon_state.get("target"),
+            "writer_policy": daemon_state.get("writer_policy"),
+            "updated_at": daemon_state.get("updated_at"),
+        },
+        "sync_plan": {
+            "summary": sync_plan.get("summary"),
+            "allowed": sync_plan.get("allowed"),
+            "blocked": sync_plan.get("blocked"),
+            "safe_to_apply": sync_plan.get("safe_to_apply"),
+            "has_conflicts": sync_plan.get("has_conflicts"),
+        },
+        "dashboard": {
+            "health": dashboard.get("health"),
+            "blocked": dashboard.get("blocked"),
+            "operator": dashboard.get("operator"),
+            "blocked_items": dashboard.get("blocked_items", []),
+            "devices": dashboard.get("devices", []),
+            "planned_devices": dashboard.get("planned_devices", []),
+            "tools": dashboard.get("tools", []),
+            "device_tools": _compact_device_tools_overview(dashboard.get("device_tools")),
+            "skill_inventory": {
+                "total": inventory.get("total"),
+                "published": inventory.get("published"),
+                "unpublished": inventory.get("unpublished"),
+                "project": inventory.get("project"),
+                "deprecated": inventory.get("deprecated"),
+            },
+            "hub_import": _compact_hub_import(dashboard.get("hub_import")),
+        },
+        "summary_cache": summary.get("summary_cache"),
+    }
+
+
+def _compact_device_tools_overview(device_tools: object) -> list[dict]:
+    if not isinstance(device_tools, list):
+        return []
+    groups: list[dict] = []
+    for group in device_tools:
+        if not isinstance(group, dict):
+            continue
+        tools = group.get("tools") if isinstance(group.get("tools"), list) else []
+        groups.append(
+            {
+                "device_id": group.get("device_id"),
+                "device_name": group.get("device_name"),
+                "health": group.get("health"),
+                "reported": group.get("reported"),
+                "peer_status_version": group.get("peer_status_version"),
+                "last_seen_at": group.get("last_seen_at"),
+                "freshness": group.get("freshness"),
+                "note": group.get("note"),
+                "tools": [
+                    {
+                        "id": tool.get("id"),
+                        "name": tool.get("name"),
+                        "state": tool.get("state"),
+                        "skills": tool.get("skills"),
+                        "installed": tool.get("installed"),
+                        "risk": tool.get("risk"),
+                        "note": tool.get("note"),
+                    }
+                    for tool in tools
+                    if isinstance(tool, dict)
+                ],
+            }
+        )
+    return groups
+
+
 def _compact_hub_import(hub_import: object) -> dict:
     if not isinstance(hub_import, dict):
         return {}
@@ -1790,6 +1880,14 @@ def _handler_factory(
                 body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
                 self._send(status_code, "application/json; charset=utf-8", body)
                 return
+            if path == "/api/overview":
+                force = _query_has_force_refresh(self.path)
+                if force and force_refresh_provider is not None:
+                    force_refresh_provider()
+                status_code, payload = summary_cache.get_summary(force=force)
+                body = json.dumps(build_dashboard_overview(payload), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                self._send(status_code, "application/json; charset=utf-8", body)
+                return
             if path == "/healthz":
                 payload = {
                     "ok": True,
@@ -1827,7 +1925,7 @@ def _handler_factory(
             if path in {"", "/"}:
                 self._send(200, "text/html; charset=utf-8", b"")
                 return
-            if path in {"/api/status", "/api/summary"}:
+            if path in {"/api/status", "/api/summary", "/api/overview"}:
                 self._send(200, "application/json; charset=utf-8", b"")
                 return
             if path == "/healthz":

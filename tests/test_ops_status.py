@@ -15,6 +15,7 @@ from skill_sync_sidecar.dashboard import (
     DashboardConfig,
     DashboardSummaryCache,
     RemoteSnapshotCache,
+    build_dashboard_overview,
     build_dashboard_status,
     build_dashboard_summary,
     build_gateway_status,
@@ -1651,6 +1652,62 @@ class OpsStatusTest(unittest.TestCase):
             self.assertNotIn("actions", summary["dashboard"]["hub_import"]["action_plan"])
             self.assertLess(len(summary["dashboard"]["hub_import"]["items"]), 80)
             self.assertEqual(summary["dashboard"]["hub_import"]["items"][0]["skill_id"], "hub-0")
+
+    def test_dashboard_overview_omits_heavy_skill_lists(self):
+        summary = {
+            "ok": True,
+            "health": "yellow",
+            "service_health": "green",
+            "mode": "gateway",
+            "writer_policy": "read-only",
+            "remote_snapshot": {"snapshot_id": "snap-1", "created_at": "2026-07-23T00:00:00Z", "total": 2},
+            "daemon_state": {"status": "gateway", "daemon_status": "running", "target": "webdav-observer"},
+            "sync_plan": {"summary": {"observed": 2}, "allowed": 0, "blocked": 0, "safe_to_apply": False, "has_conflicts": False},
+            "dashboard": {
+                "health": "yellow",
+                "blocked": 1,
+                "operator": {"headline": "存在需要确认的同步项"},
+                "blocked_items": [{"skill_id": "demo", "category": "writer_policy"}],
+                "devices": [{"id": "mac", "health": "green"}],
+                "planned_devices": [{"id": "win", "health": "not_configured"}],
+                "tools": [{"id": "codex", "skills": 2}],
+                "device_tools": [
+                    {
+                        "device_id": "mac",
+                        "device_name": "Mac 本机",
+                        "health": "green",
+                        "reported": True,
+                        "tools": [
+                            {
+                                "id": "codex",
+                                "name": "Codex",
+                                "state": "detected",
+                                "skills": 2,
+                                "skill_items": [{"skill_id": "demo"}, {"skill_id": "heavy"}],
+                            }
+                        ],
+                    }
+                ],
+                "skill_inventory": {
+                    "total": 2,
+                    "published": 1,
+                    "unpublished": 1,
+                    "project": 0,
+                    "deprecated": 0,
+                    "items": [{"skill_id": "demo"}, {"skill_id": "heavy"}],
+                },
+            },
+            "summary_cache": {"state": "fresh"},
+        }
+
+        overview = build_dashboard_overview(summary)
+
+        self.assertEqual(overview["health"], "yellow")
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["total"], 2)
+        self.assertNotIn("items", overview["dashboard"]["skill_inventory"])
+        self.assertNotIn("skill_items", overview["dashboard"]["device_tools"][0]["tools"][0])
+        self.assertEqual(overview["dashboard"]["device_tools"][0]["tools"][0]["skills"], 2)
+        self.assertEqual(overview["summary_cache"]["state"], "fresh")
 
     def test_dashboard_summary_cache_returns_503_without_seed_when_provider_times_out(self):
         def slow_provider():
