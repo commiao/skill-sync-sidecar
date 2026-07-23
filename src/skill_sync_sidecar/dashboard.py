@@ -2568,6 +2568,31 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin: 12px 0;
       border-left: 4px solid #d8a300;
     }
+    .review-queue > summary.review-queue-head-summary {
+      cursor: pointer;
+      list-style: none;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+    .review-queue > summary.review-queue-head-summary::-webkit-details-marker {
+      display: none;
+    }
+    .review-queue > summary.review-queue-head-summary::after {
+      content: "展开详情";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 780;
+      margin-top: 4px;
+      white-space: nowrap;
+    }
+    .review-queue[open] > summary.review-queue-head-summary::after {
+      content: "收起详情";
+    }
+    .review-queue > summary.review-queue-head-summary .panel-head {
+      margin-bottom: 4px;
+    }
     .review-queue-summary {
       color: var(--muted);
       margin-bottom: 10px;
@@ -4846,15 +4871,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </section>
     </section>
-    <section id="review-queue-panel" class="review-queue panel" hidden>
+    <details id="review-queue-panel" class="review-queue panel" hidden>
+      <summary class="review-queue-head-summary">
       <div class="panel-head">
         <div>
           <div id="review-queue-label" class="section-label">需要确认</div>
           <h2 id="review-queue-title">确认清单</h2>
+          <div id="review-queue-summary" class="review-queue-summary"></div>
         </div>
         <span id="review-queue-count" class="pill">0</span>
       </div>
-      <div id="review-queue-summary" class="review-queue-summary"></div>
+      </summary>
       <div id="review-recommendation" class="review-recommendation"></div>
       <div id="review-progress" class="review-progress" aria-label="确认处理进度"></div>
       <div id="review-feedback" class="review-feedback" hidden>
@@ -4865,7 +4892,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <summary>查看详细清单</summary>
         <div id="review-queue" class="review-list"></div>
       </details>
-    </section>
+    </details>
     </details>
     </details>
     <details class="secondary-context">
@@ -5464,8 +5491,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
       let title = `现在先处理 ${blocked} 件事`;
-      let summary = `不用理解下面的状态数字。先点右侧按钮；真正写入、找回或删除前都会再次确认。`;
-      let primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">看看要处理什么<span>只打开详情，不会写入或删除。</span></button>`;
+      let summary = `按右侧推荐按钮走即可；真正写入、找回或删除前都会再次确认。`;
+      let primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看要处理什么<span>只打开确认清单，不会写入或删除。</span></button>`;
       let facts = [
         ["不会自动覆盖", "有风险时会停下来等你确认。"],
         ["先看再执行", "检查只读，发布前还要确认。"],
@@ -5568,7 +5595,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else if (deleteItems.length > 0) {
         title = `先看看 ${deleteItems.length} 个少掉的 skill`;
         summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是以后单独删除共享库版本。";
-        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">看看少了什么<span>只打开详情，不会删除。</span></button>`;
+        primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看少了什么<span>只打开确认清单，不会删除。</span></button>`;
         facts = [
           ["缺失项", `${deleteNames}。`],
           ["默认安全", "保留共享库。"],
@@ -5605,7 +5632,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       return `
         <details class="simple-action-more">
-          <summary>为什么这样建议</summary>
+          <summary>查看原因和涉及的 skill</summary>
           <div class="simple-action-more-body">
             ${factHtml}
             ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
@@ -6171,6 +6198,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     function openAdvancedDetails() {
       openSupportDrawer();
       const target = document.querySelector(".advanced-workspace");
+      if (!target) return;
+      target.open = true;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function openReviewDetails() {
+      openSupportDrawer();
+      const target = $("review-queue-panel");
       if (!target) return;
       target.open = true;
       target.scrollIntoView({ behavior: "smooth", block: "start" });

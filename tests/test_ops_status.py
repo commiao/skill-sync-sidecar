@@ -544,14 +544,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("decision-console", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
-                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+                DASHBOARD_HTML.index("<details id=\"review-queue-panel\""),
             )
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
                 DASHBOARD_HTML.index("<section class=\"scope-switchboard\""),
             )
             self.assertLess(
-                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+                DASHBOARD_HTML.index("<details id=\"review-queue-panel\""),
                 DASHBOARD_HTML.index("<section class=\"decision-console\""),
             )
             self.assertIn("id=\"operator-panel\"", DASHBOARD_HTML)
@@ -567,6 +567,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderSkillChips", DASHBOARD_HTML)
             self.assertIn("skill-chip-row", DASHBOARD_HTML)
             self.assertIn("id=\"review-queue-panel\"", DASHBOARD_HTML)
+            self.assertIn("summary class=\"review-queue-head-summary\"", DASHBOARD_HTML)
+            self.assertIn("展开详情", DASHBOARD_HTML)
+            self.assertIn("收起详情", DASHBOARD_HTML)
             self.assertIn("确认清单", DASHBOARD_HTML)
             self.assertIn("需要确认", DASHBOARD_HTML)
             self.assertIn("renderReviewQueue", DASHBOARD_HTML)
@@ -600,7 +603,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("只需要按顶部推荐按钮走", DASHBOARD_HTML)
             self.assertIn("renderSimpleActionMore", DASHBOARD_HTML)
             self.assertIn("simple-action-more", DASHBOARD_HTML)
-            self.assertIn("为什么这样建议", DASHBOARD_HTML)
+            self.assertIn("查看原因和涉及的 skill", DASHBOARD_HTML)
             self.assertIn("simple-action-more-body", DASHBOARD_HTML)
             self.assertNotIn("查看清单<span>需要时再看原始队列", DASHBOARD_HTML)
             self.assertNotIn("看详情<span>只展开清单", DASHBOARD_HTML)
@@ -703,6 +706,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("检查通过后按钮会变成“保存到共享库”", DASHBOARD_HTML)
             self.assertIn("renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems)", DASHBOARD_HTML)
             self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
+            self.assertIn("openReviewDetails", DASHBOARD_HTML)
             self.assertIn("openSupportDrawer", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
             self.assertIn("<details id=\"easy-workspace\" class=\"easy-workspace panel\"", DASHBOARD_HTML)
@@ -862,7 +866,7 @@ class OpsStatusTest(unittest.TestCase):
             )
             self.assertLess(
                 DASHBOARD_HTML.index("<section class=\"workspace-overview\""),
-                DASHBOARD_HTML.index("<section id=\"review-queue-panel\""),
+                DASHBOARD_HTML.index("<details id=\"review-queue-panel\""),
             )
             self.assertIn("id=\"workspace-overview-summary\"", DASHBOARD_HTML)
             self.assertIn("renderWorkspaceOverviewSummary", DASHBOARD_HTML)
@@ -949,7 +953,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("不会自动安装到 Mac、OpenClaw 或其他设备", DASHBOARD_HTML)
             self.assertIn("row(\"已废弃\"", DASHBOARD_HTML)
             self.assertIn("查看详细清单", DASHBOARD_HTML)
-            self.assertIn("为什么这样建议", DASHBOARD_HTML)
+            self.assertIn("查看原因和涉及的 skill", DASHBOARD_HTML)
             self.assertNotIn("<ol class=\"review-recommendation-steps\">", DASHBOARD_HTML)
             self.assertIn("data-tool-id", DASHBOARD_HTML)
             self.assertIn("skillInventoryLocalInstallTools", DASHBOARD_HTML)
