@@ -6783,13 +6783,14 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "恢复需要打开本机写入开关"
             : "先检查，再确认，把共享仓库版本恢复到 OpenClaw");
       });
-      document.querySelectorAll(".codex-install-button").forEach((button) => {
+      document.querySelectorAll(".tool-install-button, .codex-install-button").forEach((button) => {
         button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
+        const toolLabel = button.dataset.toolLabel || "工具";
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
-            ? "安装到 Codex 需要打开本机写入开关"
-            : "从共享仓库安装到当前 Mac 的 Codex");
+            ? `安装到 ${toolLabel} 需要打开本机写入开关`
+            : `从共享仓库安装到当前 Mac 的 ${toolLabel}`);
       });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
@@ -7034,67 +7035,76 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     async function installCentralSkillToCodex(button) {
+      button.dataset.toolId = button.dataset.toolId || "codex";
+      button.dataset.toolLabel = button.dataset.toolLabel || "Codex";
+      return installCentralSkillToTool(button);
+    }
+
+    async function installCentralSkillToTool(button) {
       const skillId = button.dataset.skillId || "";
+      const toolId = button.dataset.toolId || "";
+      const toolLabel = button.dataset.toolLabel || toolId || "工具";
       if (!skillId) return;
+      if (!toolId) return;
       if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", "还不能安装到 Codex", "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
-        setExecutorStatus("not ready", "本机助手还不能写入 Codex skill 目录。", "yellow");
+        setReviewFeedback("yellow", `还不能安装到 ${toolLabel}`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
+        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
         return;
       }
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查安装 ${skillId}`, "检查只读；先确认共享仓库版本能安装到当前 Mac 的 Codex。");
-      setExecutorStatus("install check", `正在检查从共享仓库安装 ${skillId} 到 Codex。`, "yellow");
+      setReviewFeedback("yellow", `正在检查安装 ${skillId}`, `检查只读；先确认共享仓库版本能安装到当前 Mac 的 ${toolLabel}。`);
+      setExecutorStatus("install check", `正在检查从共享仓库安装 ${skillId} 到 ${toolLabel}。`, "yellow");
       try {
-        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-codex-install-from-central-dry-run`, {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central-dry-run`, {
           method: "POST",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skill_ids: [skillId] }),
+          body: JSON.stringify({ skill_ids: [skillId], tool_id: toolId }),
         });
         const dryRunPayload = await dryRunResponse.json();
         showExecutorOutput(formatExecutorResult(dryRunPayload));
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，会只安装到当前 Mac 的 Codex。共享仓库和其他工具不会被修改。");
+        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会只安装到当前 Mac 的 ${toolLabel}。共享仓库和其他工具不会被修改。`);
         if (!confirmProtectedWrite({
           word: "INSTALL",
-          title: `确认安装到 Codex：${skillId}`,
+          title: `确认安装到 ${toolLabel}：${skillId}`,
           will: [
-            `把共享仓库里的 ${skillId} 安装到当前 Mac 的 ~/.codex/skills。`,
+            `把共享仓库里的 ${skillId} 安装到当前 Mac 的 ${toolLabel}。`,
             "只处理这一个 skill。",
             "完成后自动刷新本机工具状态。",
           ],
           willNot: [
             "不会发布或删除共享仓库内容。",
-            "不会修改 cc-switch、skillshub、Cursor 或 OpenClaw。",
-            "不会安装项目级 skill 到全局 Codex。",
+            `不会修改 ${toolLabel} 之外的其他工具目录。`,
+            "不会安装项目级 skill 到全局工具目录。",
           ],
         })) {
-          setExecutorStatus("cancelled", "安装到 Codex 已取消。", "yellow");
-          setReviewFeedback("yellow", "已取消", "没有写入 Codex 目录。");
+          setExecutorStatus("cancelled", `安装到 ${toolLabel} 已取消。`, "yellow");
+          setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
           return;
         }
-        setReviewFeedback("yellow", `正在安装 ${skillId}`, "正在写入当前 Mac 的 Codex skill 目录；原目录会由安装计划保留备份。");
-        setExecutorStatus("installing", `正在安装 ${skillId} 到 Codex。`, "yellow");
-        const installResponse = await fetch(`${EXECUTOR_URL}/api/mac-codex-install-from-central`, {
+        setReviewFeedback("yellow", `正在安装 ${skillId}`, `正在写入当前 Mac 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
+        setExecutorStatus("installing", `正在安装 ${skillId} 到 ${toolLabel}。`, "yellow");
+        const installResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central`, {
           method: "POST",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skill_ids: [skillId], confirm: "INSTALL" }),
+          body: JSON.stringify({ skill_ids: [skillId], tool_id: toolId, confirm: "INSTALL" }),
         });
         const installPayload = await installResponse.json();
         showExecutorOutput(formatExecutorResult(installPayload));
         if (!installResponse.ok || !installPayload.ok) {
           throw new Error(executorErrorDetail(installPayload));
         }
-        setReviewFeedback("green", `${skillId} 已安装到 Codex`, "本机状态正在刷新；Skill 清单里 Codex 标记会变成已安装。");
-        setExecutorStatus("installed", `${skillId} 已安装到当前 Mac 的 Codex。`, "green");
+        setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
+        setExecutorStatus("installed", `${skillId} 已安装到当前 Mac 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
-        setReviewFeedback("red", "安装到 Codex 失败", String(err));
-        setExecutorStatus("failed", "安装到 Codex 失败，请查看执行输出。", "red");
+        setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
+        setExecutorStatus("failed", `安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -7469,7 +7479,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       const installed = new Set(Array.isArray(item.installed_tools) ? item.installed_tools : []);
       const pending = Number(item.pending || 0) > 0;
       const centralState = text((item.central || {}).state || "unpublished");
-      const canInstallCodex = centralState === "published" && item.scope !== "project" && !installed.has("codex");
       const toolChecks = skillInventoryTools().map((tool) => {
         const active = installed.has(tool.id);
         const cls = active ? "installed" : "";
@@ -7477,9 +7486,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         return `<span class="skill-tool-check ${cls}" title="${escapeHtml(active ? "已安装" : "未安装")}">${mark} ${escapeHtml(tool.label)}</span>`;
       }).join("");
       const stateClass = pending ? "pending" : (centralState === "published" ? "installed" : "");
-      const codexAction = canInstallCodex
-        ? `<button type="button" class="codex-install-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="installCentralSkillToCodex(this)" disabled>安装到 Codex</button>`
-        : `<span class="skill-tool-check ${installed.has("codex") ? "installed" : ""}">${escapeHtml(codexInstallStatus(item, installed, centralState))}</span>`;
+      const installableTools = macInstallableTools(item, installed, centralState);
+      const installAction = installableTools.length > 0
+        ? installableTools.map((tool) => {
+          const cls = tool.id === "codex" ? "tool-install-button codex-install-button" : "tool-install-button";
+          return `<button type="button" class="${cls}" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" onclick="installCentralSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`;
+        }).join("")
+        : `<span class="skill-tool-check">${escapeHtml(toolInstallStatus(item, installed, centralState))}</span>`;
       return `
         <article class="skill-inventory-row">
           <div>
@@ -7490,7 +7503,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="skill-inventory-action-row">
             <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
-            ${codexAction}
+            ${installAction}
           </div>
         </article>
       `;
@@ -7503,14 +7516,40 @@ DASHBOARD_HTML = r"""<!doctype html>
       return "可安装到 Codex";
     }
 
+    function toolInstallStatus(item, installed, centralState) {
+      if (centralState !== "published") return "先发布中央仓库";
+      if (item.scope === "project") return "项目级不装全局";
+      const localTools = skillInventoryLocalInstallTools();
+      const allInstalled = localTools.every((tool) => installed.has(tool.id) || !skillTargetsTool(item, tool));
+      if (allInstalled) return "本机兼容工具已安装";
+      return "暂无可安装工具";
+    }
+
+    function macInstallableTools(item, installed, centralState) {
+      if (centralState !== "published" || item.scope === "project") return [];
+      return skillInventoryLocalInstallTools()
+        .filter((tool) => !installed.has(tool.id) && skillTargetsTool(item, tool));
+    }
+
+    function skillTargetsTool(item, tool) {
+      const targets = Array.isArray((item.central || {}).targets) ? (item.central || {}).targets : [];
+      if (targets.length === 0) return true;
+      const normalized = new Set(targets.map((target) => text(target).toLowerCase()).filter(Boolean));
+      return tool.aliases.some((alias) => normalized.has(alias));
+    }
+
+    function skillInventoryLocalInstallTools() {
+      return skillInventoryTools().filter((tool) => tool.localInstall);
+    }
+
     function skillInventoryTools() {
       return [
-        { id: "codex", label: "Codex" },
-        { id: "claude-code", label: "Claude" },
-        { id: "cursor", label: "Cursor" },
-        { id: "cc-switch", label: "cc-switch" },
-        { id: "skillshub", label: "skillshub" },
-        { id: "openclaw", label: "OpenClaw" },
+        { id: "codex", label: "Codex", aliases: ["codex"], localInstall: true },
+        { id: "claude-code", label: "Claude", aliases: ["claude-code", "claude"], localInstall: true },
+        { id: "cursor", label: "Cursor", aliases: ["cursor"], localInstall: true },
+        { id: "cc-switch", label: "cc-switch", aliases: ["cc-switch"], localInstall: true },
+        { id: "skillshub", label: "skillshub", aliases: ["skillshub"], localInstall: true },
+        { id: "openclaw", label: "OpenClaw", aliases: ["openclaw"], localInstall: false },
       ];
     }
 

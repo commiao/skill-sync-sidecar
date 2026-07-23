@@ -24,6 +24,7 @@ from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
     run_mac_codex_install_from_central,
+    run_mac_tool_install_from_central,
     run_openclaw_approved_push_batch,
     run_openclaw_conflict_package,
 )
@@ -891,8 +892,15 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("Codex 已安装", DASHBOARD_HTML)
             self.assertIn("项目级不装全局", DASHBOARD_HTML)
             self.assertIn("installCentralSkillToCodex", DASHBOARD_HTML)
-            self.assertIn("/api/mac-codex-install-from-central-dry-run", DASHBOARD_HTML)
-            self.assertIn("/api/mac-codex-install-from-central", DASHBOARD_HTML)
+            self.assertIn("installCentralSkillToTool", DASHBOARD_HTML)
+            self.assertIn("/api/mac-tool-install-from-central-dry-run", DASHBOARD_HTML)
+            self.assertIn("/api/mac-tool-install-from-central", DASHBOARD_HTML)
+            self.assertIn("安装到 ${escapeHtml(tool.label)}", DASHBOARD_HTML)
+            self.assertIn("data-tool-id", DASHBOARD_HTML)
+            self.assertIn("skillInventoryLocalInstallTools", DASHBOARD_HTML)
+            self.assertIn("macInstallableTools", DASHBOARD_HTML)
+            self.assertIn("toolInstallStatus", DASHBOARD_HTML)
+            self.assertIn("本机兼容工具已安装", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"skill-inventory-list\""),
                 DASHBOARD_HTML.index("installCentralSkillToCodex"),
@@ -1749,13 +1757,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in payload["tools"]))
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
 
-    def test_mac_codex_install_from_central_uses_home_scoped_paths(self):
+    def test_mac_tool_install_from_central_uses_home_scoped_paths(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             remote_source = root / "remote-source"
             remote_snapshot = root / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
             codex_root = root / ".codex" / "skills"
+            cursor_root = root / ".cursor" / "skills-cursor"
             self._write_skill(remote_source / "demo", "demo", "Demo skill")
+            (remote_source / "demo" / "manifest.json").write_text(
+                '{"protocol_version":0,"scope":"global","targets":["codex","cursor"]}',
+                encoding="utf-8",
+            )
             write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
 
             with patch("skill_sync_sidecar.operator_executor.Path.home", return_value=root):
@@ -1766,18 +1779,23 @@ class OpsStatusTest(unittest.TestCase):
                 self.assertEqual(preview["target"], "codex-global")
                 self.assertEqual(preview["target_root"], str(codex_root.resolve()))
                 self.assertEqual(preview["planned"], 1)
+                self.assertEqual(preview["tool_id"], "codex")
                 self.assertFalse((codex_root / "demo" / "SKILL.md").exists())
 
                 with self.assertRaises(OperatorExecutorError):
-                    run_mac_codex_install_from_central(["demo"], yes=True, allow_local_writes=False)
+                    run_mac_tool_install_from_central("cursor", ["demo"], yes=True, allow_local_writes=False)
+                with self.assertRaises(OperatorExecutorError):
+                    run_mac_tool_install_from_central("not-a-tool", ["demo"], yes=False)
 
-                result = run_mac_codex_install_from_central(["demo"], yes=True, allow_local_writes=True)
+                result = run_mac_tool_install_from_central("cursor", ["demo"], yes=True, allow_local_writes=True)
 
             self.assertTrue(result["ok"])
-            self.assertEqual(result["operation"], "mac-codex-install-from-central")
-            self.assertEqual(result["target"], "codex-global")
+            self.assertEqual(result["operation"], "mac-tool-install-from-central")
+            self.assertEqual(result["tool_id"], "cursor")
+            self.assertEqual(result["tool_name"], "Cursor")
+            self.assertEqual(result["target"], "cursor-global")
             self.assertEqual(result["restored"], 1)
-            self.assertTrue((codex_root / "demo" / "SKILL.md").exists())
+            self.assertTrue((cursor_root / "demo" / "SKILL.md").exists())
 
     def test_publish_peer_status_can_publish_existing_peer_file(self):
         with TemporaryDirectory() as tmp:

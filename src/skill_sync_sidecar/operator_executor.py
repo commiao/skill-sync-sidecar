@@ -18,6 +18,13 @@ from .tool_status import build_device_tool_status
 
 
 SKILL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
+    "cc-switch": ("cc-switch-global", (".cc-switch", "skills"), "cc-switch"),
+    "skillshub": ("skillshub-global", (".skillshub",), "skillshub"),
+    "codex": ("codex-global", (".codex", "skills"), "Codex"),
+    "cursor": ("cursor-global", (".cursor", "skills-cursor"), "Cursor"),
+    "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),
+}
 
 
 class OperatorExecutorError(RuntimeError):
@@ -153,17 +160,32 @@ def run_mac_codex_install_from_central(
     yes: bool = False,
     allow_local_writes: bool = False,
 ) -> dict:
+    return run_mac_tool_install_from_central("codex", skill_ids, yes=yes, allow_local_writes=allow_local_writes)
+
+
+def run_mac_tool_install_from_central(
+    tool_id: str,
+    skill_ids: Sequence[str],
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+) -> dict:
+    normalized_tool_id = _normalize_tool_id(tool_id)
+    target, root_parts, label = MAC_TOOL_INSTALL_TARGETS[normalized_tool_id]
     if yes and not allow_local_writes:
-        raise OperatorExecutorError("Codex install is disabled; start operator-executor with --allow-local-writes")
+        raise OperatorExecutorError(f"{label} install is disabled; start operator-executor with --allow-local-writes")
+    target_root = Path.home().joinpath(*root_parts)
     result = restore_from_central(
-        Path.home() / ".codex" / "skills",
+        target_root,
         Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
         skill_ids,
-        target="codex-global",
+        target=target,
         remote_prefix=os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac"),
         yes=yes,
     )
-    result["operation"] = "mac-codex-install-from-central"
+    result["operation"] = "mac-tool-install-from-central"
+    result["tool_id"] = normalized_tool_id
+    result["tool_name"] = label
     return result
 
 
@@ -368,6 +390,15 @@ def _normalize_skill_ids(skill_ids: Sequence[str]) -> list[str]:
     return result
 
 
+def _normalize_tool_id(tool_id: object) -> str:
+    normalized = str(tool_id or "").strip().lower()
+    if normalized == "claude":
+        normalized = "claude-code"
+    if normalized not in MAC_TOOL_INSTALL_TARGETS:
+        raise OperatorExecutorError(f"unsupported Mac tool id: {normalized or '<empty>'}")
+    return normalized
+
+
 def _last_json_object(text: str) -> Optional[dict]:
     decoder = JSONDecoder()
     found: Optional[dict] = None
@@ -517,6 +548,25 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     result["peer_status_refresh"] = refresh
                     self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
                     return
+                if path == "/api/mac-tool-install-from-central-dry-run":
+                    result = run_mac_tool_install_from_central(_payload_tool_id(payload), skill_ids or [], yes=False)
+                    self._send_json(200, result)
+                    return
+                if path == "/api/mac-tool-install-from-central":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "INSTALL":
+                        self._send_json(400, {"ok": False, "error": "confirm must be INSTALL"})
+                        return
+                    result = run_mac_tool_install_from_central(
+                        _payload_tool_id(payload),
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
                 if path == "/api/openclaw-central-restore-dry-run":
                     result = run_openclaw_central_restore(repo, skill_ids or [], yes=False)
                     self._send_json(200 if result["ok"] else 500, result)
@@ -653,6 +703,12 @@ def _payload_tool_ids(payload: object) -> list[str]:
     if not isinstance(raw, list):
         raise OperatorExecutorError("tool_ids must be a list")
     return [str(item) for item in raw if str(item).strip()]
+
+
+def _payload_tool_id(payload: object) -> str:
+    if not isinstance(payload, dict):
+        raise OperatorExecutorError("payload must be a JSON object")
+    return _normalize_tool_id(payload.get("tool_id"))
 
 
 def _local_publish_remote():
