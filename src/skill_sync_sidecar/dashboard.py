@@ -6903,6 +6903,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       openTechnicalWorkspace();
     }
 
+    function showLocalSkillPublishGateHelp() {
+      setLocalSkillStatus("publish locked", "保存权限未开启；当前不会写共享库。", "yellow");
+      if (lastLocalSkillAnalysis) {
+        $("local-skill-result").textContent = `${lastLocalSkillAnalysis.skill_id}：当前可以先检查共享；保存到共享库需要先开启保存权限。`;
+      }
+      showPublishGateHelp();
+    }
+
     function openTechnicalWorkspace() {
       openSupportDrawer();
       const advanced = document.querySelector(".advanced-workspace");
@@ -7772,13 +7780,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if (localSkillPublishCheck) localSkillPublishCheck.disabled = !available || !lastLocalSkillAnalysis;
       if (localSkillPublish) {
-        localSkillPublish.disabled = !available || !executorAllowPublish || !lastLocalSkillAnalysis;
+        setButtonLabel(
+          localSkillPublish,
+          !available
+            ? "等待本机助手"
+            : (!lastLocalSkillAnalysis
+              ? "发布到共享库"
+              : (!executorAllowPublish ? "开启保存权限" : "发布到共享库")),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!lastLocalSkillAnalysis
+              ? ""
+              : (!executorAllowPublish ? "查看说明；不会写共享库。" : "会要求输入 PUBLISH。")),
+        );
+        localSkillPublish.disabled = !available || !lastLocalSkillAnalysis;
         localSkillPublish.title = !available
           ? "本机助手未在线"
           : (!lastLocalSkillAnalysis
             ? "请先分析一个本地 skill"
             : (!executorAllowPublish
-              ? "发布开关未打开；当前只能检查"
+              ? "保存权限未开启；点击查看开启方法"
               : "发布到共享库"));
       }
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
@@ -9754,7 +9775,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function publishLocalSkill(realPublish) {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (realPublish && !executorAllowPublish) {
-        renderLocalSkillError("当前只能检查，不能发布到共享库。请打开发布开关后再试。");
+        showLocalSkillPublishGateHelp();
         return;
       }
       if (realPublish) {

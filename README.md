@@ -43,6 +43,7 @@ For day-to-day use, open the dashboard and start from the first card:
 1. If the card says **现在不用做任何事**, leave it alone.
 2. To add a local skill, click **管理本机 skill**, paste a skill folder or `SKILL.md` path, then follow the three visible steps: **开始** -> **安装到本机工具** -> **发布到共享库**.
 3. To publish a device update, click the card's recommended button. The dashboard first runs a read-only check, then asks for confirmation before writing to the shared library.
+4. If a publish action says **开启保存权限**, the dashboard is still safe to use: it will show the local executor setup note and will not write the shared library.
 
 Sidecar infers metadata, scope, targets, risk, and install destinations. Users should not hand-write metadata files, copy files between tool roots, or remember low-level flags.
 
