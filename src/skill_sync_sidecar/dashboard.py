@@ -3996,15 +3996,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div class="easy-workspace-head">
         <div class="easy-workspace-title">
           <strong>你想做什么？</strong>
-          <span>选一个场景即可。本页默认只操作当前 Mac；同步到其他设备前会再次确认。</span>
+          <span>选一个入口即可。本页默认只操作当前 Mac；同步到其他设备前会再次确认。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </div>
       <div class="easy-workspace-grid">
         <div class="easy-card">
-          <div class="easy-card-label">场景 1</div>
+          <div class="easy-card-label">新增/安装</div>
           <h2>让某个 skill 在本机可用</h2>
-          <p>放入一个 skill 文件夹或 SKILL.md，sidecar 会判断能安装到哪些本机工具。</p>
+          <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">本地 skill 路径</div>
@@ -4024,19 +4024,19 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         </div>
         <div class="easy-card">
-          <div class="easy-card-label">场景 2</div>
+          <div class="easy-card-label">同步更新</div>
           <h2>把已确认的更新同步出去</h2>
-          <p>有待确认更新时，这里会出现“先检查”和“同步到其他设备”。没有待办时不用点任何按钮。</p>
-          <div id="easy-sync-empty" class="easy-sync-empty">当前无需同步。页面顶部显示“无待处理”时，可以关闭页面或继续工作。</div>
+          <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有待办时不用点任何按钮。</p>
+          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。页面顶部显示“无待处理”时，可以关闭页面或继续工作。</div>
           <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
             <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
             <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>同步到其他设备</button>
           </div>
-          <ol class="easy-steps" aria-label="发布流程">
-            <li><strong>1</strong><span>刷新当前 Mac 上的 skill 和工具目录。</span></li>
-            <li><strong>2</strong><span>先看会同步哪些 skill；这一步不会写入。</span></li>
-            <li><strong>3</strong><span>确认同步；看到“无待处理”才算完成。</span></li>
+          <ol id="easy-sync-steps" class="easy-steps" aria-label="发布流程" hidden>
+            <li><strong>1</strong><span>先检查会同步哪些 skill；这一步不会写入。</span></li>
+            <li><strong>2</strong><span>确认同步；发布前还会要求输入确认词。</span></li>
+            <li><strong>3</strong><span>看到“无待处理”才算完成。</span></li>
           </ol>
         </div>
       </div>
@@ -4733,7 +4733,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="simple-action-summary">同步已完成，可以关闭页面或继续工作。Mac、OpenClaw 和共享仓库已对齐；以后要新增、安装或发布 skill，就从下面两个场景开始。</div>
             </div>
           </div>
-          <div class="simple-action-done-line"><strong>安全边界：</strong>本页默认只操作当前 Mac；发布或跨设备写入前会再次确认。</div>
+          <div class="simple-action-done-line"><strong>放心：</strong>本页不会自动改其他设备；发布或跨设备写入前都会再问你。</div>
         `;
         setExecutorButtons(executorAvailable);
         return;
@@ -6011,14 +6011,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("easy-publish").disabled = !canPublishApprovedPush;
       const easySyncActions = $("easy-sync-actions");
       const easySyncEmpty = $("easy-sync-empty");
+      const easySyncSteps = $("easy-sync-steps");
       if (easySyncActions && easySyncEmpty) {
         const showSyncActions = actionSkills.length > 0;
         easySyncActions.hidden = !showSyncActions;
         easySyncActions.classList.toggle("ready", showSyncActions);
         easySyncEmpty.classList.toggle("has-work", showSyncActions);
+        if (easySyncSteps) easySyncSteps.hidden = !showSyncActions;
         easySyncEmpty.textContent = showSyncActions
           ? "检测到待确认更新。先检查，确认安全后再同步到其他设备。"
-          : "当前无需同步。页面顶部显示“无待处理”时，可以关闭页面或继续工作。";
+          : "当前没有待同步更新。页面顶部显示“无待处理”时，可以关闭页面或继续工作。";
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
