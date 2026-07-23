@@ -953,8 +953,8 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
     if health == "green":
         return {
             "state": "green",
-            "title": "现在不用处理",
-            "summary": "当前没有需要你处理的同步事项。需要新增、安装或同步 skill 时，回到页面顶部两个入口。",
+            "title": "同步已完成",
+            "summary": "Mac、OpenClaw、共享仓库当前已对齐。需要新增、安装或同步 skill 时，展开“可选：新增或同步 skill”。",
             "steps": [
                 {
                     "title": "继续观察",
@@ -4066,7 +4066,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 管理</h1>
-      <div class="brand-subtitle">先看顶部结论；无待办时可以直接关闭。要新增或同步 skill，再选下面入口。</div>
+      <div class="brand-subtitle">先看顶部结论；显示“同步已完成”就可以关闭。要新增或同步 skill，再展开可选操作。</div>
     </div>
     <div class="toolbar">
       <span id="updated">读取中</span>
@@ -4111,7 +4111,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="easy-card-label">同步更新</div>
           <h2>把已确认的更新同步出去</h2>
           <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有待办时不用点任何按钮。</p>
-          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。页面顶部显示“无待处理”时，可以关闭页面或继续工作。</div>
+          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“同步已完成”时，可以关闭页面或继续工作。</div>
           <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
             <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
@@ -4137,7 +4137,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="status-chip focus-side">
           <div class="focus-side-actions">
             <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
+            <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查同步</button>
           </div>
           <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；共享仓库和其他设备只读。</div>
           <div class="focus-metrics" aria-label="同步范围摘要">
@@ -4198,7 +4198,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               </div>
               <div class="workspace-metric">
                 <div id="local-workspace-blocked" class="workspace-metric-value">-</div>
-                <div class="workspace-metric-label">本机待处理</div>
+                <div class="workspace-metric-label">需我确认</div>
               </div>
               <div class="workspace-metric">
                 <div id="local-workspace-source" class="workspace-metric-value">-</div>
@@ -4237,8 +4237,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section id="review-queue-panel" class="review-queue panel" hidden>
       <div class="panel-head">
         <div>
-          <div id="review-queue-label" class="section-label">待办任务</div>
-          <h2 id="review-queue-title">待审批清单</h2>
+          <div id="review-queue-label" class="section-label">需要确认</div>
+          <h2 id="review-queue-title">确认清单</h2>
         </div>
         <span id="review-queue-count" class="pill">0</span>
       </div>
@@ -4267,7 +4267,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，发布也必须你明确确认。</div>
         <div class="scope-card-actions">
           <button id="scope-scan" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查待发布</button>
+          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查同步</button>
           <button id="scope-publish" type="button" onclick="runExecutorAction('publish')" disabled>发布共享仓库</button>
         </div>
       </div>
@@ -4607,7 +4607,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("strip-devices").textContent = text(deviceCount);
       const stripDryRun = $("strip-dry-run");
       if (stripDryRun) {
-        stripDryRun.textContent = conflictOnly ? "先看差异" : (breakdown.sourceChanged > 0 ? "刷新状态" : "检查待发布");
+        stripDryRun.textContent = conflictOnly ? "先看差异" : (breakdown.sourceChanged > 0 ? "刷新状态" : "检查同步");
         stripDryRun.onclick = conflictOnly ? runFirstConflictPackage : (breakdown.sourceChanged > 0 ? (() => refresh(true)) : (() => runExecutorAction("dry_run")));
       }
       if (conflictOnly) {
@@ -4829,8 +4829,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="simple-action-hero">
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
-              <div class="simple-action-title">现在不用处理</div>
-              <div class="simple-action-summary">当前没有需要你处理的同步事项，可以关闭页面或继续工作。以后要新增、安装或发布 skill，就用下面两个入口。</div>
+              <div class="simple-action-title">同步已完成</div>
+              <div class="simple-action-summary">Mac、OpenClaw、共享仓库当前已对齐。你可以关闭页面；需要新增、安装或主动同步 skill 时，再展开“可选：新增或同步 skill”。</div>
             </div>
           </div>
           <div class="simple-action-done-line"><strong>放心：</strong>本页不会自动改其他设备；发布或跨设备写入前都会再问你。</div>
@@ -6079,7 +6079,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const chips = visible
         .map((skill) => `<span class="skill-chip">${escapeHtml(text(skill))}</span>`)
         .join("");
-      const more = hidden > 0 ? `<span class="skill-more">另 ${hidden} 个，见待审批清单</span>` : "";
+      const more = hidden > 0 ? `<span class="skill-more">另 ${hidden} 个，见确认清单</span>` : "";
       return `<div class="skill-chip-row" aria-label="涉及 skill">${chips}${more}</div>`;
     }
 
@@ -6183,7 +6183,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? (sourceChangedCount > 0
             ? "OpenClaw 还在产生新修改。先等源端稳定；确定稳定后再检查同步。"
             : "检测到待确认更新。先检查，确认安全后再同步到其他设备。")
-          : "当前没有待同步更新。页面顶部显示“无待处理”时，可以关闭页面或继续工作。";
+          : "当前没有待同步更新。顶部显示“同步已完成”时，可以关闭页面或继续工作。";
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
@@ -6745,7 +6745,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           title: "Mac 本机",
           state: local.health || "green",
           line: "本机可以扫描、安装和显式发布 skill。",
-          action: Number(local.blocked || 0) > 0 ? "有本机待处理项。" : "当前不用处理本机。",
+          action: Number(local.blocked || 0) > 0 ? "有需要你确认的本机事项。" : "当前不用处理本机。",
         },
         {
           title: "共享仓库",
