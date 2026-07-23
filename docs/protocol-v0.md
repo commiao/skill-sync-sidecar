@@ -118,6 +118,32 @@ WebDAV is treated as object storage. Clients should use atomic-ish writes where 
 
 When WebDAV servers do not provide strong atomic operations, clients must prefer append-only revision objects and treat `latest.json` as a pointer that can be retried.
 
+## Skill Lifecycle
+
+Central snapshots may mark a skill as deprecated without deleting its archive:
+
+```json
+{
+  "skill_id": "old-skill",
+  "content_hash": "...",
+  "archive": "skills/cc-switch/old-skill/<hash>.zip",
+  "lifecycle": {
+    "state": "deprecated",
+    "deprecated_at": "2026-07-23T00:00:00Z",
+    "deprecated_by": "mac",
+    "reason": "replaced by new-skill"
+  }
+}
+```
+
+Lifecycle states:
+
+- `published`: the default when no lifecycle state is present.
+- `deprecated`: do not offer as a new install target, but keep the archive for audit and recovery.
+- `unpublished`: local/device-only inventory item, not present in the central snapshot.
+
+Deprecation is not deletion. A deprecate operation updates `index.json` only and must keep the referenced `skills/.../<content-hash>.zip` object intact. Existing devices are not auto-uninstalled; removal from a local tool root is a separate current-device action with its own confirmation and backup.
+
 ## Peer Status
 
 Peer devices publish operational status documents to WebDAV for read-only gateways. Peer status v1 adds device metadata, capability flags, and per-device `tools[]` measurements so the Gateway does not infer Mac/OpenClaw/Windows tool installs from the NAS container.
