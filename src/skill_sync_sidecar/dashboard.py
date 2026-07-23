@@ -3599,7 +3599,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .local-skill-input-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px;
       align-items: center;
     }
@@ -3617,6 +3617,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: var(--muted);
       font-size: 12px;
       overflow-wrap: anywhere;
+    }
+    .local-skill-followup {
+      display: none;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: center;
+    }
+    .local-skill-followup.ready {
+      display: grid;
+    }
+    .local-skill-followup button {
+      width: 100%;
     }
     .local-skill-tools {
       display: grid;
@@ -3765,6 +3777,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workbench-grid { grid-template-columns: 1fr; }
       .plain-detail-grid { grid-template-columns: 1fr; }
       .local-skill-input-row { grid-template-columns: 1fr; }
+      .local-skill-followup.ready { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
@@ -3852,6 +3865,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
       .local-skill-input-row { grid-template-columns: 1fr; gap: 6px; }
+      .local-skill-followup.ready { grid-template-columns: 1fr; gap: 6px; }
       .local-skill-input-row input { height: 32px; }
       .local-skill-tools { grid-template-columns: 1fr; max-height: 86px; overflow: hidden; }
       .local-action-note,
@@ -3972,7 +3986,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">场景 1</div>
           <h2>让某个 skill 在本机可用</h2>
-          <p>粘贴 skill 目录或 SKILL.md 路径，点“一键分析”。通过后，安装和同步按钮会自动解锁。</p>
+          <p>粘贴 skill 目录或 SKILL.md 路径，点“一键分析”。通过后，下一步按钮会自动出现。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">本地 skill 路径</div>
@@ -3981,11 +3995,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="local-skill-input-row">
               <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
               <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">一键分析</button>
+            </div>
+            <div id="local-skill-followup" class="local-skill-followup" hidden aria-label="分析后的下一步">
               <button id="local-skill-install" type="button" onclick="installLocalSkill()" disabled>安装到本机</button>
               <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查同步</button>
               <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>同步到其他设备</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">先点“一键分析”。通过后，按钮会自动解锁。</div>
+            <div id="local-skill-result" class="local-skill-result">先点“一键分析”。通过后，下一步按钮会自动出现。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
         </div>
@@ -5982,6 +5998,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       const localSkillInstall = $("local-skill-install");
       const localSkillPublishCheck = $("local-skill-publish-check");
       const localSkillPublish = $("local-skill-publish");
+      const localSkillFollowup = $("local-skill-followup");
+      if (localSkillFollowup) {
+        const showFollowup = Boolean(lastLocalSkillAnalysis);
+        localSkillFollowup.hidden = !showFollowup;
+        localSkillFollowup.classList.toggle("ready", showFollowup);
+      }
       if (localSkillAnalyze) localSkillAnalyze.disabled = !available;
       if (localSkillInstall) {
         const willWrite = Number(((lastLocalSkillAnalysis || {}).summary || {}).will_write || 0);
