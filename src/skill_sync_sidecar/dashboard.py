@@ -3982,7 +3982,7 @@ DASHBOARD_HTML = r"""<!doctype html>
   <header>
     <div class="brand">
       <h1>Skill 管理</h1>
-      <div class="brand-subtitle">第一块说不用处理就可以关掉；要操作再选下面的场景</div>
+      <div class="brand-subtitle">先看顶部结论；无待办时可以直接关闭。要新增或同步 skill，再选下面场景。</div>
     </div>
     <div class="toolbar">
       <span id="updated">读取中</span>
@@ -4004,14 +4004,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">场景 1</div>
           <h2>让某个 skill 在本机可用</h2>
-          <p>粘贴 skill 目录或 SKILL.md 路径，点“一键分析”。通过后，下一步按钮会自动出现。</p>
+          <p>放入一个 skill 文件夹或 SKILL.md，sidecar 会判断能安装到哪些本机工具。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">本地 skill 路径</div>
               <span id="local-skill-pill" class="pill">待分析</span>
             </div>
             <div class="local-skill-input-row">
-              <input id="local-skill-path" type="text" value="/Users/mac/.codex/skills/read-wechat-article" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
+              <input id="local-skill-path" type="text" value="" placeholder="粘贴 skill 目录或 SKILL.md 路径" />
               <button id="local-skill-analyze" type="button" onclick="analyzeLocalSkill()">一键分析</button>
             </div>
             <div id="local-skill-followup" class="local-skill-followup" hidden aria-label="分析后的下一步">
@@ -4019,7 +4019,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button id="local-skill-publish-check" type="button" onclick="publishLocalSkill(false)" disabled>检查同步</button>
               <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>同步到其他设备</button>
             </div>
-            <div id="local-skill-result" class="local-skill-result">先点“一键分析”。通过后，下一步按钮会自动出现。</div>
+            <div id="local-skill-result" class="local-skill-result">等待输入一个 skill 目录或 SKILL.md 路径。</div>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
         </div>
