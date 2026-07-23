@@ -5153,7 +5153,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         text(item.peer_id || item.peer_name || "unknown-peer"),
         text(item.skill_id || "unknown-skill"),
         text(item.status_action || item.plan_action || "unknown-action"),
-        text(item.local_hash || item.source_hash || item.remote_hash || item.base_hash || "unknown-version"),
+        reviewItemVersionToken(item),
       ].join("::");
     }
 
@@ -6799,7 +6799,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         text(item.skill_id || "unknown-skill"),
         text(item.category || "unknown-category"),
         text(item.status_action || item.plan_action || "unknown-action"),
+        reviewItemVersionToken(item),
       ].join("::");
+    }
+
+    function reviewItemVersionToken(item) {
+      if (!item) return "unknown-version";
+      const parts = [
+        item.local_hash,
+        item.remote_hash,
+        item.base_hash,
+        item.source_hash,
+      ].map((value) => text(value || ""));
+      const known = parts.filter((value) => value && value !== "-");
+      return known.length ? known.join("/") : "unknown-version";
     }
 
     function reviewDecisionHtml(item) {
