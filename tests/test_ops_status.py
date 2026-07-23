@@ -1114,6 +1114,13 @@ class OpsStatusTest(unittest.TestCase):
 
             guide = status["dashboard"]["operator"]["action_guide"]
             self.assertEqual(status["dashboard"]["blocked"], 2)
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "session-knowledge-manager")
+            self.assertEqual(status["dashboard"]["blocked_items"][0]["operator_state"], "delete_review")
+            self.assertEqual(status["dashboard"]["blocked_items"][1]["skill_id"], "finance-auto-bookkeeping")
+            self.assertEqual(status["dashboard"]["blocked_items"][1]["operator_state"], "source_changed")
+            self.assertEqual(status["dashboard"]["operator"]["top_issue"]["skill_id"], "session-knowledge-manager")
+            self.assertEqual(status["dashboard"]["operator"]["top_issue"]["category"], "delete_review")
+            self.assertIn("建议先从共享仓库找回", status["dashboard"]["operator"]["top_issue"]["action"])
             self.assertEqual(guide["title"], "先处理缺失/删除确认")
             self.assertIn("session-knowledge-manager", guide["summary"])
             self.assertIn("不会静默删除", guide["summary"])

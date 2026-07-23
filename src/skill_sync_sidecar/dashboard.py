@@ -934,6 +934,10 @@ def _operator_issue_action(
     target = _operator_issue_target(peer_id, peer_name, skill_id)
     if category == "conflict":
         return f"先处理 {target} 版本差异；生成只读差异报告后选择保留版本。"
+    if category in {"delete", "delete_review"} or status_action == "local_deleted":
+        return f"先处理 {target} 缺失项；建议先从共享仓库找回，确认废弃时再单独删除。"
+    if status_action == "remote_deleted":
+        return f"先处理 {target} 删除差异；确认是否保留本机版本，或接受共享仓库删除。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
         return f"先处理 {target}；确认后发布。"
     return f"先处理 {target}；查看确认清单。"
@@ -1329,7 +1333,26 @@ def _blocked_items(status: dict, peers: Dict[str, dict]) -> list[dict]:
     for peer_id, peer_status in peers.items():
         peer_name = "oc-vps / OpenClaw" if peer_id in {"oc-vps", "openclaw"} else peer_id
         items.extend(_blocked_report_items(peer_id, peer_name, peer_status))
-    return items
+    return sorted(items, key=_blocked_item_sort_key)
+
+
+def _blocked_item_sort_key(item: dict) -> tuple[int, str, str]:
+    state = item.get("operator_state") or _blocked_item_operator_state(item)
+    if state == "conflict":
+        priority = 0
+    elif state == "delete_review":
+        priority = 1
+    elif state == "source_changed":
+        priority = 2
+    elif state == "explicit_publish":
+        priority = 3
+    else:
+        priority = 4
+    return (
+        priority,
+        str(item.get("peer_id") or item.get("peer_name") or ""),
+        str(item.get("skill_id") or ""),
+    )
 
 
 def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[dict]:
@@ -5194,7 +5217,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!item) return false;
       const peerId = text(item.peer_id || "");
       const supportedPeer = peerId === "mac" || peerId === "oc-vps" || peerId === "openclaw";
-      return supportedPeer && !item.local_hash && Boolean(item.remote_hash);
+      return supportedPeer && (
+        item.status_action === "local_deleted" ||
+        (!item.local_hash && Boolean(item.remote_hash))
+      );
     }
 
     function restoreDeviceLabel(item) {
