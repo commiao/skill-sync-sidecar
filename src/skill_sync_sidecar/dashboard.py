@@ -4423,6 +4423,24 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #ecfdf5;
       color: #047857;
     }
+    .skill-tool-toggle-label.recent-installed {
+      border-color: #7dd3fc;
+      background: #eff6ff;
+      color: #075985;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, .14);
+    }
+    .skill-tool-toggle-label.recent-removed {
+      border-color: #e8d29c;
+      background: #fffbeb;
+      color: #a16207;
+      box-shadow: 0 0 0 2px rgba(217, 119, 6, .12);
+    }
+    .skill-tool-toggle-label em {
+      font-style: normal;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 760;
+    }
     .skill-tool-toggle-label.disabled {
       opacity: .68;
     }
@@ -5406,6 +5424,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentSkillInventoryModel = null;
     let currentSkillInventoryTriage = "all";
     let currentSkillInventoryQuick = "all";
+    let recentLocalToolChanges = [];
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -7946,6 +7965,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!installResponse.ok || !installPayload.ok) {
           throw new Error(executorErrorDetail(installPayload));
         }
+        rememberLocalToolChanges([skillId], toolId, "installed");
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
         setExecutorStatus("installed", `${skillId} 已安装到当前 Mac 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
@@ -8025,6 +8045,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!installResponse.ok || !installPayload.ok) {
           throw new Error(executorErrorDetail(installPayload));
         }
+        rememberLocalToolChanges(skillIds, toolId, "installed");
         setReviewFeedback("green", `已安装到 ${toolLabel}`, `已处理 ${names}；本机状态正在刷新。`);
         setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到当前 Mac 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
@@ -8105,6 +8126,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!uninstallResponse.ok || !uninstallPayload.ok) {
           throw new Error(executorErrorDetail(uninstallPayload));
         }
+        rememberLocalToolChanges(skillIds, toolId, "removed");
         setReviewFeedback("green", `已从 ${toolLabel} 移除`, `已处理 ${names}；文件已保留在移除备份目录，本机状态正在刷新。`);
         setExecutorStatus("removed", `${skillIds.length} 个 skill 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
@@ -8183,6 +8205,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!uninstallResponse.ok || !uninstallPayload.ok) {
           throw new Error(executorErrorDetail(uninstallPayload));
         }
+        rememberLocalToolChanges([skillId], toolId, "removed");
         setReviewFeedback("green", `${skillId} 已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。");
         setExecutorStatus("removed", `${skillId} 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
@@ -8774,6 +8797,38 @@ DASHBOARD_HTML = r"""<!doctype html>
       });
     }
 
+    function rememberLocalToolChanges(skillIds, toolId, action) {
+      const now = Date.now();
+      const next = (Array.isArray(skillIds) ? skillIds : [])
+        .map((skillId) => ({
+          skill_id: text(skillId),
+          tool_id: text(toolId),
+          action,
+          at: now,
+        }))
+        .filter((entry) => entry.skill_id && entry.tool_id);
+      if (next.length === 0) return;
+      const keys = new Set(next.map((entry) => recentLocalToolChangeKey(entry.skill_id, entry.tool_id)));
+      recentLocalToolChanges = [
+        ...next,
+        ...recentLocalToolChanges.filter((entry) => !keys.has(recentLocalToolChangeKey(entry.skill_id, entry.tool_id))),
+      ].slice(0, 80);
+      renderSkillInventoryFiltered();
+    }
+
+    function recentLocalToolChangeFor(skillId, toolId) {
+      const key = recentLocalToolChangeKey(skillId, toolId);
+      const maxAgeMs = 30 * 60 * 1000;
+      return recentLocalToolChanges.find((entry) => (
+        recentLocalToolChangeKey(entry.skill_id, entry.tool_id) === key
+        && Date.now() - Number(entry.at || 0) < maxAgeMs
+      ));
+    }
+
+    function recentLocalToolChangeKey(skillId, toolId) {
+      return `${text(skillId)}::${text(toolId)}`;
+    }
+
     function renderSkillInventoryWorkbench(items) {
       const counts = { local_installable: 0, local_installed: 0, publishable: 0, pending: 0 };
       (Array.isArray(items) ? items : []).forEach((item) => {
@@ -9020,13 +9075,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       const recommendation = skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools);
       const toolChecks = skillInventoryTools().map((tool) => {
         const active = installed.has(tool.id);
+        const recentChange = recentLocalToolChangeFor(item.skill_id, tool.id);
         const canInstall = centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool);
         const canToggle = tool.localInstall && (active || canInstall);
         const labelClass = [
           "skill-tool-toggle-label",
           active ? "installed" : "",
+          recentChange ? `recent-${recentChange.action}` : "",
           canToggle ? "" : "disabled",
         ].filter(Boolean).join(" ");
+        const recentBadge = recentChange
+          ? `<em>${recentChange.action === "installed" ? "刚安装" : "刚移除"}</em>`
+          : "";
         const title = !tool.localInstall
           ? `${tool.label} 由对应设备客户端管理`
           : (active
@@ -9045,7 +9105,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               onchange="toggleMacToolSkill(this)"
               ${active ? "checked" : ""}
               disabled>
-            <span>${escapeHtml(tool.label)}</span>
+            <span>${escapeHtml(tool.label)}</span>${recentBadge}
           </label>
         `;
       }).join("");
