@@ -23,7 +23,7 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertIn("Skill Sync: GREEN - NO ACTION", render_monitor_brief(report))
         self.assertIn("deferred: win=本阶段跳过", render_monitor_brief(report))
 
-    def test_monitor_report_lists_blocked_items_with_actions(self):
+    def test_monitor_report_lists_blocked_items_as_info_without_email_noise(self):
         summary = _summary(health="yellow", blocked=1)
         summary["dashboard"]["operator"]["top_issue"] = {
             "peer_id": "oc-vps",
@@ -50,16 +50,17 @@ class MonitorSummaryTest(unittest.TestCase):
         report = build_monitor_report(summary)
 
         self.assertTrue(report["ok"])
-        self.assertEqual(report["health"], "yellow")
+        self.assertEqual(report["health"], "green")
         self.assertEqual(report["blocked"], 1)
-        self.assertEqual(report["warnings"][0]["code"], "operator_top_issue")
-        self.assertEqual(report["warnings"][0]["command"], "scripts/openclaw-approved-push-batch.sh hebei-recruitment")
-        self.assertTrue(any(item["code"] == "blocked_item" for item in report["warnings"]))
+        self.assertEqual(report["warnings"], [])
+        self.assertEqual(report["info"][0]["code"], "operator_top_issue")
+        self.assertEqual(report["info"][0]["command"], "scripts/openclaw-approved-push-batch.sh hebei-recruitment")
+        self.assertTrue(any(item["code"] == "blocked_item" for item in report["info"]))
         text = render_monitor_report(report)
         self.assertIn("hebei-recruitment", text)
         self.assertIn("approved-push", text)
         brief = render_monitor_brief(report)
-        self.assertIn("Skill Sync: YELLOW - REVIEW NEEDED", brief)
+        self.assertIn("Skill Sync: GREEN - TRACKING ONLY", brief)
         self.assertIn("top_issue: [operator_top_issue]", brief)
         self.assertIn("command: scripts/openclaw-approved-push-batch.sh hebei-recruitment", brief)
 
@@ -93,14 +94,16 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertIn("device_stale", codes)
         self.assertIn("snapshot_mismatch", codes)
 
-    def test_monitor_report_warns_when_tools_are_not_reported(self):
+    def test_monitor_report_tracks_missing_tools_without_warning(self):
         summary = _summary()
         summary["dashboard"]["device_tools"][0]["reported"] = False
 
         report = build_monitor_report(summary)
 
         self.assertTrue(report["ok"])
-        self.assertEqual(report["warnings"][0]["code"], "device_tools_missing")
+        self.assertEqual(report["health"], "green")
+        self.assertEqual(report["warnings"], [])
+        self.assertEqual(report["info"][0]["code"], "device_tools_missing")
 
     def test_monitor_report_warns_on_stale_summary_cache(self):
         summary = _summary()

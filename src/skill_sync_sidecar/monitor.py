@@ -46,7 +46,7 @@ def monitor_once(
     url: str,
     *,
     timeout_seconds: float = 20.0,
-    stale_after_seconds: int = 30 * 60,
+    stale_after_seconds: int = 2 * 60 * 60,
     min_canonical_total: int = 1,
 ) -> JsonDict:
     try:
@@ -91,9 +91,9 @@ def run_monitor_loop(
     url: str,
     out_dir: Path,
     *,
-    interval_seconds: float = 300.0,
+    interval_seconds: float = 30 * 60,
     timeout_seconds: float = 20.0,
-    stale_after_seconds: int = 30 * 60,
+    stale_after_seconds: int = 2 * 60 * 60,
     min_canonical_total: int = 1,
     max_iterations: Optional[int] = None,
     print_status: bool = True,
@@ -150,13 +150,13 @@ def build_monitor_report(
     health = dashboard.get("health") or summary.get("health") or "unknown"
     operator_issue = _issue_for_operator_top_issue(operator.get("top_issue"))
     if operator_issue:
-        target = alerts if _operator_issue_is_alert(operator_issue) else warnings
+        target = alerts if _operator_issue_is_alert(operator_issue) else info
         target.append(operator_issue)
     if health == "red" and not operator_issue:
         alerts.append(_issue("dashboard_health", "Dashboard health is red.", health=str(health), action="Open the blocked queue and device status sections."))
     elif health == "yellow" and not operator_issue:
-        warnings.append(_issue("dashboard_health", "Dashboard has pending review work.", health=str(health), action="Open the blocked queue; approved local changes may need explicit approved-push."))
-    elif health != "green":
+        info.append(_issue("dashboard_health", "Dashboard has pending review work.", health=str(health), action="Open the dashboard when convenient; this is not an incident."))
+    elif health != "green" and not operator_issue:
         warnings.append(_issue("dashboard_health", "Dashboard health is not green.", health=str(health), action="Refresh dashboard status and inspect device sections."))
 
     cache_state = summary_cache.get("state")
@@ -187,12 +187,12 @@ def build_monitor_report(
 
     blocked_count = _int_or_zero(dashboard.get("blocked"))
     if blocked_count:
-        warnings.append(_issue("blocked_queue", f"{blocked_count} sync item(s) are waiting for explicit review.", count=blocked_count, action="Review each item and run approved-push/pull only after the producing work has settled."))
+        info.append(_issue("blocked_queue", f"{blocked_count} sync item(s) are waiting for explicit review.", count=blocked_count, action="Review in the dashboard when convenient; do not send repeated email for normal review work."))
     for item in blocked_items:
         if not isinstance(item, dict):
             continue
         severity = _blocked_item_severity(item)
-        target = warnings if severity == "warning" else alerts
+        target = alerts if severity == "alert" else warnings if severity == "warning" else info
         target.append(
             _issue(
                 "blocked_item",
@@ -214,7 +214,7 @@ def build_monitor_report(
 
     active_devices = [device for device in devices if isinstance(device, dict) and device.get("id") in {"gateway", "mac", "oc-vps", "openclaw"}]
     for device in active_devices:
-        _inspect_device(device, canonical_snapshot, stale_after_seconds, alerts, warnings)
+        _inspect_device(device, canonical_snapshot, stale_after_seconds, alerts, warnings, info)
 
     for group in device_tools:
         if not isinstance(group, dict):
@@ -223,12 +223,12 @@ def build_monitor_report(
         if device_id not in {"mac", "oc-vps", "openclaw"}:
             continue
         if group.get("reported") is not True:
-            warnings.append(
+            info.append(
                 _issue(
                     "device_tools_missing",
                     f"{group.get('device_name') or device_id} has not reported tools[].",
                     device_id=device_id,
-                    action="Publish peer-status v1 from that device agent.",
+                    action="Publish peer-status v1 from that device agent when installing or repairing the agent; do not send repeated email.",
                 )
             )
 
@@ -284,10 +284,14 @@ def render_monitor_brief(report: JsonDict) -> str:
     health = str(report.get("health") or "unknown").upper()
     alerts = len(report.get("alerts") or [])
     warnings = len(report.get("warnings") or [])
+    info_items = [item for item in (report.get("info") or []) if isinstance(item, dict)]
+    tracking = any(item.get("code") != "all_clear" for item in info_items)
     if alerts:
         verdict = "ACTION REQUIRED"
     elif warnings:
         verdict = "REVIEW NEEDED"
+    elif tracking:
+        verdict = "TRACKING ONLY"
     else:
         verdict = "NO ACTION"
 
@@ -305,8 +309,8 @@ def render_monitor_brief(report: JsonDict) -> str:
     if deferred_devices:
         lines.append("deferred: " + "; ".join(_format_deferred_device(device) for device in deferred_devices if isinstance(device, dict)))
 
-    if alerts or warnings:
-        issue = (report.get("alerts") or report.get("warnings") or [None])[0]
+    if alerts or warnings or tracking:
+        issue = (report.get("alerts") or report.get("warnings") or info_items or [None])[0]
         if isinstance(issue, dict):
             lines.append(f"top_issue: [{issue.get('code')}] {issue.get('message')}")
             if issue.get("command"):
@@ -319,13 +323,13 @@ def render_monitor_brief(report: JsonDict) -> str:
     return "\n".join(lines)
 
 
-def _inspect_device(device: JsonDict, canonical_snapshot: Optional[str], stale_after_seconds: int, alerts: list[JsonDict], warnings: list[JsonDict]) -> None:
+def _inspect_device(device: JsonDict, canonical_snapshot: Optional[str], stale_after_seconds: int, alerts: list[JsonDict], warnings: list[JsonDict], info: list[JsonDict]) -> None:
     device_id = str(device.get("id") or "")
     health = device.get("health")
     if health == "red":
         alerts.append(_issue("device_health", f"{device.get('name') or device_id} health is {health}.", device_id=device_id, action="Check peer-status publisher and sidecar logs for that device."))
     elif health == "yellow":
-        warnings.append(_issue("device_health", f"{device.get('name') or device_id} has pending review work.", device_id=device_id, action="Check blocked queue; this usually means pull-only is protecting a local change."))
+        info.append(_issue("device_health", f"{device.get('name') or device_id} has pending review work.", device_id=device_id, action="Check blocked queue when convenient; this usually means pull-only is protecting a local change."))
     elif health not in {"green", "not_configured"}:
         warnings.append(_issue("device_health", f"{device.get('name') or device_id} health is {health}.", device_id=device_id, action="Check peer-status publisher and sidecar logs for that device."))
     freshness = device.get("freshness") if isinstance(device.get("freshness"), dict) else {}
@@ -346,7 +350,7 @@ def _inspect_device(device: JsonDict, canonical_snapshot: Optional[str], stale_a
             )
         )
     if device_id in {"mac", "oc-vps", "openclaw"} and health == "not_configured":
-        warnings.append(_issue("device_not_configured", f"{device.get('name') or device_id} is not configured.", device_id=device_id, action="Install and publish peer status for this device."))
+        info.append(_issue("device_not_configured", f"{device.get('name') or device_id} is not configured.", device_id=device_id, action="Install and publish peer status for this device when it joins the sync ring."))
 
 
 def _action_for_blocked_item(item: JsonDict) -> str:
@@ -392,6 +396,8 @@ def _blocked_item_severity(item: JsonDict) -> str:
     category = item.get("category")
     if category in {"conflict", "delete_review"}:
         return "alert"
+    if category in {"writer_policy", "new_skill_review"}:
+        return "info"
     return "warning"
 
 

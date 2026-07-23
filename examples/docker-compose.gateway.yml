@@ -56,11 +56,11 @@ services:
       - --out-dir
       - /cache/monitor
       - --interval-seconds
-      - "${SKILL_SYNC_MONITOR_INTERVAL_SECONDS:-300}"
+      - "${SKILL_SYNC_MONITOR_INTERVAL_SECONDS:-1800}"
       - --timeout-seconds
       - "${SKILL_SYNC_MONITOR_TIMEOUT_SECONDS:-20}"
       - --stale-after-seconds
-      - "${SKILL_SYNC_MONITOR_STALE_AFTER_SECONDS:-1800}"
+      - "${SKILL_SYNC_MONITOR_STALE_AFTER_SECONDS:-7200}"
 
 volumes:
   skill-sync-gateway-cache:

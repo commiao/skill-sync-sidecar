@@ -79,10 +79,17 @@ scripts/monitor-nas-summary.sh
 SKILL_SYNC_MONITOR_FAIL_ON_ALERT=1 scripts/monitor-nas-summary.sh
 ```
 
-The monitor reads `/api/summary` and turns it into an operator report. It alerts
-on non-green dashboard health, blocked sync items, stale Mac/OpenClaw peer
-status, snapshot drift, missing device tool reports, and abnormal canonical
-snapshot totals.
+The monitor reads `/api/summary` and turns it into an operator report. Routine
+review work, source-side edits, and missing optional tool reports are recorded as
+`info` so external mail integrations do not repeatedly notify for normal sync
+work. It should alert only on incident-like conditions: red dashboard health,
+unusable summary cache, stale Mac/OpenClaw peer status, snapshot drift,
+conflict/delete review, fetch failures, or abnormal canonical snapshot totals.
+
+The Docker Compose monitor defaults to a 30 minute interval and marks active
+devices stale after 2 hours. Override with `SKILL_SYNC_MONITOR_INTERVAL_SECONDS`
+or `SKILL_SYNC_MONITOR_STALE_AFTER_SECONDS` only when a noisier operational
+posture is intentional.
 
 In Docker Compose, `skill-sync-monitor` runs the same check on an interval and
 writes:
