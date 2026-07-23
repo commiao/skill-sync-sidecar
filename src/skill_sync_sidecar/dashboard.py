@@ -4115,6 +4115,29 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .skill-inventory-triage {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .skill-inventory-triage button {
+      display: grid;
+      gap: 2px;
+      justify-items: start;
+      text-align: left;
+      padding: 8px 10px;
+    }
+    .skill-inventory-triage strong {
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.1;
+    }
+    .skill-inventory-triage span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
     .skill-inventory-list {
       display: grid;
       gap: 7px;
@@ -4408,6 +4431,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .plain-detail-grid { grid-template-columns: 1fr; }
       .skill-inventory-row { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
+      .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-followup.ready { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
@@ -4680,6 +4704,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
       <div class="skill-inventory-note">这里只展示安装矩阵；首页仍只显示下一步。安装/卸载会在当前设备客户端执行，不跨设备直接写文件。</div>
+      <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未发布整理"></div>
       <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
         <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
         <select id="skill-inventory-central-filter" aria-label="中央仓库状态">
@@ -5056,6 +5081,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let localWorkspaceFromExecutor = null;
     let lastLocalSkillAnalysis = null;
     let currentSkillInventoryModel = null;
+    let currentSkillInventoryTriage = "all";
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -7854,6 +7880,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-published").textContent = text(model.published);
       $("skill-inventory-unpublished").textContent = text(model.unpublished);
       $("skill-inventory-project").textContent = text(model.project);
+      renderSkillInventoryTriage(model.items || []);
       renderSkillInventoryFiltered();
     }
 
@@ -7863,8 +7890,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const filtered = filterSkillInventoryItems(items, skillInventoryFilters());
       const displayLimit = 160;
       const visible = filtered.slice(0, displayLimit);
+      const triageNote = currentSkillInventoryTriage === "all" ? "" : `当前整理视图：${skillInventoryTriageLabel(currentSkillInventoryTriage)}。`;
       $("skill-inventory-result-note").textContent = items.length > 0
-        ? `显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
+        ? `${triageNote}显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
         : "等待中央仓库或本机客户端上报 skill 清单。";
       $("skill-inventory-list").innerHTML = items.length > 0
         ? (visible.length > 0
@@ -7874,6 +7902,50 @@ DASHBOARD_HTML = r"""<!doctype html>
       setExecutorButtons(executorAvailable);
     }
 
+    function renderSkillInventoryTriage(items) {
+      const counts = { publishable: 0, project: 0, private: 0, waiting_path: 0 };
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        const kind = unpublishedTriageKind(item);
+        if (kind && counts[kind] !== undefined) counts[kind] += 1;
+      });
+      $("skill-inventory-triage").innerHTML = [
+        triageButton("publishable", counts.publishable, "可发布公用", "逐个检查后发布中央仓库"),
+        triageButton("project", counts.project, "项目级", "暂不从全局清单一键发布"),
+        triageButton("private", counts.private, "设备私有", "只保留在当前设备"),
+        triageButton("waiting_path", counts.waiting_path, "缺本机路径", "等待对应设备上报或恢复到 Mac"),
+      ].join("");
+    }
+
+    function triageButton(kind, count, label, note) {
+      const active = currentSkillInventoryTriage === kind ? "primary" : "";
+      return `
+        <button type="button" class="${active}" onclick="setSkillInventoryTriage('${escapeHtml(kind)}')">
+          <strong>${escapeHtml(text(count))}</strong>
+          <span>${escapeHtml(label)}</span>
+          <span>${escapeHtml(note)}</span>
+        </button>
+      `;
+    }
+
+    function skillInventoryTriageLabel(kind) {
+      if (kind === "publishable") return "可发布公用";
+      if (kind === "project") return "项目级";
+      if (kind === "private") return "设备私有";
+      if (kind === "waiting_path") return "缺本机路径";
+      return "全部";
+    }
+
+    function setSkillInventoryTriage(kind) {
+      currentSkillInventoryTriage = currentSkillInventoryTriage === kind ? "all" : kind;
+      $("skill-inventory-central-filter").value = kind === "all" ? "all" : "unpublished";
+      if (kind === "project") $("skill-inventory-scope-filter").value = "project";
+      else if (kind === "private") $("skill-inventory-scope-filter").value = "device-private";
+      else if (kind === "publishable" || kind === "waiting_path") $("skill-inventory-scope-filter").value = "global";
+      else $("skill-inventory-scope-filter").value = "all";
+      renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryFiltered();
+    }
+
     function skillInventoryFilters() {
       return {
         query: textInputValue("skill-inventory-search").toLowerCase(),
@@ -7881,6 +7953,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         scope: selectValue("skill-inventory-scope-filter"),
         tool: selectValue("skill-inventory-tool-filter"),
         sync: selectValue("skill-inventory-sync-filter"),
+        triage: currentSkillInventoryTriage,
       };
     }
 
@@ -7888,6 +7961,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       return items.filter((item) => {
         const installed = macInstalledToolIds(item);
         const centralState = text((item.central || {}).state || "unpublished");
+        if (filters.triage !== "all" && unpublishedTriageKind(item) !== filters.triage) return false;
         if (filters.central !== "all" && centralState !== filters.central) return false;
         if (filters.scope !== "all" && text(item.scope || "global") !== filters.scope) return false;
         if (filters.sync === "pending" && Number(item.pending || 0) <= 0) return false;
@@ -7910,11 +7984,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function resetSkillInventoryFilters() {
+      currentSkillInventoryTriage = "all";
       $("skill-inventory-search").value = "";
       $("skill-inventory-central-filter").value = "all";
       $("skill-inventory-scope-filter").value = "all";
       $("skill-inventory-tool-filter").value = "all";
       $("skill-inventory-sync-filter").value = "all";
+      renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
     }
 
@@ -8116,6 +8192,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (found) return text(found.path);
       }
       return local.length > 0 ? text(local[0].path) : "";
+    }
+
+    function unpublishedTriageKind(item) {
+      const centralState = text((item.central || {}).state || "unpublished");
+      if (centralState !== "unpublished") return "";
+      const scope = text(item.scope || "global");
+      if (scope === "project") return "project";
+      if (scope === "device-private") return "private";
+      if (macPublishSourcePath(item)) return "publishable";
+      return "waiting_path";
     }
 
     function skillTargetsTool(item, tool) {

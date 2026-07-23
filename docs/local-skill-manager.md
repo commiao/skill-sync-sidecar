@@ -43,6 +43,7 @@ The user should not need to edit manifest metadata or manually copy package file
 The secondary `Skill 清单` view is the per-skill management surface for the current client:
 
 - Search and filters are view-only helpers. Users can filter by skill name/description, central lifecycle state, scope, local tool, or pending sync state without changing files.
+- The unpublished triage chips split local-only skills into `可发布公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
 - Checking a local tool box installs a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
 - Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after dry-run and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
 - `发布中央仓库` appears for unpublished public skills that have a current Mac source path. It runs a dry-run first, then requires `PUBLISH`; it does not install the skill onto other devices.
