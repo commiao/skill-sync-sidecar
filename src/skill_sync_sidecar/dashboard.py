@@ -3134,6 +3134,37 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 6px;
       margin-top: 8px;
     }
+    .simple-action-more {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .simple-action-more > summary {
+      cursor: pointer;
+      list-style: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 780;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .simple-action-more > summary::-webkit-details-marker {
+      display: none;
+    }
+    .simple-action-more > summary::after {
+      content: "展开";
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .simple-action-more[open] > summary::after {
+      content: "收起";
+    }
+    .simple-action-more-body {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
     .simple-action-facts {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4964,7 +4995,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         primaryActions = `
           <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
             <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读报告<span>不会发布、不会恢复、不会删除。</span></button>
-            <button type="button" onclick="openAdvancedDetails()">查看清单<span>需要时再看原始队列。</span></button>
           </div>
         `;
         facts = [
@@ -4988,7 +5018,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         summary = `${restoreTarget} 上缺失，但中央库还有完整版本。默认安全动作是恢复到缺失设备，不删除中央库。`;
         primaryActions = `
           <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">恢复到 ${escapeHtml(restoreTarget)}<span>会先检查，再要求确认。</span></button>
-          <button type="button" onclick="openAdvancedDetails()">看详情<span>只展开清单。</span></button>
         `;
         facts = [
           ["推荐动作", `恢复 ${skill}。`],
@@ -5027,11 +5056,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         primaryActions = allPublishReady
           ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>同步到中央库<span>会要求输入 PUBLISH。</span></button>
-            <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>重新检查<span>只读，不写入。</span></button>
           `
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查一下<span>只读，不写入。</span></button>
-            <button id="simple-publish" type="button" onclick="runExecutorAction('publish')" disabled>同步到中央库<span>检查通过后可点。</span></button>
           `;
         facts = allPublishReady
           ? [
@@ -5068,14 +5095,11 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-title">${escapeHtml(title)}</div>
             <div class="simple-action-summary">${escapeHtml(summary)}</div>
           </div>
-          <div class="simple-action-actions single-primary">
-            ${primaryActions}
-          </div>
+        <div class="simple-action-actions single-primary">
+          ${primaryActions}
         </div>
-        <div class="simple-action-facts">
-          ${facts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}
-        </div>
-        ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
+      </div>
+        ${renderSimpleActionMore(facts, taskCards)}
         <div id="simple-action-feedback" class="simple-action-feedback" hidden>
           <strong id="simple-action-feedback-title">等待操作</strong>
           <span id="simple-action-feedback-detail">选择一个按钮后，这里会显示进度。</span>
@@ -5083,6 +5107,23 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-note" class="simple-action-note">只需要按顶部推荐按钮走；下面的数字、设备、版本信息都是排查时才看的详情。</div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderSimpleActionMore(facts, taskCards) {
+      const safeFacts = Array.isArray(facts) ? facts : [];
+      if (safeFacts.length === 0 && !taskCards) return "";
+      const factHtml = safeFacts.length
+        ? `<div class="simple-action-facts">${safeFacts.map(([label, value]) => `<div class="simple-action-fact"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`).join("")}</div>`
+        : "";
+      return `
+        <details class="simple-action-more">
+          <summary>为什么这样建议</summary>
+          <div class="simple-action-more-body">
+            ${factHtml}
+            ${taskCards ? `<div class="simple-action-list">${taskCards}</div>` : ""}
+          </div>
+        </details>
+      `;
     }
 
     function runFirstConflictPackage() {
