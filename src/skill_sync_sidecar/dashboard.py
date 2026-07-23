@@ -4457,6 +4457,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .local-skill-detail {
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 6px;
+    }
+    .local-skill-detail[hidden] {
+      display: none;
+    }
+    .local-skill-detail summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 780;
+    }
+    .local-skill-detail-body {
+      display: grid;
+      gap: 3px;
+      margin-top: 6px;
+      overflow-wrap: anywhere;
+    }
     .local-skill-followup {
       display: none;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4861,6 +4881,10 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布到共享库</button>
             </div>
             <div id="local-skill-result" class="local-skill-result">粘贴路径后点“开始”；检查只读，安装和发布都会再次确认。</div>
+            <details id="local-skill-detail" class="local-skill-detail" hidden>
+              <summary>查看发布明细</summary>
+              <div id="local-skill-detail-body" class="local-skill-detail-body"></div>
+            </details>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
         </div>
@@ -4892,16 +4916,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       </summary>
       <div class="skill-inventory-simple">
         <div class="skill-inventory-metric"><strong id="skill-inventory-total">-</strong><span>全部 skill</span></div>
-        <div class="skill-inventory-metric"><strong id="skill-inventory-published">-</strong><span>已进共享仓库</span></div>
+        <div class="skill-inventory-metric"><strong id="skill-inventory-published">-</strong><span>已在共享库</span></div>
         <div class="skill-inventory-metric"><strong id="skill-inventory-unpublished">-</strong><span>本机/设备独有</span></div>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
-      <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或发布到共享仓库。</div>
+      <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或发布到共享库。</div>
       <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未发布整理"></div>
       <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
         <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
-        <select id="skill-inventory-central-filter" aria-label="中央仓库状态">
+        <select id="skill-inventory-central-filter" aria-label="共享库状态">
           <option value="all">全部状态</option>
           <option value="published">已发布</option>
           <option value="unpublished">未发布</option>
@@ -8930,6 +8954,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       lastLocalSkillAnalysis = null;
+      setLocalSkillDetail([]);
       setLocalSkillStatus("analyzing", "正在分析本地 skill。", "yellow");
       setExecutorButtons(false);
       try {
@@ -8962,9 +8987,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (writes <= 0) return;
       const typed = window.prompt(`将安装 ${lastLocalSkillAnalysis.skill_id} 到 ${writes} 个本机工具。请输入 INSTALL 确认：`);
       if (typed !== "INSTALL") {
+        setLocalSkillDetail([]);
         setLocalSkillStatus("cancelled", "已取消安装，没有写入本机工具目录。", "yellow");
         return;
       }
+      setLocalSkillDetail([]);
       setLocalSkillStatus("installing", "正在安装到本机工具目录。", "yellow");
       setExecutorButtons(false);
       try {
@@ -8990,17 +9017,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function publishLocalSkill(realPublish) {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (realPublish && !executorAllowPublish) {
-        renderLocalSkillError("发布未授权：请打开发布开关后再发布到共享仓库。");
+        renderLocalSkillError("当前只能检查，不能发布到共享库。请打开发布开关后再试。");
         return;
       }
       if (realPublish) {
-        const typed = window.prompt(`将 ${lastLocalSkillAnalysis.skill_id} 发布到共享仓库。请输入 PUBLISH 确认：`);
+        const typed = window.prompt(`将 ${lastLocalSkillAnalysis.skill_id} 发布到共享库。请输入 PUBLISH 确认：`);
         if (typed !== "PUBLISH") {
-          setLocalSkillStatus("cancelled", "已取消发布，没有写入共享仓库。", "yellow");
+          setLocalSkillDetail([]);
+          setLocalSkillStatus("cancelled", "已取消发布，没有写入共享库。", "yellow");
           return;
         }
       }
-      setLocalSkillStatus(realPublish ? "publishing" : "checking", realPublish ? "正在发布到共享仓库。" : "正在检查发布。", "yellow");
+      setLocalSkillDetail([]);
+      setLocalSkillStatus(realPublish ? "publishing" : "checking", realPublish ? "正在发布到共享库。" : "正在检查共享。", "yellow");
       setExecutorButtons(false);
       try {
         const endpoint = realPublish ? "/api/local-skill/publish" : "/api/local-skill/publish-dry-run";
@@ -9013,7 +9042,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
         setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "共享库已更新。" : "检查通过，可以发布到共享库。", "green");
-        $("local-skill-result").textContent = `${payload.skill_id}：${realPublish ? "已发布到共享库" : (payload.safe_to_push ? "检查通过，可以发布" : "需要复核")}。文件 ${text(payload.uploaded_files)}，版本 ${text(payload.snapshot_id)}。`;
+        $("local-skill-result").textContent = `${payload.skill_id}：${realPublish ? "已发布到共享库。" : (payload.safe_to_push ? "检查通过，可以发布。" : "需要复核后再发布。")}`;
+        setLocalSkillDetail([
+          ["检查结果", payload.safe_to_push ? "可以发布" : "需要复核"],
+          ["文件", text(payload.uploaded_files)],
+          ["共享库版本", text(payload.snapshot_id)],
+          ["执行模式", modeLabel(payload.mode)],
+        ]);
       } catch (err) {
         renderLocalSkillError(String(err));
       } finally {
@@ -9026,12 +9061,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       const writes = Number(summary.will_write || 0);
       const scopeText = payload.scope === "project" ? "项目级" : "公用";
       $("local-skill-result").textContent = `${payload.skill_id}：识别为${scopeText} skill，可安装到 ${writes} 个本机工具。`;
+      setLocalSkillDetail([]);
       renderLocalSkillTools(payload.tools || []);
     }
 
     function renderLocalSkillInstall(payload) {
       const summary = payload.summary || {};
       $("local-skill-result").textContent = `${payload.skill_id} 已安装到本机工具，写入 ${text(summary.will_write)} 处；已保留安装记录和备份。`;
+      setLocalSkillDetail([]);
       renderLocalSkillTools(payload.items || []);
     }
 
@@ -9055,6 +9092,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       lastLocalSkillAnalysis = null;
       $("local-skill-result").textContent = message;
       $("local-skill-tools").innerHTML = "";
+      setLocalSkillDetail([]);
       setLocalSkillStatus("error", message, "red");
       setExecutorButtons(executorAvailable);
     }
@@ -9063,6 +9101,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("local-skill-pill").outerHTML = pill(statusPillLabel(label), kind).replace("<span", "<span id=\"local-skill-pill\"");
       $("local-skill-result").textContent = detail;
       updateLocalSkillGuide(label);
+    }
+
+    function setLocalSkillDetail(rows) {
+      const detail = $("local-skill-detail");
+      const body = $("local-skill-detail-body");
+      if (!detail || !body) return;
+      const cleanRows = Array.isArray(rows) ? rows.filter(([label, value]) => text(label) && text(value)) : [];
+      detail.hidden = cleanRows.length === 0;
+      body.innerHTML = cleanRows.map(([label, value]) => `<div><strong>${escapeHtml(text(label))}：</strong>${escapeHtml(text(value))}</div>`).join("");
     }
 
     function updateLocalSkillGuide(label) {
