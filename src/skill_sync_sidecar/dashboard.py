@@ -4347,6 +4347,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       min-height: 34px;
       font-size: 12px;
     }
+    .skill-inventory-list-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      margin-top: 10px;
+      padding: 0;
+    }
+    .skill-inventory-list-panel > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .skill-inventory-list-panel > summary::-webkit-details-marker {
+      display: none;
+    }
+    .skill-inventory-list-panel > summary::after {
+      content: "展开";
+      float: right;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .skill-inventory-list-panel[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .skill-inventory-list-panel[open] > summary::after {
+      content: "收起";
+    }
+    .skill-inventory-list-body {
+      padding: 0 12px 12px;
+    }
     .skill-inventory-workbench {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5196,9 +5229,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           <button id="skill-inventory-reset" type="button">清空</button>
         </div>
       </details>
-      <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
-      <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
-      <div id="skill-inventory-list" class="skill-inventory-list"></div>
+      <details id="skill-inventory-list-panel" class="skill-inventory-list-panel">
+        <summary>查看 skill 列表和安装勾选</summary>
+        <div class="skill-inventory-list-body">
+          <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
+          <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
+          <div id="skill-inventory-list" class="skill-inventory-list"></div>
+        </div>
+      </details>
     </details>
     <details class="quick-status-details">
       <summary>一般不用看：状态数字</summary>
@@ -6887,6 +6925,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (drawer) drawer.open = true;
     }
 
+    function openSkillInventoryListPanel() {
+      const panel = $("skill-inventory-list-panel");
+      if (panel) panel.open = true;
+    }
+
     function openLocalSkillWorkbench() {
       openSupportDrawer();
       const workspace = $("easy-workspace");
@@ -6918,6 +6961,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
+      openSkillInventoryListPanel();
       const target = $("skill-inventory-list") || inventory;
       if (target && target.scrollIntoView) {
         target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -9062,6 +9106,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
+      openSkillInventoryListPanel();
     }
 
     function renderSkillInventoryTriage(items) {
@@ -9108,6 +9153,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
+      openSkillInventoryListPanel();
     }
 
     function skillInventoryFilters() {

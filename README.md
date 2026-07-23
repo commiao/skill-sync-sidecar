@@ -46,7 +46,7 @@ For day-to-day use, open the dashboard and start from the first card:
 
 Sidecar infers metadata, scope, targets, risk, and install destinations. Users should not hand-write metadata files, copy files between tool roots, or remember low-level flags.
 
-The first screen is intentionally simple. Tool matrices, version details, raw queues, and diagnostics live behind **详情和高级操作**.
+The first screen is intentionally simple. Tool matrices, version details, raw queues, and diagnostics live behind **详情和高级操作**. Inside the Skill list, start from the four workbench buttons; the full per-skill list stays behind **查看 skill 列表和安装勾选** until you need to act on individual skills.
 
 The local browser executor must be running for dashboard actions:
 

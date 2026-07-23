@@ -969,6 +969,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("localWorkspaceToolInventoryId", DASHBOARD_HTML)
             self.assertIn("Skill 清单", DASHBOARD_HTML)
             self.assertIn("已在共享库", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-list-panel\"", DASHBOARD_HTML)
+            self.assertIn("查看 skill 列表和安装勾选", DASHBOARD_HTML)
+            self.assertIn("openSkillInventoryListPanel", DASHBOARD_HTML)
             self.assertIn("aria-label=\"共享库状态\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-list\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-search\"", DASHBOARD_HTML)
@@ -1016,6 +1019,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("随项目仓维护，不装全局", DASHBOARD_HTML)
             self.assertIn("不从全局清单一键安装", DASHBOARD_HTML)
             self.assertIn("项目仓的 skills/ 目录和根级 AGENTS.md", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"skill-inventory-workbench\""),
+                DASHBOARD_HTML.index("id=\"skill-inventory-list-panel\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"skill-inventory-triage\""),
+                DASHBOARD_HTML.index("id=\"skill-inventory-list-panel\""),
+            )
             self.assertIn("renderSkillInventoryTriage", DASHBOARD_HTML)
             self.assertIn("setSkillInventoryTriage", DASHBOARD_HTML)
             self.assertIn("unpublishedTriageKind", DASHBOARD_HTML)
