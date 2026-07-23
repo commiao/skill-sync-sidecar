@@ -47,6 +47,7 @@ def run_openclaw_approved_push_batch(
     timeout_seconds: int = 900,
     allow_publish: bool = False,
     allow_conflict_local_wins: bool = False,
+    refresh_peer_status: bool = False,
 ) -> dict:
     repo = repo_root.expanduser().resolve()
     script = repo / "scripts" / "openclaw-approved-push-batch.sh"
@@ -70,7 +71,7 @@ def run_openclaw_approved_push_batch(
     )
     finished_at = datetime.now(timezone.utc).isoformat()
     parsed = _last_json_object(proc.stdout)
-    return {
+    result = {
         "ok": proc.returncode == 0,
         "mode": "publish" if yes else "dry_run",
         "started_at": started_at,
@@ -86,6 +87,17 @@ def run_openclaw_approved_push_batch(
         "stdout_tail": _tail(proc.stdout),
         "stderr_tail": _tail(proc.stderr),
     }
+    approved = result.get("approved")
+    if yes and refresh_peer_status and result["ok"] and isinstance(approved, int) and approved > 0:
+        try:
+            result["peer_status_refresh"] = run_openclaw_peer_status_refresh(repo)
+        except Exception as exc:  # pragma: no cover - keep publish result authoritative
+            result["peer_status_refresh"] = {
+                "ok": False,
+                "mode": "refresh_openclaw_peer_status",
+                "error": str(exc),
+            }
+    return result
 
 
 def run_openclaw_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 300) -> dict:
@@ -648,6 +660,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         yes=True,
                         allow_publish=allow_publish,
                         allow_conflict_local_wins=allow_conflict_local_wins,
+                        refresh_peer_status=True,
                     )
                     self._send_json(200 if result["ok"] else 500, result)
                     return

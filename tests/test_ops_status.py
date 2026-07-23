@@ -1768,6 +1768,41 @@ class OpsStatusTest(unittest.TestCase):
             with self.assertRaises(OperatorExecutorError):
                 run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=True)
 
+    def test_operator_executor_publish_refreshes_openclaw_peer_status(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-approved-push-batch.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"safe_to_push\":false,\"approved\":1,\"approved_skill_ids\":[\"%s\"]}\\n' \"$2\"\n",
+                encoding="utf-8",
+            )
+            refresh = scripts / "publish-openclaw-peer-status.sh"
+            refresh.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo peer_status_published=true\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+            os.chmod(refresh, 0o755)
+
+            result = run_openclaw_approved_push_batch(
+                repo,
+                ["finance-auto-bookkeeping"],
+                yes=True,
+                allow_publish=True,
+                refresh_peer_status=True,
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["mode"], "publish")
+            self.assertEqual(result["approved"], 1)
+            self.assertTrue(result["peer_status_refresh"]["ok"])
+            self.assertEqual(result["peer_status_refresh"]["mode"], "refresh_openclaw_peer_status")
+            self.assertIn("peer_status_published=true", result["peer_status_refresh"]["stdout_tail"])
+
     def test_operator_executor_allows_explicit_conflict_local_wins_preview(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
