@@ -4302,6 +4302,36 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-project-note {
       margin: 6px 0 8px;
     }
+    .skill-inventory-guide {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid #b8cef0;
+      background: #f7fbff;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .skill-inventory-guide strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 860;
+      line-height: 1.3;
+    }
+    .skill-inventory-guide span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-guide button {
+      min-width: 112px;
+      height: 34px;
+      border-radius: 6px;
+    }
     .skill-inventory-project-note summary {
       cursor: pointer;
       color: var(--ink);
@@ -4958,6 +4988,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-row { grid-template-columns: 1fr; }
       .skill-tool-matrix { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
+      .skill-inventory-guide { grid-template-columns: 1fr; }
+      .skill-inventory-guide button { width: 100%; }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .local-skill-input-row { grid-template-columns: 1fr; }
@@ -5249,6 +5281,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
       <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或发布到共享库。</div>
+      <div id="skill-inventory-guide" class="skill-inventory-guide" aria-label="Skill 清单推荐操作"></div>
       <details class="skill-inventory-project-note">
         <summary>项目级 skill 怎么处理</summary>
         <p>项目级 skill 随项目仓维护，不从全局清单一键安装，也不直接发布成公用 skill。需要跨设备使用时，在项目仓的 skills/ 目录和根级 AGENTS.md 里声明，由项目自己的同步策略处理。</p>
@@ -9335,6 +9368,65 @@ DASHBOARD_HTML = r"""<!doctype html>
         workbenchButton("publishable", counts.publishable, "可发布共享", "本机已有路径，可先检查"),
         workbenchButton("pending", counts.pending, "待确认同步", "先处理同步队列"),
       ].join("");
+      renderSkillInventoryGuide(counts);
+    }
+
+    function renderSkillInventoryGuide(counts) {
+      const target = $("skill-inventory-guide");
+      if (!target) return;
+      const guide = skillInventoryGuideModel(counts || {});
+      target.innerHTML = `
+        <div>
+          <strong>${escapeHtml(guide.title)}</strong>
+          <span>${escapeHtml(guide.detail)}</span>
+        </div>
+        <button type="button" class="primary" onclick="${escapeHtml(guide.action)}">${escapeHtml(guide.button)}</button>
+      `;
+    }
+
+    function skillInventoryGuideModel(counts) {
+      const pending = Number(counts.pending || 0);
+      const installable = Number(counts.local_installable || 0);
+      const publishable = Number(counts.publishable || 0);
+      const installed = Number(counts.local_installed || 0);
+      if (pending > 0) {
+        return {
+          title: "推荐先处理同步提醒",
+          detail: `${pending} 个 skill 有同步确认；先看清单，不会自动写入或删除。`,
+          button: "查看待确认",
+          action: "openReviewDetails()",
+        };
+      }
+      if (installable > 0) {
+        return {
+          title: "推荐先让本机工具可用",
+          detail: `${installable} 个共享库 skill 可以安装到当前 Mac 的 Codex、Cursor 等工具。`,
+          button: "查看可安装",
+          action: "setSkillInventoryQuick('local_installable')",
+        };
+      }
+      if (publishable > 0) {
+        return {
+          title: "有本机 skill 可以共享",
+          detail: `${publishable} 个本机 skill 有路径可检查；确认后再发布到共享库。`,
+          button: "查看可发布",
+          action: "setSkillInventoryTriage('publishable')",
+        };
+      }
+      if (installed > 0) {
+        return {
+          title: "本机工具已经有可用 skill",
+          detail: `${installed} 个 skill 已安装到当前 Mac 的工具；需要整理时再查看。`,
+          button: "查看已安装",
+          action: "setSkillInventoryQuick('local_installed')",
+        };
+      }
+      return {
+        title: "还没有可操作的 skill",
+        detail: "先扫描本机或等待设备 Agent 上报；高级筛选只用于查看。",
+        button: "查看清单",
+        action: "openSkillInventoryListPanel()",
+      };
     }
 
     function workbenchButton(kind, count, label, note) {
