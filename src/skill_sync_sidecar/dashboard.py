@@ -950,6 +950,10 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         item for item in blocked_items
         if item.get("category") == "conflict" or item.get("status_action") == "conflict"
     ]
+    delete_items = [
+        item for item in blocked_items
+        if item.get("category") in {"delete", "delete_review"} or item.get("status_action") in {"local_deleted", "remote_deleted"}
+    ]
     if health == "green":
         return {
             "state": "green",
@@ -996,6 +1000,35 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
             ],
             "skills": skill_ids,
             "note": "黄色在这里表示安全暂停，不表示服务坏了。",
+        }
+    if health == "yellow" and delete_items:
+        skill_ids = _operator_skill_ids(delete_items)
+        skill_hint = "、".join(skill_ids[:3]) if skill_ids else "unknown-skill"
+        if len(skill_ids) > 3:
+            skill_hint += f" 等 {len(skill_ids)} 个"
+        return {
+            "state": "yellow",
+            "title": "先处理缺失/删除确认",
+            "summary": f"当前有 {len(delete_items)} 个缺失/删除确认：{skill_hint}。默认安全动作是保留共享仓库，不会静默删除；如果是误删，先从共享仓库恢复到缺失设备。",
+            "steps": [
+                {
+                    "title": "先保留共享仓库",
+                    "detail": "删除确认不会通过发布按钮自动处理，也不会一键删除共享仓库版本。",
+                    "kind": "review",
+                },
+                {
+                    "title": "误删就恢复",
+                    "detail": "如果这个 skill 还要用，点页面里的恢复按钮，从共享仓库恢复到缺失设备。",
+                    "kind": "publish",
+                },
+                {
+                    "title": "确实废弃再删除",
+                    "detail": "只有确认 skill 已废弃时，才走单独删除审批；不要用普通发布流程处理删除。",
+                    "kind": "verify",
+                },
+            ],
+            "skills": skill_ids,
+            "note": "红色邮件提醒来自这类高风险删除确认；它需要你决定保留并恢复，还是单独审批删除。",
         }
     if health == "yellow" and openclaw_push_items:
         skill_ids = _operator_skill_ids(openclaw_push_items)
@@ -4877,7 +4910,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-summary">${escapeHtml(skill)} 在共享仓库和 ${escapeHtml(text(item.peer_name || item.peer_id || "设备"))} 上都被改过。需要你确认保留哪一版。</div>
           </div>
         `;
-      } else if (restoreItems.length > 0 && publishItems.length === 0) {
+      } else if (restoreItems.length > 0) {
         const item = restoreItems[0];
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");

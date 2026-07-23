@@ -1017,6 +1017,77 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("不是刚才的发布按钮失效", status["dashboard"]["operator"]["action_guide"]["summary"])
             self.assertIn("只有稳定后发布才会真正清空确认项", status["dashboard"]["operator"]["action_guide"]["note"])
 
+    def test_dashboard_prioritizes_delete_review_over_source_changed(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "remote"
+            base_record = root / "base-record.json"
+            peer_status = root / "openclaw-status.json"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-1")
+            self._write_base_record(base_record, index)
+            peer_status.write_text(
+                json.dumps(
+                    {
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "yellow",
+                        "writer_policy": "pull-only",
+                        "remote_snapshot": {"total": 96},
+                        "sync_plan": {
+                            "writer_policy": "pull-only",
+                            "blocked": 2,
+                            "blocked_items": [
+                                {
+                                    "skill_id": "finance-auto-bookkeeping",
+                                    "status_action": "push",
+                                    "plan_action": "blocked",
+                                    "allowed": False,
+                                    "category": "writer_policy",
+                                    "reason": "writer policy pull-only blocks push",
+                                    "recommendation": "Review before approved-push.",
+                                    "base_hash": "hash-before",
+                                    "local_hash": "hash-after",
+                                    "remote_hash": "hash-before",
+                                },
+                                {
+                                    "skill_id": "session-knowledge-manager",
+                                    "status_action": "local_deleted",
+                                    "plan_action": "blocked",
+                                    "allowed": False,
+                                    "category": "delete_review",
+                                    "reason": "local deletion requires --allow-delete before remote deletion",
+                                    "recommendation": "Require explicit retention or delete approval.",
+                                    "base_hash": "delete-base",
+                                    "local_hash": None,
+                                    "remote_hash": "delete-base",
+                                },
+                            ],
+                        },
+                        "blocked_report": {"total": 0, "summary": {}, "items": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = build_dashboard_status(
+                DashboardConfig(
+                    local_root=local_root,
+                    remote_snapshot=snapshot_dir,
+                    base_record=base_record,
+                    allow_new=True,
+                    peer_status_files={"oc-vps": peer_status},
+                )
+            )
+
+            guide = status["dashboard"]["operator"]["action_guide"]
+            self.assertEqual(status["dashboard"]["blocked"], 2)
+            self.assertEqual(guide["title"], "先处理缺失/删除确认")
+            self.assertIn("session-knowledge-manager", guide["summary"])
+            self.assertIn("不会静默删除", guide["summary"])
+            self.assertIn("红色邮件提醒", guide["note"])
+
     def test_dashboard_hub_import_preview_response_is_non_writing_dry_run(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
