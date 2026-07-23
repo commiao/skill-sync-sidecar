@@ -6951,6 +6951,14 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "标记废弃需要打开发布开关"
             : "标记中央仓库已废弃；保留原文件和历史版本");
       });
+      document.querySelectorAll(".inventory-publish-button").forEach((button) => {
+        button.disabled = !available || !executorAllowPublish || !button.dataset.sourcePath;
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowPublish
+            ? "发布中央仓库需要打开发布开关"
+            : "先检查，再确认，把这个本机 skill 发布到中央仓库");
+      });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7491,6 +7499,74 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
+    async function publishInventorySkill(button) {
+      const skillId = button.dataset.skillId || "";
+      const sourcePath = button.dataset.sourcePath || "";
+      if (!skillId || !sourcePath) return;
+      if (!executorAvailable || !executorAllowPublish) {
+        setReviewFeedback("yellow", "还不能发布中央仓库", "需要 Mac 本机助手在线，并打开发布开关。");
+        setExecutorStatus("not ready", "本机助手还不能写入共享仓库。", "yellow");
+        return;
+      }
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查发布 ${skillId}`, "检查只读；先确认这个本机 skill 可以写入中央仓库。");
+      setExecutorStatus("local publish check", `正在检查 ${skillId} 的中央仓库发布。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/local-skill/publish-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: sourcePath }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_push) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，会把这个 skill 发布到中央仓库。");
+        if (!confirmProtectedWrite({
+          word: "PUBLISH",
+          title: `确认发布中央仓库：${skillId}`,
+          will: [
+            `把当前 Mac 上的 ${skillId} 发布到中央仓库。`,
+            "只处理这一个 skill。",
+            "完成后自动刷新本机和中央仓库状态。",
+          ],
+          willNot: [
+            "不会安装到 OpenClaw、Windows 或其他工具。",
+            "不会删除中央仓库已有内容。",
+            "不会发布项目级 skill 的全局安装动作。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", "发布中央仓库已取消。", "yellow");
+          setReviewFeedback("yellow", "已取消", "没有写入共享仓库。");
+          return;
+        }
+        setReviewFeedback("yellow", `正在发布 ${skillId}`, "正在上传中央仓库快照；完成后会刷新状态。");
+        setExecutorStatus("publishing", `正在发布 ${skillId} 到中央仓库。`, "yellow");
+        const response = await fetch(`${EXECUTOR_URL}/api/local-skill/publish`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: sourcePath, confirm: "PUBLISH" }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (!response.ok || !payload.ok) {
+          throw new Error(executorErrorDetail(payload));
+        }
+        setReviewFeedback("green", `${skillId} 已发布中央仓库`, "共享仓库状态正在刷新；需要安装到其他工具时再在清单中勾选。");
+        setExecutorStatus("published", `${skillId} 已发布到中央仓库。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", "发布中央仓库失败", String(err));
+        setExecutorStatus("failed", "发布中央仓库失败，请查看执行输出。", "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
     async function generateConflictPackage(button) {
       const skillId = button.dataset.skillId || "";
       const peerId = button.dataset.peerId || "";
@@ -7677,6 +7753,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         `safe_to_restore=${text(payload.safe_to_restore)}`,
         `approved=${text(payload.approved)}`,
         `restored=${text(payload.restored)}`,
+        `uploaded_files=${text(payload.uploaded_files)}`,
+        `snapshot_id=${text(payload.snapshot_id)}`,
+        `skill_id=${text(payload.skill_id)}`,
         `conflicts=${text(payload.total_conflicts)}`,
         `skills=${Array.isArray(payload.approved_skill_ids) ? payload.approved_skill_ids.join(", ") : text(payload.approved_skill_ids)}`,
         `command=${text(payload.command)}`,
@@ -7967,6 +8046,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reactivateAction = centralState === "deprecated"
         ? `<button type="button" class="central-reactivate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="reactivateCentralSkill(this)" disabled>恢复发布</button>`
         : "";
+      const publishPath = macPublishSourcePath(item);
+      const publishAction = centralState === "unpublished"
+        ? (item.scope === "project"
+          ? `<span class="skill-tool-check">项目级暂不一键发布</span>`
+          : (publishPath
+            ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布中央仓库</button>`
+            : `<span class="skill-tool-check">等待本机路径</span>`))
+        : "";
       return `
         <article class="skill-inventory-row">
           <div>
@@ -7977,6 +8064,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="skill-inventory-action-row">
             <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
+            ${publishAction}
             ${deprecateAction}
             ${reactivateAction}
           </div>
@@ -8017,6 +8105,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         .filter((installed) => text(installed.device_id) === "mac")
         .map((installed) => text(installed.tool_id))
         .filter(Boolean));
+    }
+
+    function macPublishSourcePath(item) {
+      const installations = Array.isArray(item.installations) ? item.installations : [];
+      const local = installations.filter((installed) => text(installed.device_id) === "mac" && text(installed.path));
+      const order = ["cc-switch", "codex", "cursor", "claude-code", "skillshub"];
+      for (const toolId of order) {
+        const found = local.find((installed) => text(installed.tool_id) === toolId);
+        if (found) return text(found.path);
+      }
+      return local.length > 0 ? text(local[0].path) : "";
     }
 
     function skillTargetsTool(item, tool) {

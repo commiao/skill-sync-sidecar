@@ -45,6 +45,8 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 - Search and filters are view-only helpers. Users can filter by skill name/description, central lifecycle state, scope, local tool, or pending sync state without changing files.
 - Checking a local tool box installs a central published skill into that Mac tool root after dry-run and `INSTALL` confirmation.
 - Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after dry-run and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
+- `发布中央仓库` appears for unpublished public skills that have a current Mac source path. It runs a dry-run first, then requires `PUBLISH`; it does not install the skill onto other devices.
+- Project-scoped skills are shown in the inventory but are not one-click published from the global list yet. They need a project-level policy before distribution.
 - `标记废弃` updates the central snapshot lifecycle to `deprecated` after dry-run and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
 - `恢复发布` updates the central snapshot lifecycle from `deprecated` back to `published` after dry-run and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 

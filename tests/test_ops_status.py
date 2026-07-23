@@ -29,6 +29,7 @@ from skill_sync_sidecar.central_lifecycle import (
 from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
+    local_publish_root_for_source,
     run_mac_codex_install_from_central,
     run_mac_tool_install_from_central,
     run_mac_tool_uninstall,
@@ -923,6 +924,13 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/central-reactivate-dry-run", DASHBOARD_HTML)
             self.assertIn("/api/central-reactivate", DASHBOARD_HTML)
             self.assertIn("勾选后安装到 ${tool.label}", DASHBOARD_HTML)
+            self.assertIn("发布中央仓库", DASHBOARD_HTML)
+            self.assertIn("inventory-publish-button", DASHBOARD_HTML)
+            self.assertIn("publishInventorySkill", DASHBOARD_HTML)
+            self.assertIn("macPublishSourcePath", DASHBOARD_HTML)
+            self.assertIn("项目级暂不一键发布", DASHBOARD_HTML)
+            self.assertIn("data-source-path", DASHBOARD_HTML)
+            self.assertIn("不会安装到 OpenClaw、Windows 或其他工具", DASHBOARD_HTML)
             self.assertIn("标记废弃", DASHBOARD_HTML)
             self.assertIn("恢复发布", DASHBOARD_HTML)
             self.assertIn("deprecateCentralSkill", DASHBOARD_HTML)
@@ -1626,6 +1634,20 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(args.port, 18765)
         self.assertTrue(args.allow_publish)
         self.assertTrue(args.allow_local_writes)
+
+    def test_operator_executor_infers_local_publish_root_from_source_path(self):
+        self.assertEqual(
+            local_publish_root_for_source(Path("/tmp/codex/demo"), "demo"),
+            Path("/tmp/codex"),
+        )
+        self.assertEqual(
+            local_publish_root_for_source(Path("/tmp/codex/demo/SKILL.md"), "demo"),
+            Path("/tmp/codex"),
+        )
+        self.assertEqual(
+            local_publish_root_for_source(Path("/tmp/codex"), "demo"),
+            Path("/tmp"),
+        )
 
     def test_local_skill_publish_parser_accepts_selective_publish_arguments(self):
         parser = build_parser()

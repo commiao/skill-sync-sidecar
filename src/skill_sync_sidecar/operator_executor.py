@@ -322,6 +322,16 @@ def run_central_reactivate(
     )
 
 
+def local_publish_root_for_source(source_path: Path, skill_id: str) -> Path:
+    source = source_path.expanduser()
+    skill_dir = source.parent if source.name == "SKILL.md" else source
+    if skill_dir.name != skill_id:
+        candidate = skill_dir / skill_id
+        if (candidate / "SKILL.md").exists():
+            return skill_dir
+    return skill_dir.parent
+
+
 def run_openclaw_central_restore(
     repo_root: Path,
     skill_ids: Sequence[str],
@@ -812,10 +822,12 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     return
                 if path == "/api/local-skill/publish-dry-run":
                     source_path = _payload_path(payload)
-                    skill_id = analyze_local_skill(source_path)["skill_id"]
+                    analysis = analyze_local_skill(source_path)
+                    skill_id = analysis["skill_id"]
+                    local_root = local_publish_root_for_source(source_path, skill_id)
                     remote, prefix = _local_publish_remote()
                     result = publish_local_skill(
-                        Path.home() / ".cc-switch" / "skills",
+                        local_root,
                         Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
                         skill_id,
                         remote,
@@ -834,10 +846,12 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         self._send_json(400, {"ok": False, "error": "confirm must be PUBLISH"})
                         return
                     source_path = _payload_path(payload)
-                    skill_id = analyze_local_skill(source_path)["skill_id"]
+                    analysis = analyze_local_skill(source_path)
+                    skill_id = analysis["skill_id"]
+                    local_root = local_publish_root_for_source(source_path, skill_id)
                     remote, prefix = _local_publish_remote()
                     result = publish_local_skill(
-                        Path.home() / ".cc-switch" / "skills",
+                        local_root,
                         Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
                         skill_id,
                         remote,
