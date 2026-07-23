@@ -5647,8 +5647,6 @@ DASHBOARD_HTML = r"""<!doctype html>
           `
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
-            <button type="button" onclick="deferSourceChangedItems()">暂时搁置<span>仅隐藏首页提醒。</span></button>
-            <button type="button" onclick="refresh(true)">刷新状态<span>只重新读取，不写入。</span></button>
           `;
         facts = allSourceChangedReady
           ? [
@@ -5667,6 +5665,16 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-card-title">正在变化的 skill</div>
             <div class="simple-action-summary">${escapeHtml(sourceChangedNames)}</div>
           </div>
+          ${allSourceChangedReady ? "" : `
+          <div class="simple-action-card">
+            <div class="simple-action-card-title">还没改完？</div>
+            <div class="simple-action-summary">可以先搁置首页提醒，或只刷新状态；这两个动作都不会写共享库。</div>
+            <div class="simple-decision-actions">
+              <button type="button" onclick="deferSourceChangedItems()">暂时搁置</button>
+              <button type="button" onclick="refresh(true)">刷新状态</button>
+            </div>
+          </div>
+          `}
         `;
       } else if (publishItems.length > 0) {
         const readyPublishItems = regularPublishItems.filter((item) => {
