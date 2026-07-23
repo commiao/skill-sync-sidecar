@@ -4740,6 +4740,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .local-skill-next {
+      color: var(--ink);
+      background: #f7fbff;
+      border-left: 3px solid #2557a7;
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 760;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .local-skill-next[hidden] {
+      display: none;
+    }
     .local-skill-detail {
       color: var(--muted);
       font-size: 12px;
@@ -5171,6 +5185,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button id="local-skill-publish" type="button" onclick="publishLocalSkill(true)" disabled>发布到共享库</button>
             </div>
             <div id="local-skill-result" class="local-skill-result">粘贴路径后点“开始”；检查只读，安装和发布都会再次确认。</div>
+            <div id="local-skill-next" class="local-skill-next" hidden></div>
             <details id="local-skill-detail" class="local-skill-detail" hidden>
               <summary>查看发布明细</summary>
               <div id="local-skill-detail-body" class="local-skill-detail-body"></div>
@@ -6939,7 +6954,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     function showLocalSkillPublishGateHelp() {
       setLocalSkillStatus("publish locked", "保存权限未开启；当前不会写共享库。", "yellow");
       if (lastLocalSkillAnalysis) {
-        $("local-skill-result").textContent = `${lastLocalSkillAnalysis.skill_id}：当前可以先检查共享；保存到共享库需要先开启保存权限。`;
+        setLocalSkillResult(
+          `${lastLocalSkillAnalysis.skill_id}：当前可以先检查共享；保存到共享库需要先开启保存权限。`,
+          "下一步：查看开启方法；开启后刷新页面，再点“发布到共享库”。",
+        );
       }
       showPublishGateHelp();
     }
@@ -9999,7 +10017,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "publish failed");
         setLocalSkillStatus(realPublish ? "published" : "publish ok", realPublish ? "共享库已更新。" : "检查通过，可以发布到共享库。", "green");
-        $("local-skill-result").textContent = `${payload.skill_id}：${realPublish ? "已发布到共享库。" : (payload.safe_to_push ? "检查通过，可以发布。" : "需要复核后再发布。")}`;
+        setLocalSkillResult(
+          `${payload.skill_id}：${realPublish ? "已发布到共享库。" : (payload.safe_to_push ? "检查通过，可以发布。" : "需要复核后再发布。")}`,
+          realPublish
+            ? "下一步：共享库已更新；其他设备会通过 sidecar 拉取，本机其他工具可在 Skill 清单里勾选安装。"
+            : (payload.safe_to_push
+              ? "下一步：点“发布到共享库”，输入 PUBLISH 后写入共享库。"
+              : "下一步：打开“查看发布明细”，确认风险后再决定是否发布。"),
+        );
         setLocalSkillDetail([
           ["检查结果", payload.safe_to_push ? "可以发布" : "需要复核"],
           ["文件", text(payload.uploaded_files)],
@@ -10017,14 +10042,22 @@ DASHBOARD_HTML = r"""<!doctype html>
       const summary = payload.summary || {};
       const writes = Number(summary.will_write || 0);
       const scopeText = payload.scope === "project" ? "项目级" : "公用";
-      $("local-skill-result").textContent = `${payload.skill_id}：识别为${scopeText} skill，可安装到 ${writes} 个本机工具。`;
+      setLocalSkillResult(
+        `${payload.skill_id}：识别为${scopeText} skill，可安装到 ${writes} 个本机工具。`,
+        writes > 0
+          ? "下一步：点“安装到本机工具”；要共享给其他设备，再点“检查共享”。"
+          : "下一步：查看下方工具原因；当前没有可写入的本机工具。",
+      );
       setLocalSkillDetail([]);
       renderLocalSkillTools(payload.tools || []);
     }
 
     function renderLocalSkillInstall(payload) {
       const summary = payload.summary || {};
-      $("local-skill-result").textContent = `${payload.skill_id} 已安装到本机工具，写入 ${text(summary.will_write)} 处；已保留安装记录和备份。`;
+      setLocalSkillResult(
+        `${payload.skill_id} 已安装到本机工具，写入 ${text(summary.will_write)} 处；已保留安装记录和备份。`,
+        "下一步：需要跨设备复用时，先点“检查共享”；只在本机使用则到这里就完成。",
+      );
       setLocalSkillDetail([]);
       renderLocalSkillTools(payload.items || []);
     }
@@ -10032,7 +10065,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderLocalSkillPublishHint() {
       if (!lastLocalSkillAnalysis) return;
       if (!executorAllowPublish) {
-        $("local-skill-result").textContent += " 发布开关未打开时，可以先检查共享；真实发布需要启用发布权限。";
+        const writes = Number((lastLocalSkillAnalysis.summary || {}).will_write || 0);
+        setLocalSkillNext(
+          writes > 0
+            ? "下一步：先点“安装到本机工具”；要共享给其他设备，先点“检查共享”，真实发布需开启保存权限。"
+            : "下一步：可以先点“检查共享”；真实发布需开启保存权限。",
+        );
       }
     }
 
@@ -10047,7 +10085,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderLocalSkillError(message) {
       lastLocalSkillAnalysis = null;
-      $("local-skill-result").textContent = message;
+      setLocalSkillResult(message, "");
       $("local-skill-tools").innerHTML = "";
       setLocalSkillDetail([]);
       setLocalSkillStatus("error", message, "red");
@@ -10056,8 +10094,21 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function setLocalSkillStatus(label, detail, kind) {
       $("local-skill-pill").outerHTML = pill(statusPillLabel(label), kind).replace("<span", "<span id=\"local-skill-pill\"");
-      $("local-skill-result").textContent = detail;
+      setLocalSkillResult(detail, "");
       updateLocalSkillGuide(label);
+    }
+
+    function setLocalSkillResult(message, nextStep) {
+      $("local-skill-result").textContent = message;
+      setLocalSkillNext(nextStep);
+    }
+
+    function setLocalSkillNext(nextStep) {
+      const next = $("local-skill-next");
+      if (!next) return;
+      const clean = text(nextStep);
+      next.hidden = !clean;
+      next.textContent = clean;
     }
 
     function setLocalSkillDetail(rows) {
