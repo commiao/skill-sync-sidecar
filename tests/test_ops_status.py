@@ -1347,6 +1347,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["dashboard"]["operator"]["action_guide"]["title"], "OpenClaw 仍在更新")
             self.assertIn("改完后点检查最新版本", status["dashboard"]["operator"]["action_guide"]["summary"])
             self.assertIn("不应阻塞其他独立更新", status["dashboard"]["operator"]["action_guide"]["note"])
+            devices = {device["id"]: device for device in status["dashboard"]["devices"]}
+            self.assertEqual(devices["oc-vps"]["note"], "OpenClaw 仍在更新；改完后再同步")
 
     def test_dashboard_prioritizes_delete_review_over_source_changed(self):
         with TemporaryDirectory() as tmp:

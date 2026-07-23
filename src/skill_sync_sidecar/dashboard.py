@@ -913,12 +913,16 @@ def _peer_device(
     health = status.get("health", "unknown")
     blocked = sync_plan.get("blocked")
     last_seen_at = _status_last_seen_at(status)
+    peer_blocked_items = _blocked_report_items(peer_id, name, status)
     if status.get("error"):
         note = f"读取 peer status 失败：{status.get('error')}"
     elif health == "green":
         note = "远端同步已完成"
     elif health == "yellow":
-        note = "远端有需要确认的同步项"
+        if peer_blocked_items and all(item.get("operator_state") == "source_changed" for item in peer_blocked_items):
+            note = "OpenClaw 仍在更新；改完后再同步"
+        else:
+            note = "远端有需要确认的同步项"
     elif health == "red":
         note = "远端状态异常，需要检查 sidecar"
     else:
