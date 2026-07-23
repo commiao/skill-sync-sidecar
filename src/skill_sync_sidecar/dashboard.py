@@ -4242,7 +4242,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="easy-card-label">同步更新</div>
           <h2>把已确认的更新同步出去</h2>
           <p>有设备更新时，这里会出现“先检查”和“同步到其他设备”。没有需要确认的事项时不用点任何按钮。</p>
-          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“同步已完成”时，可以关闭页面或继续工作。</div>
+          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。</div>
           <div id="easy-sync-actions" class="easy-action-row pending" hidden>
             <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
             <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
@@ -4251,7 +4251,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <ol id="easy-sync-steps" class="easy-steps" aria-label="发布流程" hidden>
             <li><strong>1</strong><span>先检查会同步哪些 skill；这一步不会写入。</span></li>
             <li><strong>2</strong><span>确认同步；发布前还会要求输入确认词。</span></li>
-            <li><strong>3</strong><span>看到“同步已完成”才算完成。</span></li>
+            <li><strong>3</strong><span>看到“现在不用做任何事”才算完成。</span></li>
           </ol>
         </div>
       </div>
@@ -4961,11 +4961,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="simple-action-hero">
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
-              <div class="simple-action-title">同步已完成</div>
-              <div class="simple-action-summary">Mac、OpenClaw、共享仓库当前已对齐。你可以关闭页面；需要新增、安装或主动同步 skill 时，再展开“可选：新增或同步 skill”。</div>
+              <div class="simple-action-title">现在不用做任何事</div>
+              <div class="simple-action-summary">当前没有需要你处理的 skill。可以直接关闭页面；要新增或安装 skill 时，再打开“更多操作和详情”。</div>
             </div>
           </div>
-          <div class="simple-action-done-line"><strong>放心：</strong>本页不会自动改其他设备；发布或跨设备写入前都会再问你。</div>
+          <div class="simple-action-done-line"><strong>放心：</strong>没有确认前，本页不会自动改其他设备。</div>
         `;
         setExecutorButtons(executorAvailable);
         return;
@@ -4976,9 +4976,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const judgmentCount = conflictItems.length + deleteItems.length;
-      let title = `现在有 ${blocked} 件事需要处理`;
-      let summary = `不用理解所有状态词。先按右侧推荐按钮；检查只读，真正同步或恢复前都会再次确认。`;
-      let primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">看推荐清单<span>只展开清单，不会写入或删除。</span></button>`;
+      let title = `现在先处理 ${blocked} 件事`;
+      let summary = `不用理解下面的状态数字。先点右侧按钮；真正写入、找回或删除前都会再次确认。`;
+      let primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">看看要处理什么<span>只打开详情，不会写入或删除。</span></button>`;
       let facts = [
         ["不会自动覆盖", "有风险时会停下来等你确认。"],
         ["先看再执行", "检查只读，发布前还要确认。"],
@@ -4990,11 +4990,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         const skill = text(item.skill_id || "unknown-skill");
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
-        title = conflictItems.length === 1 ? `先看差异：${skill}` : `先看 ${conflictItems.length} 个 skill 的差异`;
-        summary = "两边都有改动，系统已经暂停自动同步。你现在只需要生成只读报告；报告出来后再选保留哪一版。";
+        title = conflictItems.length === 1 ? `先看看哪里不一样：${skill}` : `先看看 ${conflictItems.length} 个 skill 哪里不一样`;
+        summary = "两边都改过，系统已经停下来等你决定。现在只生成报告，不会改任何文件。";
         primaryActions = `
           <div class="simple-choice-grid single-choice" aria-label="处理版本差异">
-            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成只读报告<span>不会发布、不会恢复、不会删除。</span></button>
+            <button type="button" class="primary conflict-package-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="generateConflictPackage(this)">生成报告<span>只看差异，不会改文件。</span></button>
           </div>
         `;
         facts = [
@@ -5014,28 +5014,28 @@ DASHBOARD_HTML = r"""<!doctype html>
         const peerId = text(item.peer_id || "");
         const reviewKey = reviewItemKey(item);
         const restoreTarget = restoreDeviceLabel(item);
-        title = restoreItems.length === 1 ? `建议恢复：${skill}` : `建议先恢复 ${restoreItems.length} 个缺失 skill`;
-        summary = `${restoreTarget} 上缺失，但中央库还有完整版本。默认安全动作是恢复到缺失设备，不删除中央库。`;
+        title = restoreItems.length === 1 ? `建议找回：${skill}` : `建议先找回 ${restoreItems.length} 个 skill`;
+        summary = `${restoreTarget} 上少了这个 skill，共享库里还在。建议先找回来，不删除共享库里的版本。`;
         primaryActions = `
-          <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">恢复到 ${escapeHtml(restoreTarget)}<span>会先检查，再要求确认。</span></button>
+          <button type="button" class="primary central-restore-button" data-skill-id="${escapeHtml(skill)}" data-peer-id="${escapeHtml(peerId)}" data-review-key="${escapeHtml(reviewKey)}" onclick="restoreCentralSkill(this)">找回到 ${escapeHtml(restoreTarget)}<span>会先检查，再要求确认。</span></button>
         `;
         facts = [
-          ["推荐动作", `恢复 ${skill}。`],
-          ["不会发生", "不会删除中央库，也不会影响其他设备。"],
-          ["需要确认", "恢复前会再次确认。"],
+          ["推荐动作", `把 ${skill} 找回来。`],
+          ["不会发生", "不会删除共享库，也不会影响其他设备。"],
+          ["需要确认", "真正找回前会再次确认。"],
         ];
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (sourceChangedItems.length > 0) {
-        title = sourceChangedItems.length === 1 ? `先等 OpenClaw 改完：${sourceChangedNames}` : `先等 OpenClaw 改完这 ${sourceChangedItems.length} 个 skill`;
-        summary = "现在不要反复点同步。它表示 OpenClaw 又产生了新版本，不是按钮没反应；等那边停止修改后，刷新并检查最后一次。";
+        title = sourceChangedItems.length === 1 ? `先等等，OpenClaw 还在改：${sourceChangedNames}` : `先等等，OpenClaw 还在改 ${sourceChangedItems.length} 个 skill`;
+        summary = "现在不要反复点同步。这不是按钮没反应，而是 OpenClaw 又有新改动；等那边停下来后再刷新。";
         primaryActions = `
-          <button type="button" class="primary" onclick="refresh(true)">刷新，看是否稳定<span>只重新读取状态，不写共享仓库。</span></button>
+          <button type="button" class="primary" onclick="refresh(true)">刷新看看<span>只重新读取状态，不写入。</span></button>
         `;
         facts = [
           ["发生了什么", "OpenClaw 本地版本又变了，旧更新大概率已发布。"],
           ["现在别做", "不要反复同步同一个正在修改的 skill。"],
           ["下一步", "只刷新状态；稳定后页面会重新给出检查/发布入口。"],
-          ["完成标准", "顶部显示“同步已完成”。"],
+          ["完成标准", "顶部显示“现在不用做任何事”。"],
         ];
         taskCards = `
           <div class="simple-action-card">
@@ -5049,27 +5049,27 @@ DASHBOARD_HTML = r"""<!doctype html>
           return result && result.publishReady;
         });
         const allPublishReady = regularPublishItems.length > 0 && readyPublishItems.length === regularPublishItems.length;
-        title = allPublishReady ? `检查通过，可以同步 ${regularPublishItems.length} 个更新` : `先检查 ${publishItems.length} 个待同步更新`;
+        title = allPublishReady ? `检查通过，可以保存 ${regularPublishItems.length} 个更新` : `先检查 ${publishItems.length} 个更新`;
         summary = allPublishReady
-          ? "现在只剩最后一步：同步到中央库。同步后页面会自动回查；如果又出现新修改，顶部会继续告诉你下一步。"
-          : "这些更新来自设备本地改动。先点检查，只看会改什么；检查通过后按钮会变成“同步到中央库”。";
+          ? "现在只剩最后一步：保存到共享库。保存后页面会自动回查；如果又出现新修改，顶部会继续告诉你下一步。"
+          : "先检查会改哪些 skill。这一步只看结果，不会写入。检查通过后按钮会变成“保存到共享库”。";
         primaryActions = allPublishReady
           ? `
-            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>同步到中央库<span>会要求输入 PUBLISH。</span></button>
+            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
           `
           : `
             <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查一下<span>只读，不写入。</span></button>
           `;
         facts = allPublishReady
           ? [
-            ["下一步", "点“同步到中央库”。"],
+            ["下一步", "点“保存到共享库”。"],
             ["确认词", "输入 PUBLISH 后才会写入。"],
-            ["完成标准", "顶部显示“同步已完成”。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
           ]
           : [
-            ["要同步", `${regularPublishNames || publishNames}。`],
-            ["第一步", "检查只读，不写中央库。"],
-            ["完成标准", "顶部显示“同步已完成”。"],
+            ["要检查", `${regularPublishNames || publishNames}。`],
+            ["第一步", "检查只读，不写共享库。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
           ];
         taskCards = `
           <div class="simple-action-card">
@@ -5078,13 +5078,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
         `;
       } else if (deleteItems.length > 0) {
-        title = `先处理 ${deleteItems.length} 个缺失 skill`;
-        summary = "缺失不等于删除。sidecar 默认保留中央库，先让你决定恢复到缺失设备，还是单独删除中央库版本。";
-        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">查看缺失项<span>不会删除中央库。</span></button>`;
+        title = `先看看 ${deleteItems.length} 个少掉的 skill`;
+        summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是以后单独删除共享库版本。";
+        primaryActions = `<button type="button" class="primary" onclick="openAdvancedDetails()">看看少了什么<span>只打开详情，不会删除。</span></button>`;
         facts = [
           ["缺失项", `${deleteNames}。`],
-          ["默认安全", "保留中央库。"],
-          ["删除保护", "删除中央库不会一键执行。"],
+          ["默认安全", "保留共享库。"],
+          ["删除保护", "删除不会一键执行。"],
         ];
         taskCards = renderSimpleDecisionList([], deleteItems);
       }
@@ -6353,7 +6353,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? (sourceChangedCount > 0
             ? "OpenClaw 还在产生新修改。先等源端稳定；确定稳定后再检查同步。"
             : "检测到待确认更新。先检查，确认安全后再同步到其他设备。")
-          : "当前没有待同步更新。顶部显示“同步已完成”时，可以关闭页面或继续工作。";
+          : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。";
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
@@ -6383,17 +6383,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (simplePublish) {
         simplePublish.textContent = !available
           ? "等待本机助手"
-          : (!executorAllowPublish ? "同步开关未打开" : (sourceChangedCount > 0 ? "等稳定后同步" : "同步到中央库"));
+          : (!executorAllowPublish ? "保存开关未打开" : (sourceChangedCount > 0 ? "等稳定后保存" : "保存到共享库"));
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "同步开关未打开"
+            ? "保存开关未打开"
             : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe
               ? "源端还在变化；等稳定后先检查"
               : (!reviewReady && !lastDryRunSafe
               ? "先检查，确认结果显示可以发布"
-              : "同步到中央库")));
+              : "保存到共享库")));
       }
       const localSkillAnalyze = $("local-skill-analyze");
       const localSkillInstall = $("local-skill-install");
@@ -6531,7 +6531,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setReviewFeedback(
             "green",
             isPublish ? "发布完成" : "检查通过",
-            isPublish ? "中央库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续同步到中央库。",
+            isPublish ? "共享库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续保存到共享库。",
           );
           if (!isPublish) {
             actionSkills.forEach((skillId) => {
@@ -6828,7 +6828,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (payload.ok && payload.safe_to_push) {
           setExecutorStatus("检查通过", `${skillId} 检查通过：可以发布。`, "green");
           updateReviewTaskResult(reviewItem || skillId, { label: "检查通过", kind: "green", publishReady: true });
-          setReviewFeedback("green", `${skillId} 检查通过`, "可以继续同步到中央库。");
+          setReviewFeedback("green", `${skillId} 检查通过`, "可以继续保存到共享库。");
         } else if (payload.ok) {
           setExecutorStatus("needs review", `${skillId} 检查完成，但还不能发布，请看输出。`, "yellow");
           updateReviewTaskResult(reviewItem || skillId, { label: "需复核", kind: "yellow", publishReady: false });
