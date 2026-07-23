@@ -5454,6 +5454,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentSkillInventoryTriage = "all";
     let currentSkillInventoryQuick = "all";
     let recentLocalToolChanges = [];
+    let lastOperationFeedback = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -5878,9 +5879,10 @@ DASHBOARD_HTML = r"""<!doctype html>
                 <button type="button" class="primary" onclick="clearSourceChangeDeferrals()">取消搁置<span>回到正常待确认状态。</span></button>
                 <button type="button" onclick="openReviewDetails()">查看确认清单<span>只打开详情，不写入。</span></button>
               </div>
-            </div>
-            <div class="simple-action-done-line"><strong>安全边界：</strong>搁置只保存在当前浏览器，不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
-          `;
+          </div>
+          ${simpleActionFeedbackHtml()}
+          <div class="simple-action-done-line"><strong>安全边界：</strong>搁置只保存在当前浏览器，不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
+        `;
           setExecutorButtons(executorAvailable);
           return;
         }
@@ -5895,6 +5897,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <button type="button" class="primary" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、发布共享。</span></button>
             </div>
           </div>
+          ${simpleActionFeedbackHtml()}
           <div class="simple-action-done-line"><strong>放心：</strong>没有确认前，本页不会自动改其他设备。</div>
         `;
         setExecutorButtons(executorAvailable);
@@ -6072,13 +6075,38 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-disabled-note" class="simple-action-disabled-note">正在确认当前按钮状态。</div>
       </div>
         ${renderSimpleActionMore(facts, taskCards)}
-        <div id="simple-action-feedback" class="simple-action-feedback" hidden>
-          <strong id="simple-action-feedback-title">等待操作</strong>
-          <span id="simple-action-feedback-detail">选择一个按钮后，这里会显示进度。</span>
-        </div>
+        ${simpleActionFeedbackHtml()}
         <div id="simple-action-note" class="simple-action-note">只需要按顶部推荐按钮走；下面的数字、设备、版本信息都是排查时才看的详情。</div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function simpleActionFeedbackHtml() {
+      const feedback = recentOperationFeedback();
+      if (!feedback) {
+        return `
+          <div id="simple-action-feedback" class="simple-action-feedback" hidden>
+            <strong id="simple-action-feedback-title">等待操作</strong>
+            <span id="simple-action-feedback-detail">选择一个按钮后，这里会显示进度。</span>
+          </div>
+        `;
+      }
+      return `
+        <div id="simple-action-feedback" class="simple-action-feedback ${escapeHtml(feedback.kind || "")}">
+          <strong id="simple-action-feedback-title">${escapeHtml(feedback.title)}</strong>
+          <span id="simple-action-feedback-detail">${escapeHtml(feedback.detail)}</span>
+        </div>
+      `;
+    }
+
+    function recentOperationFeedback() {
+      if (!lastOperationFeedback) return null;
+      const maxAgeMs = 30 * 60 * 1000;
+      if (Date.now() - Number(lastOperationFeedback.at || 0) > maxAgeMs) {
+        lastOperationFeedback = null;
+        return null;
+      }
+      return lastOperationFeedback;
     }
 
     function renderSimpleActionMore(facts, taskCards) {
@@ -7124,6 +7152,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function setReviewFeedback(kind, title, detail) {
+      if (shouldRememberOperationFeedback(kind, title)) {
+        lastOperationFeedback = { kind, title, detail, at: Date.now() };
+      }
       const feedback = $("review-feedback");
       if (feedback) {
         feedback.hidden = false;
@@ -7138,6 +7169,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("simple-action-feedback-title").textContent = title;
         $("simple-action-feedback-detail").textContent = detail;
       }
+    }
+
+    function shouldRememberOperationFeedback(kind, title) {
+      if (kind !== "green") return false;
+      return /发布完成|本次发布已完成|已发布|已安装|已从|已恢复|已标记|已恢复发布|状态已刷新/.test(text(title));
     }
 
     function setButtonLabel(button, label, subtext) {
