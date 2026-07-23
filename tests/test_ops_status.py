@@ -707,6 +707,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderSimpleActionPanel(window.lastDashboard, currentReviewQueueItems)", DASHBOARD_HTML)
             self.assertIn("openAdvancedDetails", DASHBOARD_HTML)
             self.assertIn("openReviewDetails", DASHBOARD_HTML)
+            self.assertIn("if (advanced) advanced.open = true;", DASHBOARD_HTML)
+            self.assertIn("if (technical) technical.open = true;", DASHBOARD_HTML)
             self.assertIn("openSupportDrawer", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
             self.assertIn("<details id=\"easy-workspace\" class=\"easy-workspace panel\"", DASHBOARD_HTML)
