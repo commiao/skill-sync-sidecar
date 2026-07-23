@@ -6887,11 +6887,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    function showPublishGateHelp() {
+    function showPublishGateHelp(detail) {
       setReviewFeedback(
         "yellow",
         "还不能保存到共享库",
-        "本机助手当前只允许检查。需要开启保存权限后，首页才会出现可执行的保存按钮。",
+        detail || "本机助手当前只允许检查。需要开启保存权限后，首页才会出现可执行的保存按钮。",
       );
       showExecutorOutput([
         "保存到共享库需要重新安装 Mac 本机助手，并显式打开发布权限：",
@@ -6909,6 +6909,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("local-skill-result").textContent = `${lastLocalSkillAnalysis.skill_id}：当前可以先检查共享；保存到共享库需要先开启保存权限。`;
       }
       showPublishGateHelp();
+    }
+
+    function showInventoryPublishGateHelp(skillId) {
+      showPublishGateHelp(`${skillId || "这个 skill"} 当前不会写共享库；开启保存权限后再点发布，仍会先检查并要求输入 PUBLISH。`);
     }
 
     function openTechnicalWorkspace() {
@@ -7874,11 +7878,20 @@ DASHBOARD_HTML = r"""<!doctype html>
             : "标记共享库已废弃；保留原文件和历史版本");
       });
       document.querySelectorAll(".inventory-publish-button").forEach((button) => {
-        button.disabled = !available || !executorAllowPublish || !button.dataset.sourcePath;
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowPublish ? "开启保存权限" : "发布到共享库"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowPublish ? "查看说明；不会写共享库。" : "先检查，再确认。"),
+        );
+        button.disabled = !available || !button.dataset.sourcePath;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "发布共享库需要打开发布开关"
+            ? "保存权限未开启；点击查看开启方法"
             : "先检查，再确认，把这个本机 skill 发布到共享库");
       });
       document.querySelectorAll(".inventory-bulk-install-button").forEach((button) => {
@@ -8608,9 +8621,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       const sourcePath = button.dataset.sourcePath || "";
       if (!skillId || !sourcePath) return;
-      if (!executorAvailable || !executorAllowPublish) {
-        setReviewFeedback("yellow", "还不能发布共享库", "需要 Mac 本机助手在线，并打开发布开关。");
-        setExecutorStatus("not ready", "本机助手还不能写入共享库。", "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行发布检查。", "yellow");
+        return;
+      }
+      if (!executorAllowPublish) {
+        showInventoryPublishGateHelp(skillId);
         return;
       }
       setExecutorButtons(false);
