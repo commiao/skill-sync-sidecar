@@ -6915,6 +6915,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       showPublishGateHelp(`${skillId || "这个 skill"} 当前不会写共享库；开启保存权限后再点发布，仍会先检查并要求输入 PUBLISH。`);
     }
 
+    function showCentralMutationGateHelp(skillId, actionLabel) {
+      showPublishGateHelp(`${skillId || "这个 skill"} 当前不会${actionLabel || "修改共享库"}；开启保存权限后再点操作，仍会先检查并要求输入确认词。`);
+    }
+
     function openTechnicalWorkspace() {
       openSupportDrawer();
       const advanced = document.querySelector(".advanced-workspace");
@@ -7870,11 +7874,20 @@ DASHBOARD_HTML = r"""<!doctype html>
               : `${toolLabel} 当前不能通过本机客户端操作`));
       });
       document.querySelectorAll(".central-deprecate-button").forEach((button) => {
-        button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowPublish ? "开启保存权限" : "标记废弃"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowPublish ? "查看说明；不会改共享库。" : "只标记，不删除文件。"),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "标记废弃需要打开发布开关"
+            ? "保存权限未开启；点击查看开启方法"
             : "标记共享库已废弃；保留原文件和历史版本");
       });
       document.querySelectorAll(".inventory-publish-button").forEach((button) => {
@@ -7913,11 +7926,20 @@ DASHBOARD_HTML = r"""<!doctype html>
             : `先检查，再确认，把当前筛选结果从 ${toolLabel} 移除并保留备份`);
       });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
-        button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowPublish ? "开启保存权限" : "恢复发布"),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowPublish ? "查看说明；不会改共享库。" : "恢复共享库发布状态。"),
+        );
+        button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
-            ? "恢复发布需要打开发布开关"
+            ? "保存权限未开启；点击查看开启方法"
             : "恢复共享库发布状态；不自动安装到设备");
       });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
@@ -8484,9 +8506,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function deprecateCentralSkill(button) {
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
-      if (!executorAvailable || !executorAllowPublish) {
-        setReviewFeedback("yellow", "还不能标记废弃", "需要 Mac 本机助手在线，并打开发布开关。");
-        setExecutorStatus("not ready", "本机助手还不能写入共享库。", "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行废弃检查。", "yellow");
+        return;
+      }
+      if (!executorAllowPublish) {
+        showCentralMutationGateHelp(skillId, "标记废弃");
         return;
       }
       const reason = window.prompt(`为什么要废弃 ${skillId}？可留空。`, "") || "";
@@ -8552,9 +8578,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function reactivateCentralSkill(button) {
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
-      if (!executorAvailable || !executorAllowPublish) {
-        setReviewFeedback("yellow", "还不能恢复发布", "需要 Mac 本机助手在线，并打开发布开关。");
-        setExecutorStatus("not ready", "本机助手还不能写入共享库。", "yellow");
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行恢复发布检查。", "yellow");
+        return;
+      }
+      if (!executorAllowPublish) {
+        showCentralMutationGateHelp(skillId, "恢复发布");
         return;
       }
       const reason = window.prompt(`为什么要恢复发布 ${skillId}？可留空。`, "") || "";
