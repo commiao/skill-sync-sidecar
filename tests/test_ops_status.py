@@ -24,9 +24,25 @@ from skill_sync_sidecar.operator_executor import OperatorExecutorError, run_open
 from skill_sync_sidecar.ops_status import build_ops_status, reconcile_summary, render_ops_status_text
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
+from skill_sync_sidecar.tool_status import build_device_tool_status
 
 
 class OpsStatusTest(unittest.TestCase):
+    def test_device_tool_status_includes_lightweight_skill_items(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tool_root = root / "codex-skills"
+            self._write_skill(tool_root / "demo", "Demo", "Demo skill")
+
+            tools = build_device_tool_status(
+                [("codex", "Codex", [tool_root], "Codex 可发现目录")],
+                measured_at="2026-07-23T00:00:00Z",
+            )
+
+            self.assertEqual(tools[0]["skills"], 1)
+            self.assertEqual(tools[0]["skill_items"][0]["skill_id"], "demo")
+            self.assertEqual(tools[0]["skill_items"][0]["scope"], "global")
+
     def test_build_ops_status_summarizes_clean_sync_state(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -860,6 +876,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"local-workspace-tool-summary\"", DASHBOARD_HTML)
             self.assertIn("workspace-tool-details", DASHBOARD_HTML)
             self.assertIn("工具目录明细", DASHBOARD_HTML)
+            self.assertIn("Skill 清单", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-list\"", DASHBOARD_HTML)
+            self.assertIn("renderSkillInventory", DASHBOARD_HTML)
+            self.assertIn("inventoryWithLiveLocal", DASHBOARD_HTML)
+            self.assertIn("按 skill 查看", DASHBOARD_HTML)
             self.assertIn("renderLocalToolSummary", DASHBOARD_HTML)
             self.assertIn("toolSummaryItem", DASHBOARD_HTML)
             self.assertIn("已检测工具", DASHBOARD_HTML)
@@ -1310,6 +1331,15 @@ class OpsStatusTest(unittest.TestCase):
                                 "installed": True,
                                 "state": "detected",
                                 "skills": 3,
+                                "skill_items": [
+                                    {
+                                        "skill_id": "demo",
+                                        "name": "Demo",
+                                        "scope": "global",
+                                        "content_hash": "hash-demo",
+                                        "risk_level": "ok",
+                                    }
+                                ],
                                 "risk": {"ok": 3, "warning": 0, "error": 0},
                                 "measured_at": "2026-06-28T00:00:00Z",
                                 "note": "已检测到目录",
@@ -1326,6 +1356,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(device_tools["mac"]["tools"][0]["id"], "codex")
             self.assertEqual(device_tools["mac"]["tools"][0]["state"], "detected")
             self.assertFalse(device_tools["oc-vps"]["reported"])
+            inventory = status["dashboard"]["skill_inventory"]
+            self.assertEqual(inventory["total"], 1)
+            self.assertEqual(inventory["published"], 1)
+            self.assertEqual(inventory["items"][0]["skill_id"], "demo")
+            self.assertIn("codex", inventory["items"][0]["installed_tools"])
 
     def test_dashboard_summary_keeps_ui_data_without_heavy_projection(self):
         with TemporaryDirectory() as tmp:
@@ -1372,8 +1407,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(summary["dashboard"]["operator"]["snapshot_id"], "snap-summary")
             self.assertIn("tools", summary["dashboard"])
             self.assertIn("device_tools", summary["dashboard"])
+            self.assertIn("skill_inventory", summary["dashboard"])
             self.assertIn("planned_devices", summary["dashboard"])
             self.assertEqual(summary["dashboard"]["planned_devices"][0]["id"], "win")
+            self.assertEqual(summary["dashboard"]["skill_inventory"]["items"][0]["skill_id"], "demo")
             self.assertNotIn("tool_projection", summary["dashboard"])
             self.assertNotIn("items", summary["sync_plan"])
             self.assertNotIn("actions", summary["dashboard"]["hub_import"]["action_plan"])

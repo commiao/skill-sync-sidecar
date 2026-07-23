@@ -274,6 +274,11 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
         "central_repository": _central_repository_model(status, snapshot=status.get("remote_snapshot"), tools=tool_projection, blocked_items=blocked_items),
         "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
+        "skill_inventory": _skill_inventory_model(
+            device_tools,
+            central_skills=_central_snapshot_skill_items(config.remote_snapshot),
+            blocked_items=blocked_items,
+        ),
     }
     return status
 
@@ -293,6 +298,7 @@ def build_gateway_status(
         "created_at": index.get("created_at"),
         "total": index.get("total", len(index.get("skills", []))),
         "protocol_version": index.get("protocol_version"),
+        "skills": _central_snapshot_skill_items(snapshot_dir, index=index),
     }
     peers = dict(remote_peer_status or {})
     peers.update(_load_peer_status_files(peer_status_files or {}))
@@ -357,6 +363,7 @@ def build_gateway_status(
         "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
         "central_repository": _central_repository_model(status, snapshot=snapshot, tools=tools, blocked_items=blocked_items),
         "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
+        "skill_inventory": _skill_inventory_model(device_tools, central_skills=snapshot.get("skills"), blocked_items=blocked_items),
     }
     return status
 
@@ -438,6 +445,7 @@ def build_dashboard_summary(status: dict) -> dict:
             "local_workspace": dashboard.get("local_workspace", {}),
             "central_repository": dashboard.get("central_repository", {}),
             "device_map": dashboard.get("device_map", {}),
+            "skill_inventory": dashboard.get("skill_inventory", {}),
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
         },
     }
@@ -1240,6 +1248,177 @@ def _central_repository_model(status: dict, *, snapshot: Optional[dict], tools: 
         },
         "boundary": "共享仓库保存各设备共同使用的版本；只有你明确确认后才会写入。",
     }
+
+
+def _central_snapshot_skill_items(snapshot_dir: Path, *, index: Optional[dict] = None) -> list[dict]:
+    try:
+        snapshot_index = index if isinstance(index, dict) else json.loads((snapshot_dir / "index.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    items = []
+    for skill in snapshot_index.get("skills", []):
+        if not isinstance(skill, dict):
+            continue
+        skill_id = str(skill.get("skill_id") or "").strip()
+        if not skill_id:
+            continue
+        items.append(
+            {
+                "skill_id": skill_id,
+                "name": skill.get("name"),
+                "description": skill.get("description"),
+                "scope": skill.get("scope") or "global",
+                "content_hash": skill.get("content_hash"),
+                "targets": skill.get("targets") or [],
+            }
+        )
+    items.sort(key=lambda item: str(item.get("skill_id") or ""))
+    return items
+
+
+def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, blocked_items: list[dict]) -> dict:
+    central_items = central_skills if isinstance(central_skills, list) else []
+    by_skill: dict[str, dict] = {}
+    central_ids = set()
+    for skill in central_items:
+        if not isinstance(skill, dict):
+            continue
+        skill_id = str(skill.get("skill_id") or "").strip()
+        if not skill_id:
+            continue
+        central_ids.add(skill_id)
+        entry = by_skill.setdefault(skill_id, _empty_skill_inventory_item(skill_id))
+        entry["name"] = skill.get("name") or entry.get("name") or skill_id
+        entry["description"] = skill.get("description") or entry.get("description")
+        entry["scope"] = skill.get("scope") or entry.get("scope") or "global"
+        entry["central"] = {
+            "state": "published",
+            "content_hash": skill.get("content_hash"),
+            "targets": skill.get("targets") or [],
+        }
+
+    for group in device_tools:
+        if not isinstance(group, dict):
+            continue
+        device_id = str(group.get("device_id") or "unknown")
+        device_name = group.get("device_name") or device_id
+        tools = group.get("tools") if isinstance(group.get("tools"), list) else []
+        for tool in tools:
+            if not isinstance(tool, dict):
+                continue
+            tool_id = str(tool.get("id") or "unknown")
+            tool_name = tool.get("name") or tool_id
+            for skill in tool.get("skill_items") or []:
+                if not isinstance(skill, dict):
+                    continue
+                skill_id = str(skill.get("skill_id") or "").strip()
+                if not skill_id:
+                    continue
+                entry = by_skill.setdefault(skill_id, _empty_skill_inventory_item(skill_id))
+                entry["name"] = entry.get("name") or skill.get("name") or skill_id
+                entry["description"] = entry.get("description") or skill.get("description")
+                entry["scope"] = _merge_skill_scope(entry.get("scope"), skill.get("scope"))
+                entry["installations"].append(
+                    {
+                        "device_id": device_id,
+                        "device_name": device_name,
+                        "tool_id": tool_id,
+                        "tool_name": tool_name,
+                        "state": "installed",
+                        "path": skill.get("path"),
+                        "content_hash": skill.get("content_hash"),
+                        "risk_level": skill.get("risk_level"),
+                    }
+                )
+                if skill_id not in central_ids:
+                    entry["central"]["state"] = "unpublished"
+
+    blocked_by_skill: dict[str, list[dict]] = {}
+    for item in blocked_items:
+        if not isinstance(item, dict):
+            continue
+        skill_id = str(item.get("skill_id") or "").strip()
+        if skill_id:
+            blocked_by_skill.setdefault(skill_id, []).append(item)
+    for skill_id, items in blocked_by_skill.items():
+        entry = by_skill.setdefault(skill_id, _empty_skill_inventory_item(skill_id))
+        entry["sync_state"] = _inventory_sync_state(items)
+        entry["pending"] = len(items)
+
+    items = []
+    for entry in by_skill.values():
+        installs = entry.get("installations") if isinstance(entry.get("installations"), list) else []
+        devices = sorted({str(item.get("device_id")) for item in installs if item.get("device_id")})
+        tools = sorted({str(item.get("tool_id")) for item in installs if item.get("tool_id")})
+        entry["installed_devices"] = devices
+        entry["installed_tools"] = tools
+        entry["tool_count"] = len(tools)
+        entry["device_count"] = len(devices)
+        entry["action"] = _inventory_action(entry)
+        items.append(entry)
+    items.sort(key=lambda item: (0 if item.get("pending") else 1, str(item.get("skill_id") or "")))
+    visible = items[:80]
+    return {
+        "title": "Skill 清单",
+        "scope": "current-client",
+        "summary": "按 skill 查看中央仓库和各工具安装状态；首页只显示下一步，完整列表放在这里。",
+        "total": len(items),
+        "published": sum(1 for item in items if (item.get("central") or {}).get("state") == "published"),
+        "unpublished": sum(1 for item in items if (item.get("central") or {}).get("state") == "unpublished"),
+        "project": sum(1 for item in items if item.get("scope") == "project"),
+        "global": sum(1 for item in items if item.get("scope") == "global"),
+        "pending": sum(1 for item in items if int(item.get("pending") or 0) > 0),
+        "visible_limit": len(visible),
+        "items": visible,
+    }
+
+
+def _empty_skill_inventory_item(skill_id: str) -> dict:
+    return {
+        "skill_id": skill_id,
+        "name": skill_id,
+        "description": None,
+        "scope": "global",
+        "central": {"state": "unpublished"},
+        "sync_state": "ok",
+        "pending": 0,
+        "installations": [],
+    }
+
+
+def _merge_skill_scope(existing: object, incoming: object) -> str:
+    if existing == "project" or incoming == "project":
+        return "project"
+    if existing == "device-private" or incoming == "device-private":
+        return "device-private"
+    return str(existing or incoming or "global")
+
+
+def _inventory_sync_state(items: list[dict]) -> str:
+    states = {str(item.get("operator_state") or item.get("category") or item.get("status_action") or "") for item in items}
+    if "conflict" in states:
+        return "conflict"
+    if "delete_review" in states or "delete" in states:
+        return "delete_review"
+    if "source_changed" in states:
+        return "source_changed"
+    return "pending_publish"
+
+
+def _inventory_action(entry: dict) -> str:
+    central_state = (entry.get("central") or {}).get("state")
+    sync_state = entry.get("sync_state")
+    if sync_state == "source_changed":
+        return "改完后检查最新版本。"
+    if sync_state == "conflict":
+        return "先看只读差异报告。"
+    if sync_state == "delete_review":
+        return "先决定恢复还是废弃。"
+    if sync_state == "pending_publish":
+        return "检查通过后可发布中央仓库。"
+    if central_state == "unpublished":
+        return "可选择发布到中央仓库。"
+    return "可选择安装到本机工具。"
 
 
 def _device_map_model(devices: list[dict], planned_devices: list[dict], device_tools: list[dict], blocked_items: list[dict]) -> dict:
@@ -3826,6 +4005,110 @@ DASHBOARD_HTML = r"""<!doctype html>
     .workspace-tool-count {
       font-weight: 800;
     }
+    .skill-inventory-panel {
+      margin: 12px 0;
+    }
+    .skill-inventory-head {
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      list-style: none;
+    }
+    .skill-inventory-head::-webkit-details-marker {
+      display: none;
+    }
+    .skill-inventory-head > span:first-child {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+    #skill-inventory-summary {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-simple {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 12px 0 8px;
+    }
+    .skill-inventory-metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .skill-inventory-metric strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-metric span,
+    .skill-inventory-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .skill-inventory-list {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+    }
+    .skill-inventory-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.2fr) minmax(160px, .8fr);
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 9px 10px;
+      min-width: 0;
+    }
+    .skill-inventory-name {
+      color: var(--ink);
+      font-weight: 820;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-meta,
+    .skill-inventory-action {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .skill-tool-checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .skill-tool-check {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      background: var(--soft);
+      white-space: nowrap;
+    }
+    .skill-tool-check.installed {
+      border-color: #b8d8c8;
+      background: #ecfdf5;
+      color: #047857;
+      font-weight: 760;
+    }
+    .skill-tool-check.pending {
+      border-color: #e8d29c;
+      background: #fffbeb;
+      color: #a16207;
+      font-weight: 760;
+    }
     .local-skill-manager {
       border-top: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
@@ -4023,12 +4306,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       .workbench-grid { grid-template-columns: 1fr; }
       .plain-detail-grid { grid-template-columns: 1fr; }
+      .skill-inventory-row { grid-template-columns: 1fr; }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-followup.ready { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
       .cards { grid-template-columns: 1fr; }
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
+      .skill-inventory-simple { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .guide-steps { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -4278,6 +4563,23 @@ DASHBOARD_HTML = r"""<!doctype html>
           </ol>
         </div>
       </div>
+    </details>
+    <details class="skill-inventory-panel panel">
+      <summary class="skill-inventory-head">
+        <span>
+          <strong>Skill 清单</strong>
+          <span id="skill-inventory-summary">读取中</span>
+        </span>
+        <span class="pill green">按 skill 查看</span>
+      </summary>
+      <div class="skill-inventory-simple">
+        <div class="skill-inventory-metric"><strong id="skill-inventory-total">-</strong><span>全部 skill</span></div>
+        <div class="skill-inventory-metric"><strong id="skill-inventory-published">-</strong><span>已进共享仓库</span></div>
+        <div class="skill-inventory-metric"><strong id="skill-inventory-unpublished">-</strong><span>本机/设备独有</span></div>
+        <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
+      </div>
+      <div class="skill-inventory-note">这里只展示安装矩阵；首页仍只显示下一步。安装/卸载会在当前设备客户端执行，不跨设备直接写文件。</div>
+      <div id="skill-inventory-list" class="skill-inventory-list"></div>
     </details>
     <details class="quick-status-details">
       <summary>一般不用看：状态数字</summary>
@@ -6919,6 +7221,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderLocalWorkspace(dashboard.local_workspace || {});
       renderCentralRepository(dashboard.central_repository || {});
       renderDeviceMap(dashboard.device_map || {});
+      renderSkillInventory(dashboard.skill_inventory || {});
       renderWorkspaceOverviewSummary(dashboard);
       if (!executorAvailable) {
         checkExecutor();
@@ -6984,6 +7287,153 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (value === "red") return "异常";
       if (value === "not_configured") return "未接入";
       return "未知";
+    }
+
+    function renderSkillInventory(inventory) {
+      const model = inventoryWithLiveLocal(inventory || {});
+      const items = Array.isArray(model.items) ? model.items : [];
+      $("skill-inventory-summary").textContent = model.total > 0
+        ? `${text(model.total)} 个 skill；点开只看安装矩阵，实际操作仍在当前设备客户端完成。`
+        : "等待中央仓库或本机客户端上报 skill 清单。";
+      $("skill-inventory-total").textContent = text(model.total);
+      $("skill-inventory-published").textContent = text(model.published);
+      $("skill-inventory-unpublished").textContent = text(model.unpublished);
+      $("skill-inventory-project").textContent = text(model.project);
+      $("skill-inventory-list").innerHTML = items.length > 0
+        ? items.slice(0, 40).map((item) => renderSkillInventoryRow(item)).join("")
+        : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
+    }
+
+    function inventoryWithLiveLocal(inventory) {
+      const baseItems = Array.isArray(inventory.items) ? inventory.items : [];
+      const bySkill = {};
+      baseItems.forEach((item) => {
+        const skillId = text(item.skill_id);
+        if (!skillId) return;
+        bySkill[skillId] = {
+          ...item,
+          central: item.central || { state: "unpublished" },
+          installations: Array.isArray(item.installations) ? [...item.installations] : [],
+        };
+      });
+      const liveTools = localWorkspaceFromExecutor && Array.isArray(localWorkspaceFromExecutor.tools)
+        ? localWorkspaceFromExecutor.tools
+        : [];
+      liveTools.forEach((tool) => {
+        const toolId = text(tool.id || "unknown");
+        const toolName = text(tool.name || toolId);
+        const skills = Array.isArray(tool.skill_items) ? tool.skill_items : [];
+        skills.forEach((skill) => {
+          const skillId = text(skill.skill_id);
+          if (!skillId) return;
+          const entry = bySkill[skillId] || {
+            skill_id: skillId,
+            name: skill.name || skillId,
+            description: skill.description || "",
+            scope: skill.scope || "global",
+            central: { state: "unpublished" },
+            sync_state: "ok",
+            pending: 0,
+            installations: [],
+          };
+          const installKey = `mac::${toolId}`;
+          const exists = entry.installations.some((installed) => `${text(installed.device_id)}::${text(installed.tool_id)}` === installKey);
+          if (!exists) {
+            entry.installations.push({
+              device_id: "mac",
+              device_name: "Mac 本机",
+              tool_id: toolId,
+              tool_name: toolName,
+              state: "installed",
+              path: skill.path,
+              content_hash: skill.content_hash,
+              risk_level: skill.risk_level,
+            });
+          }
+          entry.name = entry.name || skill.name || skillId;
+          entry.scope = entry.scope === "project" || skill.scope === "project" ? "project" : (entry.scope || skill.scope || "global");
+          bySkill[skillId] = entry;
+        });
+      });
+      const items = Object.values(bySkill).map((item) => {
+        const installations = Array.isArray(item.installations) ? item.installations : [];
+        const installedTools = [...new Set(installations.map((installed) => text(installed.tool_id)).filter(Boolean))].sort();
+        const installedDevices = [...new Set(installations.map((installed) => text(installed.device_id)).filter(Boolean))].sort();
+        return {
+          ...item,
+          installed_tools: installedTools,
+          installed_devices: installedDevices,
+          tool_count: installedTools.length,
+          device_count: installedDevices.length,
+        };
+      }).sort((a, b) => {
+        const pendingA = Number(a.pending || 0) > 0 ? 0 : 1;
+        const pendingB = Number(b.pending || 0) > 0 ? 0 : 1;
+        return pendingA - pendingB || text(a.skill_id).localeCompare(text(b.skill_id));
+      });
+      return {
+        total: items.length,
+        published: items.filter((item) => (item.central || {}).state === "published").length,
+        unpublished: items.filter((item) => (item.central || {}).state === "unpublished").length,
+        project: items.filter((item) => item.scope === "project").length,
+        items,
+      };
+    }
+
+    function renderSkillInventoryRow(item) {
+      const installed = new Set(Array.isArray(item.installed_tools) ? item.installed_tools : []);
+      const pending = Number(item.pending || 0) > 0;
+      const centralState = text((item.central || {}).state || "unpublished");
+      const toolChecks = skillInventoryTools().map((tool) => {
+        const active = installed.has(tool.id);
+        const cls = active ? "installed" : "";
+        const mark = active ? "✓" : "□";
+        return `<span class="skill-tool-check ${cls}" title="${escapeHtml(active ? "已安装" : "未安装")}">${mark} ${escapeHtml(tool.label)}</span>`;
+      }).join("");
+      const stateClass = pending ? "pending" : (centralState === "published" ? "installed" : "");
+      return `
+        <article class="skill-inventory-row">
+          <div>
+            <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
+            <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
+          </div>
+          <div class="skill-tool-checks">${toolChecks}</div>
+          <div>
+            <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
+            <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
+          </div>
+        </article>
+      `;
+    }
+
+    function skillInventoryTools() {
+      return [
+        { id: "codex", label: "Codex" },
+        { id: "claude-code", label: "Claude" },
+        { id: "cursor", label: "Cursor" },
+        { id: "cc-switch", label: "cc-switch" },
+        { id: "skillshub", label: "skillshub" },
+        { id: "openclaw", label: "OpenClaw" },
+      ];
+    }
+
+    function skillScopeLabel(scope) {
+      if (scope === "project") return "项目级";
+      if (scope === "device-private") return "设备私有";
+      return "公用";
+    }
+
+    function centralLabel(state) {
+      if (state === "published") return "已发布中央仓库";
+      if (state === "deprecated") return "已废弃";
+      return "未发布中央仓库";
+    }
+
+    function inventoryActionText(item) {
+      if (item.sync_state === "source_changed") return "改完后检查最新版本。";
+      if (item.sync_state === "pending_publish") return "检查通过后可发布中央仓库。";
+      if ((item.central || {}).state === "unpublished") return "可选择发布到中央仓库。";
+      return "可选择安装到本机工具。";
     }
 
     function renderLocalWorkspace(workspace) {
@@ -7083,6 +7533,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           executorAllowPublish = Boolean(payload.allow_publish);
           executorAllowLocalWrites = Boolean(payload.allow_local_writes);
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
+          renderSkillInventory(window.lastDashboard ? window.lastDashboard.skill_inventory || {} : {});
           setExecutorStatus("online", payload.allow_publish ? "Mac 本机助手在线：本机扫描可用，发布已开启。" : "Mac 本机助手在线：本机扫描和检查可用，发布未开启。", "green");
           setExecutorButtons(true);
         } else {

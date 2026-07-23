@@ -29,6 +29,7 @@ def build_device_tool_status(
         installed = bool(installed_paths)
         count = 0
         risk = {"ok": 0, "warning": 0, "error": 0}
+        skill_items: list[dict] = []
         if installed:
             try:
                 for index, path in enumerate(installed_paths):
@@ -37,6 +38,7 @@ def build_device_tool_status(
                     by_risk = dict(data.get("by_risk", {}))
                     for key in risk:
                         risk[key] += int(by_risk.get(key, 0))
+                    skill_items.extend(_tool_skill_items(data))
             except Exception as exc:  # pragma: no cover - dashboard telemetry should stay best-effort
                 tools.append(
                     {
@@ -48,6 +50,7 @@ def build_device_tool_status(
                         "installed": True,
                         "state": "error",
                         "skills": 0,
+                        "skill_items": [],
                         "risk": {},
                         "measured_at": measured,
                         "note": str(exc),
@@ -64,6 +67,7 @@ def build_device_tool_status(
                 "installed": installed,
                 "state": "detected" if installed else "not_found",
                 "skills": count,
+                "skill_items": sorted(skill_items, key=lambda item: str(item.get("skill_id") or "")),
                 "risk": risk,
                 "measured_at": measured,
                 "note": "已检测到目录" if installed else "未检测到目录",
@@ -97,3 +101,23 @@ def _device_name(peer_id: str) -> str:
     if peer_id == "win":
         return "Windows"
     return peer_id
+
+
+def _tool_skill_items(scan_data: dict) -> list[dict]:
+    items: list[dict] = []
+    for skill in scan_data.get("skills", []):
+        if not isinstance(skill, dict):
+            continue
+        items.append(
+            {
+                "skill_id": skill.get("skill_id"),
+                "name": skill.get("name"),
+                "description": skill.get("description"),
+                "scope": skill.get("scope"),
+                "path": skill.get("path"),
+                "content_hash": skill.get("content_hash"),
+                "risk_level": skill.get("risk_level"),
+                "targets": skill.get("targets") or [],
+            }
+        )
+    return items
