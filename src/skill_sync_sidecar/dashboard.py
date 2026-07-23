@@ -967,7 +967,7 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     if health == "green":
         next_action = "同步链路正常；继续观察 Mac / OpenClaw 自动周期。"
     elif health == "yellow" and top_issue:
-        next_action = action_guide.get("summary") or top_issue["action"]
+        next_action = _operator_next_action_from_guide(action_guide, top_issue)
     elif health == "yellow":
         next_action = "先处理待确认队列；OpenClaw 本地改动需要你确认后再发布。"
     elif health == "red":
@@ -975,7 +975,7 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
     else:
         next_action = "状态未知；先刷新 dashboard 或查看 sidecar 日志。"
     return {
-        "headline": _headline_for_health(health),
+        "headline": _operator_headline_from_guide(health, action_guide),
         "next_action": next_action,
         "sync_path": "Mac / OpenClaw <-> 共享库 -> 各工具目录",
         "snapshot_id": snapshot.get("snapshot_id"),
@@ -996,6 +996,25 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
         "top_issue": top_issue,
         "action_guide": action_guide,
     }
+
+
+def _operator_headline_from_guide(health: str, action_guide: dict) -> str:
+    title = action_guide.get("title") if isinstance(action_guide, dict) else None
+    if health == "yellow" and title == "OpenClaw 仍在更新":
+        return "OpenClaw 仍在更新"
+    if health == "yellow" and title == "OpenClaw 更新需要确认":
+        return "OpenClaw 更新待确认"
+    return _headline_for_health(health)
+
+
+def _operator_next_action_from_guide(action_guide: dict, top_issue: dict) -> str:
+    title = action_guide.get("title") if isinstance(action_guide, dict) else None
+    if title == "OpenClaw 仍在更新":
+        return "还在改可以先放着；改完后点检查最新版本。"
+    if title == "OpenClaw 更新需要确认":
+        skill_id = top_issue.get("skill_id") or "这个 skill"
+        return f"{skill_id} 已停止自动上传；先检查确认，安全后再发布到共享库。"
+    return action_guide.get("summary") or top_issue["action"]
 
 
 def _operator_top_issue(blocked_items: list[dict]) -> Optional[dict]:
@@ -1139,8 +1158,8 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         publish = _approved_push_batch_command(skill_ids, yes=True)
         source_changed_count = sum(1 for item in openclaw_push_items if item.get("operator_state") == "source_changed")
         if source_changed_count:
-            title = "OpenClaw 还有新修改"
-            summary = f"OpenClaw 有 {source_changed_count} 个 skill 的本地版本又不同于共享库{skill_hint}。这不是发布失败；如果还在改，可以先放着，如果已经改完，直接检查最新版本。"
+            title = "OpenClaw 仍在更新"
+            summary = f"OpenClaw 有 {source_changed_count} 个 skill 又产生新版本{skill_hint}。还在改可以先放着；改完后点检查最新版本。"
             first_step = "改完后检查最新版本"
             first_detail = "检查只读，不写共享库；如果检查期间 skill 又变化，系统会自动拒绝写入。"
             second_detail = "检查结果显示可以发布后，再输入 PUBLISH 写入共享库。"
@@ -5895,7 +5914,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function conciseGuideSummary(guide) {
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
-      if ((guide.title || "") === "OpenClaw 还有新修改") {
+      if ((guide.title || "") === "OpenClaw 仍在更新") {
         return guide.summary || "OpenClaw 有新修改；改完后检查最新版本，变化中会自动拒绝写入。";
       }
       if ((guide.state || "") === "yellow" && skills.length > 0) {
@@ -6150,12 +6169,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         const allSourceChangedReady = sourceChangedItems.length > 0 && readySourceChangedItems.length === sourceChangedItems.length;
         title = allSourceChangedReady
           ? (executorAllowPublish ? `检查通过，可以保存 ${sourceChangedItems.length} 个 OpenClaw 更新` : "检查通过，但保存开关未打开")
-          : (sourceChangedItems.length === 1 ? `OpenClaw 有新修改：${sourceChangedNames}` : `OpenClaw 有 ${sourceChangedItems.length} 个 skill 在更新`);
+          : "OpenClaw 仍在更新";
         summary = allSourceChangedReady
           ? (executorAllowPublish
             ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词；保存后页面会自动回查。"
             : "当前本机助手只允许检查，不能写共享库。需要打开发布开关后再保存。")
-          : "如果还在改，可以先不管；如果这轮已经改完，点“检查最新版本”。检查只读，不会写入；检查期间又变化会自动拒绝发布。";
+          : `还在改可以先放着；改完后点“检查最新版本”。本次涉及：${sourceChangedNames}。`;
         primaryActions = allSourceChangedReady
           ? (executorAllowPublish ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
