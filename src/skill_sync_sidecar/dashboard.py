@@ -4200,6 +4200,29 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .skill-inventory-bulk-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .skill-inventory-bulk-actions[hidden] {
+      display: none;
+    }
+    .skill-inventory-bulk-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .skill-inventory-bulk-actions button {
+      min-height: 34px;
+      font-size: 12px;
+    }
     .skill-inventory-workbench {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5029,6 +5052,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <button id="skill-inventory-reset" type="button">清空</button>
       </div>
       <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
+      <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
       <div id="skill-inventory-list" class="skill-inventory-list"></div>
     </details>
     <details class="quick-status-details">
@@ -7588,6 +7612,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "发布共享库需要打开发布开关"
             : "先检查，再确认，把这个本机 skill 发布到共享库");
       });
+      document.querySelectorAll(".inventory-bulk-install-button").forEach((button) => {
+        button.disabled = !available || !executorAllowLocalWrites || Number(button.dataset.count || 0) <= 0;
+        const toolLabel = button.dataset.toolLabel || "工具";
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowLocalWrites
+            ? `批量安装到 ${toolLabel} 需要打开本机写入开关`
+            : `先检查，再确认，把当前筛选结果安装到 ${toolLabel}`);
+      });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
         button.title = !available
@@ -7911,6 +7944,85 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (err) {
         setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
         setExecutorStatus("failed", `安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function installFilteredSkillsToTool(button) {
+      const toolId = button.dataset.toolId || "";
+      const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
+      if (!tool) return;
+      const model = currentSkillInventoryModel || { items: [] };
+      const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
+      const candidates = bulkInstallCandidatesForTool(filtered, tool);
+      const skillIds = candidates.map((item) => text(item.skill_id)).filter(Boolean);
+      if (skillIds.length === 0) {
+        setReviewFeedback("yellow", `没有可安装到 ${toolLabel} 的 skill`, "当前筛选结果里没有符合条件的共享库 skill。");
+        setExecutorStatus("no changes", `没有可安装到 ${toolLabel} 的 skill。`, "yellow");
+        return;
+      }
+      if (!executorAvailable || !executorAllowLocalWrites) {
+        setReviewFeedback("yellow", `还不能批量安装到 ${toolLabel}`, "需要 Mac 本机助手在线，并打开“允许写入本机/设备”的开关。");
+        setExecutorStatus("not ready", `本机助手还不能写入 ${toolLabel} skill 目录。`, "yellow");
+        return;
+      }
+      const names = compactSkillList(skillIds);
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查批量安装到 ${toolLabel}`, `检查只读；当前筛选结果会安装 ${names}。`);
+      setExecutorStatus("install check", `正在检查安装 ${skillIds.length} 个 skill 到 ${toolLabel}。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central-dry-run`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: skillIds, tool_id: toolId }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore || Number(dryRunPayload.planned || 0) <= 0) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只安装到当前 Mac 的 ${toolLabel}。共享库和其他工具不会被修改。`);
+        if (!confirmProtectedWrite({
+          word: "INSTALL",
+          title: `确认批量安装到 ${toolLabel}`,
+          will: [
+            `把当前筛选结果里的 ${skillIds.length} 个共享库 skill 安装到当前 Mac 的 ${toolLabel}。`,
+            `本次包括：${names}。`,
+            "完成后自动刷新本机工具状态。",
+          ],
+          willNot: [
+            "不会发布或删除共享库内容。",
+            `不会修改 ${toolLabel} 之外的其他工具目录。`,
+            "不会安装项目级 skill 到全局工具目录。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", `批量安装到 ${toolLabel} 已取消。`, "yellow");
+          setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
+          return;
+        }
+        setReviewFeedback("yellow", `正在批量安装到 ${toolLabel}`, `正在写入当前 Mac 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
+        setExecutorStatus("installing", `正在安装 ${skillIds.length} 个 skill 到 ${toolLabel}。`, "yellow");
+        const installResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: skillIds, tool_id: toolId, confirm: "INSTALL" }),
+        });
+        const installPayload = await installResponse.json();
+        showExecutorOutput(formatExecutorResult(installPayload));
+        if (!installResponse.ok || !installPayload.ok) {
+          throw new Error(executorErrorDetail(installPayload));
+        }
+        setReviewFeedback("green", `已安装到 ${toolLabel}`, `已处理 ${names}；本机状态正在刷新。`);
+        setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到当前 Mac 的 ${toolLabel}。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        setReviewFeedback("red", `批量安装到 ${toolLabel} 失败`, String(err));
+        setExecutorStatus("failed", `批量安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -8505,12 +8617,52 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-result-note").textContent = items.length > 0
         ? `${quickNote}${triageNote}显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
         : "等待共享库或本机客户端上报 skill 清单。";
+      renderSkillInventoryBulkActions(filtered);
       $("skill-inventory-list").innerHTML = items.length > 0
         ? (visible.length > 0
           ? visible.map((item) => renderSkillInventoryRow(item)).join("")
           : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function renderSkillInventoryBulkActions(filtered) {
+      const target = $("skill-inventory-bulk-actions");
+      if (!target) return;
+      const items = Array.isArray(filtered) ? filtered : [];
+      const tools = skillInventoryLocalInstallTools()
+        .map((tool) => ({ tool, candidates: bulkInstallCandidatesForTool(items, tool) }))
+        .filter((entry) => entry.candidates.length > 0);
+      if (tools.length === 0) {
+        target.hidden = true;
+        target.innerHTML = "";
+        return;
+      }
+      target.hidden = false;
+      target.innerHTML = [
+        `<span class="skill-inventory-bulk-label">批量安装当前筛选结果</span>`,
+        ...tools.map(({ tool, candidates }) => `
+          <button
+            type="button"
+            class="inventory-bulk-install-button"
+            data-tool-id="${escapeHtml(tool.id)}"
+            data-tool-label="${escapeHtml(tool.label)}"
+            data-count="${escapeHtml(text(candidates.length))}"
+            onclick="installFilteredSkillsToTool(this)"
+            disabled>安装到 ${escapeHtml(tool.label)} (${escapeHtml(text(candidates.length))})</button>
+        `),
+      ].join("");
+    }
+
+    function bulkInstallCandidatesForTool(items, tool) {
+      return (Array.isArray(items) ? items : []).filter((item) => {
+        const installed = macInstalledToolIds(item);
+        const centralState = text((item.central || {}).state || "unpublished");
+        return centralState === "published"
+          && item.scope !== "project"
+          && !installed.has(tool.id)
+          && skillTargetsTool(item, tool);
+      });
     }
 
     function renderSkillInventoryWorkbench(items) {
