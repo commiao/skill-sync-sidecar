@@ -5244,6 +5244,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
       const breakdown = blockedBreakdown(blockedItems);
       const conflictOnly = blocked > 0 && breakdown.conflict === blocked;
+      const sourceChangedItems = blockedItems.filter((item) => reviewIsSourceChangedItem(item));
+      const sourceChangedReady = sourceChangedItems.length > 0 && sourceChangedItems.every((item) => {
+        const result = reviewTaskResults[reviewItemKey(item)];
+        return result && result.publishReady;
+      });
       $("strip-health").textContent = blocked > 0
         ? (breakdown.sourceChanged > 0 ? "个源端新修改" : (breakdown.conflict === blocked ? "个需要确认" : "个需要处理"))
         : "同步完成";
@@ -5260,8 +5265,10 @@ DASHBOARD_HTML = r"""<!doctype html>
         const names = compactSkillList(blockedItems.map((item) => item.skill_id));
         $("strip-focus-note").textContent = `只剩版本差异：${names}。先看报告，不会自动覆盖。`;
       } else if (breakdown.sourceChanged > 0) {
-        const names = compactSkillList(blockedItems.filter((item) => reviewIsSourceChangedItem(item)).map((item) => item.skill_id));
-        $("strip-focus-note").textContent = `OpenClaw 有新修改：${names}。改完后点“检查最新版本”；如果检查期间又变化，系统会自动拒绝写入。`;
+        const names = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
+        $("strip-focus-note").textContent = sourceChangedReady
+          ? `检查通过：${names}。下一步保存到共享库。`
+          : `OpenClaw 有新修改：${names}。改完后点“检查最新版本”；如果检查期间又变化，系统会自动拒绝写入。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
@@ -5272,7 +5279,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         actionNote.textContent = conflictOnly
           ? "先看报告，再决定保留哪一版。"
           : (breakdown.sourceChanged > 0
-            ? "这不是发布失败；源端还在变，先别反复发布。"
+            ? (sourceChangedReady ? "现在可以保存；保存前仍需要确认词。" : "这不是发布失败；源端还在变，先别反复发布。")
             : (blocked > 0
             ? "不会自动写入共享仓库；确认后才会发布。"
             : "只操作当前 Mac，本页不会跨设备乱改。"));
@@ -5540,18 +5547,37 @@ DASHBOARD_HTML = r"""<!doctype html>
         ];
         taskCards = renderSimpleDecisionList([], restoreItems);
       } else if (sourceChangedItems.length > 0) {
-        title = sourceChangedItems.length === 1 ? `OpenClaw 有新修改：${sourceChangedNames}` : `OpenClaw 有 ${sourceChangedItems.length} 个 skill 在更新`;
-        summary = "如果还在改，可以先不管；如果这轮已经改完，点“检查最新版本”。检查只读，不会写入；检查期间又变化会自动拒绝发布。";
-        primaryActions = `
-          <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
-          <button type="button" onclick="refresh(true)">刷新状态<span>只重新读取，不写入。</span></button>
-        `;
-        facts = [
-          ["发生了什么", "OpenClaw 本地版本不同于共享库，说明有人刚改过。"],
-          ["不会误发", "发布前会重新校验 hash，变化中会拒绝写入。"],
-          ["下一步", "改完就检查；还在改就继续做你的事。"],
-          ["完成标准", "顶部显示“现在不用做任何事”。"],
-        ];
+        const readySourceChangedItems = sourceChangedItems.filter((item) => {
+          const result = reviewTaskResults[reviewItemKey(item)];
+          return result && result.publishReady;
+        });
+        const allSourceChangedReady = sourceChangedItems.length > 0 && readySourceChangedItems.length === sourceChangedItems.length;
+        title = allSourceChangedReady
+          ? `检查通过，可以保存 ${sourceChangedItems.length} 个 OpenClaw 更新`
+          : (sourceChangedItems.length === 1 ? `OpenClaw 有新修改：${sourceChangedNames}` : `OpenClaw 有 ${sourceChangedItems.length} 个 skill 在更新`);
+        summary = allSourceChangedReady
+          ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词；保存后页面会自动回查。"
+          : "如果还在改，可以先不管；如果这轮已经改完，点“检查最新版本”。检查只读，不会写入；检查期间又变化会自动拒绝发布。";
+        primaryActions = allSourceChangedReady
+          ? `
+            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
+          `
+          : `
+            <button id="simple-dry-run" type="button" class="primary" onclick="runExecutorAction('dry_run')" disabled>检查最新版本<span>只读，不写入。</span></button>
+            <button type="button" onclick="refresh(true)">刷新状态<span>只重新读取，不写入。</span></button>
+          `;
+        facts = allSourceChangedReady
+          ? [
+            ["下一步", "点“保存到共享库”。"],
+            ["确认词", "输入 PUBLISH 后才会写入。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
+          ]
+          : [
+            ["发生了什么", "OpenClaw 本地版本不同于共享库，说明有人刚改过。"],
+            ["不会误发", "发布前会重新校验 hash，变化中会拒绝写入。"],
+            ["下一步", "改完就检查；还在改就继续做你的事。"],
+            ["完成标准", "顶部显示“现在不用做任何事”。"],
+          ];
         taskCards = `
           <div class="simple-action-card">
             <div class="simple-action-card-title">正在变化的 skill</div>
