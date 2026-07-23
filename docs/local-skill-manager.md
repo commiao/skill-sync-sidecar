@@ -31,6 +31,8 @@ To add or share one local skill, open:
 管理本机 skill -> 管理和查看 skill -> 添加或同步 skill
 ```
 
+Clicking `管理本机 skill` on the top card should open this drawer, scroll to the path input, and focus it. The user should be able to paste a path immediately without hunting through the inventory.
+
 The normal user flow is:
 
 1. Paste a skill directory or `SKILL.md` path.

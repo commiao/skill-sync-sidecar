@@ -7101,9 +7101,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
-      const target = $("skill-inventory-workbench") || inventory || workspace;
+      const input = $("local-skill-path");
+      const target = input || document.querySelector(".local-skill-manager") || workspace || inventory;
       if (target && target.scrollIntoView) {
         target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      if (input) {
+        window.setTimeout(() => input.focus(), 250);
       }
     }
 
