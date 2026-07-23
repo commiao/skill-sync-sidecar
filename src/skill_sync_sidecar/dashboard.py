@@ -7001,6 +7001,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     function openReviewDetails() {
       reviewDetailsUserOpened = true;
       openSupportDrawer();
+      const advanced = document.querySelector(".advanced-workspace");
+      const technical = document.querySelector(".technical-workspace");
+      if (advanced) advanced.open = true;
+      if (technical) technical.open = true;
       const target = $("review-queue-panel");
       if (!target) return;
       target.open = true;

@@ -727,6 +727,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("reviewDetailsUserOpened", DASHBOARD_HTML)
             self.assertIn("if (!reviewDetailsUserOpened) panel.open = false;", DASHBOARD_HTML)
             self.assertIn("if (advanced) advanced.open = true;", DASHBOARD_HTML)
+            self.assertIn("const technical = document.querySelector(\".technical-workspace\");", DASHBOARD_HTML)
+            self.assertIn("if (technical) technical.open = true;", DASHBOARD_HTML)
             self.assertIn("function openReviewDetails() {\n      reviewDetailsUserOpened = true;\n      openSupportDrawer();", DASHBOARD_HTML)
             self.assertIn("openSupportDrawer", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
