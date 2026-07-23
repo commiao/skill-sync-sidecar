@@ -6481,10 +6481,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     function renderReviewRecommendation(items) {
       const target = $("review-recommendation");
       if (!target) return;
-      const deleteItems = reviewDeleteItems(items);
-      const sourceChangedItems = reviewSourceChangedItems(items);
-      const publishItems = reviewPublishItems(items);
-      const conflictItems = reviewConflictItems(items);
+      const deferredItems = Array.isArray(items) ? items.filter((item) => isDeferredSourceChange(item)) : [];
+      const actionableItems = actionableReviewItems(items);
+      const deleteItems = reviewDeleteItems(actionableItems);
+      const sourceChangedItems = reviewSourceChangedItems(actionableItems);
+      const publishItems = reviewPublishItems(actionableItems);
+      const conflictItems = reviewConflictItems(actionableItems);
       const checkedCount = publishItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
       const readyCount = publishItems.filter((item) => {
         const result = reviewTaskResults[reviewItemKey(item)];
@@ -6502,7 +6504,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? `有 ${sourceChangedItems.length} 个 OpenClaw skill 出现新修改：${sourceChangedNames}。如果还在改，可以先放着；如果已经改完，直接检查最新版本。`
           : (publishItems.length > 0
           ? `有 ${publishItems.length} 个设备更新需要确认。先检查，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
-          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`));
+          : (deferredItems.length > 0
+          ? `当前可操作更新已搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。取消搁置后才能检查或发布。`
+          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`)));
       const publishActionLabel = !executorAvailable
         ? "等待本机助手"
         : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedItems.length > 0 && remainingReady > 0 ? "先检查更新" : `发布 ${publishItems.length} 个更新`));
@@ -6522,7 +6526,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (sourceChangedItems.length ? `源端仍有新改动：${sourceChangedNames}。` : "当前没有缺失/删除确认。"));
       const secondDetail = sourceChangedOnly
         ? "点“检查”只会读取最新版本，不会写入共享库。"
-        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : "当前没有可发布更新。"));
+        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : (deferredItems.length ? "已搁置项不会进入批量检查/发布。" : "当前没有可发布更新。")));
       const thirdDetail = publishItems.length === 0
         ? "不要点发布；先完成版本差异/缺失决策。"
         : (!executorAllowPublish ? "当前发布开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `发布前还差 ${remainingReady} 个检查通过。` : `可以确认发布 ${publishItems.length} 个更新到共享仓库。`));
@@ -6603,6 +6607,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               data-skill-id="${escapeHtml(text(item.skill_id))}"
               data-review-key="${escapeHtml(reviewKey)}"
               data-review-action="${escapeHtml(reviewControlAction(item))}"
+              data-deferred="${deferred ? "true" : "false"}"
               onclick="runExecutorActionForSkill(this.dataset.skillId, this.dataset.reviewKey)"
               disabled>${escapeHtml(reviewControlLabel(item))}</button>
             ${deferred ? `
@@ -6618,15 +6623,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderReviewProgress(items) {
-      const publishableItems = Array.isArray(items) ? reviewPublishItems(items) : [];
+      const actionableItems = actionableReviewItems(items);
+      const publishableItems = reviewPublishItems(actionableItems);
       const publishableTotal = publishableItems.length;
       const checked = publishableItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
       const publishReady = publishableItems.filter((item) => {
         const result = reviewTaskResults[reviewItemKey(item)];
         return result && result.publishReady;
       }).length;
-      const deleteTotal = Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)).length : 0;
-      const conflictTotal = Array.isArray(items) ? reviewConflictItems(items).length : 0;
+      const deleteTotal = actionableItems.filter((item) => reviewIsDeleteItem(item)).length;
+      const conflictTotal = reviewConflictItems(actionableItems).length;
       const executorState = executorAvailable ? "已连接" : "未连接";
       const executorKind = executorAvailable ? "green" : "yellow";
       if (conflictTotal > 0) {
@@ -6650,7 +6656,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function allReviewPublishCandidatesReady() {
-      const publishableItems = reviewPublishItems(currentReviewQueueItems);
+      const publishableItems = reviewPublishItems(actionableReviewItems(currentReviewQueueItems));
       if (publishableItems.length === 0) return false;
       return publishableItems.every((item) => {
         const result = reviewTaskResults[reviewItemKey(item)];
@@ -6659,7 +6665,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function publishCandidateSkillIds() {
-      const skillIds = reviewPublishItems(currentReviewQueueItems)
+      const skillIds = reviewPublishItems(actionableReviewItems(currentReviewQueueItems))
         .map((item) => text(item.skill_id))
         .filter(Boolean);
       return [...new Set(skillIds)];
@@ -6698,6 +6704,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewDeleteItems(items) {
       return Array.isArray(items) ? items.filter((item) => reviewIsDeleteItem(item)) : [];
+    }
+
+    function actionableReviewItems(items) {
+      return Array.isArray(items) ? items.filter((item) => !isDeferredSourceChange(item)) : [];
     }
 
     function reviewSourceChangedItems(items) {
@@ -7041,7 +7051,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const actionSkills = currentActionSkillIds();
       const reviewReady = allReviewPublishCandidatesReady();
-      const sourceChangedCount = reviewSourceChangedItems(currentReviewQueueItems).length;
+      const actionableItems = actionableReviewItems(currentReviewQueueItems);
+      const sourceChangedCount = reviewSourceChangedItems(actionableItems).length;
+      const deferredCount = currentReviewQueueItems.filter((item) => isDeferredSourceChange(item)).length;
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
       $("executor-dry-run").disabled = !available || actionSkills.length === 0;
       $("executor-publish").disabled = !canPublishApprovedPush;
@@ -7063,7 +7075,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? (sourceChangedCount > 0
             ? "OpenClaw 有新修改。还在改可以先放着；改完后点检查最新版本。"
             : "检测到待确认更新。先检查，确认安全后再同步到其他设备。")
-          : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。";
+          : (deferredCount > 0
+            ? "当前可操作更新已搁置；取消搁置后才能检查或同步。"
+            : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。");
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
       $("local-workspace-publish").disabled = !canPublishApprovedPush;
@@ -7132,7 +7146,11 @@ DASHBOARD_HTML = r"""<!doctype html>
               : "发布到共享仓库"));
       }
       document.querySelectorAll(".review-dry-run-button").forEach((button) => {
-        button.disabled = !available || !button.dataset.skillId;
+        const deferred = button.dataset.deferred === "true";
+        button.disabled = deferred || !available || !button.dataset.skillId;
+        button.title = deferred
+          ? "已搁置；先取消搁置后再检查"
+          : (!available ? "本机助手未在线" : "检查只读，不写共享仓库");
       });
       document.querySelectorAll(".central-restore-button").forEach((button) => {
         button.disabled = !available || !executorAllowLocalWrites || !button.dataset.skillId;
@@ -7908,6 +7926,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!executorAvailable || !skillId) return;
       const reviewItem = currentReviewQueueItems.find((item) => reviewItemKey(item) === reviewKey)
         || currentReviewQueueItems.find((item) => item.skill_id === skillId);
+      if (isDeferredSourceChange(reviewItem)) {
+        setReviewFeedback("yellow", `${skillId} 已暂时搁置`, "先取消搁置，再检查或发布这个 OpenClaw 修改。");
+        return;
+      }
       if (reviewIsDeleteItem(reviewItem)) {
         const restoreTarget = restoreDeviceLabel(reviewItem);
         if (reviewCanRestoreFromCentral(reviewItem)) {
