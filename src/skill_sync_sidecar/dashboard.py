@@ -3229,7 +3229,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #f8fffb;
     }
     .simple-action-panel.green .simple-action-hero {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
     }
     .simple-action-panel.yellow {
       background: #fffdf7;
@@ -5600,7 +5600,10 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-plain">
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">现在不用做任何事</div>
-              <div class="simple-action-summary">当前没有需要你处理的 skill。可以直接关闭页面；要新增或安装 skill 时，再打开“更多操作和详情”。</div>
+              <div class="simple-action-summary">当前没有需要你处理的同步事项。要新增、安装或整理本机 skill，点右侧入口即可。</div>
+            </div>
+            <div class="simple-action-actions single-primary">
+              <button type="button" class="primary" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、发布共享。</span></button>
             </div>
           </div>
           <div class="simple-action-done-line"><strong>放心：</strong>没有确认前，本页不会自动改其他设备。</div>
@@ -6444,6 +6447,23 @@ DASHBOARD_HTML = r"""<!doctype html>
     function openSupportDrawer() {
       const drawer = document.querySelector(".support-drawer");
       if (drawer) drawer.open = true;
+    }
+
+    function openLocalSkillWorkbench() {
+      openSupportDrawer();
+      const workspace = $("easy-workspace");
+      if (workspace) workspace.open = true;
+      const inventory = document.querySelector(".skill-inventory-panel");
+      if (inventory) inventory.open = true;
+      if (currentSkillInventoryQuick === "all") {
+        currentSkillInventoryQuick = "local_installable";
+      }
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryFiltered();
+      const target = $("skill-inventory-workbench") || inventory || workspace;
+      if (target && target.scrollIntoView) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
 
     function renderReviewQueue(items) {
