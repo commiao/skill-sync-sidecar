@@ -1297,7 +1297,7 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         entry["description"] = skill.get("description") or entry.get("description")
         entry["scope"] = skill.get("scope") or entry.get("scope") or "global"
         entry["central"] = {
-            "state": skill.get("state") or "published",
+            "state": _central_skill_state(skill),
             "content_hash": skill.get("content_hash"),
             "targets": skill.get("targets") or [],
             "lifecycle": skill.get("lifecycle") if isinstance(skill.get("lifecycle"), dict) else {},
@@ -1363,7 +1363,6 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         entry["action"] = _inventory_action(entry)
         items.append(entry)
     items.sort(key=lambda item: (0 if item.get("pending") else 1, str(item.get("skill_id") or "")))
-    visible = items[:80]
     return {
         "title": "Skill 清单",
         "scope": "current-client",
@@ -1375,8 +1374,8 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         "project": sum(1 for item in items if item.get("scope") == "project"),
         "global": sum(1 for item in items if item.get("scope") == "global"),
         "pending": sum(1 for item in items if int(item.get("pending") or 0) > 0),
-        "visible_limit": len(visible),
-        "items": visible,
+        "visible_limit": len(items),
+        "items": items,
     }
 
 
@@ -4091,6 +4090,31 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 12px;
       line-height: 1.35;
     }
+    .skill-inventory-filters {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(120px, .75fr)) auto;
+      gap: 8px;
+      margin: 10px 0;
+      align-items: center;
+    }
+    .skill-inventory-filters input,
+    .skill-inventory-filters select {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 7px 9px;
+      font: inherit;
+      font-size: 13px;
+    }
+    .skill-inventory-result-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
     .skill-inventory-list {
       display: grid;
       gap: 7px;
@@ -4357,6 +4381,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .workbench-grid { grid-template-columns: 1fr; }
       .plain-detail-grid { grid-template-columns: 1fr; }
       .skill-inventory-row { grid-template-columns: 1fr; }
+      .skill-inventory-filters { grid-template-columns: 1fr; }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-followup.ready { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
@@ -4629,6 +4654,37 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
       </div>
       <div class="skill-inventory-note">这里只展示安装矩阵；首页仍只显示下一步。安装/卸载会在当前设备客户端执行，不跨设备直接写文件。</div>
+      <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
+        <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
+        <select id="skill-inventory-central-filter" aria-label="中央仓库状态">
+          <option value="all">全部状态</option>
+          <option value="published">已发布</option>
+          <option value="unpublished">未发布</option>
+          <option value="deprecated">已废弃</option>
+        </select>
+        <select id="skill-inventory-scope-filter" aria-label="Skill 范围">
+          <option value="all">全部范围</option>
+          <option value="global">公用</option>
+          <option value="project">项目级</option>
+          <option value="device-private">设备私有</option>
+        </select>
+        <select id="skill-inventory-tool-filter" aria-label="本机工具">
+          <option value="all">全部工具</option>
+          <option value="codex">Codex 已安装</option>
+          <option value="claude-code">Claude 已安装</option>
+          <option value="cursor">Cursor 已安装</option>
+          <option value="cc-switch">cc-switch 已安装</option>
+          <option value="skillshub">skillshub 已安装</option>
+          <option value="mac-none">本机未安装</option>
+        </select>
+        <select id="skill-inventory-sync-filter" aria-label="同步状态">
+          <option value="all">全部同步状态</option>
+          <option value="pending">只看待处理</option>
+          <option value="clean">只看正常</option>
+        </select>
+        <button id="skill-inventory-reset" type="button">清空</button>
+      </div>
+      <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
       <div id="skill-inventory-list" class="skill-inventory-list"></div>
     </details>
     <details class="quick-status-details">
@@ -4973,6 +5029,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorBusy = false;
     let localWorkspaceFromExecutor = null;
     let lastLocalSkillAnalysis = null;
+    let currentSkillInventoryModel = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewTaskResults = {};
@@ -7662,7 +7719,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderSkillInventory(inventory) {
       const model = inventoryWithLiveLocal(inventory || {});
-      const items = Array.isArray(model.items) ? model.items : [];
+      currentSkillInventoryModel = model;
       $("skill-inventory-summary").textContent = model.total > 0
         ? `${text(model.total)} 个 skill；点开只看安装矩阵，实际操作仍在当前设备客户端完成。`
         : "等待中央仓库或本机客户端上报 skill 清单。";
@@ -7670,9 +7727,78 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-published").textContent = text(model.published);
       $("skill-inventory-unpublished").textContent = text(model.unpublished);
       $("skill-inventory-project").textContent = text(model.project);
+      renderSkillInventoryFiltered();
+    }
+
+    function renderSkillInventoryFiltered() {
+      const model = currentSkillInventoryModel || { items: [], total: 0 };
+      const items = Array.isArray(model.items) ? model.items : [];
+      const filtered = filterSkillInventoryItems(items, skillInventoryFilters());
+      const displayLimit = 160;
+      const visible = filtered.slice(0, displayLimit);
+      $("skill-inventory-result-note").textContent = items.length > 0
+        ? `显示 ${visible.length}/${filtered.length} 个匹配项；全量 ${items.length} 个。筛选只影响当前视图，不会写入任何目录。`
+        : "等待中央仓库或本机客户端上报 skill 清单。";
       $("skill-inventory-list").innerHTML = items.length > 0
-        ? items.slice(0, 40).map((item) => renderSkillInventoryRow(item)).join("")
+        ? (visible.length > 0
+          ? visible.map((item) => renderSkillInventoryRow(item)).join("")
+          : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
+      setExecutorButtons(executorAvailable);
+    }
+
+    function skillInventoryFilters() {
+      return {
+        query: textInputValue("skill-inventory-search").toLowerCase(),
+        central: selectValue("skill-inventory-central-filter"),
+        scope: selectValue("skill-inventory-scope-filter"),
+        tool: selectValue("skill-inventory-tool-filter"),
+        sync: selectValue("skill-inventory-sync-filter"),
+      };
+    }
+
+    function filterSkillInventoryItems(items, filters) {
+      return items.filter((item) => {
+        const installed = macInstalledToolIds(item);
+        const centralState = text((item.central || {}).state || "unpublished");
+        if (filters.central !== "all" && centralState !== filters.central) return false;
+        if (filters.scope !== "all" && text(item.scope || "global") !== filters.scope) return false;
+        if (filters.sync === "pending" && Number(item.pending || 0) <= 0) return false;
+        if (filters.sync === "clean" && Number(item.pending || 0) > 0) return false;
+        if (filters.tool === "mac-none" && installed.size > 0) return false;
+        if (filters.tool !== "all" && filters.tool !== "mac-none" && !installed.has(filters.tool)) return false;
+        if (filters.query) {
+          const haystack = [
+            item.skill_id,
+            item.name,
+            item.description,
+            item.scope,
+            centralState,
+            ...(Array.isArray(item.installed_tools) ? item.installed_tools : []),
+          ].map((value) => String(value || "").toLowerCase()).join(" ");
+          if (!haystack.includes(filters.query)) return false;
+        }
+        return true;
+      });
+    }
+
+    function resetSkillInventoryFilters() {
+      $("skill-inventory-search").value = "";
+      $("skill-inventory-central-filter").value = "all";
+      $("skill-inventory-scope-filter").value = "all";
+      $("skill-inventory-tool-filter").value = "all";
+      $("skill-inventory-sync-filter").value = "all";
+      renderSkillInventoryFiltered();
+    }
+
+    function textInputValue(id) {
+      const element = $(id);
+      return element ? String(element.value || "").trim() : "";
+    }
+
+    function selectValue(id) {
+      const element = $(id);
+      return element ? String(element.value || "all") : "all";
     }
 
     function inventoryWithLiveLocal(inventory) {
@@ -8401,6 +8527,11 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     $("refresh").addEventListener("click", () => refresh(true));
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
+    ["skill-inventory-search", "skill-inventory-central-filter", "skill-inventory-scope-filter", "skill-inventory-tool-filter", "skill-inventory-sync-filter"].forEach((id) => {
+      const element = $(id);
+      if (element) element.addEventListener(id === "skill-inventory-search" ? "input" : "change", renderSkillInventoryFiltered);
+    });
+    $("skill-inventory-reset").addEventListener("click", resetSkillInventoryFilters);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
     refresh(true);
     setInterval(() => refresh(false), 30000);

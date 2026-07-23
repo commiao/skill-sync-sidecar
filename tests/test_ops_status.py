@@ -892,6 +892,16 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("工具目录明细", DASHBOARD_HTML)
             self.assertIn("Skill 清单", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-list\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-search\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-central-filter\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-scope-filter\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-tool-filter\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-sync-filter\"", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-result-note\"", DASHBOARD_HTML)
+            self.assertIn("filterSkillInventoryItems", DASHBOARD_HTML)
+            self.assertIn("resetSkillInventoryFilters", DASHBOARD_HTML)
+            self.assertIn("显示 ${visible.length}/${filtered.length} 个匹配项", DASHBOARD_HTML)
+            self.assertIn("筛选只影响当前视图，不会写入任何目录", DASHBOARD_HTML)
             self.assertIn("renderSkillInventory", DASHBOARD_HTML)
             self.assertIn("inventoryWithLiveLocal", DASHBOARD_HTML)
             self.assertIn("按 skill 查看", DASHBOARD_HTML)
@@ -929,6 +939,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("uninstallMacToolSkill", DASHBOARD_HTML)
             self.assertIn("toolInstallStatus", DASHBOARD_HTML)
             self.assertIn("本机兼容工具已安装", DASHBOARD_HTML)
+            self.assertNotIn("items.slice(0, 40)", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"skill-inventory-list\""),
                 DASHBOARD_HTML.index("installCentralSkillToCodex"),
@@ -1272,6 +1283,7 @@ class OpsStatusTest(unittest.TestCase):
 
             self._write_skill(source_skills / "demo", "Demo", "Demo skill")
             index = write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-gateway")
+            index["skills"][0]["state"] = "published"
             index["skills"][0]["lifecycle"] = {
                 "state": "deprecated",
                 "deprecated_at": "2026-07-23T00:00:00Z",
