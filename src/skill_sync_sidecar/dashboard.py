@@ -2580,7 +2580,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: none;
     }
     .review-queue > summary.review-queue-head-summary::after {
-      content: "展开详情";
+      content: "处理入口";
       color: var(--muted);
       font-size: 12px;
       font-weight: 780;
@@ -2588,7 +2588,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       white-space: nowrap;
     }
     .review-queue[open] > summary.review-queue-head-summary::after {
-      content: "收起详情";
+      content: "收起";
     }
     .review-queue > summary.review-queue-head-summary .panel-head {
       margin-bottom: 4px;
@@ -2650,6 +2650,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px;
       align-items: center;
     }
+    .review-recommendation-actions button {
+      min-height: 42px;
+      min-width: 148px;
+    }
     .review-recommendation-note {
       color: var(--muted);
       font-size: 12px;
@@ -2668,6 +2672,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-top: 8px;
       color: var(--muted);
       font-size: 13px;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
     }
     .review-detail-drawer summary {
       cursor: pointer;
@@ -4899,13 +4905,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       </summary>
       <div id="review-recommendation" class="review-recommendation"></div>
-      <div id="review-progress" class="review-progress" aria-label="确认处理进度"></div>
       <div id="review-feedback" class="review-feedback" hidden>
         <strong id="review-feedback-title">等待操作</strong>
         <span id="review-feedback-detail">先检查。</span>
       </div>
       <details class="review-detail-drawer">
-        <summary>查看详细清单</summary>
+        <summary>查看处理进度和详细清单</summary>
+        <div id="review-progress" class="review-progress" aria-label="确认处理进度"></div>
         <div id="review-queue" class="review-list"></div>
       </details>
     </details>
@@ -6414,8 +6420,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("review-queue-title").textContent = scope.title;
       $("review-progress").setAttribute("aria-label", conflictOnly ? "版本差异处理进度" : "确认处理进度");
       $("review-queue-summary").textContent = conflictOnly
-        ? `${scope.peerText}：只剩 ${items.length} 个版本差异。这里不是批量发布队列；先生成只读报告，再按推荐处理。`
-        : `${scope.peerText}：${items.length} 个待确认。${blockedBreakdownText(blockedBreakdown(items))}。`;
+        ? `${scope.peerText}：先看差异报告，再决定保留哪一版。`
+        : `${scope.peerText}：按下方推荐按钮走；详情可以稍后再看。`;
       renderReviewRecommendation(items);
       renderReviewProgress(items);
       if (conflictOnly) {
@@ -6499,17 +6505,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
       const sourceChangedOnly = sourceChangedItems.length > 0 && sourceChangedItems.length === publishItems.length;
       const summary = conflictItems.length > 0
-        ? `有 ${conflictItems.length} 个版本差异，不能一键发布。先生成只读差异报告，报告会给出恢复、发布或手动处理的推荐。`
+        ? `先生成只读差异报告，报告会告诉你该保留哪一版。`
         : (sourceChangedItems.length > 0
-          ? `有 ${sourceChangedItems.length} 个 OpenClaw skill 出现新修改：${sourceChangedNames}。如果还在改，可以先放着；如果已经改完，直接检查最新版本。`
+          ? `OpenClaw 有新修改。如果还在改，可以先放着；如果已经改完，直接检查最新版本。`
           : (publishItems.length > 0
-          ? `有 ${publishItems.length} 个设备更新需要确认。先检查，全部显示可以发布后再确认发布；缺失/删除项不会被发布按钮处理。`
+          ? `先检查一下；通过后再保存到共享库。`
           : (deferredItems.length > 0
-          ? `当前可操作更新已搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。取消搁置后才能检查或发布。`
-          : `没有可发布更新。先处理 ${deleteItems.length} 个缺失/删除确认项；默认保留共享仓库，不静默删除。`)));
+          ? `已暂时搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。取消搁置后才能继续处理。`
+          : `先处理少掉的 skill；默认保留共享库，不会自动删除。`)));
       const publishActionLabel = !executorAvailable
         ? "等待本机助手"
-        : (!executorAllowPublish ? "发布开关未打开" : (sourceChangedItems.length > 0 && remainingReady > 0 ? "先检查更新" : `发布 ${publishItems.length} 个更新`));
+        : (!executorAllowPublish ? "只能检查" : (sourceChangedItems.length > 0 && remainingReady > 0 ? "检查最新版本" : `保存 ${publishItems.length} 个更新`));
       const publishActionNote = publishItems.length === 0
         ? "当前没有东西可发布；如果点确认发布，也不会写入共享仓库。"
         : (!executorAvailable
@@ -6536,7 +6542,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ${escapeHtml(summary)}
         </div>
         <div class="review-recommendation-actions">
-          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查 ${publishItems.length} 个更新` : `检查 ${publishItems.length} 个更新`}</button>
+          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查` : `检查一下`}</button>
           <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
         </div>
         <div id="review-recommendation-note" class="review-recommendation-note">
