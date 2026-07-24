@@ -369,6 +369,22 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("monitor-summary", text)
         self.assertIn("blocked: 0", text)
         self.assertIn("Do not switch OpenClaw to `push-pull`", text)
+        self.assertIn("openclaw-approved-push-diagnose.sh", text)
+
+    def test_openclaw_approved_push_diagnose_script(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-approved-push-diagnose.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+        self.assertIn("openclaw-approved-push-batch.sh", text)
+        self.assertIn("openclaw-approved-push-diagnose.sh", help_text)
+        self.assertIn("--yes", help_text)
+        self.assertIn("--no-refresh", help_text)
+        self.assertIn("blocked queue", help_text.lower())
+        self.assertIn("approved=0", help_text)
 
 
 if __name__ == "__main__":

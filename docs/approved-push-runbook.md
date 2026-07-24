@@ -182,6 +182,34 @@ Interpretation:
 
 If status shows `blocked` again, re-open the queue and only save skill ids that are currently `status_action=push` / `plan_action=blocked` and keep `category=writer_policy`.
 
+### 一次命令排障（推荐）
+
+在遇到“点了保存后显示 `approved=0` / 看不到变化”时，先用诊断脚本：
+
+```bash
+bash scripts/openclaw-approved-push-diagnose.sh <skill-id>
+```
+
+它会做 3 件事：
+
+1. 运行 `openclaw-approved-push-batch.sh` 预检；
+2. 输出 `safe_to_push / approved / reason`；
+3. 刷新并读取 OpenClaw peer-status + blocked queue。
+
+确认可写后可一键发布：
+
+```bash
+bash scripts/openclaw-approved-push-diagnose.sh --yes <skill-id>
+```
+
+若 `reason` 为 `none of the requested skills are currently blocked publish candidates`，一般表示当前时刻没有待发布候选：
+
+- 可能该项已经在上一次提交中已处理；
+- 本地变更尚未稳定，队列刚更新；
+- 你点了非当前待审项。
+
+这时请等待生产端稳定后再跑一次诊断。
+
 ## Recovery Notes
 
 - If SSH to OpenClaw times out, retry once with a higher `OPENCLAW_CONNECT_TIMEOUT`.
