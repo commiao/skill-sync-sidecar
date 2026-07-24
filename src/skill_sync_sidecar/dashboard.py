@@ -9330,6 +9330,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function formatExecutorResult(payload) {
+      const resultReason = (payload && payload.result && typeof payload.result.reason === "string" && payload.result.reason.trim())
+        ? payload.result.reason
+        : "";
       const lines = [
         `ok=${text(payload.ok)}`,
         `mode=${text(payload.mode)}`,
@@ -9345,6 +9348,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         `skills=${Array.isArray(payload.approved_skill_ids) ? payload.approved_skill_ids.join(", ") : text(payload.approved_skill_ids)}`,
         `command=${text(payload.command)}`,
       ];
+      if (resultReason) {
+        lines.push(`reason=${resultReason}`);
+      }
       if (payload.error) lines.push(`error=${payload.error}`);
       if (payload.stderr_tail) lines.push(`\nstderr:\n${payload.stderr_tail}`);
       if (payload.stdout_tail) lines.push(`\nstdout:\n${payload.stdout_tail}`);
