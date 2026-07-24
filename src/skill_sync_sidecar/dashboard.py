@@ -4630,6 +4630,38 @@ DASHBOARD_HTML = r"""<!doctype html>
       line-height: 1.35;
       overflow-wrap: anywhere;
     }
+    .skill-inventory-row-feedback {
+      display: grid;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 6px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      min-width: 0;
+    }
+    .skill-inventory-row-feedback strong {
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .skill-inventory-row-feedback.green {
+      border-color: #b7e4cc;
+      background: #f0fdf4;
+      color: #047857;
+    }
+    .skill-inventory-row-feedback.yellow {
+      border-color: #f1d58a;
+      background: #fff8e6;
+      color: #8a5b00;
+    }
+    .skill-inventory-row-feedback.red {
+      border-color: #f5c2c2;
+      background: #fff1f1;
+      color: var(--red);
+    }
     .skill-inventory-primary-action {
       display: grid;
       gap: 4px;
@@ -5801,6 +5833,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentSkillInventoryTriage = "all";
     let currentSkillInventoryQuick = "all";
     let recentLocalToolChanges = [];
+    let recentSkillRowFeedback = [];
     let lastOperationFeedback = null;
     let currentReviewQueueItems = [];
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
@@ -8454,6 +8487,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
         })) {
           setExecutorStatus("cancelled", `安装到 ${toolLabel} 已取消。`, "yellow");
+          rememberSkillRowFeedback(skillId, "yellow", "安装已取消", `没有写入 ${toolLabel} 目录。`);
           setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
           return;
         }
@@ -8471,11 +8505,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           throw new Error(executorErrorDetail(installPayload));
         }
         rememberLocalToolChanges([skillId], toolId, "installed");
+        rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false });
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
         setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
+        rememberSkillRowFeedback(skillId, "red", `安装到 ${toolLabel} 失败`, String(err));
         setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
         setExecutorStatus("failed", `安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
       } finally {
@@ -8539,6 +8575,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
         })) {
           setExecutorStatus("cancelled", `批量安装到 ${toolLabel} 已取消。`, "yellow");
+          skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "yellow", "安装已取消", `没有写入 ${toolLabel} 目录。`, { render: false }));
+          renderSkillInventoryFiltered();
           setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
           return;
         }
@@ -8556,11 +8594,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           throw new Error(executorErrorDetail(installPayload));
         }
         rememberLocalToolChanges(skillIds, toolId, "installed");
+        skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false }));
         setReviewFeedback("green", `已安装到 ${toolLabel}`, `已处理 ${names}；本机状态正在刷新。`);
         setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
+        skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", `批量安装到 ${toolLabel} 失败`, String(err), { render: false }));
+        renderSkillInventoryFiltered();
         setReviewFeedback("red", `批量安装到 ${toolLabel} 失败`, String(err));
         setExecutorStatus("failed", `批量安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
       } finally {
@@ -8625,6 +8666,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
         })) {
           setExecutorStatus("cancelled", `批量从 ${toolLabel} 移除已取消。`, "yellow");
+          skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "yellow", "移除已取消", `没有修改 ${toolLabel} 目录。`, { render: false }));
+          renderSkillInventoryFiltered();
           setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
           return;
         }
@@ -8642,11 +8685,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           throw new Error(executorErrorDetail(uninstallPayload));
         }
         rememberLocalToolChanges(skillIds, toolId, "removed");
+        skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "green", `已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。", { render: false }));
         setReviewFeedback("green", `已从 ${toolLabel} 移除`, `已处理 ${names}；文件已保留在移除备份目录，本机状态正在刷新。`);
         setExecutorStatus("removed", `${skillIds.length} 个 skill 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
+        skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", `批量从 ${toolLabel} 移除失败`, String(err), { render: false }));
+        renderSkillInventoryFiltered();
         setReviewFeedback("red", `批量从 ${toolLabel} 移除失败`, String(err));
         setExecutorStatus("failed", `批量从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
       } finally {
@@ -8709,6 +8755,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
         })) {
           setExecutorStatus("cancelled", `从 ${toolLabel} 移除已取消。`, "yellow");
+          rememberSkillRowFeedback(skillId, "yellow", "移除已取消", `没有修改 ${toolLabel} 目录。`);
           setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
           return;
         }
@@ -8726,11 +8773,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           throw new Error(executorErrorDetail(uninstallPayload));
         }
         rememberLocalToolChanges([skillId], toolId, "removed");
+        rememberSkillRowFeedback(skillId, "green", `已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。", { render: false });
         setReviewFeedback("green", `${skillId} 已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。");
         setExecutorStatus("removed", `${skillId} 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
+        rememberSkillRowFeedback(skillId, "red", `从 ${toolLabel} 移除失败`, String(err));
         setReviewFeedback("red", `从 ${toolLabel} 移除失败`, String(err));
         setExecutorStatus("failed", `从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
       } finally {
@@ -8926,6 +8975,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
         })) {
           setExecutorStatus("cancelled", "保存共享库已取消。", "yellow");
+          rememberSkillRowFeedback(skillId, "yellow", "保存已取消", "没有写入共享库。");
           setReviewFeedback("yellow", "已取消", "没有写入共享库。");
           return;
         }
@@ -8942,11 +8992,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!response.ok || !payload.ok) {
           throw new Error(executorErrorDetail(payload));
         }
+        rememberSkillRowFeedback(skillId, "green", "已保存到共享库", "共享库状态正在刷新；需要安装到工具时再在清单中勾选。", { render: false });
         setReviewFeedback("green", `${skillId} 已保存到共享库`, "共享库状态正在刷新；需要安装到其他工具时再在清单中勾选。");
         setExecutorStatus("published", `${skillId} 已保存到共享库。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
+        rememberSkillRowFeedback(skillId, "red", "保存共享库失败", String(err));
         setReviewFeedback("red", "保存共享库失败", String(err));
         setExecutorStatus("failed", "保存共享库失败，请查看执行输出。", "red");
       } finally {
@@ -9416,6 +9468,33 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryFiltered();
     }
 
+    function rememberSkillRowFeedback(skillId, kind, title, detail, options) {
+      const cleanSkillId = text(skillId);
+      if (!cleanSkillId) return;
+      const entry = {
+        skill_id: cleanSkillId,
+        kind: text(kind || ""),
+        title: text(title || ""),
+        detail: text(detail || ""),
+        at: Date.now(),
+      };
+      recentSkillRowFeedback = [
+        entry,
+        ...recentSkillRowFeedback.filter((item) => text(item.skill_id) !== cleanSkillId),
+      ].slice(0, 80);
+      const shouldRender = !options || options.render !== false;
+      if (shouldRender) renderSkillInventoryFiltered();
+    }
+
+    function recentSkillRowFeedbackFor(skillId) {
+      const cleanSkillId = text(skillId);
+      const maxAgeMs = 30 * 60 * 1000;
+      return recentSkillRowFeedback.find((entry) => (
+        text(entry.skill_id) === cleanSkillId
+        && Date.now() - Number(entry.at || 0) < maxAgeMs
+      ));
+    }
+
     function recentLocalToolChangeFor(skillId, toolId) {
       const key = recentLocalToolChangeKey(skillId, toolId);
       const maxAgeMs = 30 * 60 * 1000;
@@ -9839,6 +9918,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <strong>下一步</strong>
               <span>${escapeHtml(skillInventoryNextActionText(item, recommendation, centralState))}</span>
             </div>
+            ${skillInventoryRowFeedbackHtml(item)}
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
             ${publishAction}
             ${deprecateAction}
@@ -9875,6 +9955,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         chips.push(`<span>项目级不装全局</span>`);
       }
       return `<div class="skill-inventory-tool-summary" aria-label="本机工具覆盖">${chips.join("")}</div>`;
+    }
+
+    function skillInventoryRowFeedbackHtml(item) {
+      const feedback = recentSkillRowFeedbackFor(item.skill_id);
+      if (!feedback) return "";
+      return `
+        <div class="skill-inventory-row-feedback ${escapeHtml(feedback.kind)}">
+          <strong>${escapeHtml(feedback.title)}</strong>
+          <span>${escapeHtml(feedback.detail)}</span>
+        </div>
+      `;
     }
 
     function skillInventoryInstallationRows(item) {
