@@ -451,7 +451,9 @@ class AdmissionScriptsTest(unittest.TestCase):
                 env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
                 text=True,
             )
-            self.assertEqual(no_match_output.strip(), "")
+            self.assertIn("openclaw_pending_ids=", no_match_output)
+            self.assertIn("openclaw_pending_count=0", no_match_output)
+            self.assertIn("no actionable openclaw writer_policy entries found", no_match_output)
 
     def test_approved_push_runbook_documents_safe_flow(self):
         repo_root = Path(__file__).resolve().parents[1]

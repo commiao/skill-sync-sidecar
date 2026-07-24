@@ -95,6 +95,8 @@ scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --yes
 # 需要限制数量时可加 --max，例如 --max 5
 ```
 
+脚本会输出 `openclaw_pending_count=0`、`openclaw_pending_ids=` 与无可发布项提示；这表示当前筛选条件下没有可直接发布的 `writer_policy` 条目，不代表链路故障。
+
 注意：
 
 - 这会把所有当前筛出的 `writer_policy` 项一并发布；`delete` / `conflict` 项仍不会被 `approved-push` 写入 WebDAV。

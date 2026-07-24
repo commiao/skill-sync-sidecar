@@ -140,11 +140,13 @@ PY
 )
 
 if [ -z "$IDS" ]; then
+  echo "openclaw_pending_ids="
+  echo "openclaw_pending_count=0"
   if [ "$PRINT_ONLY" -eq 1 ]; then
-    echo ""
-  else
-    echo "openclaw_pending_ids="
     echo "no actionable openclaw writer_policy entries found"
+  else
+    echo "no actionable openclaw writer_policy entries found"
+    echo "source_filter=${SOURCE_FILTER}"
   fi
   exit 0
 fi
