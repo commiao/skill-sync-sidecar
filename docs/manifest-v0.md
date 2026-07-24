@@ -39,6 +39,7 @@
 | `exclude` | optional | string[] | Per-skill exclude patterns, applied in addition to default generated-artifact excludes. |
 | `project` | optional | object | Project association metadata for project-scoped skills. |
 | `security` | optional | object | Encryption and review hints. |
+| `external_references` | optional | string[] | Package-relative file paths allowed to be referenced from `SKILL.md` without being included in the synced package (for non-portable runtime helpers). |
 
 ## Scope Rules
 
@@ -75,6 +76,16 @@ Sidecar always excludes generated and bulky defaults such as `__pycache__`, `nod
   "exclude": ["generated", "*.tmp", "reports/*.html"]
 }
 ```
+
+`external_references` is used for skills whose `SKILL.md` documents runtime helpers outside the synced package, such as environment-specific wrappers or host tools. The paths are package-relative and are intentionally explicit so reviewers can approve portability trade-offs:
+
+```json
+{
+  "external_references": ["scripts/local-runtime-helper.sh"]
+}
+```
+
+Use this field only with `scope=global` peer-specific workflows (for example OpenClaw private runtime adaptations). For portable skills, prefer keeping referenced files inside the skill directory.
 
 Patterns match either the relative path or the basename.
 

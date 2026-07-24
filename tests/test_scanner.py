@@ -199,6 +199,31 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(len(missing_issues), 1)
             self.assertIn("scripts/disk-cleanup.sh", missing_issues[0].message)
 
+    def test_manifest_can_allow_missing_referenced_package_file(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "disk-cleanup"
+            skill.mkdir()
+            (skill / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "protocol_version": 0,
+                        "external_references": ["./scripts/disk-cleanup.sh"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (skill / "SKILL.md").write_text(
+                "---\nname: disk-cleanup\ndescription: Disk cleanup\n---\n\n"
+                "Run `./scripts/disk-cleanup.sh safe`.\n",
+                encoding="utf-8",
+            )
+
+            record = scan_roots([f"test={root}"]).skills[0]
+
+            self.assertFalse(any(issue.code == "missing_referenced_package_file" for issue in record.issues))
+            self.assertEqual(record.risk_level, "ok")
+
     def test_packaged_referenced_files_are_not_flagged_missing(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

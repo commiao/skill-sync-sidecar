@@ -164,7 +164,16 @@ def scan_skill(source: str, skill_dir: Path, skill_md: Path) -> SkillRecord:
     targets = list(manifest.get("targets") or default_targets_for_scope(scope))
 
     issues.extend(validate_manifest(skill_dir, manifest))
-    issues.extend(validate_skill(skill_dir, skill_md, {"name": name, "description": description, **metadata}, files, size_bytes))
+    issues.extend(
+        validate_skill(
+            skill_dir,
+            skill_md,
+            {"name": name, "description": description, **metadata},
+            files,
+            size_bytes,
+            manifest,
+        )
+    )
 
     return SkillRecord(
         skill_id=skill_id,
@@ -288,7 +297,23 @@ def validate_manifest(skill_dir: Path, manifest: dict) -> List[SkillIssue]:
         issues.append(
             SkillIssue("warning", "invalid_exclude", "manifest exclude should be a list.", str(skill_dir / "manifest.json"))
         )
+
+    external_references = manifest.get("external_references")
+    if external_references is not None and not isinstance(external_references, list):
+        issues.append(
+            SkillIssue(
+                "warning",
+                "invalid_external_references",
+                "manifest external_references should be a list of relative paths.",
+                str(skill_dir / "manifest.json"),
+            )
+        )
+
     return issues
+
+
+def _normalize_reference_path(raw_path: str) -> str:
+    return str(raw_path).strip().rstrip(".,;:").removeprefix("./")
 
 
 def detect_project_path(skill_dir: Path) -> Optional[Path]:
@@ -336,6 +361,7 @@ def validate_skill(
     metadata: dict,
     files: Sequence[SkillFile],
     size_bytes: int,
+    manifest: dict,
 ) -> List[SkillIssue]:
     issues: List[SkillIssue] = []
 
@@ -401,9 +427,18 @@ def validate_skill(
         )
 
     referenced_package_paths = sorted(
-        set(match.group("path").rstrip(".,;:") for match in PACKAGE_RELATIVE_PATH_RE.finditer(skill_text))
+        set(_normalize_reference_path(match.group("path")) for match in PACKAGE_RELATIVE_PATH_RE.finditer(skill_text))
     )
+
+    allowed_external_references = {
+        _normalize_reference_path(path)
+        for path in manifest.get("external_references") or []
+        if isinstance(path, str)
+    }
+
     for rel_path in referenced_package_paths[:10]:
+        if rel_path in allowed_external_references:
+            continue
         if not (skill_dir / rel_path).exists():
             issues.append(
                 SkillIssue(
