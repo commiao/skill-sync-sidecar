@@ -3457,6 +3457,32 @@ DASHBOARD_HTML = r"""<!doctype html>
       max-width: 900px;
       overflow-wrap: anywhere;
     }
+    .simple-action-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 2px;
+    }
+    .simple-action-fact {
+      min-width: 88px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 6px 8px;
+    }
+    .simple-action-fact strong {
+      display: block;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.15;
+    }
+    .simple-action-fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
     .simple-action-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
@@ -6161,6 +6187,7 @@ DASHBOARD_HTML = r"""<!doctype html>
                 <div class="simple-action-eyebrow">现在状态</div>
                 <div class="simple-action-title">已暂时搁置 OpenClaw 修改</div>
                 <div class="simple-action-summary">${escapeHtml(deferredNames)} 还在等待你之后处理；首页先不再用它挡住其他操作。</div>
+                ${simpleActionFactsHtml(dashboard, allItems)}
               </div>
               <div class="simple-action-actions single-primary">
                 <button type="button" class="primary" onclick="clearSourceChangeDeferrals()">取消搁置<span>回到正常待确认状态。</span></button>
@@ -6179,6 +6206,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <div class="simple-action-eyebrow">现在状态</div>
               <div class="simple-action-title">现在不用做任何事</div>
               <div class="simple-action-summary">当前没有需要你处理的同步事项。要新增、安装或整理本机 skill，展开下面的本机工作区即可。</div>
+              ${simpleActionFactsHtml(dashboard, allItems)}
             </div>
             <div class="simple-action-actions single-primary">
               <button type="button" class="primary" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、保存共享。</span></button>
@@ -6240,13 +6268,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           `)
           : `
             <button type="button" class="primary" onclick="openLocalSkillWorkbench()">继续管理本机 skill<span>新增、安装、保存共享。</span></button>
-            <button id="simple-defer-source" type="button" onclick="deferSourceChangedItems()">先不提醒<span>只隐藏首页提醒。</span></button>
           `;
         if (!allSourceChangedReady) {
           secondaryActions = `
             <div class="simple-action-secondary">
-              <span>普通待审不会阻塞本机工作区；OpenClaw 改完后再检查最新版本。</span>
-              <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查最新版本</button>
+              <span>普通待审不会阻塞本机工作区；OpenClaw 改完后，到二级确认清单检查最新版本。</span>
+              <button type="button" onclick="openReviewDetails()">查看待审详情</button>
+              <button id="simple-defer-source" type="button" title="只隐藏首页提醒" onclick="deferSourceChangedItems()">先不提醒</button>
             </div>
           `;
         }
@@ -6282,6 +6310,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-eyebrow">推荐下一步</div>
             <div class="simple-action-title">${escapeHtml(title)}</div>
             <div class="simple-action-summary">${escapeHtml(summary)}</div>
+            ${simpleActionFactsHtml(dashboard, allItems)}
           </div>
         <div class="simple-action-actions single-primary">
           ${primaryActions}
@@ -6293,6 +6322,24 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前设备；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function simpleActionFactsHtml(dashboard, items) {
+      const local = dashboard.local_workspace || {};
+      const central = dashboard.central_repository || {};
+      const inventory = dashboard.skill_inventory || {};
+      const summary = inventory.summary || {};
+      const actionable = Array.isArray(items) ? items.filter((item) => !isDeferredSourceChange(item)) : [];
+      const localSkills = local.total_skills ?? summary.installed ?? inventory.total ?? "-";
+      const centralSkills = central.total_skills ?? inventory.published ?? "-";
+      const pending = actionable.length > 0 ? `${actionable.length} 项` : "无";
+      return `
+        <div class="simple-action-facts" aria-label="状态概览">
+          <div class="simple-action-fact"><strong>${escapeHtml(text(localSkills))}</strong><span>本机 skill</span></div>
+          <div class="simple-action-fact"><strong>${escapeHtml(text(centralSkills))}</strong><span>共享库</span></div>
+          <div class="simple-action-fact"><strong>${escapeHtml(pending)}</strong><span>待办</span></div>
+        </div>
+      `;
     }
 
     function simpleActionFeedbackHtml() {
