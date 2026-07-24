@@ -423,7 +423,8 @@ class AdmissionScriptsTest(unittest.TestCase):
                 env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
                 text=True,
             )
-            self.assertEqual(output.strip(), "finance-auto-bookkeeping local-writer")
+            self.assertIn("openclaw_pending_ids=finance-auto-bookkeeping local-writer", output)
+            self.assertIn("openclaw_pending_count=2", output)
 
             limited_output = subprocess.check_output(
                 [
@@ -438,7 +439,8 @@ class AdmissionScriptsTest(unittest.TestCase):
                 env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
                 text=True,
             )
-            self.assertEqual(limited_output.strip(), "finance-auto-bookkeeping")
+            self.assertIn("openclaw_pending_ids=finance-auto-bookkeeping", limited_output)
+            self.assertIn("openclaw_pending_count=1", limited_output)
 
             no_match_output = subprocess.check_output(
                 [

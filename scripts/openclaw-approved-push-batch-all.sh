@@ -151,12 +151,15 @@ if [ -z "$IDS" ]; then
   exit 0
 fi
 
+COUNT=$(echo "$IDS" | awk '{print NF}')
 if [ "$PRINT_ONLY" -eq 1 ]; then
-  printf '%s\n' "$IDS"
+  echo "openclaw_pending_ids=$IDS"
+  echo "openclaw_pending_count=${COUNT}"
   exit 0
 fi
 
 echo "openclaw_pending_ids=$IDS"
+echo "openclaw_pending_count=${COUNT}"
 
 CMD=(bash scripts/openclaw-approved-push-batch.sh)
 if [ "$MODE_FLAG" = "--yes" ]; then
