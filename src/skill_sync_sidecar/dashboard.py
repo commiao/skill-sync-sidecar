@@ -6093,13 +6093,13 @@ DASHBOARD_HTML = r"""<!doctype html>
           `)
           : `
             <button id="simple-defer-source" type="button" class="primary" onclick="deferSourceChangedItems()">先不提醒<span>只隐藏首页提醒。</span></button>
+            <button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、保存共享。</span></button>
           `;
         if (!allSourceChangedReady) {
           secondaryActions = `
             <div class="simple-action-secondary">
-              <span>改完后再回来检查；这两个按钮都不会写共享库。</span>
+              <span>OpenClaw 还在改也不影响管理当前 Mac；检查按钮只读，不写共享库。</span>
               <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查最新版本</button>
-              <button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button>
             </div>
           `;
         }
