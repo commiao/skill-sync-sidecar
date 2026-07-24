@@ -243,6 +243,12 @@ or
 bash scripts/watch-sync-health-once.sh --monitor-summary-file /tmp/skill-sync-overview.json
 ```
 
+You can also run the short operator view from a snapshot:
+
+```bash
+SKILL_SYNC_MONITOR_SUMMARY_FILE=/tmp/skill-sync-overview.json bash scripts/operator-status.sh
+```
+
 or
 
 ```bash

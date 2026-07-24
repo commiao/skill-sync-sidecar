@@ -256,6 +256,7 @@ class AdmissionScriptsTest(unittest.TestCase):
         subprocess.check_call(["bash", "-n", str(script)])
 
         self.assertIn("monitor-summary", text)
+        self.assertIn("--summary-file", text)
         self.assertIn("--brief", text)
         self.assertIn("/api/overview", text)
         self.assertNotIn("approved-push", text)

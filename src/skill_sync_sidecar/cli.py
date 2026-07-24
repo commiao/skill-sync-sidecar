@@ -147,6 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     monitor_summary = subcommands.add_parser("monitor-summary", help="Check a dashboard /api/overview endpoint and print operator actions.")
     monitor_summary.add_argument("--url", default="http://100.123.208.32:8765/api/overview", help="Dashboard overview endpoint URL.")
+    monitor_summary.add_argument("--summary-file", help="Read a local /api/overview JSON snapshot instead of fetching over network.")
     monitor_summary.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
     monitor_summary.add_argument("--stale-after-seconds", type=int, default=2 * 60 * 60, help="Mark active devices stale after this many seconds.")
     monitor_summary.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
@@ -157,6 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     monitor_loop = subcommands.add_parser("monitor-loop", help="Continuously monitor a dashboard /api/overview endpoint and write report artifacts.")
     monitor_loop.add_argument("--url", default="http://100.123.208.32:8765/api/overview", help="Dashboard overview endpoint URL.")
+    monitor_loop.add_argument("--summary-file", help="Read a local /api/overview JSON snapshot instead of fetching over network.")
     monitor_loop.add_argument("--out-dir", default="~/.cache/skill-sync-sidecar/monitor", help="Directory for last-report.json, last-report.txt, and events.jsonl.")
     monitor_loop.add_argument("--interval-seconds", type=float, default=30 * 60, help="Seconds between monitor checks.")
     monitor_loop.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
@@ -813,6 +815,7 @@ def cmd_monitor_summary(args: argparse.Namespace) -> int:
         timeout_seconds=args.timeout_seconds,
         stale_after_seconds=args.stale_after_seconds,
         min_canonical_total=args.min_canonical_total,
+        summary_file=args.summary_file,
     )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -833,6 +836,7 @@ def cmd_monitor_loop(args: argparse.Namespace) -> int:
         timeout_seconds=args.timeout_seconds,
         stale_after_seconds=args.stale_after_seconds,
         min_canonical_total=args.min_canonical_total,
+        summary_file=args.summary_file,
         max_iterations=args.max_iterations,
         print_status=not args.json,
     )

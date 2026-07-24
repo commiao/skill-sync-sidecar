@@ -11,7 +11,19 @@ from urllib.request import Request, urlopen
 JsonDict = Dict[str, Any]
 
 
-def fetch_summary(url: str, timeout_seconds: float = 20.0) -> JsonDict:
+def fetch_summary(
+    url: str,
+    timeout_seconds: float = 20.0,
+    *,
+    summary_file: Optional[str] = None,
+) -> JsonDict:
+    if summary_file:
+        summary_path = Path(summary_file).expanduser()
+        data = json.loads(summary_path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("summary file did not contain a JSON object")
+        return data
+
     request = Request(url, headers={"Accept": "application/json"})
     with urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 - operator-provided URL
         data = json.loads(response.read().decode("utf-8"))
@@ -48,9 +60,10 @@ def monitor_once(
     timeout_seconds: float = 20.0,
     stale_after_seconds: int = 2 * 60 * 60,
     min_canonical_total: int = 1,
+    summary_file: Optional[str] = None,
 ) -> JsonDict:
     try:
-        summary = fetch_summary(url, timeout_seconds=timeout_seconds)
+        summary = fetch_summary(url, timeout_seconds=timeout_seconds, summary_file=summary_file)
     except Exception as exc:
         return build_fetch_error_report(exc)
     return build_monitor_report(
@@ -92,11 +105,12 @@ def run_monitor_loop(
     out_dir: Path,
     *,
     interval_seconds: float = 30 * 60,
-    timeout_seconds: float = 20.0,
-    stale_after_seconds: int = 2 * 60 * 60,
-    min_canonical_total: int = 1,
-    max_iterations: Optional[int] = None,
-    print_status: bool = True,
+        timeout_seconds: float = 20.0,
+        stale_after_seconds: int = 2 * 60 * 60,
+        min_canonical_total: int = 1,
+        summary_file: Optional[str] = None,
+        max_iterations: Optional[int] = None,
+        print_status: bool = True,
 ) -> JsonDict:
     iterations = 0
     last_report: JsonDict = {}
@@ -106,6 +120,7 @@ def run_monitor_loop(
             timeout_seconds=timeout_seconds,
             stale_after_seconds=stale_after_seconds,
             min_canonical_total=min_canonical_total,
+            summary_file=summary_file,
         )
         paths = write_monitor_report(report, out_dir)
         report["paths"] = paths

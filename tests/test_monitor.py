@@ -195,6 +195,20 @@ class MonitorSummaryTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("Skill Sync: RED - ACTION REQUIRED", output.getvalue())
 
+    def test_monitor_summary_supports_summary_file(self):
+        parser = build_parser()
+        with TemporaryDirectory() as tmp:
+            summary_path = Path(tmp) / "overview.json"
+            summary_path.write_text(json.dumps(_summary()), encoding="utf-8")
+
+            args = parser.parse_args(["monitor-summary", "--summary-file", str(summary_path), "--brief"])
+            output = StringIO()
+            with redirect_stdout(output):
+                result = args.func(args)
+
+            self.assertEqual(result, 0)
+            self.assertIn("Skill Sync: GREEN - NO ACTION", output.getvalue())
+
     def test_write_monitor_report_creates_operator_artifacts(self):
         with TemporaryDirectory() as tmp:
             out_dir = Path(tmp)
