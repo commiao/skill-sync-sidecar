@@ -78,7 +78,18 @@ while true; do
   check_blocked_file="${tmp_dir}/blocked-${$}.txt"
   check_monitor_file="${tmp_dir}/monitor-${$}.json"
 
-  if bash "$(cd "$(dirname "$0")" && pwd)/blocked-queue.sh" >"$check_blocked_file" 2>&1; then
+  blocked_queue_cmd="$(cd "$(dirname "$0")" && pwd)/blocked-queue.sh"
+
+  if [ -n "$monitor_summary_file" ]; then
+    SKILL_SYNC_BLOCKED_QUEUE_SUMMARY_FILE="$monitor_summary_file" \
+      bash "$blocked_queue_cmd" >"$check_blocked_file" 2>&1
+  else
+    bash "$blocked_queue_cmd" >"$check_blocked_file" 2>&1
+  fi
+
+  blocked_queue_status=$?
+
+  if [ "$blocked_queue_status" -eq 0 ]; then
     blocked_status="$(sed -n '1,6p' "$check_blocked_file" | tr '\n' '; ')"
     blocked_count="$(awk '/blocked:/ {print $2}' "$check_blocked_file" | tail -n1)"
   else
