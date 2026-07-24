@@ -287,6 +287,16 @@ warnings=0
 
 ## Recovery Notes
 
+如果当前机器无法访问 NAS 接口（例如本机网络限制），可先做一次本机演练验证脚本：
+
+```bash
+tmp_dir=$(mktemp -d)
+cat > "$tmp_dir/api/overview" <<'JSON'
+{"dashboard":{"health":"green","blocked":0,"alerts":0,"warnings":0}}
+JSON
+SKILL_SYNC_MONITOR_URL="file://$tmp_dir/api/overview" bash scripts/watch-sync-health-once.sh
+```
+
 - If SSH to OpenClaw times out, retry once with a higher `OPENCLAW_CONNECT_TIMEOUT`.
 - If dry-run refuses stale hashes, do not force it. Rebuild the blocked report after the producer has stopped.
 - If a skill should stay private, add or keep it as an explicit local override instead of approved-pushing it.
