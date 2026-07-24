@@ -95,7 +95,22 @@ scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --yes
 # 需要限制数量时可加 --max，例如 --max 5
 ```
 
-脚本会输出 `openclaw_pending_count=0`、`openclaw_pending_ids=` 与无可发布项提示；这表示当前筛选条件下没有可直接发布的 `writer_policy` 条目，不代表链路故障。
+脚本会始终输出 `openclaw_pending_count=`，同时输出 `openclaw_pending_ids=`；通常行为如下：
+
+```text
+openclaw_pending_ids=finance-auto-bookkeeping local-writer
+openclaw_pending_count=2
+```
+
+无可发布项时输出：
+
+```text
+openclaw_pending_ids=
+openclaw_pending_count=0
+no actionable openclaw writer_policy entries found
+```
+
+`openclaw_pending_count=0` 表示当前筛选条件下没有可直接发布的 `writer_policy` 条目，不代表链路故障。
 
 注意：
 
