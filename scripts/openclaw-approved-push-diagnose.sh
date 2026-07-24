@@ -86,22 +86,21 @@ parse_result_json() {
   python3 - "$out_file" <<'PY'
 import json
 import sys
+import re
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
 decoder = json.JSONDecoder()
-result = None
-for offset, ch in enumerate(text):
-    if ch != "{":
-        continue
+starts = [m.start() for m in re.finditer(r"(?m)^\{", text)]
+for offset in reversed(starts):
     try:
-        parsed, _ = decoder.raw_decode(text[offset:])
+        parsed, end = decoder.raw_decode(text[offset:])
     except Exception:
         continue
-    result = parsed
-if result is None:
+    print(json.dumps(parsed, ensure_ascii=False))
+    break
+else:
     raise SystemExit(1)
-json.dump(result, sys.stdout, ensure_ascii=False)
 PY
 }
 
@@ -128,31 +127,10 @@ if ! parsed_json="$(parse_result_json "$batch_out")"; then
   exit 1
 fi
 
-safe_to_push="$(python3 - <<'PY' <<EOF
-import json,sys
-obj=json.loads(sys.stdin.read())
-print("true" if bool(obj.get("safe_to_push")) else "false")
-EOF
-<<<"$parsed_json")"
-approved="$(python3 - <<'PY' <<EOF
-import json,sys
-obj=json.loads(sys.stdin.read())
-print(obj.get("approved", ""))
-EOF
-<<<"$parsed_json")"
-reason="$(python3 - <<'PY' <<EOF
-import json,sys
-obj=json.loads(sys.stdin.read())
-print(obj.get("reason", ""))
-EOF
-<<<"$parsed_json")"
-approved_skill_ids="$(python3 - <<'PY' <<EOF
-import json,sys
-obj=json.loads(sys.stdin.read())
-ids=obj.get("approved_skill_ids", [])
-print(" ".join(ids) if isinstance(ids, list) else "")
-EOF
-<<<"$parsed_json")"
+safe_to_push="$(python3 -c 'import json,sys; obj=json.loads(sys.argv[1]); print("true" if bool(obj.get("safe_to_push", False)) else "false")' "$parsed_json")"
+approved="$(python3 -c 'import json,sys; obj=json.loads(sys.argv[1]); print(obj.get("approved", 0))' "$parsed_json")"
+reason="$(python3 -c 'import json,sys; obj=json.loads(sys.argv[1]); print(obj.get("reason", ""))' "$parsed_json")"
+approved_skill_ids="$(python3 -c 'import json,sys; obj=json.loads(sys.argv[1]); ids=obj.get("approved_skill_ids", []); print(" ".join(ids) if isinstance(ids, list) else "")' "$parsed_json")"
 
 echo
 echo "[2/3] 结果摘要"
