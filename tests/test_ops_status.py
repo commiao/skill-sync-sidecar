@@ -359,6 +359,38 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-cli-ops")
             self.assertEqual(payload["sync_plan"]["summary"], {"noop": 1})
 
+    def test_status_command_includes_tool_summary(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tool_root = root / "tool-root"
+            self._write_skill(tool_root / "demo1", "Demo One", "Demo skill one")
+
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "status",
+                    "--root",
+                    f"local={root}",
+                    "--tool-summary",
+                    "--tool-root",
+                    f"codex={tool_root}",
+                    "--json",
+                ]
+            )
+            output = StringIO()
+
+            with redirect_stdout(output):
+                result = args.func(args)
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(result, 0)
+            self.assertEqual(payload["total"], 1)
+            self.assertIn("tools", payload)
+            self.assertEqual(len(payload["tools"]), 1)
+            self.assertEqual(payload["tools"][0]["id"], "codex")
+            self.assertEqual(payload["tools"][0]["skills"], 1)
+            self.assertEqual(payload["tools"][0]["skill_items"][0]["skill_id"], "demo-one")
+
     def test_ops_status_exposes_live_blocked_plan_items(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

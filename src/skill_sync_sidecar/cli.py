@@ -76,6 +76,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = subcommands.add_parser("status", help="Summarize local skill roots.")
     add_common_scan_args(status)
+    status.add_argument("--tool-summary", action="store_true", help="Also print per-tool local skill summary.")
+    status.add_argument(
+        "--tool-root",
+        action="append",
+        help="Tool root for status summary, format tool-id=/path. Repeat for multiple tools.",
+    )
     status.set_defaults(func=cmd_status)
 
     ops_status = subcommands.add_parser("ops-status", help="Summarize daemon, base record, remote snapshot, and optional OpenClaw reconcile state.")
@@ -494,8 +500,33 @@ def cmd_scan(args: argparse.Namespace) -> int:
 def cmd_status(args: argparse.Namespace) -> int:
     summary = scan_roots(args.root)
     data = summary.to_dict()
+    tool_status: list[dict] = []
+    if args.tool_summary:
+        tool_roots = None
+        if args.tool_root:
+            parsed: list[tuple[str, str, tuple[Path, ...], str]] = []
+            for raw in args.tool_root:
+                if "=" not in raw:
+                    print(f"status failed: --tool-root must be tool-id=/path, got: {raw}", file=sys.stderr)
+                    return 2
+                tool_id, raw_path = raw.split("=", 1)
+                tool_id = tool_id.strip()
+                raw_path = raw_path.strip()
+                if not tool_id or not raw_path:
+                    print(f"status failed: --tool-root must be tool-id=/path, got: {raw}", file=sys.stderr)
+                    return 2
+                parsed.append((tool_id, tool_id, (Path(raw_path).expanduser(),), tool_id))
+            tool_roots = tuple(parsed)
+        try:
+            tool_status = build_device_tool_status(tool_roots)
+        except OSError as exc:
+            print(f"status failed: build tool summary: {exc}", file=sys.stderr)
+            return 2
     if args.json:
-        print(json.dumps({key: data[key] for key in ("total", "by_source", "by_risk", "duplicates")}, ensure_ascii=False, indent=2))
+        payload = {key: data[key] for key in ("total", "by_source", "by_risk", "duplicates")}
+        if args.tool_summary:
+            payload["tools"] = tool_status
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     print(f"total: {data['total']}")
@@ -509,6 +540,19 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"duplicates: {len(duplicates)}")
     for skill_id, count in duplicates.items():
         print(f"  {skill_id}: {count}")
+    if args.tool_summary:
+        print("tools:")
+        for item in tool_status:
+            skill_ids = ", ".join(
+                skill["skill_id"] for skill in item.get("skill_items", []) if isinstance(skill.get("skill_id"), str)
+            )
+            if len(skill_ids) > 200:
+                skill_ids = skill_ids[:200] + " ..."
+            print(f"  {item['id']}: state={item['state']} installed={item['installed']} skills={item['skills']}")
+            print(f"    name: {item['name']}")
+            print(f"    roots: {', '.join(item['roots'])}")
+            if skill_ids:
+                print(f"    skill_ids: {skill_ids}")
     return 0
 
 
