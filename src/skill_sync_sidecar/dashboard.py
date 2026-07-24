@@ -4615,6 +4615,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       justify-items: start;
       min-width: 0;
     }
+    .skill-inventory-action {
+      display: grid;
+      gap: 2px;
+    }
+    .skill-inventory-action strong {
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .skill-inventory-action span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
     .skill-inventory-primary-action {
       display: grid;
       gap: 4px;
@@ -9820,7 +9835,10 @@ DASHBOARD_HTML = r"""<!doctype html>
             <span>${escapeHtml(recommendation.detail)}</span>
           </div>
           <div class="skill-inventory-action-row">
-            <div class="skill-inventory-action">${escapeHtml(item.action || inventoryActionText(item))}</div>
+            <div class="skill-inventory-action">
+              <strong>下一步</strong>
+              <span>${escapeHtml(skillInventoryNextActionText(item, recommendation, centralState))}</span>
+            </div>
             <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
             ${publishAction}
             ${deprecateAction}
@@ -10027,6 +10045,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.sync_state === "pending_publish") return "检查通过后可保存共享库。";
       if ((item.central || {}).state === "unpublished") return "可选择保存到共享库。";
       return "可选择安装到本机工具。";
+    }
+
+    function skillInventoryNextActionText(item, recommendation, centralState) {
+      const state = text(centralState || (item.central || {}).state || "unpublished");
+      if (Number(item.pending || 0) > 0) return "先查看待审详情；不会自动写入或删除。";
+      if (state === "deprecated") return "需要重新使用时，先点恢复可用。";
+      if (state === "unpublished") {
+        if (item.scope === "project") return "保持在项目仓维护，不走全局安装。";
+        if (macPublishSourcePath(item)) return "点保存到共享库；会先检查，再要求 PUBLISH。";
+        return "等待本机扫描到路径后，再决定是否共享。";
+      }
+      if (recommendation && recommendation.title === "可安装到本机工具") return "勾选下面的本机工具；安装前会要求确认。";
+      if (recommendation && recommendation.title === "本机已可用") return "保持勾选即可使用；取消勾选会先检查并要求 REMOVE。";
+      return item.action || inventoryActionText(item);
     }
 
     function renderLocalWorkspace(workspace) {
