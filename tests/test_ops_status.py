@@ -1826,7 +1826,24 @@ class OpsStatusTest(unittest.TestCase):
                     "unpublished": 1,
                     "project": 0,
                     "deprecated": 0,
-                    "items": [{"skill_id": "demo"}, {"skill_id": "heavy"}],
+                    "pending": 1,
+                    "items": [
+                        {
+                            "skill_id": "demo",
+                            "sync_state": "source_changed",
+                            "pending": 1,
+                            "central": {"state": "published"},
+                            "installations": [{"path": "/tmp/demo"}],
+                        },
+                        {
+                            "skill_id": "heavy",
+                            "sync_state": "ok",
+                            "pending": 0,
+                            "scope": "global",
+                            "central": {"state": "unpublished"},
+                            "installations": [{"path": "/tmp/heavy"}],
+                        },
+                    ],
                 },
             },
             "summary_cache": {"state": "fresh"},
@@ -1836,6 +1853,11 @@ class OpsStatusTest(unittest.TestCase):
 
         self.assertEqual(overview["health"], "yellow")
         self.assertEqual(overview["dashboard"]["skill_inventory"]["total"], 2)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["pending"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed"], 2)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["publishable"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["pending_ordinary"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["pending_blocking"], 0)
         self.assertNotIn("items", overview["dashboard"]["skill_inventory"])
         self.assertNotIn("skill_items", overview["dashboard"]["device_tools"][0]["tools"][0])
         self.assertEqual(overview["dashboard"]["device_tools"][0]["tools"][0]["skills"], 2)

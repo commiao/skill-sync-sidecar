@@ -498,10 +498,43 @@ def build_dashboard_overview(summary: dict) -> dict:
                 "unpublished": inventory.get("unpublished"),
                 "project": inventory.get("project"),
                 "deprecated": inventory.get("deprecated"),
+                "pending": inventory.get("pending"),
+                "summary": _compact_skill_inventory_summary(inventory),
             },
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
         },
         "summary_cache": summary.get("summary_cache"),
+    }
+
+
+def _compact_skill_inventory_summary(inventory: object) -> dict:
+    if not isinstance(inventory, dict):
+        return {}
+    items = inventory.get("items") if isinstance(inventory.get("items"), list) else []
+    pending_ordinary = 0
+    pending_blocking = 0
+    installed = 0
+    publishable = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        pending = int(item.get("pending") or 0)
+        if pending > 0:
+            if item.get("sync_state") == "source_changed":
+                pending_ordinary += 1
+            else:
+                pending_blocking += 1
+        installations = item.get("installations") if isinstance(item.get("installations"), list) else []
+        if installations:
+            installed += 1
+        central = item.get("central") if isinstance(item.get("central"), dict) else {}
+        if central.get("state") == "unpublished" and item.get("scope") != "project" and any(inst.get("path") for inst in installations if isinstance(inst, dict)):
+            publishable += 1
+    return {
+        "installed": installed,
+        "publishable": publishable,
+        "pending_ordinary": pending_ordinary,
+        "pending_blocking": pending_blocking,
     }
 
 
