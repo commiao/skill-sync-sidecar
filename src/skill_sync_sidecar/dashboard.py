@@ -6984,7 +6984,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           renderReviewGroup(
             "检查 OpenClaw 新修改",
             sourceChangedItems,
-            "这些项表示源设备又产生了新版本。还在改可以先放着；改完后点检查最新版本。"
+            "这些项是普通待审，不是服务故障；可以继续管理本机 skill，OpenClaw 改完后再检查最新版本。"
           ),
           renderReviewGroup(
             "再处理可保存更新",
@@ -7051,7 +7051,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const summary = conflictItems.length > 0
         ? `先生成只读差异报告，报告会告诉你该保留哪一版。`
         : (sourceChangedItems.length > 0
-          ? `OpenClaw 有新修改。如果还在改，可以先放着；如果已经改完，直接检查最新版本。`
+          ? `普通待审：OpenClaw 有新修改；不影响本机工作区，改完后直接检查最新版本。`
           : (publishItems.length > 0
           ? `先检查一下；通过后再保存到共享库。`
           : (deferredItems.length > 0
@@ -7663,7 +7663,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (easySyncSteps) easySyncSteps.hidden = !showSyncActions;
         easySyncEmpty.textContent = showSyncActions
           ? (sourceChangedCount > 0
-            ? "OpenClaw 有新修改。还在改可以先放着；改完后点检查最新版本。"
+            ? "普通待审：OpenClaw 有新修改；不影响本机工作区，改完后点检查最新版本。"
             : "检测到待确认更新。先检查，确认安全后再保存到共享库。")
           : (deferredCount > 0
             ? "当前可操作更新已搁置；取消搁置后才能检查或同步。"
@@ -7726,7 +7726,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         } else if (actionSkills.length === 0) {
           hint = "当前没有可操作的同步更新。";
         } else if (simpleDeferSource) {
-          hint = "下一步：还在改就点“先不提醒”；改完后再点“检查最新版本”。";
+          hint = "下一步：可以继续管理本机 skill；OpenClaw 改完后再点“检查最新版本”。";
           hintKind = "ready";
         } else if (simpleDryRun) {
           hint = `下一步：点“${primaryButtonText(simpleDryRun, "检查一下")}”；检查只读，不会写入共享库。`;
