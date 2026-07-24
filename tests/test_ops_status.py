@@ -30,6 +30,7 @@ from skill_sync_sidecar.central_lifecycle import (
 from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
     OperatorExecutorError,
+    local_device_identity,
     local_publish_root_for_source,
     run_mac_codex_install_from_central,
     run_mac_tool_install_from_central,
@@ -44,6 +45,13 @@ from skill_sync_sidecar.tool_status import build_device_tool_status
 
 
 class OpsStatusTest(unittest.TestCase):
+    def test_operator_executor_reports_local_device_identity(self):
+        identity = local_device_identity()
+
+        self.assertEqual(identity["device_id"], "mac")
+        self.assertEqual(identity["device_name"], "Mac 本机")
+        self.assertEqual(identity["scope"], "local")
+
     def test_device_tool_status_includes_lightweight_skill_items(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1065,6 +1073,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("renderCurrentClientBoundary", DASHBOARD_HTML)
             self.assertIn("当前客户端：${deviceName}", DASHBOARD_HTML)
             self.assertIn("${deviceName} 的安装、移除和扫描只通过当前设备的本机助手执行。", DASHBOARD_HTML)
+            self.assertIn("currentClientName", DASHBOARD_HTML)
+            self.assertIn("currentClientHelperName", DASHBOARD_HTML)
+            self.assertIn("executorDeviceName", DASHBOARD_HTML)
+            self.assertIn("${currentClientHelperName()}在线", DASHBOARD_HTML)
+            self.assertIn("payload.device_name", DASHBOARD_HTML)
             self.assertIn("OpenClaw、Windows、NAS 只在这里展示状态，由各自客户端执行本机操作。", DASHBOARD_HTML)
             self.assertIn("这里是当前设备的 skill 工作区", DASHBOARD_HTML)
             self.assertIn("renderSkillInventoryWorkbench", DASHBOARD_HTML)

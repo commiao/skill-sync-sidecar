@@ -5641,6 +5641,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorAvailable = false;
     let executorAllowPublish = false;
     let executorAllowLocalWrites = false;
+    let executorDeviceId = "local";
+    let executorDeviceName = "本机客户端";
     let lastDryRunSafe = false;
     let lastPublishReceipt = null;
     let executorBusy = false;
@@ -5666,6 +5668,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     };
     const row = (key, value) => `<div class="key">${key}</div><div class="value mono">${escapeHtml(pretty(value))}</div>`;
     const pill = (label, kind) => `<span class="pill ${kind || ""}">${escapeHtml(text(label))}</span>`;
+    const currentClientName = () => text(executorDeviceName || (localWorkspaceFromExecutor || {}).device_name || "本机客户端");
+    const currentClientHelperName = () => `${currentClientName()}助手`;
     const escapeHtml = (value) => String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -7578,7 +7582,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       panel.hidden = false;
       $("executor-output").style.display = "none";
-      setExecutorStatus("checking", "正在检查 Mac 本机助手。", "yellow");
+      setExecutorStatus("checking", `正在检查 ${currentClientHelperName()}。`, "yellow");
       checkExecutor();
     }
 
@@ -7590,12 +7594,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         executorAvailable = response.ok && payload.ok;
         executorAllowPublish = Boolean(payload.allow_publish);
         executorAllowLocalWrites = Boolean(payload.allow_local_writes);
+        executorDeviceId = text(payload.device_id || executorDeviceId || "local");
+        executorDeviceName = text(payload.device_name || executorDeviceName || "本机客户端");
         if (executorAvailable) {
           setExecutorStatus(
             "online",
             executorAllowLocalWrites
-              ? "Mac 本机助手在线：可以扫描、分析并安装本机 skill。"
-              : "Mac 本机助手在线：可以扫描和分析本机 skill；本机写入未开启。",
+              ? `${currentClientHelperName()}在线：可以扫描、分析并安装本机 skill。`
+              : `${currentClientHelperName()}在线：可以扫描和分析本机 skill；本机写入未开启。`,
             "green",
           );
           setExecutorButtons(true);
@@ -7614,7 +7620,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       executorAllowLocalWrites = false;
       setExecutorStatus(
         "offline",
-        "本机助手未启动。请先启动本机助手；技术命令在高级日志里查看。",
+        `${currentClientHelperName()}未启动。请先启动本机助手；技术命令在高级日志里查看。`,
         "yellow",
       );
       setExecutorButtons(false);
@@ -7714,7 +7720,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         let hint = "";
         let hintKind = "";
         if (!available) {
-          hint = "下一步：先让 Mac 本机助手在线；在线后这里会自动解锁。";
+          hint = `下一步：先让 ${currentClientHelperName()}在线；在线后这里会自动解锁。`;
           hintKind = "warn";
         } else if (actionSkills.length === 0) {
           hint = "当前没有可操作的同步更新。";
@@ -9935,9 +9941,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           executorAvailable = true;
           executorAllowPublish = Boolean(payload.allow_publish);
           executorAllowLocalWrites = Boolean(payload.allow_local_writes);
+          executorDeviceId = text(payload.device_id || executorDeviceId || "local");
+          executorDeviceName = text(payload.device_name || executorDeviceName || "本机客户端");
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
           renderSkillInventory(window.lastDashboard ? window.lastDashboard.skill_inventory || {} : {});
-          setExecutorStatus("online", payload.allow_publish ? "Mac 本机助手在线：本机扫描可用，保存已开启。" : "Mac 本机助手在线：本机扫描和检查可用，保存未开启。", "green");
+          setExecutorStatus("online", payload.allow_publish ? `${currentClientHelperName()}在线：本机扫描可用，保存已开启。` : `${currentClientHelperName()}在线：本机扫描和检查可用，保存未开启。`, "green");
           setExecutorButtons(true);
         } else {
           throw new Error(payload.error || "local workspace scan failed");

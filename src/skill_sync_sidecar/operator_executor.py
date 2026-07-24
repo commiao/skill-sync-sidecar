@@ -39,6 +39,14 @@ class OperatorExecutorError(RuntimeError):
     pass
 
 
+def local_device_identity() -> dict:
+    return {
+        "device_id": "mac",
+        "device_name": "Mac 本机",
+        "scope": "local",
+    }
+
+
 def run_openclaw_approved_push_batch(
     repo_root: Path,
     skill_ids: Sequence[str],
@@ -594,11 +602,13 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
         def do_GET(self) -> None:  # noqa: N802
             path = self.path.split("?", 1)[0]
             if path == "/healthz":
+                identity = local_device_identity()
                 self._send_json(
                     200,
                     {
                         "ok": True,
                         "service": "skill-sync-operator-executor",
+                        **identity,
                         "repo_root": str(repo),
                         "allow_publish": allow_publish,
                         "allow_local_writes": allow_local_writes,
@@ -608,13 +618,12 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                 return
             if path == "/api/local-workspace":
                 tools = build_device_tool_status()
+                identity = local_device_identity()
                 self._send_json(
                     200,
                     {
                         "ok": True,
-                        "device_id": "mac",
-                        "device_name": "Mac 本机",
-                        "scope": "local",
+                        **identity,
                         "authority": "本机 executor 只读取本机 skill 目录；默认只允许 dry-run，不默认发布。",
                         "allow_publish": allow_publish,
                         "allow_local_writes": allow_local_writes,
