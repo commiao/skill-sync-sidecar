@@ -370,17 +370,25 @@ class AdmissionScriptsTest(unittest.TestCase):
                     {
                         "dashboard": {
                             "blocked_items": [
-                                {
-                                    "skill_id": "finance-auto-bookkeeping",
-                                    "source": "oc-vps / OpenClaw",
-                                    "category": "writer_policy",
-                                    "status_action": "push",
-                                },
-                                {
-                                    "skill_id": "ignored-conflict",
-                                    "source": "oc-vps / OpenClaw",
-                                    "category": "writer_policy",
-                                    "status_action": "pull",
+                                    {
+                                        "skill_id": "finance-auto-bookkeeping",
+                                        "source": "oc-vps / OpenClaw",
+                                        "category": "writer_policy",
+                                        "status_action": "push",
+                                    },
+                                    {
+                                        "skill_id": "sync-loop-fix",
+                                        "peer_name": "oc-vps / OpenClaw",
+                                        "peer_id": "oc-vps",
+                                        "source": "live_sync_plan",
+                                        "category": "writer_policy",
+                                        "status_action": "push",
+                                    },
+                                    {
+                                        "skill_id": "ignored-conflict",
+                                        "source": "oc-vps / OpenClaw",
+                                        "category": "writer_policy",
+                                        "status_action": "pull",
                                 },
                                 {
                                     "skill_id": "local-writer",
@@ -423,8 +431,8 @@ class AdmissionScriptsTest(unittest.TestCase):
                 env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
                 text=True,
             )
-            self.assertIn("openclaw_pending_ids=finance-auto-bookkeeping local-writer", output)
-            self.assertIn("openclaw_pending_count=2", output)
+            self.assertIn("openclaw_pending_ids=finance-auto-bookkeeping sync-loop-fix local-writer", output)
+            self.assertIn("openclaw_pending_count=3", output)
 
             limited_output = subprocess.check_output(
                 [

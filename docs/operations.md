@@ -217,6 +217,22 @@ For NAS/Linux, use:
 examples/systemd/skill-sync-gateway.service
 ```
 
+### Quick recurring watch (read-only)
+
+When you only need to know whether action is required, use:
+
+```bash
+bash scripts/watch-sync-health-30m.sh
+```
+
+Quick one-off smoke check:
+
+```bash
+bash scripts/watch-sync-health-once.sh
+```
+
+Expected healthy output includes `health=green`, `blocked=0`, `alerts=0`, `warnings=0`.
+
 For Synology Container Manager or Docker, use:
 
 ```text

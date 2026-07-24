@@ -128,7 +128,11 @@ ids = [
     item.get("skill_id")
     for item in blocked
     if isinstance(item, dict)
-    and item.get("source", "").startswith(source_filter)
+    and (
+        item.get("source", "").startswith(source_filter)
+        or item.get("peer_name", "").startswith(source_filter)
+        or item.get("peer_id", "") == source_filter
+    )
     and item.get("category") == "writer_policy"
     and item.get("status_action") in {"push", "push_new", "local_new"}
 ]

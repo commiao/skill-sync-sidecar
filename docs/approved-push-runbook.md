@@ -255,6 +255,36 @@ bash scripts/openclaw-approved-push-diagnose.sh --yes <skill-id>
 
 这时请等待生产端稳定后再跑一次诊断。
 
+## 持续巡检（推荐）
+
+如果你要持续观察“是否需要处理”但不想手工反复点击，可以启动只读巡检：
+
+```bash
+bash scripts/watch-sync-health-30m.sh
+```
+
+建议：
+
+- `1800` 表示每 30 分钟检查一次（默认）。
+- `--max-iterations 1` 表示只跑 1 次，适合本地快速验明。
+- 不会改文件、不发命令，只做只读检查。
+- 输出行前有 `*` 表示相对于上次有状态变化；若出现 `degraded`，脚本会补充 `blocked-queue.sh` 与侧边监控快照，便于快速判断。
+
+单次验证命令：
+
+```bash
+bash scripts/watch-sync-health-once.sh
+```
+
+健康绿态关键输出应是：
+
+```text
+health=green
+blocked=0
+alerts=0
+warnings=0
+```
+
 ## Recovery Notes
 
 - If SSH to OpenClaw times out, retry once with a higher `OPENCLAW_CONNECT_TIMEOUT`.

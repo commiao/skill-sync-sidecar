@@ -143,6 +143,10 @@ python3 -m skill_sync_sidecar sync-apply --local-root /tmp/skill-sync-target --r
 python3 -m skill_sync_sidecar sync-cycle --local-root /tmp/skill-sync-target --remote file:///tmp/skill-sync-remote --prefix snapshots/current --cache-dir ./cache-preview --work-dir ./sync-work --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run
 python3 -m skill_sync_sidecar sync-daemon --local-root /tmp/skill-sync-target --remote file:///tmp/skill-sync-remote --prefix snapshots/current --cache-dir ./cache-preview --work-dir ./sync-work --state-file ./sync-work/state.json --last-applied-record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --dry-run --max-cycles 1
 python3 -m skill_sync_sidecar rollback --record /tmp/skill-sync-target/.skill-sync-backups/<apply-id>/.apply-record.json --yes
+python3 -m skill_sync_sidecar monitor-summary --url http://127.0.0.1:8765/api/overview --json
+scripts/watch-sync-health-30m.sh
+scripts/watch-sync-health-once.sh
+scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --print-ids-only
 ```
 
 Current validation node status:
