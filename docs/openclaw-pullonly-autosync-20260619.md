@@ -2,7 +2,7 @@
 
 ## Goal
 
-Promote OpenClaw from observation-only dry-run sync to automatic `pull-only` sync, while keeping OpenClaw from automatically publishing local edits back to WebDAV.
+Promote OpenClaw from observation-only dry-run sync to automatic `pull-only` sync, while keeping OpenClaw from automatically saving local edits back to WebDAV.
 
 ## Service
 
@@ -50,7 +50,7 @@ This means OpenClaw is now automatically polling WebDAV and is ready to apply al
 
 ## Safety Boundaries
 
-- OpenClaw-to-WebDAV publishing is blocked by `--writer-policy pull-only`.
+- OpenClaw-to-WebDAV saving is blocked by `--writer-policy pull-only`.
 - OpenClaw local edits will become blocked review items instead of automatic uploads.
 - Deletes are still not automatically executed.
 - The existing dry-run observer service remains active as a parallel monitor:

@@ -67,10 +67,10 @@ skill_id=sync-probe-autosync
 status_action=push
 plan_action=blocked
 reason=writer policy pull-only blocks push
-recommendation=Review the local change. If it should publish upstream, run an explicit approved push path instead of changing the unattended OpenClaw policy.
+recommendation=Review the local change. If it should be saved to the shared library, run an explicit approved-push path instead of changing the unattended OpenClaw policy.
 ```
 
-This proves the unattended OpenClaw service does not silently publish OpenClaw-local edits back to WebDAV while running with `--writer-policy pull-only`.
+This proves the unattended OpenClaw service does not silently save OpenClaw-local edits back to WebDAV while running with `--writer-policy pull-only`.
 
 ## Restore
 

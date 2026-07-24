@@ -365,7 +365,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["sync_plan"]["blocked"], 1)
             self.assertEqual(status["sync_plan"]["blocked_items"][0]["skill_id"], "demo")
             self.assertEqual(status["sync_plan"]["blocked_items"][0]["category"], "writer_policy")
-            self.assertIn("approved push", status["sync_plan"]["blocked_items"][0]["recommendation"])
+            self.assertIn("approved-push", status["sync_plan"]["blocked_items"][0]["recommendation"])
 
     def test_dashboard_status_reuses_ops_status_model(self):
         with TemporaryDirectory() as tmp:
@@ -1144,7 +1144,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("data-source-path", DASHBOARD_HTML)
             self.assertIn("不会安装到 OpenClaw、Windows 或其他工具", DASHBOARD_HTML)
             self.assertIn("标记废弃", DASHBOARD_HTML)
-            self.assertIn("恢复发布", DASHBOARD_HTML)
+            self.assertIn("恢复可用", DASHBOARD_HTML)
             self.assertIn("deprecateCentralSkill", DASHBOARD_HTML)
             self.assertIn("reactivateCentralSkill", DASHBOARD_HTML)
             self.assertIn("REACTIVATE", DASHBOARD_HTML)

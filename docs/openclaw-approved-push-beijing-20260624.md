@@ -124,4 +124,4 @@ openclaw_device=green skills=94 blocked=0
 
 ## Decision
 
-Keep OpenClaw unattended sync on `pull-only`. Use `approved-push` for reviewed OpenClaw-local changes that should publish upstream. Use `mixed-scope-root` when applying the shared snapshot into governed roots that intentionally contain both global and project-scoped skills.
+Keep OpenClaw unattended sync on `pull-only`. Use `approved-push` for reviewed OpenClaw-local changes that should be saved to the shared library. Use `mixed-scope-root` when applying the shared snapshot into governed roots that intentionally contain both global and project-scoped skills.

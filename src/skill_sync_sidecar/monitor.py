@@ -363,7 +363,7 @@ def _action_for_blocked_item(item: JsonDict) -> str:
             return "先确认是否保留本机版本；需要保留时重新发布，需要废弃时接受共享库删除。"
         return "先确认这是误删还是废弃；未确认前不要删除共享库版本。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
-        return "Review the local device change, then run approved-push for this skill if it should publish."
+        return "Review the local device change, then run approved-push for this skill if it should be saved to the shared library."
     if category == "writer_policy" and status_action in {"pull", "pull_new"}:
         return "Review the remote change, then run an explicit approved pull/apply path if it should install."
     if category == "conflict":

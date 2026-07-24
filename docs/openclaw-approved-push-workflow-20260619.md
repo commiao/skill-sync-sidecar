@@ -2,7 +2,7 @@
 
 ## Goal
 
-Close the final governance gap for OpenClaw pull-only sync: when a local OpenClaw edit is intentionally blocked by `writer_policy=pull-only`, operators can review the blocked report and publish only explicitly approved local skills to WebDAV without changing the unattended service to `push-pull`.
+Close the final governance gap for OpenClaw pull-only sync: when a local OpenClaw edit is intentionally blocked by `writer_policy=pull-only`, operators can review the blocked report and save only explicitly approved local skills to WebDAV without changing the unattended service to `push-pull`.
 
 ## Capability
 

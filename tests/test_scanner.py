@@ -952,7 +952,8 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(report["summary"], {"writer_policy": 1})
             self.assertEqual(report["items"][0]["skill_id"], "demo")
             self.assertEqual(report["items"][0]["category"], "writer_policy")
-            self.assertIn("explicit approved push path", report["items"][0]["recommendation"])
+            self.assertIn("saved to the shared library", report["items"][0]["recommendation"])
+            self.assertIn("explicit approved-push path", report["items"][0]["recommendation"])
             self.assertTrue((out / "blocked-report.json").exists())
             self.assertIn("demo", (out / "blocked-report.md").read_text(encoding="utf-8"))
 

@@ -357,11 +357,11 @@ status_summary: {'already_converged': 1, 'local_only': 1, 'local_override': 1, '
 local_overrides: {'total': 2, 'skills': ['disk-cleanup', 'lark-cli-adapter']}
 ```
 
-This green state means the peer has no review-required sync work. OpenClaw-private skills still exist locally, but are deliberately outside WebDAV publishing.
+This green state means the peer has no review-required sync work. OpenClaw-private skills still exist locally, but are deliberately outside shared-library saving.
 
 ### Local overrides
 
-Use a local override when a peer must carry a runtime-only edit that should not be published to WebDAV. The canonical example is OpenClaw using a local Linuxbrew Python shebang for one adapter script while the portable WebDAV package keeps `#!/usr/bin/env python3`.
+Use a local override when a peer must carry a runtime-only edit that should not be saved to WebDAV. The canonical example is OpenClaw using a local Linuxbrew Python shebang for one adapter script while the portable WebDAV package keeps `#!/usr/bin/env python3`.
 
 Create `<skill-root>/.skill-sync-local-overrides.json`:
 
@@ -379,7 +379,7 @@ Create `<skill-root>/.skill-sync-local-overrides.json`:
 
 When the only local difference is under `ignore_paths`, `sync-status` reports `local_override` and `sync-plan` treats it as `noop`. If remote content changes outside the ignored paths, the sidecar still reports pull or conflict as usual. Do not use local overrides for content changes that should be shared.
 
-For a peer-private skill that should never be published to WebDAV, mark the whole skill as local-only:
+For a peer-private skill that should never be saved to WebDAV, mark the whole skill as local-only:
 
 ```json
 {
@@ -1042,7 +1042,7 @@ dryrun_service=active
 gateway_process=still_running
 ```
 
-OpenClaw promotion rule: after base adoption, default to `--writer-policy pull-only`. This lets OpenClaw receive WebDAV updates while preventing local OpenClaw edits from being uploaded automatically. If OpenClaw needs to publish a local change, review the blocked plan and run an explicit approved push path instead of changing the unattended service policy.
+OpenClaw promotion rule: after base adoption, default to `--writer-policy pull-only`. This lets OpenClaw receive WebDAV updates while preventing local OpenClaw edits from being uploaded automatically. If OpenClaw needs to save a local change to the shared library, review the blocked plan and run an explicit approved-push path instead of changing the unattended service policy.
 
 When a `pull-only` OpenClaw cycle blocks because a local skill changed, materialize a review report:
 
@@ -1057,7 +1057,7 @@ sudo -iu admin \
     --out /opt/skill-sync-sidecar/work/openclaw-blocked-review
 ```
 
-`sync-cycle` and `sync-daemon` also write this report under `--work-dir/blocked-report` whenever a cycle is blocked. Treat it as the approval queue for OpenClaw-to-WebDAV publishing; do not switch the unattended service to `push-pull` just to clear the block.
+`sync-cycle` and `sync-daemon` also write this report under `--work-dir/blocked-report` whenever a cycle is blocked. Treat it as the approval queue for OpenClaw-to-WebDAV saving; do not switch the unattended service to `push-pull` just to clear the block.
 
 After reviewing a blocked OpenClaw local edit, publish only the approved skill with `approved-push`. First run the dry-run:
 
@@ -1250,7 +1250,7 @@ Large-asset exception:
 
 - A `skill_md_only` change can still require a large archive upload when the skill directory contains binary assets.
 - `ocr` and `finance-auto-bookkeeping` are examples: small source changes can produce multi-MB archives because the package contains binary assets or data fixtures.
-- If direct WebDAV upload of such a package times out, do not publish an index that points to the missing archive. Use the local WebDAV sync folder file-remote path above, or defer the skill until a per-file/delta strategy exists.
+- If direct WebDAV upload of such a package times out, do not save an index that points to the missing archive. Use the local WebDAV sync folder file-remote path above, or defer the skill until a per-file/delta strategy exists.
 - Current adoption status: the OpenClaw peer-writer conflicts were reviewed and adopted into `adopt-openclaw-conflicts-complete-20260613`; the P0, P1 Wave-1/Wave-2/Wave-3/Wave-4/Wave-5/Wave-6/Wave-7/Wave-8/Wave-9, P2a Wave-1/Wave-2/Wave-3/Wave-4, P2b Wave-5/Wave-6, and P2c Wave-7/Wave-8/Wave-9/Wave-10/Wave-11/Wave-12/Wave-13/Wave-14 allowlists were later installed on OpenClaw and the current reconcile report shows `safe_to_auto_apply=true`, `same_without_base=92`, `pull_new=0`, and no conflicts.
 
 Before enabling it:

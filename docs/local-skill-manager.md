@@ -54,7 +54,7 @@ The secondary `Skill 清单` view is the per-skill management surface for the cu
 - `保存到共享库` appears for unpublished public skills that have a current Mac source path. It checks first, then requires `PUBLISH`; it does not directly install the skill onto other devices.
 - Project-scoped skills are shown in the inventory but are not one-click saved from the global list yet. They need a project-level policy before distribution.
 - `标记废弃` updates the shared-library lifecycle to `deprecated` after a read-only check and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
-- `恢复发布` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
+- `恢复可用` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
 The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit save confirmation, and other devices are read-only status unless their own Agent acts.

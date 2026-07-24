@@ -77,7 +77,7 @@ def _category(status_action: str, reason: str) -> str:
 def _recommendation(category: str, plan_action: str, status_action: str, writer_policy: str) -> str:
     if category == "writer_policy":
         if writer_policy == "pull-only":
-            return "Review the local change. If it should publish upstream, run an explicit approved push path instead of changing the unattended OpenClaw policy."
+            return "Review the local change. If it should be saved to the shared library, run an explicit approved-push path instead of changing the unattended OpenClaw policy."
         if writer_policy == "push-only":
             return "Review the remote change. If it should install locally, run an explicit approved pull path instead of changing the unattended writer policy."
         return f"Review whether policy {writer_policy} should allow {plan_action} for this skill."
@@ -87,7 +87,7 @@ def _recommendation(category: str, plan_action: str, status_action: str, writer_
         return "Materialize a tombstone and require explicit retention or delete approval before propagating deletion."
     if category == "new_skill_review":
         if status_action == "local_new":
-            return "Review the local new skill before publishing it upstream with --allow-new."
+            return "Review the local new skill before saving it to the shared library with --allow-new."
         return "Review the remote new skill before installing it locally with --allow-new."
     return "Inspect this blocked item and choose an explicit pull, push, or defer action."
 

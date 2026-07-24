@@ -132,7 +132,7 @@ Reason:
 
 OpenClaw system Python is `3.6.8`, which cannot run the adapter because the adapter uses modern Python features. The local shebang points direct execution at the isolated Linuxbrew Python `3.14.2`, so the local change is useful for OpenClaw runtime compatibility.
 
-However, publishing that hard-coded OpenClaw path to WebDAV would make the package less portable for Mac/Windows/other peers. Treat it as an OpenClaw-local runtime override until the sidecar has a first-class local override mechanism or the adapter scripts use a portable launcher.
+However, saving that hard-coded OpenClaw path to WebDAV would make the package less portable for Mac/Windows/other peers. Treat it as an OpenClaw-local runtime override until the sidecar has a first-class local override mechanism or the adapter scripts use a portable launcher.
 
 ## Decision
 

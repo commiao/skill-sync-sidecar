@@ -2,7 +2,7 @@
 
 ## Goal
 
-Validate OpenClaw as a peer device that may receive WebDAV skill updates without automatically publishing OpenClaw-local edits back upstream.
+Validate OpenClaw as a peer device that may receive WebDAV skill updates without automatically saving OpenClaw-local edits back upstream.
 
 This closes the gap after base adoption: OpenClaw has a durable base record, and the sidecar now has an explicit `pull-only` writer policy for safe downstream sync.
 

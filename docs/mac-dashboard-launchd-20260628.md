@@ -101,7 +101,7 @@ Mac `ops-status`:
 
 - The dashboard is read-only. It does not trigger sync, upload to WebDAV, or apply packages.
 - OpenClaw remains `pull-only`; explicit `approved-push` is still required for reviewed OpenClaw-originated changes.
-- OpenClaw-private skills such as `disk-cleanup` remain local policy items and are not published to the shared WebDAV snapshot.
+- OpenClaw-private skills such as `disk-cleanup` remain local policy items and are not saved to the shared WebDAV snapshot.
 - Older stderr log lines may contain historical SSH timeouts from before NAS/OpenClaw connectivity stabilized. New OpenClaw status should come from `openclaw-skill-sync-peer-status.timer` on OpenClaw, not from this Mac job.
 
 ## Next Step

@@ -7248,7 +7248,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function shouldRememberOperationFeedback(kind, title) {
       if (kind !== "green") return false;
-      return /保存完成|本次保存已完成|发布完成|本次发布已完成|已保存|已发布|已安装|已从|已恢复|已标记|已恢复发布|状态已刷新/.test(text(title));
+      return /保存完成|本次保存已完成|已保存|已安装|已从|已恢复|已标记|已恢复可用|状态已刷新/.test(text(title));
     }
 
     function setButtonLabel(button, label, subtext) {
@@ -7896,17 +7896,17 @@ DASHBOARD_HTML = r"""<!doctype html>
           button,
           !available
             ? "等待本机助手"
-            : (!executorAllowPublish ? "开启保存权限" : "恢复发布"),
+            : (!executorAllowPublish ? "开启保存权限" : "恢复可用"),
           !available
             ? "本机助手在线后可继续。"
-            : (!executorAllowPublish ? "查看说明；不会改共享库。" : "恢复共享库发布状态。"),
+            : (!executorAllowPublish ? "查看说明；不会改共享库。" : "恢复共享库可用状态。"),
         );
         button.disabled = !available || !button.dataset.skillId;
         button.title = !available
           ? "本机助手未在线"
           : (!executorAllowPublish
             ? "保存权限未开启；点击查看开启方法"
-            : "恢复共享库发布状态；不自动安装到设备");
+            : "恢复共享库可用状态；不自动安装到设备");
       });
       document.querySelectorAll(".openclaw-conflict-publish-button").forEach((button) => {
         button.disabled = !available || !executorAllowPublish || !button.dataset.skillId;
@@ -8565,17 +8565,17 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!skillId) return;
       if (!executorAvailable) {
         setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
-        setExecutorStatus("not ready", "本机助手未在线，不能执行恢复发布检查。", "yellow");
+        setExecutorStatus("not ready", "本机助手未在线，不能执行恢复可用检查。", "yellow");
         return;
       }
       if (!executorAllowPublish) {
-        showCentralMutationGateHelp(skillId, "恢复发布");
+        showCentralMutationGateHelp(skillId, "恢复可用");
         return;
       }
-      const reason = window.prompt(`为什么要恢复发布 ${skillId}？可留空。`, "") || "";
+      const reason = window.prompt(`为什么要恢复可用 ${skillId}？可留空。`, "") || "";
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查恢复发布 ${skillId}`, "检查只读；确认共享库当前版本仍是本机看到的版本。");
-      setExecutorStatus("reactivate check", `正在检查 ${skillId} 的共享库恢复发布操作。`, "yellow");
+      setReviewFeedback("yellow", `正在检查恢复可用 ${skillId}`, "检查只读；确认共享库当前版本仍是本机看到的版本。");
+      setExecutorStatus("reactivate check", `正在检查 ${skillId} 的共享库恢复可用操作。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/central-reactivate-dry-run`, {
           method: "POST",
@@ -8588,12 +8588,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_reactivate) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，只会恢复共享库发布状态；不会自动安装到设备。");
+        setReviewFeedback("green", `检查通过：${skillId}`, "下一步确认后，只会恢复共享库可用状态；不会自动安装到设备。");
         if (!confirmProtectedWrite({
           word: "REACTIVATE",
-          title: `确认恢复发布：${skillId}`,
+          title: `确认恢复可用：${skillId}`,
           will: [
-            `把共享库里的 ${skillId} 从已废弃恢复为可发布状态。`,
+            `把共享库里的 ${skillId} 从已废弃恢复为可用状态。`,
             "只上传新的 index.json。",
             "恢复后可再次选择安装到本机工具。",
           ],
@@ -8603,12 +8603,12 @@ DASHBOARD_HTML = r"""<!doctype html>
             "不会修改 OpenClaw 服务。",
           ],
         })) {
-          setExecutorStatus("cancelled", "恢复发布已取消。", "yellow");
+          setExecutorStatus("cancelled", "恢复可用已取消。", "yellow");
           setReviewFeedback("yellow", "已取消", "没有写入共享库。");
           return;
         }
-        setReviewFeedback("yellow", `正在恢复发布 ${skillId}`, "正在上传新的共享库 index；原文件保持不变。");
-        setExecutorStatus("reactivating", `正在恢复 ${skillId} 的发布状态。`, "yellow");
+        setReviewFeedback("yellow", `正在恢复可用 ${skillId}`, "正在上传新的共享库 index；原文件保持不变。");
+        setExecutorStatus("reactivating", `正在恢复 ${skillId} 的可用状态。`, "yellow");
         const response = await fetch(`${EXECUTOR_URL}/api/central-reactivate`, {
           method: "POST",
           cache: "no-store",
@@ -8620,13 +8620,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!response.ok || !payload.ok) {
           throw new Error(executorErrorDetail(payload));
         }
-        setReviewFeedback("green", `${skillId} 已恢复发布`, "共享库状态正在刷新；需要安装到工具时再在清单中选择。");
-        setExecutorStatus("reactivated", `${skillId} 已恢复共享库发布状态。`, "green");
+        setReviewFeedback("green", `${skillId} 已恢复可用`, "共享库状态正在刷新；需要安装到工具时再在清单中选择。");
+        setExecutorStatus("reactivated", `${skillId} 已恢复共享库可用状态。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
-        setReviewFeedback("red", "恢复发布失败", String(err));
-        setExecutorStatus("failed", "恢复发布失败，请查看执行输出。", "red");
+        setReviewFeedback("red", "恢复可用失败", String(err));
+        setExecutorStatus("failed", "恢复可用失败，请查看执行输出。", "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -9524,7 +9524,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? `<button type="button" class="central-deprecate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="deprecateCentralSkill(this)" disabled>标记废弃</button>`
         : "";
       const reactivateAction = centralState === "deprecated"
-        ? `<button type="button" class="central-reactivate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="reactivateCentralSkill(this)" disabled>恢复发布</button>`
+        ? `<button type="button" class="central-reactivate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="reactivateCentralSkill(this)" disabled>恢复可用</button>`
         : "";
       const publishPath = macPublishSourcePath(item);
       const publishAction = centralState === "unpublished"
@@ -9590,7 +9590,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return {
           kind: "muted",
           title: "已废弃，默认不再安装",
-          detail: "需要重新使用时，先恢复发布状态。",
+          detail: "需要重新使用时，先恢复可用状态。",
         };
       }
       if (centralState === "unpublished") {
