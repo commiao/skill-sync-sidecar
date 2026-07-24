@@ -45,7 +45,7 @@ The user should not need to edit metadata, understand technical check output, or
 
 The secondary `Skill 清单` view is the per-skill management surface for the current client:
 
-- The top `推荐操作` strip chooses one plain next action from the current state: pending sync review, installable local tools, publishable local skills, installed local skills, or the full list. It is the first thing a non-technical user should follow.
+- The top `推荐操作` strip chooses one plain next action from the current state: pending sync review, installable local tools, savable local skills, installed local skills, or the full list. It is the first thing a non-technical user should follow.
 - After a recommended action opens the list, the `正在看` strip explains the current view and the next safe operation, such as checking a tool box, saving one skill to the shared library, or leaving project skills in the project repository.
 - Search and filters are view-only helpers. Users can filter by skill name/description, shared-library state, scope, local tool, or pending sync state without changing files.
 - The unpublished triage chips split local-only skills into `可保存公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
@@ -88,7 +88,7 @@ Allows the executor to write into local tool skill roots after the dashboard con
 
 Allows the executor to upload the selected skill and merged `index.json` to the WebDAV central snapshot after the dashboard confirmation prompt. The internal flag keeps the historical `publish` name, but the dashboard presents this as `保存到共享库`.
 
-The launchd helper enables local installs by default and keeps central publishing disabled unless explicitly requested:
+The launchd helper enables local installs by default and keeps central shared-library saving disabled unless explicitly requested:
 
 ```bash
 scripts/install-operator-executor-launchd.sh
@@ -116,7 +116,7 @@ python3 -m skill_sync_sidecar local-skill-install \
   --dry-run
 ```
 
-Check shared-library publish:
+Check shared-library save:
 
 ```bash
 python3 -m skill_sync_sidecar local-skill-publish \
@@ -126,7 +126,7 @@ python3 -m skill_sync_sidecar local-skill-publish \
   --dry-run
 ```
 
-Real central publish requires `--yes` and explicit authorization to upload private skill content to WebDAV.
+Real central save requires `--yes` and explicit authorization to upload private skill content to WebDAV.
 
 ## Acceptance Case: read-wechat-article
 
@@ -153,7 +153,7 @@ Installed local roots:
 
 Each root contains `SKILL.md` and `manifest.json`.
 
-Central publish result:
+Central save result:
 
 ```text
 safe_to_push=true
@@ -166,7 +166,7 @@ local_hash=6292e4d420bde89a710a90f13ed15562a4f36c172015f2b6cc4c82efafe17485
 remote_hash=6292e4d420bde89a710a90f13ed15562a4f36c172015f2b6cc4c82efafe17485
 ```
 
-After explicit data-export approval, `read-wechat-article` was published to the WebDAV central snapshot. A follow-up publish dry-run now returns `noop`, which means the central snapshot already matches the local skill content hash.
+After explicit data-export approval, `read-wechat-article` was saved to the WebDAV central snapshot. A follow-up save dry-run now returns `noop`, which means the central snapshot already matches the local skill content hash.
 
 ## Safety Rules
 
@@ -175,6 +175,6 @@ After explicit data-export approval, `read-wechat-article` was published to the 
 - Existing target skills are backed up before replacement.
 - Local removals are moved to `.skill-sync-removed/<timestamp>/`, not permanently deleted.
 - Existing identical skills with missing metadata only receive `manifest.json`; they are not replaced.
-- Selective publish merges only the selected skill into the central snapshot and leaves unrelated conflicts untouched.
+- Selective save merges only the selected skill into the central snapshot and leaves unrelated conflicts untouched.
 - Central deprecation changes lifecycle metadata only; it does not delete WebDAV archives or uninstall devices.
 - Central reactivation changes lifecycle metadata only; it does not rewrite WebDAV archives or install devices.

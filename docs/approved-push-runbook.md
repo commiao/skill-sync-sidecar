@@ -1,10 +1,12 @@
 # Approved Push Runbook
 
-Use this runbook when OpenClaw is `yellow` because pull-only sync found local skill changes that may need to publish to WebDAV.
+Use this runbook when OpenClaw is `yellow` because pull-only sync found local skill changes that may need to be saved to WebDAV.
 
 ## Goal
 
-Publish only reviewed OpenClaw-local skill changes while keeping the unattended OpenClaw sidecar policy at `pull-only`.
+Save only reviewed OpenClaw-local skill changes while keeping the unattended OpenClaw sidecar policy at `pull-only`.
+
+The CLI and script names keep the historical `approved-push` terminology. The dashboard presents the same operator action as `保存到共享库`.
 
 Do not switch OpenClaw to `push-pull` just to clear a queue. The queue is the safety mechanism.
 
@@ -40,7 +42,7 @@ For new OpenClaw-local skills, the helper allows `push_new` by default. Use `--n
 
 Dry-run must show `safe_to_push: true`. If it reports stale hashes, regenerate the queue after the producer stops writing and try again.
 
-## Publish
+## Save To Shared Library
 
 After reviewing the dry-run output, rerun with `--yes`.
 

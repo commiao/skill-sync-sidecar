@@ -11,7 +11,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `gateway`: serve the same dashboard from WebDAV directly, for NAS or always-on observer hosts.
 - `local-skill-analyze`: analyze a local skill directory, infer manifest metadata, and preview local tool installs.
 - `local-skill-install`: install one local skill into selected local tool roots with generated manifest metadata and backup records.
-- `local-skill-publish`: publish one installed local skill to the central snapshot without applying unrelated conflicts.
+- `local-skill-publish`: save one installed local skill to the central snapshot without applying unrelated conflicts. The command keeps the historical `publish` name, while the dashboard presents this action as **保存到共享库**.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
@@ -41,10 +41,10 @@ Peer-specific runtime edits and private skills can be declared locally with `<sk
 For day-to-day use, open the dashboard and start from the first card:
 
 1. If the card says **现在不用做任何事**, leave it alone.
-2. To add a local skill, click **管理本机 skill**, paste a skill folder or `SKILL.md` path, then follow the three visible steps: **开始** -> **安装到本机工具** -> **发布到共享库**.
-3. To publish a device update, click the card's recommended button. The dashboard first runs a read-only check, then asks for confirmation before writing to the shared library.
-4. If a publish action says **开启保存权限**, the dashboard is still safe to use: it will show the local executor setup note and will not write the shared library.
-5. If an install/remove action says **开启本机写入**, it only affects the current device's tool skill folders after confirmation; it does not enable shared-library publishing.
+2. To add a local skill, click **管理本机 skill**, paste a skill folder or `SKILL.md` path, then follow the three visible steps: **开始** -> **安装到本机工具** -> **保存到共享库**.
+3. To save a device update, click the card's recommended button. The dashboard first runs a read-only check, then asks for confirmation before writing to the shared library.
+4. If a save action says **开启保存权限**, the dashboard is still safe to use: it will show the local executor setup note and will not write the shared library.
+5. If an install/remove action says **开启本机写入**, it only affects the current device's tool skill folders after confirmation; it does not enable shared-library saving.
 
 Sidecar infers metadata, scope, targets, risk, and install destinations. Users should not hand-write metadata files, copy files between tool roots, or remember low-level flags.
 
@@ -58,9 +58,9 @@ python3 -m skill_sync_sidecar operator-executor \
   --allow-local-writes
 ```
 
-`--allow-local-writes` only permits writes to local tool skill roots after the dashboard confirmation prompt. It does not enable WebDAV publishing. Start with `--allow-publish` separately when central writes are intended.
+`--allow-local-writes` only permits writes to local tool skill roots after the dashboard confirmation prompt. It does not enable WebDAV saving. Start with `--allow-publish` separately when central writes are intended; the flag name is kept for CLI compatibility.
 
-The launchd helper enables local installs by default and keeps central publish disabled unless requested:
+The launchd helper enables local installs by default and keeps central shared-library saving disabled unless requested:
 
 ```bash
 scripts/install-operator-executor-launchd.sh
@@ -467,7 +467,7 @@ Writer policy controls which side is allowed to make automatic content changes:
 - `push-only`: allows local-to-WebDAV pushes but blocks WebDAV-to-local pulls.
 - `no-writes`: allows only no-op cycles.
 
-For OpenClaw, use `--writer-policy pull-only` unless there is an explicit decision that OpenClaw may publish local edits upstream. Under `pull-only`, local OpenClaw edits become blocked plan items and require review instead of being uploaded.
+For OpenClaw, use `--writer-policy pull-only` unless there is an explicit decision that OpenClaw may save local edits upstream. Under `pull-only`, local OpenClaw edits become blocked plan items and require review instead of being uploaded.
 
 For OpenClaw, run the stricter gate before converting a dry-run service into a writable service:
 
