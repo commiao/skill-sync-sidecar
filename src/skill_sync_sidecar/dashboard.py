@@ -7570,8 +7570,18 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function shouldRememberOperationFeedback(kind, title) {
-      if (kind !== "green") return false;
-      return /保存完成|本次保存已完成|已保存|已安装|已从|已恢复|已标记|已恢复可用|状态已刷新/.test(text(title));
+      const cleanTitle = text(title);
+      if (!cleanTitle || /^正在/.test(cleanTitle)) return false;
+      if (kind === "green") {
+        return /检查通过|保存完成|本次保存已完成|已保存|已安装|已从|已恢复|已标记|已恢复可用|状态已刷新/.test(cleanTitle);
+      }
+      if (kind === "yellow") {
+        return /保存完成|没有写入|已拒绝|仍在修改|还有其他提醒|等待设备上报|状态刷新失败|当前没有可保存更新|保存开关未打开|还不能保存|已取消|需要复核/.test(cleanTitle);
+      }
+      if (kind === "red") {
+        return /失败|调用失败|执行失败/.test(cleanTitle);
+      }
+      return false;
     }
 
     function setButtonLabel(button, label, subtext) {
