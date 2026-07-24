@@ -2,7 +2,7 @@
 
 ## Goal
 
-Publish one reviewed OpenClaw-local skill change, `beijing-recruitment`, to the shared WebDAV snapshot without changing OpenClaw's unattended `pull-only` policy.
+Save one reviewed OpenClaw-local skill change, `beijing-recruitment`, to the shared WebDAV snapshot without changing OpenClaw's unattended `pull-only` policy.
 
 ## Starting State
 

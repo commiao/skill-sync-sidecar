@@ -147,4 +147,4 @@ pid=2966537
 
 The sidecar can now replace cc-switch for WebDAV-backed private skill synchronization across mixed global/project skill roots.
 
-The remaining governance rule still holds: OpenClaw is `pull-only` for unattended sync. If OpenClaw-local edits need to publish upstream, generate a blocked report and run `approved-push` for explicit skill IDs.
+The remaining governance rule still holds: OpenClaw is `pull-only` for unattended sync. If OpenClaw-local edits need to be saved to the shared WebDAV library, generate a blocked report and run `approved-push` for explicit skill IDs.

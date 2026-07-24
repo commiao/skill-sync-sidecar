@@ -11,7 +11,7 @@ Validate that the enabled OpenClaw `pull-only` automatic sync service can apply 
 - Description: `Harmless canary skill for validating skill-sync-sidecar pull-only automatic sync from WebDAV to OpenClaw.`
 - Contents: one `SKILL.md`, no scripts, no credentials, no side effects.
 
-## Mac Publish
+## Mac Save To Shared Library
 
 The Mac snapshot was rebuilt from `/Users/mac/.cc-switch/skills` and pushed to:
 

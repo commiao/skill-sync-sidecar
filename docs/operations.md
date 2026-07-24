@@ -968,7 +968,7 @@ push-only = allow local-to-WebDAV pushes; block WebDAV-to-local pulls
 no-writes = allow only no-op cycles
 ```
 
-OpenClaw should use `pull-only` until there is an explicit policy decision that OpenClaw may publish local edits upstream. Under `pull-only`, a local OpenClaw edit is surfaced as a blocked sync plan instead of being uploaded to WebDAV.
+OpenClaw should use `pull-only` until there is an explicit policy decision that OpenClaw may save local edits to the shared WebDAV library. Under `pull-only`, a local OpenClaw edit is surfaced as a blocked sync plan instead of being uploaded to WebDAV.
 
 Validated rehearsal:
 
@@ -1260,7 +1260,7 @@ Before enabling it:
 3. Verify the service user's Python runtime is >=3.9.
 4. Keep remote service connectivity checks separate from sidecar rollout.
 5. Run `openclaw-gate --require-complete --fail-on-blocked`; it must pass before any writable OpenClaw service rollout.
-6. Require `--writer-policy pull-only` for OpenClaw unless there is an explicit approval that this peer may publish local edits upstream.
+6. Require `--writer-policy pull-only` for OpenClaw unless there is an explicit approval that this peer may save local edits to the shared WebDAV library.
 7. Review any `conflict`, blocked push, or delete actions before allowing writes to `/home/admin/clawd/skills` or WebDAV.
 
 Suggested validation:
