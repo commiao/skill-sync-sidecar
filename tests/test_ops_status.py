@@ -1833,7 +1833,10 @@ class OpsStatusTest(unittest.TestCase):
                             "sync_state": "source_changed",
                             "pending": 1,
                             "central": {"state": "published"},
-                            "installations": [{"path": "/tmp/demo"}],
+                            "installations": [
+                                {"path": "/tmp/demo", "tool_id": "codex", "device_id": "mac"},
+                                {"path": "/tmp/demo-copy", "tool_id": "codex", "device_id": "mac"},
+                            ],
                         },
                         {
                             "skill_id": "heavy",
@@ -1841,7 +1844,10 @@ class OpsStatusTest(unittest.TestCase):
                             "pending": 0,
                             "scope": "global",
                             "central": {"state": "unpublished"},
-                            "installations": [{"path": "/tmp/heavy"}],
+                            "installations": [
+                                {"path": "/tmp/heavy", "tool_id": "cursor", "device_id": "mac"},
+                                {"path": "/tmp/heavy-oc", "tool_id": "claude-code", "device_id": "oc-vps"},
+                            ],
                         },
                     ],
                 },
@@ -1858,6 +1864,11 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["publishable"], 1)
         self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["pending_ordinary"], 1)
         self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["pending_blocking"], 0)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed_by_tool"]["codex"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed_by_tool"]["cursor"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed_by_tool"]["claude-code"], 1)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed_by_device"]["mac"], 2)
+        self.assertEqual(overview["dashboard"]["skill_inventory"]["summary"]["installed_by_device"]["oc-vps"], 1)
         self.assertNotIn("items", overview["dashboard"]["skill_inventory"])
         self.assertNotIn("skill_items", overview["dashboard"]["device_tools"][0]["tools"][0])
         self.assertEqual(overview["dashboard"]["device_tools"][0]["tools"][0]["skills"], 2)

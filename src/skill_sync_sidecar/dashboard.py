@@ -515,6 +515,8 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
     pending_blocking = 0
     installed = 0
     publishable = 0
+    installed_by_tool: dict[str, int] = {}
+    installed_by_device: dict[str, int] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -527,6 +529,21 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
         installations = item.get("installations") if isinstance(item.get("installations"), list) else []
         if installations:
             installed += 1
+        item_tool_ids: set[str] = set()
+        item_device_ids: set[str] = set()
+        for inst in installations:
+            if not isinstance(inst, dict):
+                continue
+            tool_id = str(inst.get("tool_id") or "").strip()
+            device_id = str(inst.get("device_id") or "").strip()
+            if tool_id:
+                item_tool_ids.add(tool_id)
+            if device_id:
+                item_device_ids.add(device_id)
+        for tool_id in item_tool_ids:
+            installed_by_tool[tool_id] = installed_by_tool.get(tool_id, 0) + 1
+        for device_id in item_device_ids:
+            installed_by_device[device_id] = installed_by_device.get(device_id, 0) + 1
         central = item.get("central") if isinstance(item.get("central"), dict) else {}
         if central.get("state") == "unpublished" and item.get("scope") != "project" and any(inst.get("path") for inst in installations if isinstance(inst, dict)):
             publishable += 1
@@ -535,6 +552,8 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
         "publishable": publishable,
         "pending_ordinary": pending_ordinary,
         "pending_blocking": pending_blocking,
+        "installed_by_tool": dict(sorted(installed_by_tool.items())),
+        "installed_by_device": dict(sorted(installed_by_device.items())),
     }
 
 
