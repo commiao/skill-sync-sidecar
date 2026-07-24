@@ -97,6 +97,14 @@ SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 \
   scripts/install-operator-executor-launchd.sh
 ```
 
+For non-default clients, set the displayed device identity before installing the helper:
+
+```bash
+SKILL_SYNC_DEVICE_ID=win \
+SKILL_SYNC_DEVICE_NAME="Windows 笔记本" \
+  scripts/install-operator-executor-launchd.sh
+```
+
 When shared-library saving is disabled, the dashboard still allows `检查共享` and disables `保存到共享库` with an explanation.
 
 ## CLI Equivalents

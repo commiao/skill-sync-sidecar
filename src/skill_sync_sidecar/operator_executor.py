@@ -40,9 +40,11 @@ class OperatorExecutorError(RuntimeError):
 
 
 def local_device_identity() -> dict:
+    device_id = os.environ.get("SKILL_SYNC_DEVICE_ID", "mac").strip() or "mac"
+    device_name = os.environ.get("SKILL_SYNC_DEVICE_NAME", "Mac 本机").strip() or "Mac 本机"
     return {
-        "device_id": "mac",
-        "device_name": "Mac 本机",
+        "device_id": device_id,
+        "device_name": device_name,
         "scope": "local",
     }
 

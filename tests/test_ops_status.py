@@ -46,10 +46,19 @@ from skill_sync_sidecar.tool_status import build_device_tool_status
 
 class OpsStatusTest(unittest.TestCase):
     def test_operator_executor_reports_local_device_identity(self):
-        identity = local_device_identity()
+        with patch.dict(os.environ, {}, clear=True):
+            identity = local_device_identity()
 
         self.assertEqual(identity["device_id"], "mac")
         self.assertEqual(identity["device_name"], "Mac 本机")
+        self.assertEqual(identity["scope"], "local")
+
+    def test_operator_executor_device_identity_can_be_configured(self):
+        with patch.dict(os.environ, {"SKILL_SYNC_DEVICE_ID": "win", "SKILL_SYNC_DEVICE_NAME": "Windows 笔记本"}):
+            identity = local_device_identity()
+
+        self.assertEqual(identity["device_id"], "win")
+        self.assertEqual(identity["device_name"], "Windows 笔记本")
         self.assertEqual(identity["scope"], "local")
 
     def test_device_tool_status_includes_lightweight_skill_items(self):

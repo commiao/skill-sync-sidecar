@@ -7,12 +7,14 @@ host="${SKILL_SYNC_EXECUTOR_HOST:-127.0.0.1}"
 port="${SKILL_SYNC_EXECUTOR_PORT:-18765}"
 allow_local_writes="${SKILL_SYNC_EXECUTOR_ALLOW_LOCAL_WRITES:-1}"
 allow_publish="${SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH:-0}"
+device_id="${SKILL_SYNC_DEVICE_ID:-mac}"
+device_name="${SKILL_SYNC_DEVICE_NAME:-Mac 本机}"
 logs_dir="${SKILL_SYNC_EXECUTOR_LOGS_DIR:-$HOME/Library/Logs}"
 plist="$HOME/Library/LaunchAgents/${label}.plist"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$logs_dir"
 
-python3 - "$plist" "$label" "$repo_root" "$host" "$port" "$allow_local_writes" "$allow_publish" "$logs_dir" <<'PY'
+python3 - "$plist" "$label" "$repo_root" "$host" "$port" "$allow_local_writes" "$allow_publish" "$device_id" "$device_name" "$logs_dir" <<'PY'
 import plistlib
 import sys
 from pathlib import Path
@@ -24,7 +26,9 @@ host = sys.argv[4]
 port = sys.argv[5]
 allow_local_writes = sys.argv[6] == "1"
 allow_publish = sys.argv[7] == "1"
-logs_dir = Path(sys.argv[8]).expanduser()
+device_id = sys.argv[8]
+device_name = sys.argv[9]
+logs_dir = Path(sys.argv[10]).expanduser()
 program_arguments = [
     "/usr/bin/python3",
     "-c",
@@ -46,6 +50,8 @@ payload = {
     "ProgramArguments": program_arguments,
     "EnvironmentVariables": {
         "PYTHONPATH": str(repo_root / "src"),
+        "SKILL_SYNC_DEVICE_ID": device_id,
+        "SKILL_SYNC_DEVICE_NAME": device_name,
     },
     "WorkingDirectory": str(repo_root),
     "RunAtLoad": True,
@@ -65,4 +71,6 @@ echo "label=$label"
 echo "url=http://$host:$port/healthz"
 echo "allow_local_writes=$allow_local_writes"
 echo "allow_publish=$allow_publish"
+echo "device_id=$device_id"
+echo "device_name=$device_name"
 echo "plist=$plist"
