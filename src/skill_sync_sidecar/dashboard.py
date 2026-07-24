@@ -5502,7 +5502,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <span>OpenClaw、Windows、NAS 只在这里展示状态，由各自客户端执行本机操作。</span>
         </div>
       </div>
-      <div class="skill-inventory-note">这是当前设备操作区：先选工作区或在列表里勾选安装/移除；路径、保存、废弃等细节放到行内高级详情里。</div>
+      <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先选工作区或在列表里勾选安装/移除；查看路径和状态的实时变更也会在这里展示，路径、保存、废弃等细节放到行内高级详情里。</div>
       <div id="skill-inventory-guide" class="skill-inventory-guide" aria-label="Skill 清单推荐操作"></div>
       <details class="skill-inventory-project-note">
         <summary>项目级 skill 怎么处理</summary>
