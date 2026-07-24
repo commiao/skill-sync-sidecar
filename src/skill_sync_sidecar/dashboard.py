@@ -8397,14 +8397,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (payload.ok) {
           if (isPublish && Number(payload.approved || 0) === 0) {
             lastDryRunSafe = false;
+            const publishReason = payload && payload.result && payload.result.reason ? String(payload.result.reason).trim() : "";
             await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
             await refresh(true);
+            const safeNoWriteNote = publishReason
+              ? `保存返回 approved=0：${publishReason}`
+              : "保存返回 approved=0。通常表示检查后状态变了：该项已保存、已恢复，或变成需要确认的版本差异。请看当前确认分类。";
             setExecutorStatus("no changes", "没有保存任何 skill；队列已变化或当前项已不再是可保存更新。", "yellow");
-            setReviewFeedback(
-              "yellow",
-              "没有写入共享库",
-              "保存返回 approved=0。通常表示检查后状态变了：该项已保存、已恢复，或变成需要确认的版本差异。请看当前确认分类。",
-            );
+            setReviewFeedback("yellow", "没有写入共享库", safeNoWriteNote);
             return;
           }
           setExecutorStatus(isPublish ? "saved" : "检查通过", isPublish ? "已写入共享库，正在确认状态。" : "检查通过：可以继续保存到共享库。", "green");
