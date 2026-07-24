@@ -117,6 +117,51 @@ no actionable openclaw writer_policy entries found
 - 这会把所有当前筛出的 `writer_policy` 项一并发布；`delete` / `conflict` 项仍不会被 `approved-push` 写入 WebDAV。
 - 如果发现列表不全，先点一次 dashboard 刷新，确认卡片状态无刷新卡住（`blocked` 是否仍未清空）。
 
+## 一条命令（推荐给普通用户）
+
+如果只想“把当前可发布项先预检，再按需一键发布”，可以用新增的快速脚本：
+
+```bash
+# 1) 仅预检（不写入）
+scripts/openclaw-approved-push-quick.sh
+
+# 2) 预检全部通过后，写入共享库
+scripts/openclaw-approved-push-quick.sh --yes
+```
+
+可选参数：
+
+- `--source "oc-vps / OpenClaw"`：按来源过滤，默认即 OpenClaw。
+- `--max 3`：只处理前 3 个候选，适合演示/验证。
+- `--no-refresh`：发布成功后不自动刷新 peer-status（默认会刷新）。
+- `--help`：查看完整说明。
+
+输出重点（示例）：
+
+```text
+openclaw_pending_count=3
+openclaw_pending_ids=finance-auto-bookkeeping investment-analysis puter-image-gen
+[2] 执行 dry-run 预检...
+mode=预检
+safe_to_push=true
+approved=3
+approved_skill_ids=finance-auto-bookkeeping investment-analysis puter-image-gen
+结论=预检通过，可改为 --yes 发布。
+```
+
+发布成功时会输出：
+
+```text
+mode=发布
+safe_to_push=true
+approved=3
+approved_skill_ids=...
+结论=已按脚本返回写入；建议立即刷新 peer-status。
+已执行发布动作...
+```
+
+如果列表里包含 `safe_to_push=false` 或 `approved=0`，不要反复点击发布按钮；优先回看 `blocked` 详情（尤其是是否为 `conflict/delete` 或 hash 已变化）。
+
 ## Verify OpenClaw
 
 If you want peer status to refresh automatically, add `--refresh-peer-status`
