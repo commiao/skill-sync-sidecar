@@ -4173,6 +4173,42 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 8px;
       margin: 12px 0 8px;
     }
+    .skill-inventory-client {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: stretch;
+      border: 1px solid #c8dcf4;
+      border-radius: 8px;
+      background: #f7fbff;
+      padding: 10px;
+      margin: 8px 0 10px;
+    }
+    .skill-inventory-client-main,
+    .skill-inventory-client-rule {
+      min-width: 0;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+    }
+    .skill-inventory-client-main strong,
+    .skill-inventory-client-rule strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.3;
+    }
+    .skill-inventory-client-main span,
+    .skill-inventory-client-rule span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
     .skill-inventory-metric {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -4899,6 +4935,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-row { grid-template-columns: 1fr; }
       .skill-tool-matrix { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
+      .skill-inventory-client { grid-template-columns: 1fr 1fr; }
       .skill-inventory-guide { grid-template-columns: 1fr; }
       .skill-inventory-guide button { width: 100%; }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -4910,6 +4947,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .device-tool-grid { grid-template-columns: 1fr; }
       .device-map-grid { grid-template-columns: 1fr 1fr; }
       .skill-inventory-simple { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .skill-inventory-client { grid-template-columns: 1fr; gap: 6px; }
       .guide-steps { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
       .plan-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -5190,6 +5228,24 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-metric"><strong id="skill-inventory-published">-</strong><span>已在共享库</span></div>
         <div class="skill-inventory-metric"><strong id="skill-inventory-unpublished">-</strong><span>本机/设备独有</span></div>
         <div class="skill-inventory-metric"><strong id="skill-inventory-project">-</strong><span>项目级</span></div>
+      </div>
+      <div class="skill-inventory-client" aria-label="当前客户端操作边界">
+        <div class="skill-inventory-client-main">
+          <strong>当前客户端：Mac 本机</strong>
+          <span>这里的安装、移除和扫描只通过当前设备的本机助手执行。</span>
+        </div>
+        <div class="skill-inventory-client-rule">
+          <strong>勾选工具</strong>
+          <span>只安装到当前 Mac 的 Codex、Cursor、cc-switch 等本机工具。</span>
+        </div>
+        <div class="skill-inventory-client-rule">
+          <strong>保存共享库</strong>
+          <span>先检查，再输入确认词；不会自动安装到其他设备。</span>
+        </div>
+        <div class="skill-inventory-client-rule">
+          <strong>其他设备</strong>
+          <span>OpenClaw、Windows、NAS 只在这里展示状态，由各自客户端执行本机操作。</span>
+        </div>
       </div>
       <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或保存到共享库。</div>
       <div id="skill-inventory-guide" class="skill-inventory-guide" aria-label="Skill 清单推荐操作"></div>
