@@ -181,7 +181,7 @@ def build_parser() -> argparse.ArgumentParser:
     local_skill_install_mode.add_argument("--yes", action="store_true", help="Install into local tool roots and write backup records.")
     local_skill_install.set_defaults(func=cmd_local_skill_install)
 
-    local_skill_publish = subcommands.add_parser("local-skill-publish", help="Publish one installed local skill to the central snapshot without applying unrelated conflicts.")
+    local_skill_publish = subcommands.add_parser("local-skill-publish", help="Save one installed local skill to the central snapshot without applying unrelated conflicts.")
     add_common_remote_args(local_skill_publish)
     local_skill_publish.add_argument("--path", required=True, help="Skill directory or SKILL.md path used to determine the skill id.")
     local_skill_publish.add_argument("--local-root", default="~/.cc-switch/skills", help="Local canonical tool root to publish from.")

@@ -185,7 +185,7 @@ class LocalSkillTest(unittest.TestCase):
             remote = FileRemote(remote_root)
             upload_snapshot(remote_snapshot, remote)
 
-            with self.assertRaises(LocalSkillError):
+            with self.assertRaisesRegex(LocalSkillError, "shared-library save is blocked"):
                 publish_local_skill(local_root, remote_snapshot, "demo", remote)
 
     def _write_skill(self, path: Path, skill_id: str, body: str = "body") -> None:

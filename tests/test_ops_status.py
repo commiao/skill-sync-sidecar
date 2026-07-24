@@ -1944,6 +1944,9 @@ class OpsStatusTest(unittest.TestCase):
 
     def test_local_skill_publish_parser_accepts_selective_publish_arguments(self):
         parser = build_parser()
+        help_text = parser.format_help()
+        self.assertIn("local-skill-publish", help_text)
+        self.assertIn("Save one installed local skill", help_text)
 
         args = parser.parse_args(
             [

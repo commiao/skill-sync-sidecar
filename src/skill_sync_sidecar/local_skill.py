@@ -152,7 +152,7 @@ def publish_local_skill(
     local_record = scan_skill("local-publish", local_skill_dir, local_skill_dir / "SKILL.md")
     local_risk = _risk_summary(local_record, local_skill_dir)
     if local_risk.get("level") == "error":
-        raise LocalSkillError(f"risk check failed; central publish is blocked for: {normalized}")
+        raise LocalSkillError(f"risk check failed; shared-library save is blocked for: {normalized}")
     status = build_sync_status(local_root, remote_snapshot_dir, last_applied_record)
     plan = build_sync_plan(status, allow_new=True, writer_policy="push-pull")
     item = next((dict(value) for value in plan.get("items", []) if value.get("skill_id") == normalized), None)
