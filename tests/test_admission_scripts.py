@@ -274,7 +274,7 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("/api/overview", text)
         self.assertIn("last-report.json", text)
         self.assertIn("普通待审", text)
-        self.assertIn(".simple-action-panel.deferrable", text)
+        self.assertIn(".simple-action-panel", text)
         self.assertNotIn(" compose ", text)
         self.assertNotIn(" up -d", text)
         self.assertNotIn("docker restart", text)

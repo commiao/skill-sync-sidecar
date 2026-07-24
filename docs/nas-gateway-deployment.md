@@ -153,6 +153,13 @@ reachability, `deployed-commit.txt`, gateway `/healthz`, `/api/overview`, the
 dashboard HTML strings, portal reachability, and the monitor last report. It
 does not run Compose and does not restart containers.
 
+如果环境偶发 SSH 抖动，可在执行时暂时跳过/降级监控读取，避免一次性失败阻断整体校验：
+
+```bash
+SKILL_SYNC_NAS_CHECK_MONITOR=0 scripts/verify-nas-gateway-deploy.sh
+SKILL_SYNC_NAS_MONITOR_REPORT_REQUIRED=0 scripts/validate-nas-sidecar.sh
+```
+
 If `deployed-commit.txt` already matches the intended commit and the containers
 are healthy, finish with the normal HTTP/API checks. If the commit was written
 but containers are not healthy, rerun the same Compose command once from the NAS

@@ -54,7 +54,7 @@ except RemoteError as exc:
     print("webdav_http_ok=false")
     print(f"webdav_http_error={exc}")
 else:
-    print(f"webdav_http_ok={str(b'Skill Sync Observer' in html).lower()}")
+    print(f"webdav_http_ok={str(b'Skill Sync Sidecar' in html).lower()}")
     print(f"webdav_http_url={os.environ['WEBDAV_HTTP_BASE'].rstrip('/')}/{os.environ['WEBDAV_HTTP_PATH'].lstrip('/')}")
     print(f"webdav_http_bytes={len(html)}")
 PY

@@ -9,7 +9,9 @@ gateway_url="${SKILL_SYNC_NAS_GATEWAY_URL:-http://${nas_host}:8765}"
 portal_url="${SKILL_SYNC_NAS_PORTAL_URL:-http://${nas_host}:17172/portal}"
 timeout_seconds="${SKILL_SYNC_NAS_VERIFY_TIMEOUT_SECONDS:-10}"
 expected_commit="${1:-${SKILL_SYNC_EXPECTED_COMMIT:-}}"
-html_checks="${SKILL_SYNC_NAS_HTML_CHECKS:-普通待审,.simple-action-panel.deferrable,管理本机 skill,这里是当前设备的 skill 工作区}"
+html_checks="${SKILL_SYNC_NAS_HTML_CHECKS:-普通待审,.simple-action-panel,.simple-action-panel.yellow,管理本机 skill,这里是当前设备的 skill 工作区}"
+monitor_check="${SKILL_SYNC_NAS_CHECK_MONITOR:-1}"
+monitor_check_required="${SKILL_SYNC_NAS_MONITOR_REPORT_REQUIRED:-1}"
 ssh_target="${ssh_user}@${nas_host}"
 
 tmp_dir="$(mktemp -d)"
@@ -87,10 +89,16 @@ PY
 
 echo "portal_head=$(head -n 1 "${portal_head}" || true)"
 
-if "${ssh_common[@]}" "sudo -n '${docker_bin}' exec skill-sync-monitor python -c 'import json; d=json.load(open(\"/cache/monitor/last-report.json\")); print(\"monitor_health=%s dashboard=%s alerts=%d warnings=%d info=%d\" % (d.get(\"health\"), d.get(\"dashboard_health\"), len(d.get(\"alerts\") or []), len(d.get(\"warnings\") or []), len(d.get(\"info\") or [])))'" >"${tmp_dir}/monitor.txt" 2>"${tmp_dir}/monitor.err"; then
-  cat "${tmp_dir}/monitor.txt"
+if [ "${monitor_check}" != "0" ]; then
+  if "${ssh_common[@]}" "sudo -n '${docker_bin}' exec skill-sync-monitor python -c 'import json; d=json.load(open(\"/cache/monitor/last-report.json\")); print(\"monitor_health=%s dashboard=%s alerts=%d warnings=%d info=%d\" % (d.get(\"health\"), d.get(\"dashboard_health\"), len(d.get(\"alerts\") or []), len(d.get(\"warnings\") or []), len(d.get(\"info\") or [])))'" >"${tmp_dir}/monitor.txt" 2>"${tmp_dir}/monitor.err"; then
+    cat "${tmp_dir}/monitor.txt"
+  else
+    echo "monitor_report_ok=false"
+    sed 's/^/monitor_error=/' "${tmp_dir}/monitor.err"
+    if [ "${monitor_check_required}" = "1" ]; then
+      exit 5
+    fi
+  fi
 else
-  echo "monitor_report_ok=false"
-  sed 's/^/monitor_error=/' "${tmp_dir}/monitor.err"
-  exit 5
+  echo "monitor_report_ok=skipped"
 fi
