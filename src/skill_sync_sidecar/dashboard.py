@@ -4471,11 +4471,34 @@ DASHBOARD_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
     }
     .skill-inventory-meta,
+    .skill-inventory-tool-summary,
     .skill-inventory-action {
       color: var(--muted);
       font-size: 12px;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }
+    .skill-inventory-tool-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 5px;
+    }
+    .skill-inventory-tool-summary span {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 6px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-tool-summary span.ready {
+      border-color: #b7e4cc;
+      color: #047857;
+      background: #f0fdf4;
     }
     .skill-inventory-action-row {
       display: grid;
@@ -9634,6 +9657,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div>
             <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
             <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
+            ${skillInventoryToolSummary(item, installed, installableTools)}
           </div>
           <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
             <strong>${escapeHtml(recommendation.title)}</strong>
@@ -9656,6 +9680,27 @@ DASHBOARD_HTML = r"""<!doctype html>
           </details>
         </article>
       `;
+    }
+
+    function skillInventoryToolSummary(item, installed, installableTools) {
+      const installedLabels = skillInventoryLocalInstallTools()
+        .filter((tool) => installed.has(tool.id))
+        .map((tool) => tool.label);
+      const installableLabels = (Array.isArray(installableTools) ? installableTools : [])
+        .map((tool) => tool.label)
+        .filter(Boolean);
+      const chips = [];
+      if (installedLabels.length > 0) {
+        chips.push(`<span class="ready">已装：${escapeHtml(compactSkillList(installedLabels))}</span>`);
+      } else {
+        chips.push(`<span>本机未安装</span>`);
+      }
+      if (installableLabels.length > 0) {
+        chips.push(`<span>可装：${escapeHtml(compactSkillList(installableLabels))}</span>`);
+      } else if (item.scope === "project") {
+        chips.push(`<span>项目级不装全局</span>`);
+      }
+      return `<div class="skill-inventory-tool-summary" aria-label="本机工具覆盖">${chips.join("")}</div>`;
     }
 
     function skillInventoryInstallationRows(item) {
