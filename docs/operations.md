@@ -231,6 +231,18 @@ Quick one-off smoke check:
 bash scripts/watch-sync-health-once.sh
 ```
 
+When the sidecar endpoint is inaccessible, you can run against a local summary snapshot:
+
+```bash
+SKILL_SYNC_MONITOR_SUMMARY_FILE=/tmp/skill-sync-overview.json bash scripts/watch-sync-health-once.sh
+```
+
+or
+
+```bash
+bash scripts/watch-sync-health.sh --monitor-summary-file /tmp/skill-sync-overview.json --max-iterations 1
+```
+
 Expected healthy output includes `health=green`, `blocked=0`, `alerts=0`, `warnings=0`.
 
 For Synology Container Manager or Docker, use:

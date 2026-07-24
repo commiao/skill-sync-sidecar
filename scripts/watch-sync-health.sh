@@ -7,6 +7,7 @@ Usage: watch-sync-health.sh [--interval-seconds N] [--max-iterations N] [--monit
 
 Periodic read-only health watcher for Skill Sync.
 - monitor-url: sidecar overview endpoint (default  http://100.123.208.32:8765/api/overview)
+- monitor-summary-file: optional local JSON file path (default SKILL_SYNC_MONITOR_SUMMARY_FILE or none)
 - interval-seconds: sleep between checks (default 1800)
 - max-iterations: stop after N rounds (0 = run forever)
 USAGE
@@ -15,6 +16,7 @@ USAGE
 interval_seconds="${WATCH_SYNC_HEALTH_INTERVAL_SECONDS:-1800}"
 max_iterations="${WATCH_SYNC_HEALTH_MAX_ITERATIONS:-0}"
 monitor_url="${SKILL_SYNC_MONITOR_URL:-http://100.123.208.32:8765/api/overview}"
+monitor_summary_file="${SKILL_SYNC_MONITOR_SUMMARY_FILE:-}"
 
 while [[ ${#} -gt 0 ]]; do
   case "${1:-}" in
@@ -33,6 +35,10 @@ while [[ ${#} -gt 0 ]]; do
     --monitor-url)
       shift
       monitor_url="${1:?--monitor-url requires a value}"
+      ;;
+    --monitor-summary-file)
+      shift
+      monitor_summary_file="${1:?--monitor-summary-file requires a value}"
       ;;
     *)
       echo "error: unknown argument: ${1}" >&2
@@ -54,6 +60,11 @@ if ! [[ "$max_iterations" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+if [ -n "$monitor_summary_file" ] && [ ! -r "$monitor_summary_file" ]; then
+  echo "error: --monitor-summary-file / SKILL_SYNC_MONITOR_SUMMARY_FILE must be readable: $monitor_summary_file" >&2
+  exit 1
+fi
+
 prev_health=""
 iter=0
 tmp_dir="${TMPDIR:-/tmp}/skill-sync-watch"
@@ -71,16 +82,40 @@ while true; do
     blocked_status="$(sed -n '1,6p' "$check_blocked_file" | tr '\n' '; ')"
     blocked_count="$(awk '/blocked:/ {print $2}' "$check_blocked_file" | tail -n1)"
   else
-    blocked_count="unknown"
-    blocked_status="blocked-queue.sh failed"
-    state="degraded"
+    if [ -n "$monitor_summary_file" ] && [ -r "$monitor_summary_file" ]; then
+      if ! blocked_count="$(python3 - "$monitor_summary_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+summary = json.loads(open(path, encoding="utf-8").read())
+items = summary.get("dashboard", {}).get("blocked_items") if isinstance(summary.get("dashboard", {}), dict) else []
+print(len(items) if isinstance(items, list) else 0)
+PY
+)"; then
+        blocked_count="unknown"
+        blocked_status="blocked-queue.sh failed; summary fallback failed"
+        state="degraded"
+      else
+        blocked_count="${blocked_count:-0}"
+        blocked_status="blocked-queue.sh failed; fallback to monitor summary (count=${blocked_count})"
+      fi
+    else
+      blocked_count="unknown"
+      blocked_status="blocked-queue.sh failed"
+      state="degraded"
+    fi
   fi
 
-  if MONITOR_URL="$monitor_url" python3 - <<'PY' >"$check_monitor_file" 2>/dev/null; then
-import json, urllib.request, os
-url = os.environ['MONITOR_URL']
-with urllib.request.urlopen(url, timeout=30) as r:
-    data = json.load(r)
+  if MONITOR_URL="$monitor_url" MONITOR_SUMMARY_FILE="$monitor_summary_file" python3 - <<'PY' >"$check_monitor_file" 2>/dev/null; then
+import json, os, urllib.request
+summary_file = os.environ.get("MONITOR_SUMMARY_FILE", "").strip()
+if summary_file:
+    with open(summary_file, encoding="utf-8") as f:
+        data = json.load(f)
+else:
+    with urllib.request.urlopen(os.environ["MONITOR_URL"], timeout=30) as r:
+        data = json.load(r)
 d = data.get('dashboard', data)
 print(f"health={d.get('health')}")
 print(f"blocked={d.get('blocked', 'unknown')}")

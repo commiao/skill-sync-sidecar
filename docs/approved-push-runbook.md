@@ -294,7 +294,7 @@ tmp_dir=$(mktemp -d)
 cat > "$tmp_dir/api/overview" <<'JSON'
 {"dashboard":{"health":"green","blocked":0,"alerts":0,"warnings":0}}
 JSON
-SKILL_SYNC_MONITOR_URL="file://$tmp_dir/api/overview" bash scripts/watch-sync-health-once.sh
+SKILL_SYNC_MONITOR_SUMMARY_FILE="$tmp_dir/api/overview" bash scripts/watch-sync-health-once.sh
 ```
 
 - If SSH to OpenClaw times out, retry once with a higher `OPENCLAW_CONNECT_TIMEOUT`.
