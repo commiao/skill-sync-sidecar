@@ -9,7 +9,7 @@ gateway_url="${SKILL_SYNC_NAS_GATEWAY_URL:-http://${nas_host}:8765}"
 portal_url="${SKILL_SYNC_NAS_PORTAL_URL:-http://${nas_host}:17172/portal}"
 timeout_seconds="${SKILL_SYNC_NAS_VERIFY_TIMEOUT_SECONDS:-10}"
 expected_commit="${1:-${SKILL_SYNC_EXPECTED_COMMIT:-}}"
-html_checks="${SKILL_SYNC_NAS_HTML_CHECKS:-普通待审,.simple-action-panel.deferrable,管理本机 skill}"
+html_checks="${SKILL_SYNC_NAS_HTML_CHECKS:-普通待审,.simple-action-panel.deferrable,管理本机 skill,这里是当前设备的 skill 工作区}"
 ssh_target="${ssh_user}@${nas_host}"
 
 tmp_dir="$(mktemp -d)"
