@@ -19,6 +19,21 @@ Wait before approving when any of these are true:
 - The blocked item is a conflict or delete review, not a writer-policy push.
 - The skill is OpenClaw-private, such as `disk-cleanup`.
 
+## Why "save" may look like no change
+
+Common causes:
+
+- `approved=0` after save: usually means this item is no longer a valid publish candidate in the latest report (stale/changed after pre-check).
+- The list contains only conflict/delete items: those are not saved by the one-click button.
+- Publish permission is not enabled: executor is in check-only mode (`allow_publish=0`).
+- The item is a normal OpenClaw pull-only writer-policy block. It is intentional ordinary deferral, not an error.
+
+How to verify quickly:
+
+1. Do `scripts/openclaw-approved-push-batch.sh <skill-id>` first (dry-run).
+2. If output is clear, do `scripts/openclaw-approved-push-batch.sh --yes <skill-id>`.
+3. Then run `scripts/publish-openclaw-peer-status.sh` and check `blocked=0`.
+
 Useful checks:
 
 ```bash
