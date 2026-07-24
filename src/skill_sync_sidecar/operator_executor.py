@@ -81,6 +81,7 @@ def run_openclaw_approved_push_batch(
     )
     finished_at = datetime.now(timezone.utc).isoformat()
     parsed = _last_json_object(proc.stdout)
+    parsed_reason = parsed.get("reason") if isinstance(parsed, dict) else None
     result = {
         "ok": proc.returncode == 0,
         "mode": "publish" if yes else "dry_run",
@@ -94,6 +95,7 @@ def run_openclaw_approved_push_batch(
         "approved_skill_ids": parsed.get("approved_skill_ids") if isinstance(parsed, dict) else normalized,
         "allow_conflict_local_wins": allow_conflict_local_wins,
         "result": parsed,
+        "result_reason": parsed_reason,
         "stdout_tail": _tail(proc.stdout),
         "stderr_tail": _tail(proc.stderr),
     }

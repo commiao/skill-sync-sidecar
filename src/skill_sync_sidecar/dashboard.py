@@ -8397,7 +8397,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (payload.ok) {
           if (isPublish && Number(payload.approved || 0) === 0) {
             lastDryRunSafe = false;
-            const publishReason = payload && payload.result && payload.result.reason ? String(payload.result.reason).trim() : "";
+            const publishReason = payload && typeof payload.result_reason === "string" && payload.result_reason.trim()
+          ? String(payload.result_reason).trim()
+          : (payload && payload.result && payload.result.reason ? String(payload.result.reason).trim() : "");
             await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
             await refresh(true);
             const safeNoWriteNote = publishReason
@@ -9330,9 +9332,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function formatExecutorResult(payload) {
-      const resultReason = (payload && payload.result && typeof payload.result.reason === "string" && payload.result.reason.trim())
-        ? payload.result.reason
-        : "";
+      const resultReason = (payload && typeof payload.result_reason === "string" && payload.result_reason.trim())
+        ? payload.result_reason
+        : (payload && payload.result && typeof payload.result.reason === "string" && payload.result.reason.trim())
+          ? payload.result.reason
+          : "";
       const lines = [
         `ok=${text(payload.ok)}`,
         `mode=${text(payload.mode)}`,

@@ -2175,6 +2175,33 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(result["peer_status_refresh"]["mode"], "refresh_openclaw_peer_status")
             self.assertIn("peer_status_published=true", result["peer_status_refresh"]["stdout_tail"])
 
+    def test_operator_executor_preserves_approved_push_reason(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-approved-push-batch.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '{\"safe_to_push\":false,\"approved\":0,\"reason\":\"none of the requested skills are currently blocked publish candidates\"}\\n'\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+
+            result = run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=False)
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["approved"], 0)
+            self.assertFalse(result["safe_to_push"])
+            self.assertEqual(
+                result["result_reason"],
+                "none of the requested skills are currently blocked publish candidates",
+            )
+            self.assertEqual(
+                result["result"]["reason"] if isinstance(result.get("result"), dict) else None,
+                "none of the requested skills are currently blocked publish candidates",
+            )
+
     def test_operator_executor_allows_explicit_conflict_local_wins_preview(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
