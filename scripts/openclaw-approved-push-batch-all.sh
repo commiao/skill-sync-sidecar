@@ -140,16 +140,21 @@ PY
 )
 
 if [ -z "$IDS" ]; then
-  echo "openclaw_pending_ids="
-  echo "no actionable openclaw writer_policy entries found"
+  if [ "$PRINT_ONLY" -eq 1 ]; then
+    echo ""
+  else
+    echo "openclaw_pending_ids="
+    echo "no actionable openclaw writer_policy entries found"
+  fi
   exit 0
 fi
 
-echo "openclaw_pending_ids=$IDS"
 if [ "$PRINT_ONLY" -eq 1 ]; then
   printf '%s\n' "$IDS"
   exit 0
 fi
+
+echo "openclaw_pending_ids=$IDS"
 
 CMD=(bash scripts/openclaw-approved-push-batch.sh)
 if [ "$MODE_FLAG" = "--yes" ]; then

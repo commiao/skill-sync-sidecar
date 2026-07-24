@@ -89,8 +89,8 @@ It also updates:
 # 1) 只做本地预览（不发指令）
 scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --print-ids-only
 
-# 2) 确认结果后，直接一次性发布（默认不刷新 peer-status；如需自动刷新加 --yes 时加参数）
-scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --yes --refresh-peer-status
+# 2) 确认结果后，直接一次性发布（默认会刷新 peer-status；如不需要刷新可加 --no-refresh）
+scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --yes
 
 # 需要限制数量时可加 --max，例如 --max 5
 ```

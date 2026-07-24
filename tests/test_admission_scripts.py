@@ -359,6 +359,100 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("systemctl", text)
         self.assertNotIn("launchctl", text)
 
+    def test_openclaw_approved_push_batch_all_script_is_cli_ready(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-approved-push-batch-all.sh"
+        text = script.read_text(encoding="utf-8")
+        with TemporaryDirectory() as tmp:
+            summary = Path(tmp) / "openclaw-queue-summary.json"
+            summary.write_text(
+                json.dumps(
+                    {
+                        "dashboard": {
+                            "blocked_items": [
+                                {
+                                    "skill_id": "finance-auto-bookkeeping",
+                                    "source": "oc-vps / OpenClaw",
+                                    "category": "writer_policy",
+                                    "status_action": "push",
+                                },
+                                {
+                                    "skill_id": "ignored-conflict",
+                                    "source": "oc-vps / OpenClaw",
+                                    "category": "writer_policy",
+                                    "status_action": "pull",
+                                },
+                                {
+                                    "skill_id": "local-writer",
+                                    "source": "oc-vps / OpenClaw",
+                                    "category": "writer_policy",
+                                    "status_action": "local_new",
+                                },
+                                {
+                                    "skill_id": "other-device",
+                                    "source": "mac",
+                                    "category": "writer_policy",
+                                    "status_action": "push",
+                                },
+                            ]
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            subprocess.check_call(["bash", "-n", str(script)])
+            help_text = subprocess.check_output(["bash", str(script), "--help"], text=True)
+
+            self.assertIn("--print-ids-only", help_text)
+            self.assertIn("--source", help_text)
+            self.assertIn("--max N", help_text)
+            self.assertIn("--yes", help_text)
+            self.assertIn("--no-refresh", help_text)
+            self.assertIn("local_new", help_text)
+
+            output = subprocess.check_output(
+                [
+                    "bash",
+                    str(script),
+                    "--source",
+                    "oc-vps / OpenClaw",
+                    "--print-ids-only",
+                ],
+                env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
+                text=True,
+            )
+            self.assertEqual(output.strip(), "finance-auto-bookkeeping local-writer")
+
+            limited_output = subprocess.check_output(
+                [
+                    "bash",
+                    str(script),
+                    "--source",
+                    "oc-vps / OpenClaw",
+                    "--print-ids-only",
+                    "--max",
+                    "1",
+                ],
+                env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
+                text=True,
+            )
+            self.assertEqual(limited_output.strip(), "finance-auto-bookkeeping")
+
+            no_match_output = subprocess.check_output(
+                [
+                    "bash",
+                    str(script),
+                    "--source",
+                    "win / Local",
+                    "--print-ids-only",
+                ],
+                env={**os.environ, "SKILL_SYNC_MONITOR_SUMMARY_FILE": str(summary)},
+                text=True,
+            )
+            self.assertEqual(no_match_output.strip(), "")
+
     def test_approved_push_runbook_documents_safe_flow(self):
         repo_root = Path(__file__).resolve().parents[1]
         runbook = repo_root / "docs" / "approved-push-runbook.md"
@@ -373,6 +467,7 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("blocked: 0", text)
         self.assertIn("Do not switch OpenClaw to `push-pull`", text)
         self.assertIn("openclaw-approved-push-diagnose.sh", text)
+        self.assertIn("openclaw-approved-push-batch-all.sh", text)
 
     def test_openclaw_approved_push_diagnose_script(self):
         repo_root = Path(__file__).resolve().parents[1]
