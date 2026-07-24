@@ -8441,45 +8441,56 @@ DASHBOARD_HTML = r"""<!doctype html>
       setExecutorButtons(false);
       setExecutorStatus(isPublish ? "saving" : "dry-run", isPublish ? "正在保存，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
       setReviewFeedback("yellow", isPublish ? "正在保存" : "正在检查", isPublish ? "正在写入共享库，请等待完成。" : "检查只读，不会写入共享库。");
-      try {
-        const request = await runApprovedPushRequest(isPublish ? "publish" : "dry_run", actionSkills, isPublish ? "PUBLISH" : undefined);
-        const response = request.response;
-        const payload = request.payload;
-        lastDryRunSafe = !isPublish && Boolean(payload.ok && payload.safe_to_push);
-        showExecutorOutput(formatExecutorResult(payload));
-        if (payload.ok) {
-          if (isPublish && Number(payload.approved || 0) === 0) {
-            lastDryRunSafe = false;
-            const publishReason = payload && typeof payload.result_reason === "string" && payload.result_reason.trim()
-          ? String(payload.result_reason).trim()
-          : (payload && payload.result && payload.result.reason ? String(payload.result.reason).trim() : "");
-            await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
-            await refresh(true);
-            const safeNoWriteNote = publishReason
-              ? `保存返回 approved=0：${publishReason}`
-              : "保存返回 approved=0。通常表示检查后状态变了：该项已保存、已恢复，或变成需要确认的版本差异。请看当前确认分类。";
-            setExecutorStatus("no changes", "没有保存任何 skill；队列已变化或当前项已不再是可保存更新。", "yellow");
-            setReviewFeedback("yellow", "没有写入共享库", safeNoWriteNote);
-            return;
-          }
-          setExecutorStatus(isPublish ? "saved" : "检查通过", isPublish ? "已写入共享库，正在确认状态。" : "检查通过：可以继续保存到共享库。", "green");
-          setReviewFeedback(
-            "green",
-            isPublish ? "保存完成" : "检查通过",
-            isPublish ? "共享库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续保存到共享库。",
+        try {
+          const request = await runApprovedPushRequest(
+            isPublish ? "publish" : "dry_run",
+            actionSkills,
+            isPublish ? "PUBLISH" : undefined
           );
-          if (!isPublish) {
-            actionSkills.forEach((skillId) => {
-              currentReviewQueueItems
-                .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
-                .forEach((item) => {
-                  reviewTaskResults[reviewItemKey(item)] = { label: "检查通过", kind: "green", publishReady: true };
-                });
-            });
-            renderReviewQueue(currentReviewQueueItems);
-            rerenderTopActionPanel();
-            setReviewFeedback("green", "检查通过", "现在可以点“保存到共享库”完成同步。");
-          }
+          const response = request.response;
+          const payload = request.payload;
+          lastDryRunSafe = !isPublish && Boolean(payload.ok && payload.safe_to_push);
+          showExecutorOutput(formatExecutorResult(payload));
+          if (payload.ok) {
+            if (isPublish && Number(payload.approved || 0) === 0) {
+              lastDryRunSafe = false;
+              const publishReason = payload && typeof payload.result_reason === "string" && payload.result_reason.trim()
+                ? String(payload.result_reason).trim()
+                : (payload && payload.result && payload.result.reason ? String(payload.result.reason).trim() : "");
+              const resultPayload = payload.result || {};
+              const requested = Array.isArray(resultPayload.requested_skill_ids) ? resultPayload.requested_skill_ids : actionSkills;
+              const skipped = Array.isArray(resultPayload.stale_skipped_skill_ids) ? resultPayload.stale_skipped_skill_ids : [];
+              const staleCount = skipped.filter(Boolean).length;
+              const staleHint = staleCount > 0
+                ? ` 本批操作共 ${requested.length} 个，其中 ${staleCount} 个当前不再是可保存更新（已恢复、已保存，或已变为其他状态）：${compactSkillList(skipped)}。`
+                : "";
+              await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
+              await refresh(true);
+              const safeNoWriteNote = publishReason
+                ? `保存返回 approved=0：${publishReason}`
+                : "保存返回 approved=0。通常表示检查后状态变了：该项已保存、已恢复，或变成需要确认的版本差异。请看当前确认分类。";
+              setExecutorStatus("no changes", "没有保存任何 skill；队列已变化或当前项已不再是可保存更新。", "yellow");
+              setReviewFeedback("yellow", "没有写入共享库", `${safeNoWriteNote}${staleHint}`);
+              return;
+            }
+            setExecutorStatus(isPublish ? "saved" : "检查通过", isPublish ? "已写入共享库，正在确认状态。" : "检查通过：可以继续保存到共享库。", "green");
+            setReviewFeedback(
+              "green",
+              isPublish ? "保存完成" : "检查通过",
+              isPublish ? "共享库已更新；正在重新读取 OpenClaw 和 NAS 状态。" : "检查通过，可以继续保存到共享库。",
+            );
+            if (!isPublish) {
+              actionSkills.forEach((skillId) => {
+                currentReviewQueueItems
+                  .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
+                  .forEach((item) => {
+                    reviewTaskResults[reviewItemKey(item)] = { label: "检查通过", kind: "green", publishReady: true };
+                  });
+              });
+              renderReviewQueue(currentReviewQueueItems);
+              rerenderTopActionPanel();
+              setReviewFeedback("green", "检查通过", "现在可以点“保存到共享库”完成同步。");
+            }
           if (isPublish) {
             lastPublishReceipt = {
               skill_ids: actionSkills,
