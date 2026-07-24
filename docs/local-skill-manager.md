@@ -63,7 +63,7 @@ Clicking a first-screen `查看确认清单` or `看看要处理什么` action s
 Clicking permission/setup actions such as `开启保存权限` or `开启本机写入` should open the technical setup area only. It must not focus the local skill path input; that input is reserved for the explicit `管理本机 skill` workflow.
 
 When OpenClaw is actively changing a skill, the first screen may show `暂时搁置`.
-The `先不提醒` action should be the easiest first-screen action while editing is still in progress, so users can continue local skill management without opening technical details.
+The first screen must say this is ordinary review work, not a service failure. The primary action should let the user continue local skill management, and `先不提醒` should be available as a secondary way to hide the reminder while editing is still in progress.
 This is a browser-local UI deferral only:
 
 - It is stored in `localStorage` for the current browser.
