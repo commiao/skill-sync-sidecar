@@ -1678,6 +1678,7 @@ def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[di
         copied["peer_id"] = peer_id
         copied["peer_name"] = peer_name
         copied.setdefault("source", "live_sync_plan" if raw_items is plan_items else "blocked_report")
+        copied["recommendation"] = _normalize_blocked_recommendation(str(copied.get("recommendation") or ""))
         copied.setdefault("operator_state", _blocked_item_operator_state(copied))
         copied.setdefault("status_description", _blocked_item_status_description(copied))
         copied.setdefault("operator_action", _blocked_item_operator_action(copied))
@@ -1686,6 +1687,16 @@ def _blocked_report_items(peer_id: str, peer_name: str, status: dict) -> list[di
             copied.setdefault("operator_command", command)
         items.append(copied)
     return items
+
+
+def _normalize_blocked_recommendation(recommendation: str) -> str:
+    if not recommendation:
+        return recommendation
+    replacements = {
+        "Review the local change. If it should publish upstream, run an explicit approved push path instead of changing the unattended OpenClaw policy.": "Review the local change. If it should be saved to the shared library, run an explicit approved-push path instead of changing the unattended OpenClaw policy.",
+        "Review the local new skill before publishing it upstream with --allow-new.": "Review the local new skill before saving it to the shared library with --allow-new.",
+    }
+    return replacements.get(recommendation, recommendation)
 
 
 def _blocked_item_operator_state(item: dict) -> str:

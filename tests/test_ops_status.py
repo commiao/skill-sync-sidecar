@@ -398,6 +398,7 @@ class OpsStatusTest(unittest.TestCase):
                                     "status_action": "push",
                                     "category": "writer_policy",
                                     "reason": "writer policy pull-only blocks push",
+                                    "recommendation": "Review the local change. If it should publish upstream, run an explicit approved push path instead of changing the unattended OpenClaw policy.",
                                 }
                             ],
                         },
@@ -453,6 +454,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("OpenClaw", status["dashboard"]["operator"]["sync_path"])
             self.assertEqual(status["dashboard"]["blocked_items"][0]["peer_id"], "oc-vps")
             self.assertEqual(status["dashboard"]["blocked_items"][0]["skill_id"], "beijing-recruitment")
+            self.assertIn("saved to the shared library", status["dashboard"]["blocked_items"][0]["recommendation"])
+            self.assertIn("approved-push", status["dashboard"]["blocked_items"][0]["recommendation"])
             self.assertIn("检查", status["dashboard"]["blocked_items"][0]["operator_action"])
             self.assertEqual(
                 status["dashboard"]["blocked_items"][0]["operator_command"],
