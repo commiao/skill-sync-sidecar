@@ -9259,20 +9259,24 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderSkillInventoryWorkbench(items) {
-      const counts = { local_installable: 0, local_installed: 0, publishable: 0, pending: 0 };
+      const counts = { local_installable: 0, local_installed: 0, publishable: 0, pending: 0, pending_blocking: 0, pending_ordinary: 0 };
       (Array.isArray(items) ? items : []).forEach((item) => {
         const installed = macInstalledToolIds(item);
         const centralState = text((item.central || {}).state || "unpublished");
         if (macInstallableTools(item, installed, centralState).length > 0) counts.local_installable += 1;
         if (installed.size > 0) counts.local_installed += 1;
         if (unpublishedTriageKind(item) === "publishable") counts.publishable += 1;
-        if (Number(item.pending || 0) > 0) counts.pending += 1;
+        if (Number(item.pending || 0) > 0) {
+          counts.pending += 1;
+          if (item.sync_state === "source_changed") counts.pending_ordinary += 1;
+          else counts.pending_blocking += 1;
+        }
       });
       $("skill-inventory-workbench").innerHTML = [
         workbenchButton("local_installable", counts.local_installable, "可安装到本机", "勾选 Codex / Cursor 等工具"),
         workbenchButton("local_installed", counts.local_installed, "本机已安装", "查看并可确认移除"),
         workbenchButton("publishable", counts.publishable, "可保存共享", "本机已有路径，可先检查"),
-        workbenchButton("pending", counts.pending, "待确认同步", "先处理同步队列"),
+        workbenchButton("pending", counts.pending, "待确认同步", counts.pending_blocking > 0 ? "先处理高风险确认" : "普通待审，不阻塞本机"),
       ].join("");
       renderSkillInventoryGuide(counts);
     }
@@ -9292,13 +9296,15 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function skillInventoryGuideModel(counts) {
       const pending = Number(counts.pending || 0);
+      const blockingPending = Number(counts.pending_blocking || 0);
+      const ordinaryPending = Number(counts.pending_ordinary || 0);
       const installable = Number(counts.local_installable || 0);
       const publishable = Number(counts.publishable || 0);
       const installed = Number(counts.local_installed || 0);
-      if (pending > 0) {
+      if (blockingPending > 0) {
         return {
-          title: "推荐先处理同步提醒",
-          detail: `${pending} 个 skill 有同步确认；先看清单，不会自动写入或删除。`,
+          title: "推荐先处理高风险同步",
+          detail: `${blockingPending} 个 skill 需要先确认；不会自动写入或删除。`,
           button: "查看待确认",
           action: "openReviewDetails()",
         };
@@ -9325,6 +9331,14 @@ DASHBOARD_HTML = r"""<!doctype html>
           detail: `${installed} 个 skill 已安装到 ${currentClientName()} 的工具；需要整理时再查看。`,
           button: "查看已安装",
           action: "setSkillInventoryQuick('local_installed')",
+        };
+      }
+      if (ordinaryPending > 0) {
+        return {
+          title: "OpenClaw 有普通待审",
+          detail: `${ordinaryPending} 个 OpenClaw 新修改待确认；这不阻塞本机工作区。`,
+          button: "查看普通待审",
+          action: "setSkillInventoryQuick('pending')",
         };
       }
       return {

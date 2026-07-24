@@ -45,7 +45,7 @@ The user should not need to edit metadata, understand technical check output, or
 
 The secondary `Skill 清单` view is the per-skill management surface for the current client. It must derive the current device id/name from the local executor (`SKILL_SYNC_DEVICE_ID` / `SKILL_SYNC_DEVICE_NAME`) instead of assuming the operator is always on Mac:
 
-- The top `推荐操作` strip chooses one plain next action from the current state: pending sync review, installable local tools, savable local skills, installed local skills, or the full list. It is the first thing a non-technical user should follow.
+- The top `推荐操作` strip chooses one plain next action from the current state: high-risk sync review, installable local tools, savable local skills, installed local skills, ordinary OpenClaw review, or the full list. Ordinary OpenClaw `source_changed` review must not outrank local install/save work.
 - After a recommended action opens the list, the `正在看` strip explains the current view and the next safe operation, such as checking a tool box, saving one skill to the shared library, or leaving project skills in the project repository.
 - Search and filters are view-only helpers. Users can filter by skill name/description, shared-library state, scope, local tool, or pending sync state without changing files.
 - The unpublished triage chips split local-only skills into `可保存公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
