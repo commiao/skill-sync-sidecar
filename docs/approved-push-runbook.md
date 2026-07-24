@@ -37,11 +37,13 @@ How to verify quickly:
 Useful checks:
 
 ```bash
-scripts/blocked-queue.sh
+bash scripts/blocked-queue.sh
 scripts/ops-watch.sh
 ssh -o ConnectTimeout=20 -o BatchMode=yes root@100.79.177.102 \
   'ps -eo pid,ppid,lstart,cmd | grep -E "recruitment|job-monitor|job-cron|skill_sync_sidecar" | grep -v grep || true'
 ```
+
+> Note: `blocked-queue.sh` is a Bash script. Use `bash` (or execute it directly) instead of `python3 scripts/blocked-queue.sh`.
 
 ## Dry-Run Approval
 
