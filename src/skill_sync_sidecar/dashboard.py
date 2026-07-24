@@ -3533,16 +3533,39 @@ DASHBOARD_HTML = r"""<!doctype html>
       text-align: center;
     }
     .simple-action-secondary {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      justify-self: end;
+      max-width: min(520px, 100%);
+    }
+    .simple-action-secondary > summary {
+      cursor: pointer;
+      list-style: none;
+      color: var(--ink);
+      font-weight: 800;
+      text-align: right;
+    }
+    .simple-action-secondary > summary::-webkit-details-marker {
+      display: none;
+    }
+    .simple-action-secondary > summary::after {
+      content: " +";
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .simple-action-secondary[open] > summary::after {
+      content: " -";
+    }
+    .simple-action-secondary-body {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
       justify-content: flex-end;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.35;
+      margin-top: 8px;
     }
-    .simple-action-secondary button {
+    .simple-action-secondary-body button {
       min-height: 34px;
       font-size: 12px;
       padding: 6px 9px;
@@ -5208,11 +5231,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       .simple-action-grid { grid-template-columns: 1fr; gap: 8px; }
       .simple-action-actions { display: grid; grid-template-columns: 1fr; }
       .simple-action-secondary {
-        justify-content: stretch;
+        justify-self: stretch;
+        max-width: 100%;
+      }
+      .simple-action-secondary > summary {
+        text-align: left;
+      }
+      .simple-action-secondary-body {
         display: grid;
         grid-template-columns: 1fr;
+        justify-content: stretch;
       }
-      .simple-action-secondary button { width: 100%; }
+      .simple-action-secondary-body button { width: 100%; }
       .simple-choice-grid { min-width: 0; }
       .simple-action-item { display: grid; }
       .local-skill-manager { margin: 8px 0; padding: 8px 0; }
@@ -6272,8 +6302,10 @@ DASHBOARD_HTML = r"""<!doctype html>
               </div>
               <div class="simple-action-actions single-primary">
                 <button type="button" class="primary" onclick="clearSourceChangeDeferrals()">取消搁置<span>回到正常待确认状态。</span></button>
-                <button type="button" onclick="openReviewDetails()">查看确认清单<span>只打开详情，不写入。</span></button>
               </div>
+              ${simpleActionSecondaryHtml("搁置详情留在确认清单里；打开只查看，不写共享库。", [
+                `<button type="button" onclick="openReviewDetails()">查看确认清单</button>`,
+              ])}
           </div>
           ${simpleActionFeedbackHtml()}
           <div class="simple-action-done-line"><strong>安全边界：</strong>搁置只保存在当前浏览器，不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
@@ -6303,7 +6335,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       let title = "有同步事项待处理";
       let summary = "先按右侧主按钮走；细节和原始队列放在“查看详情”里。";
       let primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看要处理什么<span>只打开确认清单，不会写入或删除。</span></button>`;
-      let secondaryActions = `<div class="simple-action-secondary"><span>详情留在二级页面，需要时再看。</span><button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button></div>`;
+      let secondaryActions = simpleActionSecondaryHtml("详情留在二级页面，需要时再看。", [
+        `<button type="button" onclick="openLocalSkillWorkbench()">管理本机 skill</button>`,
+      ]);
       if (conflictItems.length > 0) {
         const item = conflictItems[0];
         const skill = text(item.skill_id || "unknown-skill");
@@ -6351,13 +6385,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button type="button" class="primary" onclick="openLocalSkillWorkbench()">继续管理本机 skill<span>新增、安装、保存共享。</span></button>
           `;
         if (!allSourceChangedReady) {
-          secondaryActions = `
-            <div class="simple-action-secondary">
-              <span>普通待审不会阻塞本机工作区；OpenClaw 改完后，到二级确认清单检查最新版本。</span>
-              <button type="button" onclick="openReviewDetails()">查看待审详情</button>
-              <button id="simple-defer-source" type="button" title="只隐藏首页提醒" onclick="deferSourceChangedItems()">先不提醒</button>
-            </div>
-          `;
+          secondaryActions = simpleActionSecondaryHtml(
+            "普通待审不会阻塞本机工作区；OpenClaw 改完后，到二级确认清单检查最新版本。",
+            [
+              `<button type="button" onclick="openReviewDetails()">查看待审详情</button>`,
+              `<button id="simple-defer-source" type="button" title="只隐藏首页提醒" onclick="deferSourceChangedItems()">先不提醒</button>`,
+            ],
+          );
         }
       } else if (publishItems.length > 0) {
         const readyPublishItems = regularPublishItems.filter((item) => {
@@ -6403,6 +6437,20 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前设备；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
       setExecutorButtons(executorAvailable);
+    }
+
+    function simpleActionSecondaryHtml(detail, buttons) {
+      const body = [
+        detail ? `<span>${escapeHtml(text(detail))}</span>` : "",
+        ...(Array.isArray(buttons) ? buttons : []),
+      ].filter(Boolean).join("");
+      if (!body) return "";
+      return `
+        <details class="simple-action-secondary">
+          <summary>其他选项</summary>
+          <div class="simple-action-secondary-body">${body}</div>
+        </details>
+      `;
     }
 
     function simpleActionFactsHtml(dashboard, items) {
