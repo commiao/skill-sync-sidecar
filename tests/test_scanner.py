@@ -181,6 +181,31 @@ class ScannerTest(unittest.TestCase):
             self.assertIn("/home/admin/clawd/scripts/disk-cleanup.sh", external_issues[0].message)
             self.assertNotIn("https://example.test", external_issues[0].message)
 
+    def test_invalid_external_references_field_is_warned(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "demo"
+            skill.mkdir()
+            (skill / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "protocol_version": 0,
+                        "external_references": "scripts/run.sh",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (skill / "SKILL.md").write_text(
+                "---\nname: demo\ndescription: Demo\n---\n\nRun `./scripts/run.sh`.\n",
+                encoding="utf-8",
+            )
+
+            record = scan_roots([f"test={root}"]).skills[0]
+
+            self.assertEqual(record.risk_level, "warning")
+            self.assertTrue(any(issue.code == "invalid_external_references" for issue in record.issues))
+            self.assertTrue(any(issue.code == "missing_referenced_package_file" for issue in record.issues))
+
     def test_missing_referenced_package_files_are_flagged(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
