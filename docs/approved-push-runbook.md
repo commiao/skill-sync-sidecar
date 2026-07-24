@@ -83,6 +83,15 @@ It also updates:
 
 ## Verify OpenClaw
 
+If you want peer status to refresh automatically, add `--refresh-peer-status`
+when you run `openclaw-approved-push-batch.sh --yes`:
+
+```bash
+scripts/openclaw-approved-push-batch.sh --yes --refresh-peer-status finance-auto-bookkeeping
+```
+
+Otherwise, do the two-step verification manually:
+
 Refresh and publish OpenClaw peer status:
 
 ```bash

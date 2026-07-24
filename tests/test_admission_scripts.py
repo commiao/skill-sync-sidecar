@@ -352,7 +352,10 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("--allow-new", text)
         self.assertIn("--allow-conflict-local-wins", help_text)
         self.assertIn("allow_conflict_local_wins", text)
+        self.assertIn("--refresh-peer-status", help_text)
+        self.assertIn("SKILL_SYNC_APPROVED_PUSH_REFRESH_STATUS", help_text)
         self.assertIn("SKILL_ID", help_text)
+        self.assertIn("repo_root", text)
         self.assertNotIn("systemctl", text)
         self.assertNotIn("launchctl", text)
 
