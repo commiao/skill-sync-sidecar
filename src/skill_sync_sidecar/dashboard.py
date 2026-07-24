@@ -5536,6 +5536,15 @@ DASHBOARD_HTML = r"""<!doctype html>
             <option value="skillshub">skillshub 已安装</option>
             <option value="mac-none">本机未安装</option>
           </select>
+          <select id="skill-inventory-device-filter" aria-label="设备筛选">
+            <option value="all">全部设备</option>
+            <option value="mac">本机设备</option>
+            <option value="oc-vps">OpenClaw (oc-vps)</option>
+            <option value="openclaw">OpenClaw (openclaw)</option>
+            <option value="windows">Windows 设备</option>
+            <option value="gateway">NAS Gateway</option>
+            <option value="none">当前未在任何设备安装</option>
+          </select>
           <select id="skill-inventory-sync-filter" aria-label="同步状态">
             <option value="all">全部同步状态</option>
             <option value="pending">只看待处理</option>
@@ -9841,6 +9850,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         central: selectValue("skill-inventory-central-filter"),
         scope: selectValue("skill-inventory-scope-filter"),
         tool: selectValue("skill-inventory-tool-filter"),
+        device: selectValue("skill-inventory-device-filter"),
         sync: selectValue("skill-inventory-sync-filter"),
         quick: currentSkillInventoryQuick,
         triage: currentSkillInventoryTriage,
@@ -9862,6 +9872,14 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (filters.sync === "clean" && Number(item.pending || 0) > 0) return false;
         if (filters.tool === "mac-none" && installed.size > 0) return false;
         if (filters.tool !== "all" && filters.tool !== "mac-none" && !installed.has(filters.tool)) return false;
+        if (filters.device !== "all") {
+          const installedDevices = new Set((Array.isArray(item.installed_devices) ? item.installed_devices : []).map((value) => text(value)));
+          if (filters.device === "none") {
+            if (installedDevices.size > 0) return false;
+          } else if (!installedDevices.has(filters.device) && !(filters.device === "openclaw" && installedDevices.has("oc-vps"))) {
+            return false;
+          }
+        }
         if (filters.query) {
           const haystack = [
             item.skill_id,
@@ -9870,6 +9888,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             item.scope,
             centralState,
             ...(Array.isArray(item.installed_tools) ? item.installed_tools : []),
+            ...(Array.isArray(item.installed_devices) ? item.installed_devices : []),
           ].map((value) => String(value || "").toLowerCase()).join(" ");
           if (!haystack.includes(filters.query)) return false;
         }
@@ -9884,6 +9903,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-central-filter").value = "all";
       $("skill-inventory-scope-filter").value = "all";
       $("skill-inventory-tool-filter").value = "all";
+      const deviceFilter = $("skill-inventory-device-filter");
+      if (deviceFilter) deviceFilter.value = "all";
       $("skill-inventory-sync-filter").value = "all";
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
@@ -10086,6 +10107,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const installableLabels = (Array.isArray(installableTools) ? installableTools : [])
         .map((tool) => tool.label)
         .filter(Boolean);
+      const installedByDevice = skillInventoryDeviceInstallMap(item);
+      const deviceSummary = skillInventoryDeviceSummary(installedByDevice);
       const chips = [];
       if (installedLabels.length > 0) {
         chips.push(`<span class="ready">已装：${escapeHtml(compactSkillList(installedLabels))}</span>`);
@@ -10097,7 +10120,34 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else if (item.scope === "project") {
         chips.push(`<span>项目级不装全局</span>`);
       }
+      if (deviceSummary) {
+        chips.push(`<span>已覆盖：${escapeHtml(deviceSummary)}</span>`);
+      }
       return `<div class="skill-inventory-tool-summary" aria-label="本机工具覆盖">${chips.join("")}</div>`;
+    }
+
+    function skillInventoryDeviceInstallMap(item) {
+      const installs = Array.isArray(item.installations) ? item.installations : [];
+      const byDevice = {};
+      installs.forEach((installed) => {
+        const device = text(installed.device_id);
+        if (!device) return;
+        const tool = text(installed.tool_name) || text(installed.tool_id);
+        byDevice[device] = byDevice[device] || [];
+        if (tool && !byDevice[device].includes(tool)) byDevice[device].push(tool);
+      });
+      Object.values(byDevice).forEach((tools) => tools.sort());
+      return byDevice;
+    }
+
+    function skillInventoryDeviceSummary(installedByDevice) {
+      const entries = Object.entries(installedByDevice || {})
+        .map(([deviceId, tools]) => {
+          if (!Array.isArray(tools) || tools.length === 0) return "";
+          return `${inventoryDeviceLabel(deviceId)}:${tools.join("、")}`;
+        })
+        .filter(Boolean);
+      return entries.join("；");
     }
 
     function skillInventoryRowFeedbackHtml(item) {
@@ -10260,6 +10310,17 @@ DASHBOARD_HTML = r"""<!doctype html>
         { id: "skillshub", label: "skillshub", aliases: ["skillshub"], localInstall: true },
         { id: "openclaw", label: "OpenClaw", aliases: ["openclaw"], localInstall: false },
       ];
+    }
+
+    function inventoryDeviceLabel(deviceId) {
+      const clean = text(deviceId);
+      if (clean === "oc-vps" || clean === "openclaw") return "OpenClaw";
+      if (clean === "mac") return "Mac";
+      if (clean === "windows") return "Windows";
+      if (clean === "gateway") return "NAS";
+      if (clean === "win") return "Windows";
+      if (clean) return clean;
+      return "未知设备";
     }
 
     function skillScopeLabel(scope) {
@@ -10944,7 +11005,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     $("refresh").addEventListener("click", () => refresh(true));
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
-    ["skill-inventory-search", "skill-inventory-central-filter", "skill-inventory-scope-filter", "skill-inventory-tool-filter", "skill-inventory-sync-filter"].forEach((id) => {
+    ["skill-inventory-search", "skill-inventory-central-filter", "skill-inventory-scope-filter", "skill-inventory-tool-filter", "skill-inventory-device-filter", "skill-inventory-sync-filter"].forEach((id) => {
       const element = $(id);
       if (element) element.addEventListener(id === "skill-inventory-search" ? "input" : "change", renderSkillInventoryFiltered);
     });
