@@ -263,6 +263,25 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertNotIn("sync-apply", text)
         self.assertNotIn("push --yes", text)
 
+    def test_nas_gateway_deploy_verifier_is_read_only(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "verify-nas-gateway-deploy.sh"
+        text = script.read_text(encoding="utf-8")
+
+        subprocess.check_call(["bash", "-n", str(script)])
+        self.assertIn("deployed-commit.txt", text)
+        self.assertIn("/healthz", text)
+        self.assertIn("/api/overview", text)
+        self.assertIn("last-report.json", text)
+        self.assertIn("普通待审", text)
+        self.assertIn(".simple-action-panel.deferrable", text)
+        self.assertNotIn(" compose ", text)
+        self.assertNotIn(" up -d", text)
+        self.assertNotIn("docker restart", text)
+        self.assertNotIn("docker rm", text)
+        self.assertNotIn("sync-cycle", text)
+        self.assertNotIn("sync-apply", text)
+
     def test_blocked_queue_script_is_read_only_and_renders_items(self):
         repo_root = Path(__file__).resolve().parents[1]
         script = repo_root / "scripts" / "blocked-queue.sh"

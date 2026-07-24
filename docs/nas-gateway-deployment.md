@@ -142,6 +142,17 @@ sudo -n /var/packages/ContainerManager/target/usr/bin/docker ps --format 'table 
 sudo -n /var/packages/ContainerManager/target/usr/bin/docker compose --env-file .env -f examples/docker-compose.gateway.yml ps
 ```
 
+From the Mac repo, the same read-only verification is wrapped as:
+
+```bash
+scripts/verify-nas-gateway-deploy.sh 9787874
+```
+
+The optional argument is the expected deployed commit. The script checks NAS SSH
+reachability, `deployed-commit.txt`, gateway `/healthz`, `/api/overview`, the
+dashboard HTML strings, portal reachability, and the monitor last report. It
+does not run Compose and does not restart containers.
+
 If `deployed-commit.txt` already matches the intended commit and the containers
 are healthy, finish with the normal HTTP/API checks. If the commit was written
 but containers are not healthy, rerun the same Compose command once from the NAS
