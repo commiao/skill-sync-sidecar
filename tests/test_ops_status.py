@@ -1947,6 +1947,7 @@ class OpsStatusTest(unittest.TestCase):
         help_text = parser.format_help()
         self.assertIn("local-skill-publish", help_text)
         self.assertIn("Save one installed local skill", help_text)
+        self.assertIn("Save explicitly approved blocked local push items", help_text)
 
         args = parser.parse_args(
             [
