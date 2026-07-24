@@ -14,6 +14,7 @@ The MVP keeps writes behind explicit confirmation flags:
 - `local-skill-publish`: save one installed local skill to the central snapshot without applying unrelated conflicts. The command keeps the historical `publish` name, while the dashboard presents this action as **保存到共享库**.
 - `openclaw-gate`: evaluate the latest read-only OpenClaw reconcile report before any peer-writer apply.
 - `doctor`: validate skill metadata, size, file count, symlinks, risky shell patterns, local absolute path references, and referenced package files that are missing.
+  - `--suggest-external-references`: print `manifest.json` suggestions for `external_references` from current `missing_referenced_package_file` findings.
 - `snapshot`: write a local WebDAV-ready snapshot directory with `index.json` and per-skill zip archives.
 - `remote-status`: read remote snapshot metadata.
 - `push`: upload a local snapshot to a remote; dry-run unless `--yes` is provided.
@@ -123,6 +124,7 @@ python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
 python3 -m skill_sync_sidecar openclaw-gate --require-complete --fail-on-blocked
 python3 -m skill_sync_sidecar scan --json
 python3 -m skill_sync_sidecar doctor
+python3 -m skill_sync_sidecar doctor --suggest-external-references
 python3 -m skill_sync_sidecar snapshot --out ./snapshot-preview
 python3 -m skill_sync_sidecar push --snapshot-dir ./snapshot-preview --remote file:///tmp/skill-sync-remote
 python3 -m skill_sync_sidecar push --snapshot-dir ./snapshot-preview --remote file:///tmp/skill-sync-remote --yes

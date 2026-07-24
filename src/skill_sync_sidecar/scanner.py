@@ -312,6 +312,29 @@ def validate_manifest(skill_dir: Path, manifest: dict) -> List[SkillIssue]:
     return issues
 
 
+def extract_referenced_package_paths(skill_text: str) -> List[str]:
+    return sorted(
+        set(_normalize_reference_path(match.group("path")) for match in PACKAGE_RELATIVE_PATH_RE.finditer(skill_text))
+    )
+
+
+def collect_missing_referenced_package_files(skill_dir: Path, manifest: dict, skill_text: str) -> List[str]:
+    referenced_package_paths = extract_referenced_package_paths(skill_text)
+    allowed_external_references = {
+        _normalize_reference_path(path)
+        for path in manifest.get("external_references") or []
+        if isinstance(path, str)
+    }
+
+    missing = []
+    for rel_path in referenced_package_paths:
+        if rel_path in allowed_external_references:
+            continue
+        if not (skill_dir / rel_path).exists():
+            missing.append(rel_path)
+    return missing
+
+
 def _normalize_reference_path(raw_path: str) -> str:
     return str(raw_path).strip().rstrip(".,;:").removeprefix("./")
 
@@ -426,28 +449,17 @@ def validate_skill(
             )
         )
 
-    referenced_package_paths = sorted(
-        set(_normalize_reference_path(match.group("path")) for match in PACKAGE_RELATIVE_PATH_RE.finditer(skill_text))
-    )
-
-    allowed_external_references = {
-        _normalize_reference_path(path)
-        for path in manifest.get("external_references") or []
-        if isinstance(path, str)
-    }
+    referenced_package_paths = collect_missing_referenced_package_files(skill_dir, manifest, skill_text)
 
     for rel_path in referenced_package_paths[:10]:
-        if rel_path in allowed_external_references:
-            continue
-        if not (skill_dir / rel_path).exists():
-            issues.append(
-                SkillIssue(
-                    "warning",
-                    "missing_referenced_package_file",
-                    f"SKILL.md references {rel_path}, but that file is not included in the skill package.",
-                    str(skill_md),
-                )
+        issues.append(
+            SkillIssue(
+                "warning",
+                "missing_referenced_package_file",
+                f"SKILL.md references {rel_path}, but that file is not included in the skill package.",
+                str(skill_md),
             )
+        )
 
     return issues
 

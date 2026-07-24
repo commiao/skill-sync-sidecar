@@ -18,7 +18,12 @@ from skill_sync_sidecar.config import load_cc_switch_webdav_settings
 from skill_sync_sidecar.cli import guard_http_upload
 from skill_sync_sidecar.conflicts import build_conflict_packages
 from skill_sync_sidecar.diff import diff_snapshot_indexes
-from skill_sync_sidecar.scanner import normalize_skill_id, scan_roots
+from skill_sync_sidecar.scanner import (
+    collect_missing_referenced_package_files,
+    extract_referenced_package_paths,
+    normalize_skill_id,
+    scan_roots,
+)
 from skill_sync_sidecar.remote import Remote, RemoteEntry, RemoteError, WebDavRemote, download_snapshot, open_remote, upload_snapshot
 from skill_sync_sidecar.reconcile import build_reconcile_report, write_reconcile_outputs
 from skill_sync_sidecar.snapshot import write_snapshot
@@ -264,6 +269,44 @@ class ScannerTest(unittest.TestCase):
             record = scan_roots([f"test={root}"]).skills[0]
 
             self.assertFalse(any(issue.code == "missing_referenced_package_file" for issue in record.issues))
+
+    def test_extract_referenced_package_paths_normalizes_and_dedups(self):
+        text = """
+        Use `./scripts/run.sh` and `scripts/run.sh` in docs.
+        Another: `./scripts/setup.sh`.
+        """
+
+        self.assertEqual(
+            extract_referenced_package_paths(text),
+            ["scripts/run.sh", "scripts/setup.sh"],
+        )
+
+    def test_collect_missing_referenced_package_files_uses_manifest_external_references(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "disk-cleanup"
+            skill.mkdir()
+            scripts = skill / "scripts"
+            scripts.mkdir()
+            (scripts / "allow.sh").write_text("echo allow\n", encoding="utf-8")
+            (skill / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "protocol_version": 0,
+                        "external_references": ["./scripts/allow.sh", "scripts/keep.txt"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (skill / "SKILL.md").write_text(
+                "---\nname: disk-cleanup\ndescription: Disk cleanup\n---\n\n"
+                "Run `./scripts/allow.sh` and `./scripts/missing.sh` and `scripts/keep.txt`.\n",
+                encoding="utf-8",
+            )
+
+            missing = collect_missing_referenced_package_files(skill, json.loads((skill / "manifest.json").read_text()), """Run `./scripts/allow.sh` and `./scripts/missing.sh` and `scripts/keep.txt`.""")
+
+            self.assertEqual(missing, ["scripts/missing.sh"])
 
     def test_parent_skill_hash_excludes_nested_skill_package(self):
         with TemporaryDirectory() as tmp:

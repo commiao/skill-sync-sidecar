@@ -38,6 +38,7 @@ from .projection import ProjectionError, build_tool_projection, parse_tool_adapt
 from .remote import RemoteError, build_upload_plan, download_snapshot, join_remote_path, open_remote, upload_snapshot
 from .reconcile import ReconcileError, build_reconcile_report, load_inventory, write_reconcile_outputs
 from .scanner import scan_roots
+from .scanner import collect_missing_referenced_package_files
 from .snapshot import write_snapshot
 from .stage import StageError, stage_snapshot
 from .sync_apply import SyncApplyError, build_sync_apply_preview, execute_sync_apply
@@ -241,6 +242,11 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subcommands.add_parser("doctor", help="Validate local skills and report sync blockers.")
     add_common_scan_args(doctor)
     doctor.add_argument("--fail-on-warning", action="store_true", help="Exit non-zero when warnings are present.")
+    doctor.add_argument(
+        "--suggest-external-references",
+        action="store_true",
+        help="Also print manifest external_references suggestions for missing script references.",
+    )
     doctor.set_defaults(func=cmd_doctor)
 
     snapshot = subcommands.add_parser("snapshot", help="Write a local WebDAV-ready snapshot directory.")
@@ -963,14 +969,50 @@ def cmd_openclaw_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_skill_text(skill_md: Path) -> str:
+    try:
+        return skill_md.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     summary = scan_roots(args.root)
     data = summary.to_dict()
     warning_count = 0
     error_count = 0
 
+    suggestions = []
+    if args.suggest_external_references:
+        for skill in summary.skills:
+            if not skill.manifest_path:
+                continue
+
+            try:
+                manifest_text = skill.manifest_path.read_text(encoding="utf-8", errors="replace")
+                manifest = json.loads(manifest_text)
+                if not isinstance(manifest, dict):
+                    manifest = {}
+            except (OSError, json.JSONDecodeError):
+                manifest = {}
+
+            missing = collect_missing_referenced_package_files(skill.path, manifest, _read_skill_text(skill.skill_md))
+            if not missing:
+                continue
+            suggestion = sorted(set(missing))
+            suggestions.append(
+                {
+                    "skill_id": skill.skill_id,
+                    "manifest_path": str(skill.manifest_path),
+                    "missing_references": suggestion,
+                }
+            )
+
     if args.json:
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        payload = dict(data)
+        if args.suggest_external_references:
+            payload["external_reference_suggestions"] = suggestions
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"checked: {data['total']} skills")
         for skill in summary.skills:
@@ -982,6 +1024,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 print(f"  [{issue.severity}] {issue.code}: {issue.message}")
                 if issue.path:
                     print(f"    {issue.path}")
+
+        if args.suggest_external_references:
+            if suggestions:
+                print("\nexternal_references suggestions")
+            for suggestion in suggestions:
+                print(f"\n{suggestion['skill_id']}")
+                print(f"  manifest: {suggestion['manifest_path']}")
+                refs = ", ".join(suggestion['missing_references'])
+                print(f"  missing refs: {refs}")
+                print(
+                    f"  apply: add/update external_references: {json.dumps(suggestion['missing_references'], ensure_ascii=False)}"
+                )
 
     for skill in summary.skills:
         for issue in skill.issues:
