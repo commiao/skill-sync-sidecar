@@ -112,6 +112,43 @@ docker exec skill-sync-monitor cat /cache/monitor/last-report.txt
 docker logs --tail 50 skill-sync-monitor
 ```
 
+## Interrupted NAS Deploy / Tailnet Unreachable
+
+If a NAS deployment SSH session times out while Docker Compose is rebuilding or
+restarting services, switch to read-only recovery checks before taking any more
+action. The safe first question is whether the NAS node is reachable at all, not
+whether the sidecar container is healthy.
+
+From Mac, check all three paths:
+
+```bash
+ssh -o ConnectTimeout=10 commiao@100.123.208.32 'printf ssh-ok'
+curl --noproxy '*' -sS -I --max-time 10 http://100.123.208.32:8765/
+curl --noproxy '*' -sS -I --max-time 10 http://100.123.208.32:17172/portal
+```
+
+If SSH, the sidecar dashboard, and the report portal all time out, treat this as
+NAS/Tailscale reachability loss, even when `tailscale status` still shows the NAS
+peer as `Online` or `Active`. Tailscale metadata can be fresher than the actual
+data path. Do not repeatedly run Docker Compose, do not assume the sidecar image
+is bad, and do not touch OpenClaw to compensate.
+
+Only after SSH returns should the operator finish verification or repair:
+
+```bash
+cd /volume1/docker/skill-sync-gateway
+cat deployed-commit.txt
+sudo -n /var/packages/ContainerManager/target/usr/bin/docker ps --format 'table {{.Names}}\t{{.Status}}' | grep skill-sync
+sudo -n /var/packages/ContainerManager/target/usr/bin/docker compose --env-file .env -f examples/docker-compose.gateway.yml ps
+```
+
+If `deployed-commit.txt` already matches the intended commit and the containers
+are healthy, finish with the normal HTTP/API checks. If the commit was written
+but containers are not healthy, rerun the same Compose command once from the NAS
+deployment directory and inspect logs. If the commit was not written, restart the
+deploy from the archive upload step. In all cases, keep OpenClaw gateway and
+OpenClaw skill services out of the NAS gateway recovery path.
+
 Day-2 operator checks from the Mac repo:
 
 ```bash
