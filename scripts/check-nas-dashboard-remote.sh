@@ -20,10 +20,24 @@ import os
 from skill_sync_sidecar.config import load_cc_switch_webdav_settings
 from skill_sync_sidecar.remote import RemoteError
 from skill_sync_sidecar.remote import WebDavRemote
+from skill_sync_sidecar.config import ConfigError
 
-settings = load_cc_switch_webdav_settings()
+def report_failure(reason: str, detail: str) -> None:
+    print("check_remote_ok=false")
+    print(f"check_error={reason}")
+    print(f"check_error_detail={detail}")
+    raise SystemExit(2)
+
+try:
+    settings = load_cc_switch_webdav_settings()
+except (ConfigError, RuntimeError) as exc:
+    report_failure("config", str(exc))
+
 remote = WebDavRemote(settings.base_url, settings.username, settings.password, timeout=15, retries=1)
-raw = remote.get_bytes(os.environ["WEBDAV_PATH"])
+try:
+    raw = remote.get_bytes(os.environ["WEBDAV_PATH"])
+except RemoteError as exc:
+    report_failure("webdav", str(exc))
 data = json.loads(raw.decode("utf-8"))
 print("webdav_ok=true")
 print(f"webdav_path={os.environ['WEBDAV_PATH']}")
