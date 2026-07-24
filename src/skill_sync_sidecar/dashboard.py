@@ -6107,7 +6107,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("strip-focus-note").textContent = blocked > 0
           ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
           : (deferredSourceChangedItems.length > 0
-            ? `已搁置 ${compactSkillList(deferredSourceChangedItems.map((item) => item.skill_id))}；这只影响当前浏览器首页。`
+            ? `当前不用处理；已搁置 ${compactSkillList(deferredSourceChangedItems.map((item) => item.skill_id))} 的首页提醒，可以继续管理本机 skill。`
             : "同步正常。需要导入或更新本机 skill 时，再点扫描本机。");
       }
       const actionNote = $("strip-action-note");
@@ -6119,7 +6119,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             : (blocked > 0
             ? "不会自动写入共享库；确认后才会保存。"
             : (deferredSourceChangedItems.length > 0
-              ? "搁置不会写入任何位置；取消搁置后可继续检查。"
+              ? "搁置不会写入任何位置；需要重新处理时再取消搁置。"
               : "只操作当前设备，本页不会跨设备乱改。")));
       }
     }
@@ -6324,19 +6324,20 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="simple-action-hero">
               <div class="simple-action-plain">
                 <div class="simple-action-eyebrow">现在状态</div>
-                <div class="simple-action-title">已暂时搁置 OpenClaw 修改</div>
-                <div class="simple-action-summary">${escapeHtml(deferredNames)} 还在等待你之后处理；首页先不再用它挡住其他操作。</div>
+                <div class="simple-action-title">当前不用处理</div>
+                <div class="simple-action-summary">${escapeHtml(deferredNames)} 已暂时搁置；这只隐藏当前浏览器首页提醒。你可以继续管理本机 skill。</div>
                 ${simpleActionFactsHtml(dashboard, allItems)}
               </div>
               <div class="simple-action-actions single-primary">
-                <button type="button" class="primary" onclick="clearSourceChangeDeferrals()">取消搁置<span>回到正常待确认状态。</span></button>
+                <button type="button" class="primary" onclick="openLocalSkillWorkbench()">管理本机 skill<span>新增、安装、保存共享。</span></button>
               </div>
-              ${simpleActionSecondaryHtml("搁置详情留在确认清单里；打开只查看，不写共享库。", [
+              ${simpleActionSecondaryHtml("搁置详情留在确认清单里；需要重新处理时再取消搁置。", [
+                `<button type="button" onclick="clearSourceChangeDeferrals()">取消搁置</button>`,
                 `<button type="button" onclick="openReviewDetails()">查看确认清单</button>`,
               ])}
           </div>
           ${simpleActionFeedbackHtml()}
-          <div class="simple-action-done-line"><strong>安全边界：</strong>搁置只保存在当前浏览器，不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
+          <div class="simple-action-done-line"><strong>完成态：</strong>当前没有需要你马上处理的同步事项；搁置不写共享库，也不会改 OpenClaw。OpenClaw 再产生新版本时会重新提醒。</div>
         `;
           setExecutorButtons(executorAvailable);
           return;
@@ -7338,7 +7339,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (publishItems.length > 0
           ? `先检查一下；通过后再保存到共享库。`
           : (deferredItems.length > 0
-          ? `已暂时搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。取消搁置后才能继续处理。`
+          ? `已暂时搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。当前不用处理；需要重新处理时再取消搁置。`
           : `先处理少掉的 skill；默认保留共享库，不会自动删除。`)));
       const publishActionLabel = !executorAvailable
         ? "等待本机助手"
@@ -7359,7 +7360,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (sourceChangedItems.length ? `源端仍有新改动：${sourceChangedNames}。` : "当前没有缺失/删除确认。"));
       const secondDetail = sourceChangedOnly
         ? "点“检查”只会读取最新版本，不会写入共享库。"
-        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : (deferredItems.length ? "已搁置项不会进入批量检查/保存。" : "当前没有可保存更新。")));
+        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : (deferredItems.length ? "已搁置项不会进入批量检查/保存；可以继续本机 skill 管理。" : "当前没有可保存更新。")));
       const thirdDetail = publishItems.length === 0
         ? "不要点保存；先完成版本差异/缺失决策。"
         : (!executorAllowPublish ? "当前保存开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `保存前还差 ${remainingReady} 个检查通过。` : `可以保存 ${publishItems.length} 个更新到共享库。`));
@@ -7973,7 +7974,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "普通待审：OpenClaw 有新修改；不影响本机工作区，改完后点检查最新版本。"
             : "检测到待确认更新。先检查，确认安全后再保存到共享库。")
           : (deferredCount > 0
-            ? "当前可操作更新已搁置；取消搁置后才能检查或同步。"
+            ? "当前不用处理；普通待审已搁置，可以继续管理本机 skill。"
             : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。");
       }
       $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
@@ -8107,7 +8108,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const deferred = button.dataset.deferred === "true";
         button.disabled = deferred || !available || !button.dataset.skillId;
         button.title = deferred
-          ? "已搁置；先取消搁置后再检查"
+          ? "已搁置；需要重新处理时再取消搁置"
           : (!available ? "本机助手未在线" : "检查只读，不写共享库");
       });
       document.querySelectorAll(".central-restore-button").forEach((button) => {
@@ -9205,7 +9206,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewItem = currentReviewQueueItems.find((item) => reviewItemKey(item) === reviewKey)
         || currentReviewQueueItems.find((item) => item.skill_id === skillId);
       if (isDeferredSourceChange(reviewItem)) {
-        setReviewFeedback("yellow", `${skillId} 已暂时搁置`, "先取消搁置，再检查或保存这个 OpenClaw 修改。");
+        setReviewFeedback("yellow", `${skillId} 已暂时搁置`, "当前不用处理；需要重新检查或保存时再取消搁置。");
         return;
       }
       if (reviewIsDeleteItem(reviewItem)) {
