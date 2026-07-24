@@ -99,7 +99,7 @@ blocked=0
 If OpenClaw is still yellow, run:
 
 ```bash
-scripts/blocked-queue.sh
+bash scripts/blocked-queue.sh
 ```
 
 A new yellow item means OpenClaw produced another local change after the approved push. Treat it as a new approval cycle.
@@ -147,7 +147,7 @@ PYTHONPATH=src python3 -m skill_sync_sidecar monitor-summary \
   --url http://100.123.208.32:8765/api/overview \
   --timeout-seconds 60
 
-scripts/blocked-queue.sh
+bash scripts/blocked-queue.sh
 ```
 
 Expected final state:
@@ -158,6 +158,29 @@ blocked: 0
 alerts: 0
 warnings: 0
 ```
+
+## When Save Shows No-Change
+
+If the dashboard says `approved=0` after save or no skill was written, use this sequence:
+
+```bash
+bash scripts/openclaw-approved-push-batch.sh <skill-id>
+
+# if still shows 0/clear candidate, regenerate after writer stops changing
+bash scripts/openclaw-approved-push-batch.sh <skill-id>
+
+# refresh peer status and confirm blocked list
+bash scripts/publish-openclaw-peer-status.sh
+bash scripts/blocked-queue.sh
+```
+
+Interpretation:
+
+- `reason=none of the requested skills are currently blocked publish candidates`: the item is already handled or changed out of date.
+- `reason=writer policy pull-only blocks push`: waiting until manual review; this is normal protection in pull-only mode.
+- Other reasons with `approved=0`: treat as changing inputs and rerun dry-run before save.
+
+If status shows `blocked` again, re-open the queue and only save skill ids that are currently `status_action=push` / `plan_action=blocked` and keep `category=writer_policy`.
 
 ## Recovery Notes
 
