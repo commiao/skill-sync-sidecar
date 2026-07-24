@@ -2874,6 +2874,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 6px;
       min-width: 0;
     }
+    .review-group.deferrable {
+      border: 1px solid #c8d7ef;
+      border-radius: 8px;
+      background: #f8fbff;
+      padding: 8px;
+    }
+    .review-group.risky {
+      border: 1px solid #efcaca;
+      border-radius: 8px;
+      background: #fff8f8;
+      padding: 8px;
+    }
     .review-group-title {
       color: var(--ink);
       font-weight: 850;
@@ -2951,6 +2963,14 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 8px 10px;
       background: #fbfcfe;
       min-width: 0;
+    }
+    .review-item.deferrable {
+      background: #fbfdff;
+      border-color: #c8d7ef;
+    }
+    .review-item.risky {
+      background: #fffafa;
+      border-color: #efcaca;
     }
     .review-skill {
       font-weight: 800;
@@ -7231,19 +7251,22 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("review-queue").innerHTML = renderReviewGroup(
           "当前版本差异",
           conflictItems,
-          "点“生成只读报告”，报告会把推荐动作放在最上方。"
+          "点“生成只读报告”，报告会把推荐动作放在最上方。",
+          "risky"
         );
       } else {
         $("review-queue").innerHTML = [
           renderReviewGroup(
             "先处理缺失/删除确认",
             deleteItems,
-            "这些不是保存按钮要处理的内容；当前面板不会删除共享库。"
+            "这些不是保存按钮要处理的内容；当前面板不会删除共享库。",
+            "risky"
           ),
           renderReviewGroup(
-            "检查 OpenClaw 新修改",
+            "可稍后处理：OpenClaw 普通待审",
             sourceChangedItems,
-            "这些项是普通待审，不是服务故障；可以继续管理本机 skill，OpenClaw 改完后再检查最新版本。"
+            "这些项是普通待审，不是服务故障；可以继续管理本机 skill，OpenClaw 改完后再检查最新版本。",
+            "deferrable"
           ),
           renderReviewGroup(
             "再处理可保存更新",
@@ -7253,7 +7276,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           renderReviewGroup(
             "最后处理版本差异/未知项",
             conflictItems.length ? conflictItems : otherItems,
-            "版本差异或未知项先看只读报告，不进入一键保存。"
+            "版本差异或未知项先看只读报告，不进入一键保存。",
+            conflictItems.length ? "risky" : ""
           ),
         ].filter(Boolean).join("");
       }
@@ -7358,10 +7382,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       `;
     }
 
-    function renderReviewGroup(title, groupItems, note) {
+    function renderReviewGroup(title, groupItems, note, kind) {
       if (!Array.isArray(groupItems) || groupItems.length === 0) return "";
+      const className = ["review-group", kind || ""].filter(Boolean).join(" ");
       return `
-        <section class="review-group">
+        <section class="${escapeHtml(className)}">
           <div class="review-group-title">${escapeHtml(title)} (${groupItems.length})</div>
           <div class="review-group-note">${escapeHtml(note)}</div>
           ${groupItems.map((item) => renderReviewItem(item)).join("")}
@@ -7373,8 +7398,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const command = item.operator_command || "";
       const reviewKey = reviewItemKey(item);
       const deferred = isDeferredSourceChange(item);
+      const className = ["review-item", reviewItemClass(item)].filter(Boolean).join(" ");
       return `
-        <div class="review-item">
+        <div class="${escapeHtml(className)}">
           <div>
             <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
             <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
@@ -7407,7 +7433,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ` : ""}
           </div>
           <div class="review-controls">
-            ${pill(deferred ? "首页已搁置" : reviewStatusText(item), deferred ? "green" : "yellow")}
+            ${pill(deferred ? "首页已搁置" : reviewStatusText(item), reviewStatusKind(item, deferred))}
             <button
               type="button"
               class="review-dry-run-button"
@@ -7640,9 +7666,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewActionText(item) {
+      if (reviewIsSourceChangedItem(item)) return "OpenClaw 有新修改，可稍后处理。";
       if (reviewIsDeleteItem(item) && item.status_action === "local_deleted") return `${restoreDeviceLabel(item)} 缺失，共享库仍保留。`;
       if (reviewIsDeleteItem(item) && item.status_action === "remote_deleted") return "共享库已删除，本机仍保留。";
-      if (reviewIsSourceChangedItem(item)) return "源端又产生了新版本。";
       if (item.category === "conflict") return "版本不一致，先看只读报告。";
       if (item.status_action === "local_new") return "远端新增，先检查。";
       if (item.status_action === "push_new") return "新 skill 待保存。";
@@ -7664,7 +7690,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewRiskText(item) {
-      if (reviewIsSourceChangedItem(item)) return "变更中";
+      if (reviewIsSourceChangedItem(item)) return "不阻塞";
       if (item.category === "conflict") return "高风险";
       if (reviewIsDeleteItem(item)) return "高风险";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "中风险";
@@ -7673,7 +7699,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewNextStepText(item) {
-      if (reviewIsSourceChangedItem(item)) return "下一步：这不是故障；可以继续管理本机 skill，OpenClaw 改完后再检查最新版本。";
+      if (reviewIsSourceChangedItem(item)) return "下一步：可稍后处理；继续管理本机 skill，OpenClaw 改完后再检查最新版本。";
       if (item.category === "conflict") return "下一步：先生成只读差异报告，再按推荐恢复、保存或手动处理。";
       if (item.status_action === "local_deleted") return `下一步：决定是恢复到 ${restoreDeviceLabel(item)}，还是单独确认删除共享库里的这个 skill。`;
       if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新保存，还是接受共享库删除。";
@@ -7684,7 +7710,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function reviewStatusText(item) {
-      if (reviewIsSourceChangedItem(item)) return "普通待审";
+      if (reviewIsSourceChangedItem(item)) return "可稍后";
       if (item.status_action === "local_deleted") return `${restoreDeviceLabel(item)} 缺失`;
       if (item.status_action === "remote_deleted") return "共享库缺失";
       if (item.status_action === "local_new") return "新增";
@@ -7692,6 +7718,18 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (item.status_action === "push") return "更新";
       if (item.category === "conflict") return "版本差异";
       return statusLabel(item.status_action || item.category || "需确认");
+    }
+
+    function reviewStatusKind(item, deferred) {
+      if (deferred) return "green";
+      if (reviewIsSourceChangedItem(item)) return "green";
+      return "yellow";
+    }
+
+    function reviewItemClass(item) {
+      if (reviewIsSourceChangedItem(item)) return "deferrable";
+      if (reviewIsDeleteItem(item) || item.category === "conflict" || item.status_action === "conflict") return "risky";
+      return "";
     }
 
     function reviewIsDeleteItem(item) {
