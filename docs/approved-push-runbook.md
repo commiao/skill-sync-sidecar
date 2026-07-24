@@ -83,29 +83,16 @@ It also updates:
 
 ### 一次性处理当前待审批 OpenClaw 写盘项（可选）
 
-有时会出现 5~10 条都是本次 review 里的 `writer_policy`，手工逐条点太慢。你可以一次性提取出当前待审批页里的可发布 ID，再走一条命令提交：
+有时会出现 5~10 条都是本次 review 里的 `writer_policy`，手工逐条点太慢。你可以一次性提取并提交当前待审批页里的可发布 ID。
 
 ```bash
-# 1) 从当前 dashboard JSON 抽取该 source 的可写入技能
-python3 - <<'PY'
-import json, urllib.request
-import os
-url = os.environ.get("SKILL_SYNC_MONITOR_URL", "http://100.123.208.32:8765/api/overview")
-with urllib.request.urlopen(url, timeout=20) as response:
-    data = json.loads(response.read().decode("utf-8"))
-blocked = data.get("dashboard", {}).get("blocked_items", [])
-ids = [
-    item.get("skill_id")
-    for item in blocked
-    if item.get("source") == "oc-vps / OpenClaw"
-    and item.get("category") == "writer_policy"
-    and item.get("status_action") in {"push", "push_new", "local_new"}
-]
-print(" ".join([_ for _ in ids if _]))
-PY
+# 1) 只做本地预览（不发指令）
+scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --print-ids-only
 
-# 假设上一步输出了：a b c ...
-scripts/openclaw-approved-push-batch.sh --yes --refresh-peer-status a b c
+# 2) 确认结果后，直接一次性发布（默认不刷新 peer-status；如需自动刷新加 --yes 时加参数）
+scripts/openclaw-approved-push-batch-all.sh --source "oc-vps / OpenClaw" --yes --refresh-peer-status
+
+# 需要限制数量时可加 --max，例如 --max 5
 ```
 
 注意：
