@@ -240,6 +240,12 @@ SKILL_SYNC_MONITOR_SUMMARY_FILE=/tmp/skill-sync-overview.json bash scripts/watch
 or
 
 ```bash
+bash scripts/watch-sync-health-once.sh --monitor-summary-file /tmp/skill-sync-overview.json
+```
+
+or
+
+```bash
 bash scripts/watch-sync-health.sh --monitor-summary-file /tmp/skill-sync-overview.json --max-iterations 1
 ```
 

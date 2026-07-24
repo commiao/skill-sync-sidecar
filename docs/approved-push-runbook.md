@@ -297,6 +297,12 @@ JSON
 SKILL_SYNC_MONITOR_SUMMARY_FILE="$tmp_dir/api/overview" bash scripts/watch-sync-health-once.sh
 ```
 
+or
+
+```bash
+bash scripts/watch-sync-health-once.sh --monitor-summary-file "$tmp_dir/api/overview"
+```
+
 - If SSH to OpenClaw times out, retry once with a higher `OPENCLAW_CONNECT_TIMEOUT`.
 - If dry-run refuses stale hashes, do not force it. Rebuild the blocked report after the producer has stopped.
 - If a skill should stay private, add or keep it as an explicit local override instead of approved-pushing it.
