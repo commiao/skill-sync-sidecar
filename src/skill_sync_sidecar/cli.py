@@ -32,7 +32,7 @@ from .hub_import import (
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .monitor import monitor_once, render_monitor_brief, render_monitor_report, run_monitor_loop
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
-from .operator_executor import serve_operator_executor
+from .operator_executor import local_device_identity, serve_operator_executor
 from .ops_status import build_ops_status, render_ops_status_text
 from .projection import ProjectionError, build_tool_projection, parse_tool_adapter_spec
 from .remote import RemoteError, build_upload_plan, download_snapshot, join_remote_path, open_remote, upload_snapshot
@@ -96,7 +96,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     publish_peer_status = subcommands.add_parser("publish-peer-status", help="Publish this device's ops status JSON to WebDAV for shared gateways.")
     add_common_remote_args(publish_peer_status)
-    publish_peer_status.add_argument("--peer-id", required=True, help="Stable peer id, for example mac, oc-vps, or win.")
+    publish_peer_status.add_argument("--peer-id", help="Stable peer id, for example mac, oc-vps, or win. Defaults to SKILL_SYNC_DEVICE_ID or mac.")
+    publish_peer_status.add_argument("--peer-name", help="Human-readable device name. Defaults to SKILL_SYNC_DEVICE_NAME when peer-id matches this client.")
     publish_peer_status.add_argument("--status-path", required=True, help="Remote JSON path, for example skill-sync-sidecar-peer-status/mac.json.")
     publish_peer_status.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
     publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
@@ -547,6 +548,10 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         print(f"publish-peer-status failed: {exc}", file=sys.stderr)
         return 2
 
+    identity = local_device_identity()
+    peer_id = args.peer_id or identity["device_id"]
+    peer_name = args.peer_name or (identity["device_name"] if peer_id == identity["device_id"] else None)
+
     if args.status_file:
         try:
             status = json.loads(Path(args.status_file).expanduser().read_text(encoding="utf-8"))
@@ -556,6 +561,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         if not isinstance(status, dict):
             print("publish-peer-status failed: --status-file must contain a JSON object", file=sys.stderr)
             return 2
+        peer_id = args.peer_id or str(status.get("peer_id") or status.get("id") or peer_id)
     else:
         status = build_ops_status(
             Path(args.local_root),
@@ -574,7 +580,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         payload.update(
             {
                 "peer_status_version": 1,
-                "device": build_device_status(args.peer_id),
+                "device": build_device_status(peer_id, name=peer_name),
                 "capabilities": build_peer_capabilities(),
                 "tools": build_device_tool_status(),
             }
@@ -582,7 +588,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
     payload.update(
         {
             "record_type": "skill-sync-peer-status",
-            "peer_id": args.peer_id,
+            "peer_id": peer_id,
             "published_at": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -595,7 +601,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
     result = {
         "ok": True,
         "record_type": "skill-sync-peer-status-publish-result",
-        "peer_id": args.peer_id,
+        "peer_id": peer_id,
         "path": remote_path,
         "health": payload.get("health"),
         "snapshot_id": payload.get("remote_snapshot", {}).get("snapshot_id") if isinstance(payload.get("remote_snapshot"), dict) else None,

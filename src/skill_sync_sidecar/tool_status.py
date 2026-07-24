@@ -76,10 +76,10 @@ def build_device_tool_status(
     return tools
 
 
-def build_device_status(peer_id: str, *, measured_at: Optional[str] = None) -> dict:
+def build_device_status(peer_id: str, *, name: Optional[str] = None, measured_at: Optional[str] = None) -> dict:
     return {
         "id": peer_id,
-        "name": _device_name(peer_id),
+        "name": name or _device_name(peer_id),
         "kind": "agent",
         "measured_at": measured_at or datetime.now(timezone.utc).isoformat(),
     }

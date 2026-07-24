@@ -5151,8 +5151,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     <details class="support-drawer">
       <summary>
         <span class="support-drawer-title">
-          <strong>管理和查看 skill</strong>
-          <span>新增、安装、共享或查看明细时打开。</span>
+          <strong>其他操作和详情</strong>
+          <span>只有要新增 skill、安装到工具、保存共享库或排查问题时再打开。</span>
         </span>
       </summary>
       <div class="support-drawer-body">
@@ -5299,7 +5299,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </details>
     </details>
     <details class="quick-status-details">
-      <summary>一般不用看：状态数字</summary>
+      <summary>二级详情：状态数字</summary>
       <section class="status-strip" aria-label="状态摘要">
         <div class="status-chip focus-main">
           <div class="status-chip-label">当前状态</div>
@@ -5330,7 +5330,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </section>
     </details>
     <details class="advanced-workspace">
-      <summary>一般不用看：Mac / OpenClaw / 中央库明细</summary>
+      <summary>二级详情：Mac / OpenClaw / 中央库明细</summary>
     <section id="plain-detail-grid" class="plain-detail-grid" aria-label="同步对象概览"></section>
     <details class="technical-workspace">
       <summary>高级：工具目录、版本号、原始队列</summary>
@@ -5435,7 +5435,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     </details>
     </details>
     <details class="secondary-context">
-      <summary>权限边界和执行细节</summary>
+      <summary>二级详情：权限边界和执行细节</summary>
       <div class="secondary-context-body">
     <section class="scope-switchboard" aria-label="Skill 同步分区">
       <div class="scope-card local">
@@ -5529,7 +5529,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
     </details>
     <details class="advanced-diagnostics">
-      <summary>高级诊断：状态、设备、工具、队列明细</summary>
+      <summary>高级诊断：原始状态、设备、工具、队列明细</summary>
       <div class="advanced-body">
     <section class="status-band">
       <div id="health-card" class="panel health">

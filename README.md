@@ -69,7 +69,7 @@ SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 \
   scripts/install-operator-executor-launchd.sh
 ```
 
-Use `SKILL_SYNC_DEVICE_ID` and `SKILL_SYNC_DEVICE_NAME` when installing the helper on another client so the dashboard labels the current device correctly.
+Use `SKILL_SYNC_DEVICE_ID` and `SKILL_SYNC_DEVICE_NAME` when installing the helper or peer-status publisher on another client so the dashboard labels the current device and its Agent report consistently.
 
 CLI equivalents remain available for automation:
 

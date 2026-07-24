@@ -5,6 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python_bin="${PYTHON:-python3}"
 label="${SKILL_SYNC_MAC_PEER_STATUS_LABEL:-com.skill-sync-sidecar.mac-peer-status}"
 interval_seconds="${SKILL_SYNC_MAC_PEER_STATUS_INTERVAL_SECONDS:-300}"
+device_id="${SKILL_SYNC_DEVICE_ID:-mac}"
+device_name="${SKILL_SYNC_DEVICE_NAME:-Mac 本机}"
 launch_agents_dir="$HOME/Library/LaunchAgents"
 logs_dir="$HOME/Library/Logs"
 plist_path="$launch_agents_dir/${label}.plist"
@@ -24,6 +26,8 @@ PYTHON_BIN="$python_bin" \
 REPO_ROOT="$repo_root" \
 LABEL="$label" \
 INTERVAL_SECONDS="$interval_seconds" \
+DEVICE_ID="$device_id" \
+DEVICE_NAME="$device_name" \
 LOGS_DIR="$logs_dir" \
 "$python_bin" - <<'PY'
 import os
@@ -39,6 +43,8 @@ plist = {
     "ProgramArguments": program_args,
     "EnvironmentVariables": {
         "PYTHON": os.environ["PYTHON_BIN"],
+        "SKILL_SYNC_DEVICE_ID": os.environ["DEVICE_ID"],
+        "SKILL_SYNC_DEVICE_NAME": os.environ["DEVICE_NAME"],
     },
     "RunAtLoad": True,
     "StartInterval": int(os.environ["INTERVAL_SECONDS"]),
@@ -61,6 +67,8 @@ sleep 3
 
 echo "mac_peer_status_launchd_ok=true"
 echo "label=$label"
+echo "device_id=$device_id"
+echo "device_name=$device_name"
 echo "plist=$plist_path"
 echo "interval_seconds=$interval_seconds"
 launchctl print "gui/$(id -u)/$label" | sed -n '1,35p'

@@ -63,6 +63,10 @@ Older peer status documents remain valid. When Gateway reads a peer status witho
 
 When `skill-sync publish-peer-status --status-file <file>` is used, the file is published without injecting local tool scans. This preserves OpenClaw handoff files and avoids making the Mac publisher pretend to know OpenClaw's local tool roots.
 
+## Device Identity
+
+For device-side Agents, `publish-peer-status` uses `SKILL_SYNC_DEVICE_ID` and `SKILL_SYNC_DEVICE_NAME` when `--peer-id` / `--peer-name` are not provided. Explicit CLI arguments still win, so an OpenClaw publish job can safely publish `oc-vps` even if it runs from a shell that has Mac defaults.
+
 ## Ownership Boundaries
 
 - Agent scans local tool roots and publishes `tools[]`.

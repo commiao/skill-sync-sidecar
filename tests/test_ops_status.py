@@ -503,11 +503,11 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("Skill 管理", DASHBOARD_HTML)
             self.assertIn("日常只看第一张卡片：它会告诉你现在要不要操作。", DASHBOARD_HTML)
             self.assertIn("<details class=\"support-drawer\">", DASHBOARD_HTML)
-            self.assertIn("管理和查看 skill", DASHBOARD_HTML)
-            self.assertIn("新增、安装、共享或查看明细时打开。", DASHBOARD_HTML)
+            self.assertIn("其他操作和详情", DASHBOARD_HTML)
+            self.assertIn("只有要新增 skill、安装到工具、保存共享库或排查问题时再打开。", DASHBOARD_HTML)
             self.assertIn("support-drawer-body", DASHBOARD_HTML)
             self.assertIn("quick-status-details", DASHBOARD_HTML)
-            self.assertIn("一般不用看：状态数字", DASHBOARD_HTML)
+            self.assertIn("二级详情：状态数字", DASHBOARD_HTML)
             self.assertIn("status-strip", DASHBOARD_HTML)
             self.assertIn("状态摘要", DASHBOARD_HTML)
             self.assertIn("当前状态", DASHBOARD_HTML)
@@ -551,7 +551,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("Skill 同步分区", DASHBOARD_HTML)
             self.assertIn("scope-readonly-rail", DASHBOARD_HTML)
             self.assertIn("<details class=\"secondary-context\">", DASHBOARD_HTML)
-            self.assertIn("权限边界和执行细节", DASHBOARD_HTML)
+            self.assertIn("二级详情：权限边界和执行细节", DASHBOARD_HTML)
             self.assertIn("id=\"scope-local-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-central-count\"", DASHBOARD_HTML)
             self.assertIn("id=\"scope-device-count\"", DASHBOARD_HTML)
@@ -782,7 +782,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"easy-dry-run\"", DASHBOARD_HTML)
             self.assertIn("id=\"easy-publish\"", DASHBOARD_HTML)
             self.assertIn("没有已检查通过的待保存更新", DASHBOARD_HTML)
-            self.assertIn("一般不用看：Mac / OpenClaw / 中央库明细", DASHBOARD_HTML)
+            self.assertIn("二级详情：Mac / OpenClaw / 中央库明细", DASHBOARD_HTML)
             self.assertIn("currentReviewQueueItems", DASHBOARD_HTML)
             self.assertIn("rerenderReviewQueueIfViewportModeChanged", DASHBOARD_HTML)
             self.assertIn("window.addEventListener(\"resize\"", DASHBOARD_HTML)
@@ -1240,7 +1240,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"central-repository-kv\"", DASHBOARD_HTML)
             self.assertIn("id=\"device-map\"", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-diagnostics\">", DASHBOARD_HTML)
-            self.assertIn("高级诊断：状态、设备、工具、队列明细", DASHBOARD_HTML)
+            self.assertIn("高级诊断：原始状态、设备、工具、队列明细", DASHBOARD_HTML)
             self.assertIn("refreshLocalWorkspace", DASHBOARD_HTML)
             self.assertIn("id=\"devices\"", DASHBOARD_HTML)
             self.assertIn("id=\"planned-devices\"", DASHBOARD_HTML)
@@ -2197,6 +2197,72 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIsInstance(payload["tools"], list)
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in payload["tools"]))
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
+
+    def test_publish_peer_status_uses_configured_device_identity_by_default(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "snapshot"
+            remote_dir = root / "remote"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-win")
+
+            parser = build_parser()
+            with patch.dict(os.environ, {"SKILL_SYNC_DEVICE_ID": "win", "SKILL_SYNC_DEVICE_NAME": "Windows 笔记本"}):
+                args = parser.parse_args(
+                    [
+                        "publish-peer-status",
+                        "--remote",
+                        f"file://{remote_dir}",
+                        "--status-path",
+                        "skill-sync-sidecar-peer-status/win.json",
+                        "--local-root",
+                        str(local_root),
+                        "--remote-snapshot",
+                        str(snapshot_dir),
+                    ]
+                )
+                self.assertEqual(args.func(args), 0)
+
+            payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "win.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["peer_id"], "win")
+            self.assertEqual(payload["device"]["id"], "win")
+            self.assertEqual(payload["device"]["name"], "Windows 笔记本")
+
+    def test_publish_peer_status_explicit_peer_id_overrides_local_identity(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "skills"
+            snapshot_dir = root / "snapshot"
+            remote_dir = root / "remote"
+
+            self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-openclaw")
+
+            parser = build_parser()
+            with patch.dict(os.environ, {"SKILL_SYNC_DEVICE_ID": "mac", "SKILL_SYNC_DEVICE_NAME": "Mac 本机"}):
+                args = parser.parse_args(
+                    [
+                        "publish-peer-status",
+                        "--remote",
+                        f"file://{remote_dir}",
+                        "--peer-id",
+                        "oc-vps",
+                        "--status-path",
+                        "skill-sync-sidecar-peer-status/oc-vps.json",
+                        "--local-root",
+                        str(local_root),
+                        "--remote-snapshot",
+                        str(snapshot_dir),
+                    ]
+                )
+                self.assertEqual(args.func(args), 0)
+
+            payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "oc-vps.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["peer_id"], "oc-vps")
+            self.assertEqual(payload["device"]["id"], "oc-vps")
+            self.assertEqual(payload["device"]["name"], "oc-vps / OpenClaw")
 
     def test_mac_tool_install_from_central_uses_home_scoped_paths(self):
         with TemporaryDirectory() as tmp:
