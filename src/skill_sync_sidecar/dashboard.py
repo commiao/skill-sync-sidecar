@@ -3439,6 +3439,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       background: #fffdf7;
       border-color: #e8d29c;
     }
+    .simple-action-panel.deferrable {
+      background: #fbfdff;
+      border-color: #c8d7ef;
+    }
     .simple-action-panel.version-difference {
       background: #f8fbff;
       border-color: #b8cef0;
@@ -6315,7 +6319,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const blocked = allItems.length > 0 ? actionableItems.length : Number(dashboard.blocked || 0);
       const breakdown = blockedBreakdown(actionableItems);
       const conflictOnly = blocked > 0 && conflictItems.length === blocked;
-      const kind = blocked === 0 ? "green" : (conflictOnly ? "version-difference" : "yellow");
+      const ordinaryOnly = blocked > 0 && sourceChangedItems.length === blocked;
+      const kind = blocked === 0 ? "green" : (ordinaryOnly ? "deferrable" : (conflictOnly ? "version-difference" : "yellow"));
       panel.className = `simple-action-panel panel ${kind}`;
       if (blocked === 0) {
         if (deferredSourceChangedItems.length > 0) {
@@ -6491,11 +6496,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const localSkills = local.total_skills ?? summary.installed ?? inventory.total ?? "-";
       const centralSkills = central.total_skills ?? inventory.published ?? "-";
       const pending = actionable.length > 0 ? `${actionable.length} 项` : "无";
+      const ordinaryOnly = actionable.length > 0 && actionable.every((item) => reviewIsSourceChangedItem(item));
+      const pendingLabel = ordinaryOnly ? "普通待审" : "待办";
       return `
         <div class="simple-action-facts" aria-label="状态概览">
           <div class="simple-action-fact"><strong>${escapeHtml(text(localSkills))}</strong><span>本机 skill</span></div>
           <div class="simple-action-fact"><strong>${escapeHtml(text(centralSkills))}</strong><span>共享库</span></div>
-          <div class="simple-action-fact"><strong>${escapeHtml(pending)}</strong><span>待办</span></div>
+          <div class="simple-action-fact"><strong>${escapeHtml(pending)}</strong><span>${escapeHtml(pendingLabel)}</span></div>
         </div>
       `;
     }
