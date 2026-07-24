@@ -5176,7 +5176,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             <div class="local-skill-guide" aria-label="新增本地 skill 流程">
               <div id="local-skill-step-pick" class="local-skill-step active"><strong>1</strong><span>粘贴路径<em>目录或 SKILL.md 都可以。</em></span></div>
-              <div id="local-skill-step-install" class="local-skill-step"><strong>2</strong><span>安装本机<em>只写当前 Mac 的工具。</em></span></div>
+              <div id="local-skill-step-install" class="local-skill-step"><strong>2</strong><span>安装本机<em>只写当前设备的工具。</em></span></div>
               <div id="local-skill-step-publish" class="local-skill-step"><strong>3</strong><span>保存共享<em>保存前会再次确认。</em></span></div>
             </div>
             <div class="local-skill-input-row">
@@ -5311,7 +5311,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
             <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查同步</button>
           </div>
-          <div id="strip-action-note" class="focus-side-note">只操作 Mac 本机；共享库和其他设备只读。</div>
+          <div id="strip-action-note" class="focus-side-note">只操作当前设备；共享库和其他设备只读。</div>
           <div class="focus-metrics" aria-label="同步范围摘要">
             <div class="focus-metric">
               <div class="status-chip-label">本机</div>
@@ -5351,7 +5351,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           </div>
           <div id="local-workspace-summary" class="workspace-subtitle">正在读取本机工作区。</div>
           <div class="workspace-flow" aria-label="本机操作流程">
-            <div class="workspace-step"><strong>1. 扫描</strong><span>读取当前 Mac 上各工具的 skill。</span></div>
+            <div class="workspace-step"><strong>1. 扫描</strong><span>读取当前设备上各工具的 skill。</span></div>
             <div class="workspace-step"><strong>2. 检查</strong><span>只看会改什么，不写共享库。</span></div>
             <div class="workspace-step"><strong>3. 保存</strong><span>确认无误后再写入共享库。</span></div>
           </div>
@@ -5500,7 +5500,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               <h2>本机助手</h2>
               <span id="executor-pill" class="pill">检查中</span>
             </div>
-            <div id="executor-status" class="executor-status">正在检查 Mac 本机助手。</div>
+            <div id="executor-status" class="executor-status">正在检查本机助手。</div>
             <div class="executor-actions">
               <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
               <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键检查</button>
@@ -5641,7 +5641,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let executorAvailable = false;
     let executorAllowPublish = false;
     let executorAllowLocalWrites = false;
-    let executorDeviceId = "local";
+    let executorDeviceId = "mac";
     let executorDeviceName = "本机客户端";
     let lastDryRunSafe = false;
     let lastPublishReceipt = null;
@@ -5668,6 +5668,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     };
     const row = (key, value) => `<div class="key">${key}</div><div class="value mono">${escapeHtml(pretty(value))}</div>`;
     const pill = (label, kind) => `<span class="pill ${kind || ""}">${escapeHtml(text(label))}</span>`;
+    const currentClientId = () => text(executorDeviceId || (localWorkspaceFromExecutor || {}).device_id || "mac") || "mac";
     const currentClientName = () => text(executorDeviceName || (localWorkspaceFromExecutor || {}).device_name || "本机客户端");
     const currentClientHelperName = () => `${currentClientName()}助手`;
     const escapeHtml = (value) => String(value)
@@ -5879,7 +5880,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "不会自动写入共享库；确认后才会保存。"
             : (deferredSourceChangedItems.length > 0
               ? "搁置不会写入任何位置；取消搁置后可继续检查。"
-              : "只操作当前 Mac，本页不会跨设备乱改。")));
+              : "只操作当前设备，本页不会跨设备乱改。")));
       }
     }
 
@@ -6169,7 +6170,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!allSourceChangedReady) {
           secondaryActions = `
             <div class="simple-action-secondary">
-              <span>OpenClaw 还在改也不影响管理当前 Mac；检查按钮只读，不写共享库。</span>
+              <span>OpenClaw 还在改也不影响管理当前设备；检查按钮只读，不写共享库。</span>
               <button id="simple-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查最新版本</button>
             </div>
           `;
@@ -6214,7 +6215,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div id="simple-action-disabled-note" class="simple-action-disabled-note">正在确认当前按钮状态。</div>
       </div>
         ${simpleActionFeedbackHtml()}
-        <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前 Mac；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
+        <div id="simple-action-note" class="simple-action-note"><strong>操作边界：</strong>本页直接操作当前设备；共享库只有确认保存才写入；OpenClaw、Windows 和其他设备只展示状态，不会被远程修改。</div>
       `;
       setExecutorButtons(executorAvailable);
     }
@@ -6560,7 +6561,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable || !executorAllowPublish) {
-        setReviewFeedback("yellow", "保存未开启", "保存 OpenClaw 版需要 Mac 本机助手在线，并打开保存开关。");
+        setReviewFeedback("yellow", "保存未开启", `保存 OpenClaw 版需要${currentClientHelperName()}在线，并打开保存开关。`);
         return;
       }
       setExecutorButtons(false);
@@ -6589,7 +6590,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
           willNot: [
             "不会删除共享库里的其他 skill。",
-            "不会修改 Mac 本机工具目录。",
+            `不会修改 ${currentClientName()} 的工具目录。`,
             "不会绕过保存权限。",
           ],
         })) {
@@ -6631,7 +6632,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable || !executorAllowLocalWrites) {
-        setReviewFeedback("yellow", "恢复未开启", "恢复需要 Mac 本机助手在线，并打开本机写入开关。");
+        setReviewFeedback("yellow", "恢复未开启", `恢复需要${currentClientHelperName()}在线，并打开本机写入开关。`);
         return;
       }
       setExecutorButtons(false);
@@ -6660,7 +6661,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ],
           willNot: [
             "不会删除共享库版本。",
-            "不会修改 Mac 本机工具目录。",
+            `不会修改 ${currentClientName()} 的工具目录。`,
             "不会处理其他 skill。",
           ],
         })) {
@@ -6824,7 +6825,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         detail || "本机助手当前只允许检查。需要开启保存权限后，首页才会出现可执行的保存按钮。",
       );
       showExecutorOutput([
-        "保存到共享库需要重新安装 Mac 本机助手，并显式打开保存权限：",
+        `保存到共享库需要重新安装${currentClientHelperName()}，并显式打开保存权限：`,
         "",
         "SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 scripts/install-operator-executor-launchd.sh",
         "",
@@ -6853,7 +6854,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function showLocalWriteGateHelp(targetLabel) {
-      const target = text(targetLabel || "当前 Mac 的工具目录");
+      const target = text(targetLabel || `${currentClientName()} 的工具目录`);
       setReviewFeedback(
         "yellow",
         "还不能写入本机工具",
@@ -7186,7 +7187,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         $("review-progress").innerHTML = [
           reviewStage("1", "生成只读报告", `${conflictTotal} 个版本差异`, "yellow", "只读取 OpenClaw 和共享库，不写入。"),
           reviewStage("2", "按推荐处理", "报告给出建议", "yellow", "推荐动作会显示在报告最上方。"),
-        reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认项是否清空。" : "需要 Mac 本机助手在线。"),
+        reviewStage("3", "自动确认结果", "写入后回查", executorKind, executorAvailable ? "完成后自动刷新状态，确认项是否清空。" : `需要${currentClientHelperName()}在线。`),
         ].join("");
         return;
       }
@@ -7196,7 +7197,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? `${deleteTotal} 个删除项不会自动保存；需恢复缺失设备或单独确认删除。`
         : "保存前会再次确认。";
       $("review-progress").innerHTML = [
-        reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : "先确认 Mac 本机助手在线。"),
+        reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : `先确认${currentClientHelperName()}在线。`),
         reviewStage("2", "检查可保存更新", `${checked}/${publishableTotal} 已检查`, dryRunKind, publishableTotal > 0 ? "检查只读，不会写共享库。" : "当前没有可保存项；不要反复点保存。"),
         reviewStage("3", conflictTotal > 0 ? "版本确认" : "保存共享库", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可保存`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
       ].join("");
@@ -7847,6 +7848,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       });
       document.querySelectorAll(".tool-install-button, .codex-install-button").forEach((button) => {
         const toolLabel = button.dataset.toolLabel || "工具";
+        const clientName = currentClientName();
         setButtonLabel(
           button,
           !available
@@ -7861,10 +7863,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
             ? "本机写入权限未开启；点击查看开启方法"
-            : `从共享库安装到当前 Mac 的 ${toolLabel}`);
+            : `从共享库安装到 ${clientName} 的 ${toolLabel}`);
       });
       document.querySelectorAll(".tool-uninstall-button").forEach((button) => {
         const toolLabel = button.dataset.toolLabel || "工具";
+        const clientName = currentClientName();
         setButtonLabel(
           button,
           !available
@@ -7879,7 +7882,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
             ? "本机写入权限未开启；点击查看开启方法"
-            : `从当前 Mac 的 ${toolLabel} 移除，并保留备份`);
+            : `从 ${clientName} 的 ${toolLabel} 移除，并保留备份`);
       });
       document.querySelectorAll(".skill-tool-toggle").forEach((input) => {
         const allowed = input.dataset.toggleAllowed === "true";
@@ -7997,7 +8000,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const requestedSkillsLabel = compactSkillList(actionSkills);
       if (!executorAvailable) {
         showExecutorOutput("本机助手未连接，无法执行检查或保存。按钮没有真正执行，请先确认本机助手在线。");
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线；状态已重新刷新。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线；状态已重新刷新。`);
         await refresh(true);
         checkExecutor();
         return;
@@ -8127,7 +8130,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       } catch (err) {
         showExecutorOutput(String(err));
         setExecutorStatus("failed", "本机助手调用失败，请确认本机服务仍在线。", "red");
-        setReviewFeedback("red", "本机助手调用失败", "请确认 Mac 本机助手仍在线。");
+        setReviewFeedback("red", "本机助手调用失败", `请确认${currentClientHelperName()}仍在线。`);
       } finally {
         executorBusy = false;
         setExecutorButtons(executorAvailable);
@@ -8170,7 +8173,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         return;
       }
       if (!executorAllowLocalWrites) {
@@ -8238,10 +8241,11 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      const clientName = currentClientName();
       if (!skillId) return;
       if (!toolId) return;
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行安装检查。", "yellow");
         return;
       }
@@ -8250,7 +8254,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查安装 ${skillId}`, `检查只读；先确认共享库版本能安装到当前 Mac 的 ${toolLabel}。`);
+      setReviewFeedback("yellow", `正在检查安装 ${skillId}`, `检查只读；先确认共享库版本能安装到 ${clientName} 的 ${toolLabel}。`);
       setExecutorStatus("install check", `正在检查从共享库安装 ${skillId} 到 ${toolLabel}。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central-dry-run`, {
@@ -8264,12 +8268,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会只安装到当前 Mac 的 ${toolLabel}。共享库和其他工具不会被修改。`);
+        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会只安装到 ${clientName} 的 ${toolLabel}。共享库和其他工具不会被修改。`);
         if (!confirmProtectedWrite({
           word: "INSTALL",
           title: `确认安装到 ${toolLabel}：${skillId}`,
           will: [
-            `把共享库里的 ${skillId} 安装到当前 Mac 的 ${toolLabel}。`,
+            `把共享库里的 ${skillId} 安装到 ${clientName} 的 ${toolLabel}。`,
             "只处理这一个 skill。",
             "完成后自动刷新本机工具状态。",
           ],
@@ -8283,7 +8287,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
           return;
         }
-        setReviewFeedback("yellow", `正在安装 ${skillId}`, `正在写入当前 Mac 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
+        setReviewFeedback("yellow", `正在安装 ${skillId}`, `正在写入 ${clientName} 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
         setExecutorStatus("installing", `正在安装 ${skillId} 到 ${toolLabel}。`, "yellow");
         const installResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central`, {
           method: "POST",
@@ -8298,7 +8302,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
         rememberLocalToolChanges([skillId], toolId, "installed");
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
-        setExecutorStatus("installed", `${skillId} 已安装到当前 Mac 的 ${toolLabel}。`, "green");
+        setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
@@ -8313,6 +8317,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
+      const clientName = currentClientName();
       if (!tool) return;
       const model = currentSkillInventoryModel || { items: [] };
       const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
@@ -8324,7 +8329,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行批量安装检查。", "yellow");
         return;
       }
@@ -8348,12 +8353,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_restore || Number(dryRunPayload.planned || 0) <= 0) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只安装到当前 Mac 的 ${toolLabel}。共享库和其他工具不会被修改。`);
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只安装到 ${clientName} 的 ${toolLabel}。共享库和其他工具不会被修改。`);
         if (!confirmProtectedWrite({
           word: "INSTALL",
           title: `确认批量安装到 ${toolLabel}`,
           will: [
-            `把当前筛选结果里的 ${skillIds.length} 个共享库 skill 安装到当前 Mac 的 ${toolLabel}。`,
+            `把当前筛选结果里的 ${skillIds.length} 个共享库 skill 安装到 ${clientName} 的 ${toolLabel}。`,
             `本次包括：${names}。`,
             "完成后自动刷新本机工具状态。",
           ],
@@ -8367,7 +8372,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
           return;
         }
-        setReviewFeedback("yellow", `正在批量安装到 ${toolLabel}`, `正在写入当前 Mac 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
+        setReviewFeedback("yellow", `正在批量安装到 ${toolLabel}`, `正在写入 ${clientName} 的 ${toolLabel} skill 目录；原目录会由安装计划保留备份。`);
         setExecutorStatus("installing", `正在安装 ${skillIds.length} 个 skill 到 ${toolLabel}。`, "yellow");
         const installResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central`, {
           method: "POST",
@@ -8382,7 +8387,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
         rememberLocalToolChanges(skillIds, toolId, "installed");
         setReviewFeedback("green", `已安装到 ${toolLabel}`, `已处理 ${names}；本机状态正在刷新。`);
-        setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到当前 Mac 的 ${toolLabel}。`, "green");
+        setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
@@ -8397,6 +8402,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
+      const clientName = currentClientName();
       if (!tool) return;
       const model = currentSkillInventoryModel || { items: [] };
       const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
@@ -8408,7 +8414,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行批量移除检查。", "yellow");
         return;
       }
@@ -8432,12 +8438,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_uninstall || Number(dryRunPayload.planned || 0) <= 0) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只从当前 Mac 的 ${toolLabel} 移走，并保留备份。共享库不会变化。`);
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, `下一步确认后，会只从 ${clientName} 的 ${toolLabel} 移走，并保留备份。共享库不会变化。`);
         if (!confirmProtectedWrite({
           word: "REMOVE",
           title: `确认批量从 ${toolLabel} 移除`,
           will: [
-            `把当前筛选结果里的 ${skillIds.length} 个 skill 从当前 Mac 的 ${toolLabel} 可发现目录移走。`,
+            `把当前筛选结果里的 ${skillIds.length} 个 skill 从 ${clientName} 的 ${toolLabel} 可发现目录移走。`,
             `本次包括：${names}。`,
             "把原目录放进 .skill-sync-removed 备份目录。",
             "完成后自动刷新本机工具状态。",
@@ -8452,7 +8458,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
           return;
         }
-        setReviewFeedback("yellow", `正在批量从 ${toolLabel} 移除`, `正在从当前 Mac 的 ${toolLabel} 移走，并保留备份。`);
+        setReviewFeedback("yellow", `正在批量从 ${toolLabel} 移除`, `正在从 ${clientName} 的 ${toolLabel} 移走，并保留备份。`);
         setExecutorStatus("removing", `正在从 ${toolLabel} 移除 ${skillIds.length} 个 skill。`, "yellow");
         const uninstallResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall`, {
           method: "POST",
@@ -8467,7 +8473,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
         rememberLocalToolChanges(skillIds, toolId, "removed");
         setReviewFeedback("green", `已从 ${toolLabel} 移除`, `已处理 ${names}；文件已保留在移除备份目录，本机状态正在刷新。`);
-        setExecutorStatus("removed", `${skillIds.length} 个 skill 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
+        setExecutorStatus("removed", `${skillIds.length} 个 skill 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
@@ -8491,9 +8497,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      const clientName = currentClientName();
       if (!skillId || !toolId) return;
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行移除检查。", "yellow");
         return;
       }
@@ -8502,7 +8509,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查移除 ${skillId}`, `检查只读；先确认 ${skillId} 当前在 Mac 的 ${toolLabel} 目录里。`);
+      setReviewFeedback("yellow", `正在检查移除 ${skillId}`, `检查只读；先确认 ${skillId} 当前在 ${clientName} 的 ${toolLabel} 目录里。`);
       setExecutorStatus("remove check", `正在检查从 ${toolLabel} 移除 ${skillId}。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall-dry-run`, {
@@ -8516,12 +8523,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_uninstall || Number(dryRunPayload.planned || 0) <= 0) {
           throw new Error(executorErrorDetail(dryRunPayload));
         }
-        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会从当前 Mac 的 ${toolLabel} 移走，并保留备份。共享库不会变化。`);
+        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会从 ${clientName} 的 ${toolLabel} 移走，并保留备份。共享库不会变化。`);
         if (!confirmProtectedWrite({
           word: "REMOVE",
           title: `确认从 ${toolLabel} 移除：${skillId}`,
           will: [
-            `把 ${skillId} 从当前 Mac 的 ${toolLabel} 可发现目录移走。`,
+            `把 ${skillId} 从 ${clientName} 的 ${toolLabel} 可发现目录移走。`,
             "把原目录放进 .skill-sync-removed 备份目录。",
             "完成后自动刷新本机工具状态。",
           ],
@@ -8535,7 +8542,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           setReviewFeedback("yellow", "已取消", `没有修改 ${toolLabel} 目录。`);
           return;
         }
-        setReviewFeedback("yellow", `正在移除 ${skillId}`, `正在从当前 Mac 的 ${toolLabel} 移走，并保留备份。`);
+        setReviewFeedback("yellow", `正在移除 ${skillId}`, `正在从 ${clientName} 的 ${toolLabel} 移走，并保留备份。`);
         setExecutorStatus("removing", `正在从 ${toolLabel} 移除 ${skillId}。`, "yellow");
         const uninstallResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall`, {
           method: "POST",
@@ -8550,7 +8557,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }
         rememberLocalToolChanges([skillId], toolId, "removed");
         setReviewFeedback("green", `${skillId} 已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。");
-        setExecutorStatus("removed", `${skillId} 已从当前 Mac 的 ${toolLabel} 移除。`, "green");
+        setExecutorStatus("removed", `${skillId} 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
       } catch (err) {
@@ -8565,7 +8572,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行废弃检查。", "yellow");
         return;
       }
@@ -8637,7 +8644,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const skillId = button.dataset.skillId || "";
       if (!skillId) return;
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行恢复可用检查。", "yellow");
         return;
       }
@@ -8710,7 +8717,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const sourcePath = button.dataset.sourcePath || "";
       if (!skillId || !sourcePath) return;
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         setExecutorStatus("not ready", "本机助手未在线，不能执行保存检查。", "yellow");
         return;
       }
@@ -8738,7 +8745,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           word: "PUBLISH",
           title: `确认保存共享库：${skillId}`,
           will: [
-            `把当前 Mac 上的 ${skillId} 保存到共享库。`,
+            `把 ${currentClientName()} 上的 ${skillId} 保存到共享库。`,
             "只处理这一个 skill。",
             "完成后自动刷新本机和共享库状态。",
           ],
@@ -8787,7 +8794,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       if (!executorAvailable) {
-        setReviewFeedback("yellow", "本机助手未连接", "请先让 Mac 本机助手在线。");
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
         return;
       }
       setExecutorButtons(false);
@@ -8952,7 +8959,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         showExecutorOutput(String(err));
         setExecutorStatus("failed", "本机助手调用失败，请确认本机服务仍在线。", "red");
         updateReviewTaskResult(reviewItem || skillId, { label: "调用失败", kind: "red", publishReady: false });
-        setReviewFeedback("red", "本机助手调用失败", "请确认 Mac 本机助手仍在线。");
+        setReviewFeedback("red", "本机助手调用失败", `请确认${currentClientHelperName()}仍在线。`);
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -9145,7 +9152,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (triage === "waiting_path") {
         return {
           title: `正在看：缺本机路径 (${filtered})`,
-          detail: "下一步：等待对应设备上报，或先恢复到当前 Mac 后再处理。",
+          detail: `下一步：等待对应设备上报，或先恢复到 ${currentClientName()} 后再处理。`,
         };
       }
       if (query || (filters || {}).central !== "all" || (filters || {}).scope !== "all" || (filters || {}).tool !== "all" || (filters || {}).sync !== "all") {
@@ -9299,7 +9306,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (installable > 0) {
         return {
           title: "推荐先让本机工具可用",
-          detail: `${installable} 个共享库 skill 可以安装到当前 Mac 的 Codex、Cursor 等工具。`,
+          detail: `${installable} 个共享库 skill 可以安装到 ${currentClientName()} 的 Codex、Cursor 等工具。`,
           button: "查看可安装",
           action: "setSkillInventoryQuick('local_installable')",
         };
@@ -9315,7 +9322,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (installed > 0) {
         return {
           title: "本机工具已经有可用 skill",
-          detail: `${installed} 个 skill 已安装到当前 Mac 的工具；需要整理时再查看。`,
+          detail: `${installed} 个 skill 已安装到 ${currentClientName()} 的工具；需要整理时再查看。`,
           button: "查看已安装",
           action: "setSkillInventoryQuick('local_installed')",
         };
@@ -9505,12 +9512,13 @@ DASHBOARD_HTML = r"""<!doctype html>
             pending: 0,
             installations: [],
           };
-          const installKey = `mac::${toolId}`;
+          const clientId = currentClientId();
+          const installKey = `${clientId}::${toolId}`;
           const exists = entry.installations.some((installed) => `${text(installed.device_id)}::${text(installed.tool_id)}` === installKey);
           if (!exists) {
             entry.installations.push({
-              device_id: "mac",
-              device_name: "Mac 本机",
+              device_id: clientId,
+              device_name: currentClientName(),
               tool_id: toolId,
               tool_name: toolName,
               state: "installed",
@@ -9638,9 +9646,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function skillInventoryInstallationRows(item) {
       const installations = Array.isArray(item.installations) ? item.installations : [];
-      const local = installations.filter((installed) => text(installed.device_id) === "mac");
+      const clientName = currentClientName();
+      const local = installations.filter((installed) => text(installed.device_id) === currentClientId());
       if (local.length === 0) {
-        return `<div class="empty">当前 Mac 还没有安装这个 skill。保存到共享库后，可在上方勾选安装到本机工具。</div>`;
+        return `<div class="empty">${escapeHtml(clientName)} 还没有安装这个 skill。保存到共享库后，可在上方勾选安装到本机工具。</div>`;
       }
       return `<div class="skill-installation-list">${local.map((installed) => `
         <div class="skill-installation-row">
@@ -9738,14 +9747,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     function macInstalledToolIds(item) {
       const installations = Array.isArray(item.installations) ? item.installations : [];
       return new Set(installations
-        .filter((installed) => text(installed.device_id) === "mac")
+        .filter((installed) => text(installed.device_id) === currentClientId())
         .map((installed) => text(installed.tool_id))
         .filter(Boolean));
     }
 
     function macPublishSourcePath(item) {
       const installations = Array.isArray(item.installations) ? item.installations : [];
-      const local = installations.filter((installed) => text(installed.device_id) === "mac" && text(installed.path));
+      const local = installations.filter((installed) => text(installed.device_id) === currentClientId() && text(installed.path));
       const order = ["cc-switch", "codex", "cursor", "claude-code", "skillshub"];
       for (const toolId of order) {
         const found = local.find((installed) => text(installed.tool_id) === toolId);
@@ -9990,7 +9999,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     async function installLocalSkill() {
       if (!executorAvailable || !lastLocalSkillAnalysis) return;
       if (!executorAllowLocalWrites) {
-        showLocalWriteGateHelp("当前 Mac 的工具目录");
+        showLocalWriteGateHelp(`${currentClientName()} 的工具目录`);
         return;
       }
       const writes = Number((lastLocalSkillAnalysis.summary || {}).will_write || 0);

@@ -43,22 +43,22 @@ The normal user flow is:
 
 The user should not need to edit metadata, understand technical check output, or manually copy package files. The dashboard should phrase the action in plain language; detailed paths, versions, generated metadata, and raw queues belong in the secondary details views.
 
-The secondary `Skill 清单` view is the per-skill management surface for the current client:
+The secondary `Skill 清单` view is the per-skill management surface for the current client. It must derive the current device id/name from the local executor (`SKILL_SYNC_DEVICE_ID` / `SKILL_SYNC_DEVICE_NAME`) instead of assuming the operator is always on Mac:
 
 - The top `推荐操作` strip chooses one plain next action from the current state: pending sync review, installable local tools, savable local skills, installed local skills, or the full list. It is the first thing a non-technical user should follow.
 - After a recommended action opens the list, the `正在看` strip explains the current view and the next safe operation, such as checking a tool box, saving one skill to the shared library, or leaving project skills in the project repository.
 - Search and filters are view-only helpers. Users can filter by skill name/description, shared-library state, scope, local tool, or pending sync state without changing files.
 - The unpublished triage chips split local-only skills into `可保存公用`, `项目级`, `设备私有`, and `缺本机路径`. Clicking a chip only changes the current view.
-- Checking a local tool box installs a shared-library skill into that Mac tool root after a read-only check and `INSTALL` confirmation.
-- Unchecking an installed local tool box moves the skill out of that Mac tool root into `.skill-sync-removed/<timestamp>/` after a read-only check and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
-- `保存到共享库` appears for unpublished public skills that have a current Mac source path. It checks first, then requires `PUBLISH`; it does not directly install the skill onto other devices.
+- Checking a local tool box installs a shared-library skill into that current client's tool root after a read-only check and `INSTALL` confirmation.
+- Unchecking an installed local tool box moves the skill out of that current client's tool root into `.skill-sync-removed/<timestamp>/` after a read-only check and `REMOVE` confirmation; it does not delete the backup or change the central snapshot.
+- `保存到共享库` appears for unpublished public skills that have a current client source path. It checks first, then requires `PUBLISH`; it does not directly install the skill onto other devices.
 - Project-scoped skills are shown in the inventory but are not one-click saved from the global list yet. They need a project-level policy before distribution.
 - `标记废弃` updates the shared-library lifecycle to `deprecated` after a read-only check and `DEPRECATE` confirmation. It uploads `index.json` only and keeps existing archives.
 - `恢复可用` updates the shared-library lifecycle from `deprecated` back to `published` after a read-only check and `REACTIVATE` confirmation. It uploads `index.json` only and does not auto-install the skill into any tool.
 
 The first dashboard screen should remain a simple "what should I do now" view. Tool matrices, search/filter controls, install/remove buttons, and lifecycle actions belong in the secondary inventory/details view.
-The first screen should also state the operation boundary plainly: the current Mac is directly operable, the shared library is written only after explicit save confirmation, and other devices are read-only status unless their own Agent acts.
-The first screen should prefer one primary action plus at most a few secondary shortcuts. It should not expose raw queues, tool matrices, hash/version details, long explanations, diagnostic counts, or embedded detail drawers as the normal path. Put those details behind `其他操作和详情`, `查看确认清单`, `Skill 清单`, or advanced sections.
+The first screen should also state the operation boundary plainly: the current client is directly operable, the shared library is written only after explicit save confirmation, and other devices are read-only status unless their own Agent acts.
+The first screen should prefer one primary action plus at most a few secondary shortcuts. It should not expose raw queues, tool matrices, hash/version details, long explanations, diagnostic counts, or embedded detail drawers as the normal path. Put those details behind `其他操作和详情`, `查看确认清单`, `Skill 清单`, or advanced sections. A non-technical user should be able to operate the first card without reading this document.
 Clicking a first-screen `查看确认清单` or `看看要处理什么` action should open every parent drawer needed to make the review queue visible, then scroll directly to that queue.
 Clicking permission/setup actions such as `开启保存权限` or `开启本机写入` should open the technical setup area only. It must not focus the local skill path input; that input is reserved for the explicit `管理本机 skill` workflow.
 
@@ -67,7 +67,7 @@ The `先不提醒` action should be the easiest first-screen action while editin
 This is a browser-local UI deferral only:
 
 - It is stored in `localStorage` for the current browser.
-- It does not write WebDAV, OpenClaw, Mac tool roots, or central metadata.
+- It does not write WebDAV, OpenClaw, current-client tool roots, or central metadata.
 - It is tied to the current source version, so a new OpenClaw edit shows up again.
 - The original item stays visible in the secondary confirmation list.
 - Use it when a skill is still being edited and the dashboard should not block other local management work.
