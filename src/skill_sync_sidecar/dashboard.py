@@ -8340,6 +8340,33 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
 
+    async function runApprovedPushRequest(mode, actionSkills, confirmWord) {
+      const endpoint = mode === "publish" ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
+      const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skill_ids: actionSkills,
+          confirm: confirmWord,
+        }),
+      });
+      const payload = await response.json();
+      return { response, payload };
+    }
+
+    function syncReviewTaskResultForActionSkills(actionSkills) {
+      actionSkills.forEach((skillId) => {
+        currentReviewQueueItems
+          .filter((item) => item.skill_id === skillId && reviewIsPublishCandidate(item))
+          .forEach((item) => {
+            reviewTaskResults[reviewItemKey(item)] = { label: "检查通过", kind: "green", publishReady: true };
+          });
+      });
+      renderReviewQueue(currentReviewQueueItems);
+      rerenderTopActionPanel();
+    }
+
     async function runExecutorAction(mode) {
       const actionSkills = currentActionSkillIds();
       const requestedSkillsLabel = compactSkillList(actionSkills);
@@ -8357,6 +8384,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       const isPublish = mode === "publish";
+      const shouldRunDryRunFirst = isPublish && !allReviewPublishCandidatesReady();
       if (isPublish) {
         if (!executorAllowPublish) {
           showExecutorOutput("当前没有打开保存开关，所以只能检查，不能写入共享库。");
@@ -8364,10 +8392,43 @@ DASHBOARD_HTML = r"""<!doctype html>
           setExecutorButtons(executorAvailable);
           return;
         }
-        if (!lastDryRunSafe && !allReviewPublishCandidatesReady()) {
-          showExecutorOutput("请先运行检查，并确认结果显示可以保存。");
-          setReviewFeedback("yellow", "还不能保存", "请先运行检查，确认结果显示可以保存后再写入共享库。");
-          return;
+        if (shouldRunDryRunFirst) {
+          setReviewFeedback("yellow", "先自动检查", "保存前先做一次公开校验，确认结果稳定后再写入共享库。");
+          setExecutorStatus("dry-run", "正在先做检查，请稍等。", "yellow");
+          try {
+            const dryRunResult = await runApprovedPushRequest("dry_run", actionSkills);
+            const { response: dryRunResponse, payload: dryRunPayload } = dryRunResult;
+            lastDryRunSafe = Boolean(dryRunPayload.ok && dryRunPayload.safe_to_push);
+            showExecutorOutput(formatExecutorResult(dryRunPayload));
+            if (!dryRunResponse.ok) {
+              if (executorPayloadIsStaleSourceChange(dryRunPayload)) {
+                await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
+                await refresh(true);
+                setExecutorStatus("needs review", staleSourceChangeDetail(dryRunPayload), "yellow");
+                setReviewFeedback("yellow", "OpenClaw 仍在修改", staleSourceChangeDetail(dryRunPayload));
+                return;
+              }
+              throw new Error(executorErrorDetail(dryRunPayload));
+            }
+            if (dryRunPayload.ok && dryRunPayload.safe_to_push) {
+              syncReviewTaskResultForActionSkills(actionSkills);
+              setExecutorStatus("check ready", "检查通过，可继续保存。", "green");
+              setReviewFeedback("green", "检查通过", "你可以继续保存到共享库。");
+              lastDryRunSafe = true;
+              if (!allReviewPublishCandidatesReady()) {
+                setExecutorStatus("needs review", "部分 skill 检查仍待确认", "yellow");
+                setReviewFeedback("yellow", "暂未全部可保存", "有部分技能仍在变化，请继续检查后再保存。");
+                return;
+              }
+            } else {
+              setReviewFeedback("yellow", "不能保存", "检查返回未通过；先按提示处理后再试。");
+              return;
+            }
+          } catch (err) {
+            setExecutorStatus("failed", "检查失败，请查看输出。", "red");
+            setReviewFeedback("red", "检查失败", String(err));
+            return;
+          }
         }
         const typed = window.prompt("保存会写入共享库。请输入 PUBLISH 确认：");
         if (typed !== "PUBLISH") {
@@ -8381,17 +8442,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       setExecutorStatus(isPublish ? "saving" : "dry-run", isPublish ? "正在保存，请不要关闭页面。" : "正在运行检查，请稍等。", "yellow");
       setReviewFeedback("yellow", isPublish ? "正在保存" : "正在检查", isPublish ? "正在写入共享库，请等待完成。" : "检查只读，不会写入共享库。");
       try {
-        const endpoint = isPublish ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
-        const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
-          method: "POST",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            skill_ids: actionSkills,
-            confirm: isPublish ? "PUBLISH" : undefined,
-          }),
-        });
-        const payload = await response.json();
+        const request = await runApprovedPushRequest(isPublish ? "publish" : "dry_run", actionSkills, isPublish ? "PUBLISH" : undefined);
+        const response = request.response;
+        const payload = request.payload;
         lastDryRunSafe = !isPublish && Boolean(payload.ok && payload.safe_to_push);
         showExecutorOutput(formatExecutorResult(payload));
         if (payload.ok) {
