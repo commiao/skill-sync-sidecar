@@ -1056,8 +1056,8 @@ def _operator_summary(status: dict, devices: list[dict], blocked_items: list[dic
 
 def _operator_headline_from_guide(health: str, action_guide: dict) -> str:
     title = action_guide.get("title") if isinstance(action_guide, dict) else None
-    if health == "yellow" and title == "OpenClaw 新修改待审":
-        return "服务正常，有 OpenClaw 待审"
+    if health == "yellow" and title == "OpenClaw 修改可稍后处理":
+        return "服务正常，OpenClaw 可稍后处理"
     if health == "yellow" and title == "OpenClaw 更新需要确认":
         return "OpenClaw 更新待确认"
     return _headline_for_health(health)
@@ -1065,8 +1065,8 @@ def _operator_headline_from_guide(health: str, action_guide: dict) -> str:
 
 def _operator_next_action_from_guide(action_guide: dict, top_issue: dict) -> str:
     title = action_guide.get("title") if isinstance(action_guide, dict) else None
-    if title == "OpenClaw 新修改待审":
-        return "可以继续管理本机 skill；OpenClaw 改完后再检查最新版本。"
+    if title == "OpenClaw 修改可稍后处理":
+        return "可以继续管理本机 skill；OpenClaw 改完后再检查。"
     if title == "OpenClaw 更新需要确认":
         skill_id = top_issue.get("skill_id") or "这个 skill"
         return f"{skill_id} 已停止自动上传；先检查确认，安全后再保存到共享库。"
@@ -1214,12 +1214,12 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
         publish = _approved_push_batch_command(skill_ids, yes=True)
         source_changed_count = sum(1 for item in openclaw_push_items if item.get("operator_state") == "source_changed")
         if source_changed_count:
-            title = "OpenClaw 新修改待审"
-            summary = f"服务正常；OpenClaw 有 {source_changed_count} 个 skill 又产生新版本{skill_hint}。这只是普通待审，不影响管理当前设备的 skill；OpenClaw 改完后再检查最新版本。"
+            title = "OpenClaw 修改可稍后处理"
+            summary = f"服务正常；OpenClaw 有 {source_changed_count} 个 skill 又产生新版本{skill_hint}。这只是普通待审，可以稍后处理；不影响管理当前设备的 skill。"
             first_step = "改完后检查最新版本"
             first_detail = "检查只读，不写共享库；如果检查期间 skill 又变化，系统会自动拒绝写入。"
             second_detail = "检查结果显示可以保存后，再输入 PUBLISH 写入共享库。"
-            note = "黄色在这里表示普通待审，不是服务故障。反复出现同一个 skill 时，通常表示源端还在写文件；这只会保护该 skill，不应阻塞其他独立更新。"
+            note = "黄色在这里表示普通待审、可稍后处理，不是服务故障。反复出现同一个 skill 时，通常表示源端还在写文件；这只会保护该 skill，不应阻塞其他独立更新。"
         else:
             title = "OpenClaw 更新需要确认"
             summary = f"OpenClaw 有 {len(skill_ids)} 个本地 skill 变更{skill_hint}，sidecar 已暂停自动同步；先检查确认，安全后再保存到共享库。刚保存过同一项又出现，表示 OpenClaw 又产生了新修改，不是按钮失效。"
@@ -6025,6 +6025,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function dashboardHealthLabel(status, dashboard) {
       const health = status.health || "unknown";
       if (health === "green") return "同步正常";
+      if (health === "yellow" && dashboardHasOnlyOrdinaryReview(dashboard)) return "服务正常，普通待审";
       if (health === "yellow" && status.service_health === "green") return "服务正常，有同步提醒";
       if (health === "yellow") return "有同步提醒";
       if (health === "red") return "需要处理";
@@ -6033,10 +6034,17 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function operatorVerdict(health, status) {
       if (health === "green") return "正常";
+      if (health === "yellow" && status && dashboardHasOnlyOrdinaryReview(status.dashboard || {})) return "可稍后";
       if (health === "yellow" && status && status.service_health === "green") return "服务正常";
       if (health === "yellow") return "有提醒";
       if (health === "red") return "需要处理";
       return "未知";
+    }
+
+    function dashboardHasOnlyOrdinaryReview(dashboard) {
+      const items = Array.isArray((dashboard || {}).blocked_items) ? dashboard.blocked_items : [];
+      const actionable = items.filter((item) => !isDeferredSourceChange(item));
+      return actionable.length > 0 && actionable.every((item) => reviewIsSourceChangedItem(item));
     }
 
     function renderStatusStrip(dashboard, health) {
@@ -6074,7 +6082,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const names = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
         $("strip-focus-note").textContent = sourceChangedReady
           ? `检查通过：${names}。下一步保存到共享库。`
-          : `服务正常；OpenClaw 有新修改：${names}。这只是普通待审，不影响管理当前设备的 skill。`;
+          : `服务正常；OpenClaw 有新修改：${names}。这是可稍后处理的普通待审，不影响管理当前设备的 skill。`;
       } else {
         $("strip-focus-note").textContent = blocked > 0
           ? `还有 ${blocked} 件事要你确认。上方会给出唯一推荐按钮。`
@@ -6126,7 +6134,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0 && breakdown.sourceChanged > 0) {
         const names = compactSkillList(items.filter((item) => reviewIsSourceChangedItem(item)).map((item) => item.skill_id));
-        return `普通待审：OpenClaw 有新修改：${names}。不影响本机工作区；改完后点检查最新版本。`;
+        return `可稍后处理：OpenClaw 有新修改：${names}。不影响本机工作区；改完后点检查最新版本。`;
       }
       if ((dashboard.health || status.health) === "yellow" && blocked > 0) {
         return `先处理 ${blocked} 个待确认事项；检查只预览，确认后再保存到共享库。`;
@@ -6136,8 +6144,8 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function conciseGuideSummary(guide) {
       const skills = Array.isArray(guide.skills) ? guide.skills : [];
-      if ((guide.title || "") === "OpenClaw 新修改待审") {
-        return guide.summary || "普通待审：OpenClaw 有新修改；改完后检查最新版本，变化中会自动拒绝写入。";
+      if ((guide.title || "") === "OpenClaw 修改可稍后处理") {
+        return guide.summary || "可稍后处理：OpenClaw 有新修改；改完后检查最新版本，变化中会自动拒绝写入。";
       }
       if ((guide.state || "") === "yellow" && skills.length > 0) {
         return `重点是 ${skills.length} 个待确认 skill。先看上方推荐动作，再检查。`;
@@ -6369,12 +6377,12 @@ DASHBOARD_HTML = r"""<!doctype html>
         const allSourceChangedReady = sourceChangedItems.length > 0 && readySourceChangedItems.length === sourceChangedItems.length;
         title = allSourceChangedReady
           ? (executorAllowPublish ? "可以保存 OpenClaw 更新" : "检查通过，但保存开关未打开")
-          : "OpenClaw 新修改待审";
+          : "OpenClaw 修改可稍后处理";
         summary = allSourceChangedReady
           ? (executorAllowPublish
             ? "现在只剩最后一步：保存到共享库。保存前还会要求输入确认词。"
             : "当前本机助手只允许检查，不能写共享库。需要打开保存开关后再保存。")
-          : "服务正常；这只是 OpenClaw 有新版本待确认，不影响你继续管理当前设备的 skill。";
+          : "服务正常；这只是 OpenClaw 有新版本的普通待审，可以稍后处理，不影响你继续管理当前设备的 skill。";
         primaryActions = allSourceChangedReady
           ? (executorAllowPublish ? `
             <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
@@ -6386,7 +6394,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           `;
         if (!allSourceChangedReady) {
           secondaryActions = simpleActionSecondaryHtml(
-            "普通待审不会阻塞本机工作区；OpenClaw 改完后，到二级确认清单检查最新版本。",
+            "普通待审可稍后处理，不会阻塞本机工作区；OpenClaw 改完后，到二级确认清单检查最新版本。",
             [
               `<button type="button" onclick="openReviewDetails()">查看待审详情</button>`,
               `<button id="simple-defer-source" type="button" title="只隐藏首页提醒" onclick="deferSourceChangedItems()">先不提醒</button>`,
