@@ -4612,13 +4612,28 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .skill-inventory-row {
       display: grid;
-      grid-template-columns: minmax(200px, .9fr) minmax(260px, 1.1fr) minmax(170px, auto);
-      gap: 10px;
+      gap: 8px;
       align-items: start;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
       padding: 9px 10px;
+      min-width: 0;
+    }
+    .skill-inventory-row-main {
+      display: grid;
+      gap: 8px;
+      align-items: start;
+      grid-template-columns: minmax(170px, 1.2fr) minmax(150px, 0.8fr);
+      min-width: 0;
+    }
+    .skill-inventory-row-main .skill-inventory-tool-summary {
+      margin-top: 5px;
+    }
+    .skill-inventory-row-actions {
+      display: grid;
+      gap: 6px;
+      justify-items: start;
       min-width: 0;
     }
     .skill-inventory-name {
@@ -4756,6 +4771,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .skill-inventory-detail[open] > summary::after {
       content: "收起";
+    }
+    .skill-inventory-detail-body {
+      margin-top: 6px;
+      display: grid;
+      gap: 6px;
     }
     .skill-tool-matrix {
       grid-column: 1 / -1;
@@ -5160,6 +5180,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .plain-detail-grid { grid-template-columns: 1fr; }
       .skill-inventory-row { grid-template-columns: 1fr; }
       .skill-tool-matrix { grid-template-columns: 1fr; }
+      .skill-inventory-row-main { grid-template-columns: 1fr; }
       .skill-inventory-filters { grid-template-columns: 1fr; }
       .skill-inventory-client { grid-template-columns: 1fr 1fr; }
       .skill-inventory-guide { grid-template-columns: 1fr; }
@@ -5481,7 +5502,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <span>OpenClaw、Windows、NAS 只在这里展示状态，由各自客户端执行本机操作。</span>
         </div>
       </div>
-      <div class="skill-inventory-note">这里是当前设备的 skill 工作区。先点一个工作区入口，再在列表里勾选安装/移除，或保存到共享库。</div>
+      <div class="skill-inventory-note">这是当前设备操作区：先选工作区或在列表里勾选安装/移除；详情、路径、保存/废弃等操作放到行内「高级」里。</div>
       <div id="skill-inventory-guide" class="skill-inventory-guide" aria-label="Skill 清单推荐操作"></div>
       <details class="skill-inventory-project-note">
         <summary>项目级 skill 怎么处理</summary>
@@ -10016,33 +10037,43 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       return `
         <article class="skill-inventory-row">
-          <div>
-            <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
-            <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
-            ${skillInventoryToolSummary(item, installed, installableTools)}
-          </div>
-          <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
-            <strong>${escapeHtml(recommendation.title)}</strong>
-            <span>${escapeHtml(recommendation.detail)}</span>
-          </div>
-          <div class="skill-inventory-action-row">
-            <div class="skill-inventory-action">
-              <strong>下一步</strong>
-              <span>${escapeHtml(skillInventoryNextActionText(item, recommendation, centralState))}</span>
+          <div class="skill-inventory-row-main">
+            <div>
+              <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
+              <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
+              ${skillInventoryToolSummary(item, installed, installableTools)}
             </div>
-            ${skillInventoryRowFeedbackHtml(item)}
-            <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
-            ${publishAction}
-            ${deprecateAction}
-            ${reactivateAction}
+            <div class="skill-inventory-row-actions">
+              <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
+              <div class="skill-inventory-action">
+                <strong>推荐</strong>
+                <span>${escapeHtml(recommendation.title)}</span>
+              </div>
+            </div>
           </div>
           <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
             <div class="skill-tool-matrix-title">本机工具</div>
             <div class="skill-tool-checks">${toolChecks}</div>
           </div>
           <details class="skill-inventory-detail">
-            <summary>查看路径和状态</summary>
-            ${skillInventoryInstallationRows(item)}
+            <summary>高级：路径和操作</summary>
+            <div class="skill-inventory-detail-body">
+              <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
+                <strong>${escapeHtml(recommendation.title)}</strong>
+                <span>${escapeHtml(recommendation.detail)}</span>
+              </div>
+              <div class="skill-inventory-action">
+                <strong>下一步</strong>
+                <span>${escapeHtml(skillInventoryNextActionText(item, recommendation, centralState))}</span>
+              </div>
+              ${skillInventoryRowFeedbackHtml(item)}
+              <div class="skill-inventory-action-row">
+                ${publishAction}
+                ${deprecateAction}
+                ${reactivateAction}
+              </div>
+              ${skillInventoryInstallationRows(item)}
+            </div>
           </details>
         </article>
       `;
