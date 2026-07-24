@@ -1086,6 +1086,12 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("刚移除", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-workbench\"", DASHBOARD_HTML)
             self.assertIn("本机工作区快捷操作", DASHBOARD_HTML)
+            self.assertIn("id=\"skill-inventory-tool-overview\"", DASHBOARD_HTML)
+            self.assertIn("本机工具覆盖概览", DASHBOARD_HTML)
+            self.assertIn("renderSkillInventoryToolOverview", DASHBOARD_HTML)
+            self.assertIn("${escapeHtml(text(installedCount))} 已装", DASHBOARD_HTML)
+            self.assertIn("${escapeHtml(text(installableCount))} 可安装", DASHBOARD_HTML)
+            self.assertIn("查看 ${escapeHtml(tool.label)} 已安装的 skill", DASHBOARD_HTML)
             self.assertIn("aria-label=\"当前客户端操作边界\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-current-client-title\"", DASHBOARD_HTML)
             self.assertIn("id=\"skill-inventory-current-client-detail\"", DASHBOARD_HTML)
@@ -1134,6 +1140,14 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("随项目仓维护，不装全局", DASHBOARD_HTML)
             self.assertIn("不从全局清单一键安装", DASHBOARD_HTML)
             self.assertIn("项目仓的 skills/ 目录和根级 AGENTS.md", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"skill-inventory-workbench\""),
+                DASHBOARD_HTML.index("id=\"skill-inventory-tool-overview\""),
+            )
+            self.assertLess(
+                DASHBOARD_HTML.index("id=\"skill-inventory-tool-overview\""),
+                DASHBOARD_HTML.index("id=\"skill-inventory-triage\""),
+            )
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"skill-inventory-workbench\""),
                 DASHBOARD_HTML.index("id=\"skill-inventory-list-panel\""),

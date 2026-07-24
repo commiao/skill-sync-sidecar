@@ -4473,6 +4473,37 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-list-body {
       padding: 0 12px 12px;
     }
+    .skill-inventory-tool-overview {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .skill-inventory-tool-overview button {
+      display: grid;
+      gap: 3px;
+      justify-items: start;
+      text-align: left;
+      padding: 9px 10px;
+      background: #fff;
+    }
+    .skill-inventory-tool-overview strong {
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.15;
+    }
+    .skill-inventory-tool-overview span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .skill-inventory-tool-overview em {
+      color: var(--blue);
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 760;
+      line-height: 1.2;
+    }
     .skill-inventory-workbench {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5039,6 +5070,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-client { grid-template-columns: 1fr 1fr; }
       .skill-inventory-guide { grid-template-columns: 1fr; }
       .skill-inventory-guide button { width: 100%; }
+      .skill-inventory-tool-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .local-skill-input-row { grid-template-columns: 1fr; }
@@ -5355,6 +5387,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <p>项目级 skill 随项目仓维护，不从全局清单一键安装，也不直接保存成公用 skill。需要跨设备使用时，在项目仓的 skills/ 目录和根级 AGENTS.md 里声明，由项目自己的同步策略处理。</p>
       </details>
       <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
+      <div id="skill-inventory-tool-overview" class="skill-inventory-tool-overview" aria-label="本机工具覆盖概览"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未共享整理"></div>
       <details class="skill-inventory-filter-panel">
         <summary>高级筛选和搜索</summary>
@@ -9198,6 +9231,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-unpublished").textContent = text(model.unpublished);
       $("skill-inventory-project").textContent = text(model.project);
       renderSkillInventoryWorkbench(model.items || []);
+      renderSkillInventoryToolOverview(model.items || []);
       renderSkillInventoryTriage(model.items || []);
       renderSkillInventoryFiltered();
     }
@@ -9401,6 +9435,29 @@ DASHBOARD_HTML = r"""<!doctype html>
         workbenchButton("pending", counts.pending, "待确认同步", counts.pending_blocking > 0 ? "先处理高风险确认" : "普通待审，不阻塞本机"),
       ].join("");
       renderSkillInventoryGuide(counts);
+    }
+
+    function renderSkillInventoryToolOverview(items) {
+      const target = $("skill-inventory-tool-overview");
+      if (!target) return;
+      const rows = skillInventoryLocalInstallTools().map((tool) => {
+        let installedCount = 0;
+        let installableCount = 0;
+        (Array.isArray(items) ? items : []).forEach((item) => {
+          const installed = macInstalledToolIds(item);
+          const centralState = text((item.central || {}).state || "unpublished");
+          if (installed.has(tool.id)) installedCount += 1;
+          else if (centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool)) installableCount += 1;
+        });
+        return { tool, installedCount, installableCount };
+      });
+      target.innerHTML = rows.map(({ tool, installedCount, installableCount }) => `
+        <button type="button" onclick="openLocalSkillInventory('${escapeHtml(tool.id)}')" title="查看 ${escapeHtml(tool.label)} 已安装的 skill">
+          <strong>${escapeHtml(tool.label)}</strong>
+          <span>${escapeHtml(text(installedCount))} 已装</span>
+          <em>${escapeHtml(text(installableCount))} 可安装</em>
+        </button>
+      `).join("");
     }
 
     function renderSkillInventoryGuide(counts) {
