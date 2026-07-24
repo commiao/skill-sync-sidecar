@@ -5231,12 +5231,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       </div>
       <div class="skill-inventory-client" aria-label="当前客户端操作边界">
         <div class="skill-inventory-client-main">
-          <strong>当前客户端：Mac 本机</strong>
-          <span>这里的安装、移除和扫描只通过当前设备的本机助手执行。</span>
+          <strong id="skill-inventory-current-client-title">当前客户端：本机客户端</strong>
+          <span id="skill-inventory-current-client-detail">这里的安装、移除和扫描只通过当前设备的本机助手执行。</span>
         </div>
         <div class="skill-inventory-client-rule">
           <strong>勾选工具</strong>
-          <span>只安装到当前 Mac 的 Codex、Cursor、cc-switch 等本机工具。</span>
+          <span id="skill-inventory-current-client-tools">只安装到当前客户端的本机工具。</span>
         </div>
         <div class="skill-inventory-client-rule">
           <strong>保存共享库</strong>
@@ -9804,8 +9804,9 @@ DASHBOARD_HTML = r"""<!doctype html>
       const tools = Array.isArray(live.tools) ? live.tools : (Array.isArray(workspace.tools) ? workspace.tools : []);
       const total = live.total_skills ?? workspace.total_skills;
       const blocked = live.blocked ?? workspace.blocked;
-      const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? "最近一次 Mac 上报" : "等待本机授权");
       const deviceName = text(workspace.device_name || live.device_name || "Mac 本机");
+      const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? `最近一次 ${deviceName} 上报` : "等待本机授权");
+      renderCurrentClientBoundary(workspace, tools);
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
       $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。日常操作请用页面顶部两个入口。`;
       $("local-workspace-total").textContent = text(total);
@@ -9826,6 +9827,24 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? ` ${workspace.remote_blocked_note}`
         : "";
       $("local-workspace-boundary").textContent = (workspace.boundary || "这里不会跨设备改 OpenClaw 或 Windows；其他设备只看状态。") + remoteNote;
+    }
+
+    function renderCurrentClientBoundary(workspace, tools) {
+      const live = localWorkspaceFromExecutor || {};
+      const deviceName = text(live.device_name || (workspace || {}).device_name || "本机客户端");
+      const detectedTools = (Array.isArray(tools) ? tools : [])
+        .filter((tool) => tool && (tool.state === "detected" || tool.installed || Number(tool.skills || 0) > 0))
+        .map((tool) => text(tool.name || tool.id || tool.tool_id))
+        .filter((name) => name && name !== "-");
+      const toolText = detectedTools.length > 0
+        ? compactSkillList(detectedTools)
+        : "Codex、Cursor、cc-switch 等";
+      const title = $("skill-inventory-current-client-title");
+      const detail = $("skill-inventory-current-client-detail");
+      const toolDetail = $("skill-inventory-current-client-tools");
+      if (title) title.textContent = `当前客户端：${deviceName}`;
+      if (detail) detail.textContent = `${deviceName} 的安装、移除和扫描只通过当前设备的本机助手执行。`;
+      if (toolDetail) toolDetail.textContent = `只安装到 ${deviceName} 的 ${toolText} 本机工具。`;
     }
 
     function localToolInventoryButton(tool) {
