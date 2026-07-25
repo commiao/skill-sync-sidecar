@@ -20,6 +20,7 @@ from skill_sync_sidecar.conflicts import build_conflict_packages
 from skill_sync_sidecar.diff import diff_snapshot_indexes
 from skill_sync_sidecar.scanner import (
     collect_missing_referenced_package_files,
+    default_targets_for_scope,
     extract_referenced_package_paths,
     normalize_skill_id,
     scan_roots,
@@ -422,6 +423,31 @@ class ScannerTest(unittest.TestCase):
             hash_a = build(Path(tmp_a), "server.js.bak-preshorthash-20260725T005122")
             hash_b = build(Path(tmp_b), "server.js.bak-preshorthash-20260725T010451")
             self.assertEqual(hash_a, hash_b)
+
+    def test_global_default_targets_include_ide_tools(self):
+        targets = default_targets_for_scope("global")
+        for tool in ("cc-switch", "skillshub", "codex", "openclaw", "claude-code", "cursor", "qoder"):
+            self.assertIn(tool, targets)
+
+    def test_scan_follows_symlinked_tool_skills(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            canonical = root / "canonical"
+            tool_root = root / "tool-skills"
+            tool_root.mkdir(parents=True)
+            real_skill = canonical / "claude-mem"
+            real_skill.mkdir(parents=True)
+            (real_skill / "SKILL.md").write_text(
+                "---\nname: claude-mem\ndescription: Memory\n---\n",
+                encoding="utf-8",
+            )
+            (tool_root / "claude-mem").symlink_to(real_skill, target_is_directory=True)
+
+            without_follow = scan_roots([f"claude-code={tool_root}"]).skills
+            self.assertEqual(without_follow, [])
+
+            skills = scan_roots([f"claude-code={tool_root}"], follow_symlinks=True).skills
+            self.assertEqual([skill.skill_id for skill in skills], ["claude-mem"])
 
     def test_scan_excludes_runtime_session_state_by_default(self):
         with TemporaryDirectory() as tmp:

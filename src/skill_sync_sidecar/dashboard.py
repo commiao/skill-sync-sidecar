@@ -5532,6 +5532,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <option value="codex">Codex 已安装</option>
             <option value="claude-code">Claude 已安装</option>
             <option value="cursor">Cursor 已安装</option>
+            <option value="qoder">Qoder 已安装</option>
             <option value="cc-switch">cc-switch 已安装</option>
             <option value="skillshub">skillshub 已安装</option>
             <option value="mac-none">本机未安装</option>
@@ -10082,7 +10083,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       const toolChecks = skillInventoryTools().map((tool) => {
         const active = installed.has(tool.id);
         const recentChange = recentLocalToolChangeFor(item.skill_id, tool.id);
-        const canInstall = centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool);
+        const targetsThisTool = skillTargetsTool(item, tool);
+        const canInstall = centralState === "published" && item.scope !== "project" && targetsThisTool;
         const canToggle = tool.localInstall && (active || canInstall);
         const labelClass = [
           "skill-tool-toggle-label",
@@ -10097,7 +10099,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? `${tool.label} 由对应设备客户端管理`
           : (active
             ? `${tool.label} 已安装；取消勾选会先检查并确认移除`
-            : (canInstall ? `勾选后安装到 ${tool.label}` : toolInstallStatus(item, installed, centralState)));
+            : (canInstall
+              ? `勾选后安装到 ${tool.label}`
+              : (!targetsThisTool
+                ? `未面向 ${tool.label}：该技能未声明投给此工具（并非缺文件，可在 targets 中加入 ${tool.id}）`
+                : toolInstallStatus(item, installed, centralState))));
         return `
           <label class="${labelClass}" title="${escapeHtml(title)}">
             <input
@@ -10380,6 +10386,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         { id: "codex", label: "Codex", aliases: ["codex"], localInstall: true },
         { id: "claude-code", label: "Claude", aliases: ["claude-code", "claude"], localInstall: true },
         { id: "cursor", label: "Cursor", aliases: ["cursor"], localInstall: true },
+        { id: "qoder", label: "Qoder", aliases: ["qoder"], localInstall: true },
         { id: "cc-switch", label: "cc-switch", aliases: ["cc-switch"], localInstall: true },
         { id: "skillshub", label: "skillshub", aliases: ["skillshub"], localInstall: true },
         { id: "openclaw", label: "OpenClaw", aliases: ["openclaw"], localInstall: false },

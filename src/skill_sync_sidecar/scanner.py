@@ -99,7 +99,11 @@ def parse_root_spec(spec: str) -> Tuple[str, Path]:
     return source, Path(raw_path).expanduser()
 
 
-def scan_roots(root_specs: Optional[Sequence[str]] = None) -> ScanSummary:
+def scan_roots(
+    root_specs: Optional[Sequence[str]] = None,
+    *,
+    follow_symlinks: bool = False,
+) -> ScanSummary:
     roots = [parse_root_spec(spec) for spec in root_specs] if root_specs else default_roots()
     skills: List[SkillRecord] = []
     seen_paths = set()
@@ -107,7 +111,7 @@ def scan_roots(root_specs: Optional[Sequence[str]] = None) -> ScanSummary:
     for source, root in roots:
         if not root.exists():
             continue
-        for skill_md in discover_skill_files(root):
+        for skill_md in discover_skill_files(root, follow_symlinks=follow_symlinks):
             skill_dir = skill_md.parent.resolve()
             if skill_dir in seen_paths:
                 continue
@@ -118,9 +122,25 @@ def scan_roots(root_specs: Optional[Sequence[str]] = None) -> ScanSummary:
     return ScanSummary(skills)
 
 
-def discover_skill_files(root: Path) -> Iterator[Path]:
-    for current_root, dirnames, filenames in os.walk(root):
+def discover_skill_files(root: Path, *, follow_symlinks: bool = False) -> Iterator[Path]:
+    # Tool skill roots (e.g. ~/.claude/skills, ~/.qoder/skills) are usually populated
+    # with symlinks pointing back into the canonical library. os.walk defaults to
+    # followlinks=False, which would make those tools look empty. Callers that scan a
+    # tool inventory opt into follow_symlinks; we guard against cycles by tracking
+    # already-visited real directories. Canonical/hub scans keep the default off so
+    # symlinked mirrors are not double-counted as canonical content.
+    visited: set = set()
+    for current_root, dirnames, filenames in os.walk(root, followlinks=follow_symlinks):
         current = Path(current_root)
+        if follow_symlinks:
+            try:
+                real_current = current.resolve()
+            except OSError:
+                real_current = current
+            if real_current in visited:
+                dirnames[:] = []
+                continue
+            visited.add(real_current)
         dirnames[:] = [
             dirname
             for dirname in sorted(dirnames)
@@ -360,7 +380,7 @@ def detect_project_path(skill_dir: Path) -> Optional[Path]:
 def default_targets_for_scope(scope: str) -> List[str]:
     if scope == "project":
         return ["codex", "cursor", "qoder"]
-    return ["cc-switch", "skillshub", "codex", "openclaw"]
+    return ["cc-switch", "skillshub", "codex", "openclaw", "claude-code", "cursor", "qoder"]
 
 
 def is_excluded(rel_path: str, patterns: Sequence[str]) -> bool:

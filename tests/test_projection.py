@@ -9,7 +9,12 @@ from skill_sync_sidecar.hub_import import (
     execute_hub_import_apply,
     parse_hub_source_spec,
 )
-from skill_sync_sidecar.projection import ToolAdapter, build_tool_projection, parse_tool_adapter_spec
+from skill_sync_sidecar.projection import (
+    ToolAdapter,
+    build_tool_projection,
+    default_tool_adapters,
+    parse_tool_adapter_spec,
+)
 from skill_sync_sidecar.scanner import scan_roots
 from skill_sync_sidecar.snapshot import write_snapshot
 
@@ -61,6 +66,22 @@ class ToolProjectionTest(unittest.TestCase):
         self.assertEqual(adapter.name, "Codex")
         self.assertEqual(adapter.target_aliases, ["codex"])
         self.assertEqual([str(path) for path in adapter.roots], ["/tmp/a", "/tmp/b"])
+
+    def test_default_tool_adapters_include_qoder(self):
+        adapters = {adapter.tool_id: adapter for adapter in default_tool_adapters()}
+
+        self.assertIn("qoder", adapters)
+        qoder = adapters["qoder"]
+        self.assertEqual(qoder.name, "Qoder")
+        self.assertEqual(qoder.target_aliases, ["qoder"])
+        self.assertTrue(any(root.name == "skills" and root.parent.name == ".qoder" for root in qoder.roots))
+
+    def test_parse_tool_adapter_spec_uses_qoder_default_metadata(self):
+        adapter = parse_tool_adapter_spec("qoder=/tmp/qoder-skills")
+
+        self.assertEqual(adapter.tool_id, "qoder")
+        self.assertEqual(adapter.name, "Qoder")
+        self.assertEqual(adapter.target_aliases, ["qoder"])
 
     def test_hub_import_diagnosis_classifies_duplicates_updates_and_imports(self):
         with TemporaryDirectory() as tmp:

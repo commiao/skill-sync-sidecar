@@ -13,6 +13,7 @@ DEFAULT_TOOL_ROOTS: tuple[tuple[str, str, tuple[Path, ...], str], ...] = (
     ("codex", "Codex", (Path.home() / ".codex" / "skills", Path.home() / ".agents" / "skills"), "Codex 可发现目录"),
     ("cursor", "Cursor", (Path.home() / ".cursor" / "skills-cursor",), "Cursor 技能目录"),
     ("claude-code", "Claude Code", (Path.home() / ".claude" / "skills",), "Claude Code 技能目录"),
+    ("qoder", "Qoder", (Path.home() / ".qoder" / "skills",), "Qoder 技能目录"),
 )
 
 
@@ -33,7 +34,7 @@ def build_device_tool_status(
         if installed:
             try:
                 for index, path in enumerate(installed_paths):
-                    data = scan_roots([f"{tool_id}-{index}={path}"]).to_dict()
+                    data = scan_roots([f"{tool_id}-{index}={path}"], follow_symlinks=True).to_dict()
                     count += int(data.get("total", 0))
                     by_risk = dict(data.get("by_risk", {}))
                     for key in risk:
