@@ -382,6 +382,47 @@ class ScannerTest(unittest.TestCase):
 
             self.assertEqual({file.path for file in record.files}, {"SKILL.md", "keep.txt"})
 
+    def test_scan_excludes_editor_backup_files_by_default(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "with-backups"
+            (skill / "scripts").mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "---\nname: with-backups\ndescription: Backup noise\n---\n",
+                encoding="utf-8",
+            )
+            (skill / "scripts" / "server.js").write_text("real\n", encoding="utf-8")
+            (skill / "SKILL.md.bak-review-20260101").write_text("old\n", encoding="utf-8")
+            (skill / "scripts" / "server.js.bak").write_text("old\n", encoding="utf-8")
+            (skill / "scripts" / "server.js.bak-preregexfix-20260725").write_text("old\n", encoding="utf-8")
+            (skill / "scripts" / "server.js.bak.20260725").write_text("old\n", encoding="utf-8")
+            (skill / "scripts" / "server.js.orig").write_text("old\n", encoding="utf-8")
+            (skill / "scripts" / "server.js~").write_text("old\n", encoding="utf-8")
+
+            record = scan_roots([f"test={root}"]).skills[0]
+
+            self.assertEqual(
+                {file.path for file in record.files},
+                {"SKILL.md", "scripts/server.js"},
+            )
+
+    def test_content_hash_ignores_backup_noise(self):
+        def build(root: Path, backup_name: str) -> str:
+            skill = root / "finance"
+            (skill / "scripts").mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "---\nname: finance-auto-bookkeeping\ndescription: Finance\n---\n",
+                encoding="utf-8",
+            )
+            (skill / "scripts" / "server.js").write_text("shared content\n", encoding="utf-8")
+            (skill / "scripts" / backup_name).write_text("per-machine backup\n", encoding="utf-8")
+            return scan_roots([f"cc-switch={root}"]).skills[0].content_hash
+
+        with TemporaryDirectory() as tmp_a, TemporaryDirectory() as tmp_b:
+            hash_a = build(Path(tmp_a), "server.js.bak-preshorthash-20260725T005122")
+            hash_b = build(Path(tmp_b), "server.js.bak-preshorthash-20260725T010451")
+            self.assertEqual(hash_a, hash_b)
+
     def test_scan_excludes_runtime_session_state_by_default(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
