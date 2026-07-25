@@ -9751,27 +9751,86 @@ DASHBOARD_HTML = r"""<!doctype html>
       return SKILL_SHORT_DESC[String(id || "")] || "";
     }
 
+    const SKILL_GROUP_LABELS = {
+      "lark": "飞书 / Lark",
+      "recruitment": "招聘监控",
+      "understand": "代码理解",
+      "gstack": "GStack 套件",
+      "browser": "浏览器 / 抓取",
+      "search": "联网搜索",
+      "image": "图像 / OCR",
+      "doc": "文档 / PDF",
+      "aliyun": "阿里云",
+      "plan": "规划 / 评审",
+      "design": "设计",
+      "review": "评审 / 代码审查",
+      "deploy": "发布 / 部署",
+      "quality": "调试 / 质量 / 复盘",
+      "report": "报告 / 汇总",
+      "security": "安全 / 防护",
+      "session": "会话 / 上下文",
+      "task": "任务",
+      "memory": "记忆 / 知识",
+      "skill": "技能管理",
+      "create": "创建 Cursor 资产",
+      "config": "配置 / 元技能",
+      "finance": "记账 / 投资",
+      "wechat": "公众号 / 微信",
+      "misc": "其他",
+    };
+
+    const SKILL_GROUP_EXPLICIT = {
+      "browse": "browser", "browser": "browser", "scrape": "browser", "skillify": "browser",
+      "hackernews-frontpage": "browser", "pair-agent": "browser", "setup-browser-cookies": "browser",
+      "open-gstack-browser": "gstack",
+      "searxng": "search", "tavily": "search", "social-search": "search",
+      "liblibai-skill": "image", "puter-image-gen": "image", "ocr": "image", "dms-image-audit-gallery-report": "image",
+      "docx": "doc", "pdf": "doc", "make-pdf": "doc", "wowerpoint": "doc",
+      "autoplan": "plan", "make-plan": "plan", "office-hours": "plan", "do": "plan",
+      "codex": "review", "codex-review-loop": "review", "babysit": "review", "oh-my-issues": "review",
+      "ship": "deploy", "land-and-deploy": "deploy", "landing-report": "deploy", "document-release": "deploy",
+      "claude-code-plugin-release": "deploy", "split-to-prs": "deploy", "codeup-personal-git": "deploy",
+      "investigate": "quality", "health": "quality", "pathfinder": "quality", "what-the": "quality",
+      "devex-review": "quality", "retro": "quality", "pua": "quality", "canary": "quality", "smart-explore": "understand",
+      "daily-report": "report", "smart-reporter": "report", "weekly-digests": "report", "timeline-report": "report", "standup": "report",
+      "cso": "security", "careful": "security", "guard": "security", "freeze": "security", "unfreeze": "security",
+      "role-maintainer": "session", "trigger-manager": "session", "proactive-agent": "session",
+      "claude-mem": "memory", "mem-search": "memory", "how-it-works": "memory", "cloud-sync": "memory",
+      "knowledge-agent": "memory", "para-second-brain": "memory", "kg-query": "memory", "learn": "memory", "learn-codebase": "memory",
+      "find-skills": "skill", "evoskill": "skill", "using-superpowers": "skill", "migrate-to-skills": "skill",
+      "automate": "config", "env-setup": "config", "statusline": "config", "model-router": "config",
+      "mcp-builder": "config", "sdk": "config", "loop": "config", "onboard": "config", "canvas": "config",
+      "shell": "config", "sync-probe-autosync": "config", "calendar": "config",
+      "gold-analysis": "finance", "investment-analysis": "finance",
+      "alibabacloud-cli-guidance": "aliyun",
+      "read-wechat-article": "wechat", "xiaodi-writer": "wechat",
+    };
+
     function skillGroupOf(id) {
       const s = String(id || "");
-      if (s.startsWith("lark-") || s.startsWith("feishu-")) return { id: "lark", label: "飞书 / Lark" };
-      if (s.endsWith("-recruitment") || s.startsWith("recruitment")) return { id: "recruitment", label: "招聘监控" };
-      if (s.startsWith("understand")) return { id: "understand", label: "代码理解 understand" };
-      if (s.startsWith("gstack") || s === "open-gstack-browser") return { id: "gstack", label: "GStack" };
-      if (s.startsWith("plan-") || s === "plan" || s === "autoplan" || s === "make-plan") return { id: "plan", label: "规划 / 评审" };
-      if (s.startsWith("design")) return { id: "design", label: "设计" };
-      if (s.startsWith("wechat") || s === "read-wechat-article" || s === "xiaodi-writer") return { id: "wechat", label: "公众号 / 微信" };
-      if (s.startsWith("aliyun") || s === "alibabacloud-cli-guidance" || s === "dms-image-audit-gallery-report") return { id: "aliyun", label: "阿里云" };
-      if (s.startsWith("create-")) return { id: "create", label: "创建 / 配置" };
-      if (s.startsWith("session-") || s.startsWith("context-")) return { id: "session", label: "会话 / 上下文" };
-      if (s.startsWith("review") || s === "codex" || s === "codex-review-loop") return { id: "review", label: "评审 / 代码审查" };
-      if (s.startsWith("setup")) return { id: "setup", label: "环境配置 setup" };
-      if (s.startsWith("task")) return { id: "task", label: "任务" };
-      if (s.startsWith("skill") || s === "find-skills" || s === "evoskill") return { id: "skill", label: "技能管理" };
-      if (s.startsWith("benchmark")) return { id: "benchmark", label: "基准测试" };
-      if (s.startsWith("finance") || s === "gold-analysis" || s === "investment-analysis") return { id: "finance", label: "记账 / 投资" };
-      if (s === "claude-mem" || s === "mem-search" || s === "how-it-works" || s === "cloud-sync" || s === "knowledge-agent") return { id: "memory", label: "记忆 / claude-mem" };
-      const pre = s.split("-")[0] || s;
-      return { id: pre, label: pre };
+      let g = SKILL_GROUP_EXPLICIT[s];
+      if (!g) {
+        if (s.startsWith("lark-") || s.startsWith("feishu-")) g = "lark";
+        else if (s.endsWith("-recruitment") || s.startsWith("recruitment")) g = "recruitment";
+        else if (s.startsWith("understand")) g = "understand";
+        else if (s.startsWith("gstack")) g = "gstack";
+        else if (s.startsWith("plan")) g = "plan";
+        else if (s.startsWith("design")) g = "design";
+        else if (s.startsWith("review")) g = "review";
+        else if (s.startsWith("wechat")) g = "wechat";
+        else if (s.startsWith("aliyun")) g = "aliyun";
+        else if (s.startsWith("finance")) g = "finance";
+        else if (s.startsWith("create-")) g = "create";
+        else if (s.startsWith("session-") || s.startsWith("context-")) g = "session";
+        else if (s.startsWith("setup") || s.startsWith("update-")) g = "config";
+        else if (s.startsWith("task")) g = "task";
+        else if (s.startsWith("skill")) g = "skill";
+        else if (s.startsWith("benchmark")) g = "quality";
+        else if (s.startsWith("qa")) g = "quality";
+        else if (s.startsWith("learn")) g = "memory";
+        else g = "misc";
+      }
+      return { id: g, label: SKILL_GROUP_LABELS[g] || g };
     }
 
     function renderSkillInventoryGroups(items) {
@@ -9781,17 +9840,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (!groups.has(g.id)) groups.set(g.id, { id: g.id, label: g.label, items: [] });
         groups.get(g.id).items.push(item);
       });
-      const misc = { id: "misc", label: "其他", items: [] };
       const named = [];
       groups.forEach((g) => {
-        if (g.items.length <= 1) misc.items.push(...g.items);
-        else named.push(g);
+        g.items.sort((a, b) => text(a.skill_id).localeCompare(text(b.skill_id)));
+        named.push(g);
       });
-      named.sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
-      if (misc.items.length > 0) {
-        misc.items.sort((a, b) => text(a.skill_id).localeCompare(text(b.skill_id)));
-        named.push(misc);
-      }
+      named.sort((a, b) => {
+        if (a.id === "misc") return 1;
+        if (b.id === "misc") return -1;
+        return b.items.length - a.items.length || a.label.localeCompare(b.label);
+      });
       return named.map((g) => {
         const rows = g.items.map((item) => renderSkillInventoryRow(item)).join("");
         return `
