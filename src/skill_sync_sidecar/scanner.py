@@ -59,6 +59,14 @@ DEFAULT_EXCLUDED_FILE_PATTERNS = {
     "id_dsa",
     "id_ecdsa",
     "id_ed25519",
+    # Ephemeral editor/tooling backups. These are never real skill content and
+    # usually carry per-machine timestamps or labels, so including them in the
+    # content hash produces phantom cross-device sync conflicts.
+    "*.bak",
+    "*.bak-*",
+    "*.bak.*",
+    "*.orig",
+    "*~",
 }
 
 DEFAULT_EXCLUDED_PATH_PATTERNS = {
