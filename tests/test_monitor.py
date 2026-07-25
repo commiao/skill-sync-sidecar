@@ -4,9 +4,20 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest import mock
+from urllib.error import URLError
 
 from skill_sync_sidecar.cli import build_parser
-from skill_sync_sidecar.monitor import build_monitor_report, render_monitor_brief, render_monitor_report, run_monitor_loop, write_monitor_report
+from skill_sync_sidecar import monitor as monitor_module
+from skill_sync_sidecar.monitor import (
+    build_monitor_report,
+    fetch_summary_with_retry,
+    monitor_once,
+    render_monitor_brief,
+    render_monitor_report,
+    run_monitor_loop,
+    write_monitor_report,
+)
 
 
 class MonitorSummaryTest(unittest.TestCase):
@@ -223,7 +234,46 @@ class MonitorSummaryTest(unittest.TestCase):
             self.assertIn("Skill Sync Monitor", Path(paths["text"]).read_text(encoding="utf-8"))
             self.assertEqual(len(Path(paths["events"]).read_text(encoding="utf-8").splitlines()), 1)
 
-    def test_monitor_loop_one_shot_writes_fetch_failure_report(self):
+    def test_fetch_summary_with_retry_recovers_from_transient_error(self):
+        calls = {"n": 0}
+
+        def fake_fetch(url, timeout_seconds=20.0, summary_file=None):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise URLError("connection refused")
+            return _summary()
+
+        with mock.patch.object(monitor_module, "fetch_summary", side_effect=fake_fetch):
+            result = fetch_summary_with_retry(
+                "http://gateway/api/overview",
+                retries=5,
+                backoff_seconds=0,
+            )
+
+        self.assertEqual(calls["n"], 3)
+        self.assertEqual(result["health"], "green")
+
+    def test_monitor_once_retries_then_reports_without_alert(self):
+        calls = {"n": 0}
+
+        def fake_fetch(url, timeout_seconds=20.0, summary_file=None):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise URLError("connection refused")
+            return _summary()
+
+        with mock.patch.object(monitor_module, "fetch_summary", side_effect=fake_fetch):
+            report = monitor_once(
+                "http://gateway/api/overview",
+                fetch_retries=5,
+                fetch_retry_backoff_seconds=0,
+            )
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["health"], "green")
+        self.assertEqual(report["alerts"], [])
+
+    def test_monitor_loop_one_shot_suppresses_transient_fetch_failure(self):
         with TemporaryDirectory() as tmp:
             report = run_monitor_loop(
                 "http://127.0.0.1:1/missing",
@@ -231,11 +281,33 @@ class MonitorSummaryTest(unittest.TestCase):
                 timeout_seconds=0.01,
                 max_iterations=1,
                 print_status=False,
+                fetch_retries=1,
             )
 
+            self.assertTrue(report["ok"])
+            self.assertNotEqual(report["health"], "red")
+            self.assertEqual(report["alerts"], [])
+            self.assertTrue(
+                any(item["code"] == "summary_fetch_transient" for item in report["warnings"])
+            )
+            self.assertTrue((Path(tmp) / "last-report.json").exists())
+
+    def test_monitor_loop_alerts_after_consecutive_fetch_failures(self):
+        with TemporaryDirectory() as tmp:
+            report = run_monitor_loop(
+                "http://127.0.0.1:1/missing",
+                Path(tmp),
+                interval_seconds=0,
+                timeout_seconds=0.01,
+                max_iterations=2,
+                print_status=False,
+                fetch_retries=1,
+                fetch_failure_alert_threshold=2,
+            )
+
+            self.assertFalse(report["ok"])
             self.assertEqual(report["health"], "red")
             self.assertEqual(report["alerts"][0]["code"], "summary_fetch_failed")
-            self.assertTrue((Path(tmp) / "last-report.json").exists())
 
     def test_monitor_loop_parser_accepts_runtime_arguments(self):
         parser = build_parser()
