@@ -30,7 +30,15 @@ from .hub_import import (
     render_hub_import_preview_text,
 )
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
-from .monitor import monitor_once, render_monitor_brief, render_monitor_report, run_monitor_loop
+from .monitor import (
+    DEFAULT_FETCH_FAILURE_ALERT_THRESHOLD,
+    DEFAULT_FETCH_RETRIES,
+    DEFAULT_FETCH_RETRY_BACKOFF_SECONDS,
+    monitor_once,
+    render_monitor_brief,
+    render_monitor_report,
+    run_monitor_loop,
+)
 from .openclaw_gate import build_openclaw_gate, render_openclaw_gate_text
 from .operator_executor import local_device_identity, serve_operator_executor
 from .ops_status import build_ops_status, render_ops_status_text
@@ -149,6 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_summary.add_argument("--url", default="http://100.123.208.32:8765/api/overview", help="Dashboard overview endpoint URL.")
     monitor_summary.add_argument("--summary-file", help="Read a local /api/overview JSON snapshot instead of fetching over network.")
     monitor_summary.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
+    monitor_summary.add_argument("--fetch-retries", type=int, default=1, help="Attempts for a single summary fetch before giving up. Defaults to a genuine single shot for this one-off command.")
+    monitor_summary.add_argument("--fetch-retry-backoff-seconds", type=float, default=DEFAULT_FETCH_RETRY_BACKOFF_SECONDS, help="Base backoff (doubled each retry) between transient fetch retries.")
     monitor_summary.add_argument("--stale-after-seconds", type=int, default=2 * 60 * 60, help="Mark active devices stale after this many seconds.")
     monitor_summary.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
     monitor_summary.add_argument("--fail-on-alert", action="store_true", help="Exit 3 when alerts are present.")
@@ -162,6 +172,9 @@ def build_parser() -> argparse.ArgumentParser:
     monitor_loop.add_argument("--out-dir", default="~/.cache/skill-sync-sidecar/monitor", help="Directory for last-report.json, last-report.txt, and events.jsonl.")
     monitor_loop.add_argument("--interval-seconds", type=float, default=30 * 60, help="Seconds between monitor checks.")
     monitor_loop.add_argument("--timeout-seconds", type=float, default=20.0, help="HTTP timeout in seconds.")
+    monitor_loop.add_argument("--fetch-retries", type=int, default=DEFAULT_FETCH_RETRIES, help="Attempts per poll to fetch the summary before treating it as a failure. Absorbs deploy/startup windows.")
+    monitor_loop.add_argument("--fetch-retry-backoff-seconds", type=float, default=DEFAULT_FETCH_RETRY_BACKOFF_SECONDS, help="Base backoff (doubled each retry) between transient fetch retries.")
+    monitor_loop.add_argument("--fetch-failure-alert-threshold", type=int, default=DEFAULT_FETCH_FAILURE_ALERT_THRESHOLD, help="Only emit a red summary_fetch_failed alert after this many consecutive failed polls; earlier failures are reported as non-alerting transient warnings.")
     monitor_loop.add_argument("--stale-after-seconds", type=int, default=2 * 60 * 60, help="Mark active devices stale after this many seconds.")
     monitor_loop.add_argument("--min-canonical-total", type=int, default=1, help="Alert if canonical snapshot total is below this value.")
     monitor_loop.add_argument("--max-iterations", type=int, help=argparse.SUPPRESS)
@@ -816,6 +829,8 @@ def cmd_monitor_summary(args: argparse.Namespace) -> int:
         stale_after_seconds=args.stale_after_seconds,
         min_canonical_total=args.min_canonical_total,
         summary_file=args.summary_file,
+        fetch_retries=args.fetch_retries,
+        fetch_retry_backoff_seconds=args.fetch_retry_backoff_seconds,
     )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -839,6 +854,9 @@ def cmd_monitor_loop(args: argparse.Namespace) -> int:
         summary_file=args.summary_file,
         max_iterations=args.max_iterations,
         print_status=not args.json,
+        fetch_retries=args.fetch_retries,
+        fetch_retry_backoff_seconds=args.fetch_retry_backoff_seconds,
+        fetch_failure_alert_threshold=args.fetch_failure_alert_threshold,
     )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

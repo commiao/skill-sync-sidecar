@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import json
+import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
 JsonDict = Dict[str, Any]
+
+# Deploy-window defaults: a rolling `docker compose up --build` restarts the
+# gateway, so the monitor sees short-lived 5xx / connection failures right after
+# it starts. These defaults absorb that window (~5 attempts spread over ~60s).
+DEFAULT_FETCH_RETRIES = 5
+DEFAULT_FETCH_RETRY_BACKOFF_SECONDS = 3.0
+DEFAULT_FETCH_FAILURE_ALERT_THRESHOLD = 2
 
 
 def fetch_summary(
@@ -30,6 +39,54 @@ def fetch_summary(
     if not isinstance(data, dict):
         raise ValueError("summary endpoint did not return a JSON object")
     return data
+
+
+def _is_transient_fetch_error(exc: Exception) -> bool:
+    """Transient errors are worth retrying (startup / rolling-restart window).
+
+    A deterministic HTTP error such as 404 is not retried to exhaustion, but a
+    5xx, a connection failure, or a timeout is treated as transient.
+    """
+    if isinstance(exc, HTTPError):
+        return 500 <= exc.code < 600
+    if isinstance(exc, URLError):
+        return True
+    if isinstance(exc, (socket.timeout, TimeoutError, ConnectionError)):
+        return True
+    return False
+
+
+def fetch_summary_with_retry(
+    url: str,
+    timeout_seconds: float = 20.0,
+    *,
+    summary_file: Optional[str] = None,
+    retries: int = 1,
+    backoff_seconds: float = DEFAULT_FETCH_RETRY_BACKOFF_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> JsonDict:
+    """Fetch the summary, retrying transient network errors with backoff.
+
+    Local ``summary_file`` reads never hit the network, so they are attempted
+    exactly once regardless of ``retries``.
+    """
+    if summary_file:
+        return fetch_summary(url, timeout_seconds=timeout_seconds, summary_file=summary_file)
+
+    attempts = max(1, retries)
+    last_exc: Optional[Exception] = None
+    for attempt in range(attempts):
+        try:
+            return fetch_summary(url, timeout_seconds=timeout_seconds)
+        except Exception as exc:  # noqa: BLE001 - decide retry vs. propagate below
+            last_exc = exc
+            if attempt >= attempts - 1 or not _is_transient_fetch_error(exc):
+                raise
+            delay = backoff_seconds * (2 ** attempt)
+            if delay > 0:
+                sleep(delay)
+    assert last_exc is not None  # pragma: no cover - loop always returns or raises
+    raise last_exc
 
 
 def build_fetch_error_report(exc: Exception) -> JsonDict:
@@ -54,6 +111,44 @@ def build_fetch_error_report(exc: Exception) -> JsonDict:
     }
 
 
+def build_transient_fetch_report(
+    exc: Exception,
+    *,
+    consecutive_failures: int,
+    threshold: int,
+) -> JsonDict:
+    """Non-alerting report for a short-lived fetch failure.
+
+    Produced while ``consecutive_failures`` is still below ``threshold`` so a
+    deploy / startup window does not trigger the mail integration. Health is
+    kept off ``red`` and no ``alerts`` are emitted; a single warning explains
+    that the failure was tolerated and will be re-checked on the next poll.
+    """
+    return {
+        "ok": True,
+        "record_type": "skill-sync-monitor-report",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "health": "yellow",
+        "dashboard_health": "unknown",
+        "blocked": None,
+        "snapshot_id": None,
+        "canonical_total": None,
+        "alerts": [],
+        "warnings": [
+            {
+                "code": "summary_fetch_transient",
+                "message": (
+                    "Dashboard summary fetch failed transiently "
+                    f"({consecutive_failures}/{threshold}); likely a deploy or "
+                    f"startup window. Ignored, waiting for the next poll: {exc}"
+                ),
+                "action": "No action needed unless failures persist past the alert threshold.",
+            }
+        ],
+        "info": [],
+    }
+
+
 def monitor_once(
     url: str,
     *,
@@ -61,9 +156,17 @@ def monitor_once(
     stale_after_seconds: int = 2 * 60 * 60,
     min_canonical_total: int = 1,
     summary_file: Optional[str] = None,
+    fetch_retries: int = 1,
+    fetch_retry_backoff_seconds: float = DEFAULT_FETCH_RETRY_BACKOFF_SECONDS,
 ) -> JsonDict:
     try:
-        summary = fetch_summary(url, timeout_seconds=timeout_seconds, summary_file=summary_file)
+        summary = fetch_summary_with_retry(
+            url,
+            timeout_seconds=timeout_seconds,
+            summary_file=summary_file,
+            retries=fetch_retries,
+            backoff_seconds=fetch_retry_backoff_seconds,
+        )
     except Exception as exc:
         return build_fetch_error_report(exc)
     return build_monitor_report(
@@ -111,17 +214,39 @@ def run_monitor_loop(
         summary_file: Optional[str] = None,
         max_iterations: Optional[int] = None,
         print_status: bool = True,
+        fetch_retries: int = DEFAULT_FETCH_RETRIES,
+        fetch_retry_backoff_seconds: float = DEFAULT_FETCH_RETRY_BACKOFF_SECONDS,
+        fetch_failure_alert_threshold: int = DEFAULT_FETCH_FAILURE_ALERT_THRESHOLD,
 ) -> JsonDict:
     iterations = 0
     last_report: JsonDict = {}
+    consecutive_failures = 0
     while True:
-        report = monitor_once(
-            url,
-            timeout_seconds=timeout_seconds,
-            stale_after_seconds=stale_after_seconds,
-            min_canonical_total=min_canonical_total,
-            summary_file=summary_file,
-        )
+        try:
+            summary = fetch_summary_with_retry(
+                url,
+                timeout_seconds=timeout_seconds,
+                summary_file=summary_file,
+                retries=fetch_retries,
+                backoff_seconds=fetch_retry_backoff_seconds,
+            )
+        except Exception as exc:  # noqa: BLE001 - transient vs. sustained handled below
+            consecutive_failures += 1
+            if consecutive_failures >= fetch_failure_alert_threshold:
+                report = build_fetch_error_report(exc)
+            else:
+                report = build_transient_fetch_report(
+                    exc,
+                    consecutive_failures=consecutive_failures,
+                    threshold=fetch_failure_alert_threshold,
+                )
+        else:
+            consecutive_failures = 0
+            report = build_monitor_report(
+                summary,
+                stale_after_seconds=stale_after_seconds,
+                min_canonical_total=min_canonical_total,
+            )
         paths = write_monitor_report(report, out_dir)
         report["paths"] = paths
         last_report = report
