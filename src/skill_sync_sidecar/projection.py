@@ -29,6 +29,7 @@ def default_tool_adapters() -> List[ToolAdapter]:
         ToolAdapter("codex", "Codex", [home / ".codex" / "skills", home / ".agents" / "skills"], ["codex"], ["global"]),
         ToolAdapter("cursor", "Cursor", [home / ".cursor" / "skills-cursor"], ["cursor"], ["global"]),
         ToolAdapter("claude-code", "Claude Code", [home / ".claude" / "skills"], ["claude-code", "claude"], ["global"]),
+        ToolAdapter("qoder", "Qoder", [home / ".qoder" / "skills"], ["qoder"], ["global"]),
     ]
 
 
@@ -113,7 +114,7 @@ def _installed_by_skill_id(adapter: ToolAdapter) -> Dict[str, List[Dict[str, obj
     root_specs = [f"{adapter.tool_id}-{index}={root}" for index, root in enumerate(adapter.roots) if root.exists()]
     if not root_specs:
         return {}
-    summary = scan_roots(root_specs)
+    summary = scan_roots(root_specs, follow_symlinks=True)
     installed: Dict[str, List[Dict[str, object]]] = {}
     for skill in summary.skills:
         installed.setdefault(skill.skill_id, []).append(
