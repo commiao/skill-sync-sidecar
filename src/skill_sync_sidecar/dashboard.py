@@ -4610,6 +4610,50 @@ DASHBOARD_HTML = r"""<!doctype html>
       gap: 7px;
       margin-top: 10px;
     }
+    .skill-group {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafbfc;
+      overflow: hidden;
+    }
+    .skill-group > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      font-weight: 600;
+      user-select: none;
+    }
+    .skill-group > summary::-webkit-details-marker { display: none; }
+    .skill-group > summary::before {
+      content: "▸";
+      color: var(--muted, #888);
+      font-size: 11px;
+      transition: transform 0.15s ease;
+    }
+    .skill-group[open] > summary::before { transform: rotate(90deg); }
+    .skill-group-name { flex: 1; min-width: 0; }
+    .skill-group-count {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted, #666);
+      background: #eef1f4;
+      border-radius: 999px;
+      padding: 1px 9px;
+    }
+    .skill-group-body {
+      display: grid;
+      gap: 7px;
+      padding: 0 8px 10px 8px;
+    }
+    .skill-short-desc {
+      margin-left: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted, #667);
+    }
     .skill-inventory-row {
       display: grid;
       gap: 8px;
@@ -9520,11 +9564,253 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryFiltered();
     }
 
+    const SKILL_SHORT_DESC = {
+      "alibabacloud-cli-guidance": "阿里云CLI管理",
+      "aliyun-dms-cli": "阿里云DMS查询",
+      "aliyun-sls-query": "阿里云SLS日志",
+      "automate": "建Cursor自动化",
+      "autoplan": "自动评审流水线",
+      "babysit": "盯PR到合并",
+      "beijing-recruitment": "北京招聘监控",
+      "benchmark": "性能回归检测",
+      "benchmark-models": "跨模型基准测试",
+      "browse": "无头浏览器测试",
+      "browser": "浏览器自动化",
+      "calendar": "日历日程管理",
+      "canary": "部署后金丝雀",
+      "canvas": "建实时React画布",
+      "careful": "危险命令防护",
+      "chengdu-recruitment": "成都招聘监控",
+      "chongqing-recruitment": "重庆招聘监控",
+      "claude-code-plugin-release": "插件发版流程",
+      "claude-mem": "跨会话记忆",
+      "cloud-sync": "记忆云同步",
+      "codeup-personal-git": "强制个人Codeup",
+      "codex": "Codex代码审查",
+      "codex-review-loop": "多轮交叉审查",
+      "context-restore": "恢复工作上下文",
+      "context-save": "保存工作上下文",
+      "create-hook": "建Cursor钩子",
+      "create-rule": "建Cursor规则",
+      "create-skill": "建Cursor技能",
+      "create-subagent": "建子代理",
+      "cso": "安全审计模式",
+      "daily-report": "早晚报生成",
+      "design-consultation": "设计咨询调研",
+      "design-html": "生成设计HTML",
+      "design-is": "设计十诫审计",
+      "design-review": "设计视觉QA",
+      "design-shotgun": "多方案设计",
+      "devex-review": "开发体验审计",
+      "dms-image-audit-gallery-report": "图片任务审计",
+      "do": "分阶段执行计划",
+      "document-release": "发版文档更新",
+      "docx": "Word文档处理",
+      "env-setup": "环境配置",
+      "evoskill": "技能进化追踪",
+      "feishu-image-sender": "飞书发图发文件",
+      "feishu-keyword-responder": "飞书关键词回复",
+      "feishu-notify": "飞书消息通知",
+      "finance-auto": "全自动记账",
+      "finance-auto-bookkeeping": "智能自动记账",
+      "find-skills": "发现安装技能",
+      "freeze": "锁定编辑目录",
+      "gold-analysis": "黄金行情分析",
+      "gstack": "GStack浏览器",
+      "gstack-openclaw-ceo-review": "CEO视角评审",
+      "gstack-openclaw-investigate": "根因排查调试",
+      "gstack-openclaw-office-hours": "创意评估",
+      "gstack-openclaw-retro": "工程周回顾",
+      "gstack-upgrade": "升级gstack",
+      "guard": "全量安全模式",
+      "hackernews-frontpage": "抓HN首页",
+      "health": "代码质量看板",
+      "hebei-recruitment": "河北招聘监控",
+      "how-it-works": "记忆原理说明",
+      "investigate": "系统化调试",
+      "investment-analysis": "投资标的分析",
+      "kg-query": "中央知识图谱",
+      "knowledge-agent": "建知识库问答",
+      "land-and-deploy": "合并并部署",
+      "landing-report": "发布队列看板",
+      "lark-approval": "飞书审批",
+      "lark-apps": "飞书妙搭部署",
+      "lark-attendance": "飞书考勤打卡",
+      "lark-base": "飞书多维表格",
+      "lark-calendar": "飞书日历日程",
+      "lark-cli-adapter": "飞书CLI适配器",
+      "lark-contact": "飞书通讯录",
+      "lark-doc": "飞书云文档",
+      "lark-drive": "飞书云空间",
+      "lark-event": "飞书实时事件",
+      "lark-im": "飞书即时通讯",
+      "lark-mail": "飞书邮箱",
+      "lark-markdown": "飞书Markdown",
+      "lark-minutes": "飞书妙记",
+      "lark-note": "飞书会议纪要",
+      "lark-okr": "飞书OKR",
+      "lark-openapi-explorer": "飞书原生API",
+      "lark-shared": "飞书CLI登录",
+      "lark-sheets": "飞书电子表格",
+      "lark-skill-maker": "建飞书技能",
+      "lark-slides": "飞书幻灯片",
+      "lark-task": "飞书任务",
+      "lark-vc": "飞书视频会议",
+      "lark-vc-agent": "飞书会中机器人",
+      "lark-whiteboard": "飞书画板",
+      "lark-wiki": "飞书知识库",
+      "lark-workflow-meeting-summary": "飞书纪要汇总",
+      "lark-workflow-standup-report": "飞书日程摘要",
+      "learn": "管理项目学习",
+      "learn-codebase": "通读代码库",
+      "liblibai-skill": "LiblibAI生图",
+      "loop": "循环跑技能",
+      "make-pdf": "Markdown转PDF",
+      "make-plan": "建实施计划",
+      "mcp-builder": "建MCP服务器",
+      "mem-search": "搜索记忆库",
+      "migrate-to-skills": "迁移为技能",
+      "model-router": "模型路由选择",
+      "ocr": "多源OCR识别",
+      "office-hours": "YC办公时间",
+      "oh-my-issues": "聚类GitHub问题",
+      "onboard": "上手引导",
+      "open-gstack-browser": "开GStack浏览器",
+      "pair-agent": "远程代理配对",
+      "para-second-brain": "PARA第二大脑",
+      "pathfinder": "代码流程图",
+      "pdf": "PDF处理",
+      "plan-ceo-review": "CEO计划评审",
+      "plan-design-review": "设计计划评审",
+      "plan-devex-review": "体验计划评审",
+      "plan-eng-review": "工程计划评审",
+      "plan-tune": "评审自调优",
+      "proactive-agent": "主动型代理",
+      "pua": "高压逼解问题",
+      "puter-image-gen": "Puter生图",
+      "qa": "QA测试修bug",
+      "qa-only": "只报QA测试",
+      "read-wechat-article": "读公众号文章",
+      "recruitment-core": "招聘监控核心",
+      "recruitment-intel-client": "招聘情报客户端",
+      "retro": "工程周回顾",
+      "review": "落地前PR审查",
+      "review-bugbot": "Bugbot审查",
+      "review-security": "安全审查",
+      "role-maintainer": "维护会话角色",
+      "scrape": "抓网页数据",
+      "sdk": "SDK开发指南",
+      "searxng": "SearXNG搜索",
+      "session-knowledge-manager": "会话知识管理",
+      "session-lifetime-manager": "会话生命周期",
+      "setup-browser-cookies": "导入浏览器Cookie",
+      "setup-deploy": "配置部署",
+      "setup-gbrain": "配置gbrain",
+      "shell": "跑Shell命令",
+      "ship": "发布流程",
+      "skill-creator": "创建技能",
+      "skill-finder-cn": "查找安装技能",
+      "skill-vetter": "技能安全审查",
+      "skillify": "抓取流程固化",
+      "smart-explore": "AST结构搜索",
+      "smart-reporter": "早晚报生成",
+      "social-search": "社媒内容搜集",
+      "split-to-prs": "拆分为多PR",
+      "standup": "跨分支站会",
+      "statusline": "配置状态栏",
+      "sync-probe-autosync": "同步金丝雀探针",
+      "task": "任务清单管理",
+      "task-complete-summary": "任务完成总结",
+      "task-splitter": "拆分子任务",
+      "tavily": "Tavily网搜",
+      "tianjin-recruitment": "天津招聘监控",
+      "timeline-report": "项目历程报告",
+      "trigger-manager": "触发词管理",
+      "understand": "建代码知识图",
+      "understand-chat": "问答代码库",
+      "understand-dashboard": "代码知识看板",
+      "understand-diff": "分析代码diff",
+      "understand-domain": "提取业务领域",
+      "understand-explain": "深讲代码",
+      "understand-knowledge": "分析wiki知识库",
+      "understand-onboard": "生成上手指南",
+      "unfreeze": "解锁编辑目录",
+      "update-cli-config": "改CLI配置",
+      "update-cursor-settings": "改Cursor设置",
+      "using-superpowers": "技能使用入门",
+      "wechat-editorial-automation": "公众号运营自动化",
+      "wechat-publisher": "公众号发文",
+      "weekly-digests": "项目周报摘要",
+      "what-the": "大白话解释",
+      "wowerpoint": "生成幻灯片PDF",
+      "xiaodi-writer": "小迪公众号写手",
+      "zhengzhou-recruitment": "郑州招聘监控",
+    };
+
+    function skillShortDesc(id) {
+      return SKILL_SHORT_DESC[String(id || "")] || "";
+    }
+
+    function skillGroupOf(id) {
+      const s = String(id || "");
+      if (s.startsWith("lark-") || s.startsWith("feishu-")) return { id: "lark", label: "飞书 / Lark" };
+      if (s.endsWith("-recruitment") || s.startsWith("recruitment")) return { id: "recruitment", label: "招聘监控" };
+      if (s.startsWith("understand")) return { id: "understand", label: "代码理解 understand" };
+      if (s.startsWith("gstack") || s === "open-gstack-browser") return { id: "gstack", label: "GStack" };
+      if (s.startsWith("plan-") || s === "plan" || s === "autoplan" || s === "make-plan") return { id: "plan", label: "规划 / 评审" };
+      if (s.startsWith("design")) return { id: "design", label: "设计" };
+      if (s.startsWith("wechat") || s === "read-wechat-article" || s === "xiaodi-writer") return { id: "wechat", label: "公众号 / 微信" };
+      if (s.startsWith("aliyun") || s === "alibabacloud-cli-guidance" || s === "dms-image-audit-gallery-report") return { id: "aliyun", label: "阿里云" };
+      if (s.startsWith("create-")) return { id: "create", label: "创建 / 配置" };
+      if (s.startsWith("session-") || s.startsWith("context-")) return { id: "session", label: "会话 / 上下文" };
+      if (s.startsWith("review") || s === "codex" || s === "codex-review-loop") return { id: "review", label: "评审 / 代码审查" };
+      if (s.startsWith("setup")) return { id: "setup", label: "环境配置 setup" };
+      if (s.startsWith("task")) return { id: "task", label: "任务" };
+      if (s.startsWith("skill") || s === "find-skills" || s === "evoskill") return { id: "skill", label: "技能管理" };
+      if (s.startsWith("benchmark")) return { id: "benchmark", label: "基准测试" };
+      if (s.startsWith("finance") || s === "gold-analysis" || s === "investment-analysis") return { id: "finance", label: "记账 / 投资" };
+      if (s === "claude-mem" || s === "mem-search" || s === "how-it-works" || s === "cloud-sync" || s === "knowledge-agent") return { id: "memory", label: "记忆 / claude-mem" };
+      const pre = s.split("-")[0] || s;
+      return { id: pre, label: pre };
+    }
+
+    function renderSkillInventoryGroups(items) {
+      const groups = new Map();
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        const g = skillGroupOf(text(item.skill_id));
+        if (!groups.has(g.id)) groups.set(g.id, { id: g.id, label: g.label, items: [] });
+        groups.get(g.id).items.push(item);
+      });
+      const misc = { id: "misc", label: "其他", items: [] };
+      const named = [];
+      groups.forEach((g) => {
+        if (g.items.length <= 1) misc.items.push(...g.items);
+        else named.push(g);
+      });
+      named.sort((a, b) => b.items.length - a.items.length || a.label.localeCompare(b.label));
+      if (misc.items.length > 0) {
+        misc.items.sort((a, b) => text(a.skill_id).localeCompare(text(b.skill_id)));
+        named.push(misc);
+      }
+      return named.map((g) => {
+        const rows = g.items.map((item) => renderSkillInventoryRow(item)).join("");
+        return `
+          <details class="skill-group">
+            <summary class="skill-group-summary">
+              <span class="skill-group-name">${escapeHtml(g.label)}</span>
+              <span class="skill-group-count">${g.items.length}</span>
+            </summary>
+            <div class="skill-group-body">${rows}</div>
+          </details>
+        `;
+      }).join("");
+    }
+
     function renderSkillInventoryFiltered() {
       const model = currentSkillInventoryModel || { items: [], total: 0 };
       const items = Array.isArray(model.items) ? model.items : [];
       const filtered = filterSkillInventoryItems(items, skillInventoryFilters());
-      const displayLimit = 160;
+      const displayLimit = 300;
       const visible = filtered.slice(0, displayLimit);
       const quickNote = currentSkillInventoryQuick === "all" ? "" : `当前工作区：${skillInventoryQuickLabel(currentSkillInventoryQuick)}。`;
       const triageNote = currentSkillInventoryTriage === "all" ? "" : `当前整理视图：${skillInventoryTriageLabel(currentSkillInventoryTriage)}。`;
@@ -9535,7 +9821,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryBulkActions(filtered);
       $("skill-inventory-list").innerHTML = items.length > 0
         ? (visible.length > 0
-          ? visible.map((item) => renderSkillInventoryRow(item)).join("")
+          ? renderSkillInventoryGroups(visible)
           : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
       setExecutorButtons(executorAvailable);
@@ -10140,7 +10426,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <article class="skill-inventory-row">
           <div class="skill-inventory-row-main">
             <div>
-              <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}</div>
+              <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}</div>
               <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
               ${skillInventoryToolSummary(item, installed, installableTools)}
             </div>
