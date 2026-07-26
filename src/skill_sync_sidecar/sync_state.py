@@ -121,6 +121,16 @@ def _classify_skill(
     local_hash = _hash(local)
     remote_hash = _hash(remote)
 
+    if remote and _central_lifecycle_state(remote) == "deprecated":
+        return _item(
+            skill_id,
+            "central_deprecated",
+            base_hash,
+            local_hash,
+            remote_hash,
+            "central skill is deprecated; installed devices are left unchanged",
+        )
+
     if base_hash is None:
         if local_hash is None and remote_hash is not None:
             return _item(skill_id, "remote_new", base_hash, local_hash, remote_hash, "remote has a skill that has not been applied locally")
@@ -268,10 +278,7 @@ def _snapshot_entries_by_skill_id(snapshot_dir: Path) -> Dict[str, dict]:
     if not index_path.exists():
         raise SyncStateError(f"remote snapshot has no index.json: {snapshot_dir}")
     index = json.loads(index_path.read_text(encoding="utf-8"))
-    return _unique_by_skill_id(
-        (skill for skill in index.get("skills", []) if _central_lifecycle_state(skill) != "deprecated"),
-        "remote",
-    )
+    return _unique_by_skill_id(index.get("skills", []), "remote")
 
 
 def _central_lifecycle_state(skill: dict) -> str:
