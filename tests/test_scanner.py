@@ -860,6 +860,30 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(status["items"][0]["action"], "conflict")
             self.assertTrue(status["has_conflicts"])
 
+    def test_sync_status_treats_deprecated_remote_as_not_required(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            record_path = base / "apply-record.json"
+
+            local_root.mkdir()
+            content_hash = self._write_demo_skill(remote_source, "base")
+            self._write_apply_record(record_path, {"demo": content_hash})
+            index = write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            index["skills"][0]["lifecycle"] = {"state": "deprecated", "deprecated_by": "mac"}
+            (remote_snapshot / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            status = build_sync_status(local_root, remote_snapshot, record_path)
+            plan = build_sync_plan(status)
+
+            self.assertEqual(status["summary"], {"already_converged": 1})
+            self.assertEqual(status["items"][0]["action"], "already_converged")
+            self.assertEqual(status["items"][0]["remote_hash"], None)
+            self.assertEqual(plan["blocked"], 0)
+            self.assertTrue(plan["safe_to_apply"])
+
     def test_sync_status_acknowledges_declared_local_override(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)
