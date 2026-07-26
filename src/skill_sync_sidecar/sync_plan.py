@@ -66,7 +66,7 @@ def _plan_item(item: dict, allow_new: bool, allow_delete: bool) -> SyncPlanItem:
         return _item(skill_id, status_action, "noop", True, str(item.get("reason") or "local-only skill acknowledged"), base_hash, local_hash, remote_hash)
     if status_action == "local_override":
         return _item(skill_id, status_action, "noop", True, str(item.get("reason") or "local override acknowledged"), base_hash, local_hash, remote_hash)
-    if status_action in {"unchanged", "already_converged", "deleted_both", "same_without_base"}:
+    if status_action in {"unchanged", "already_converged", "central_deprecated", "deleted_both", "same_without_base"}:
         return _item(skill_id, status_action, "noop", True, "no sync action needed", base_hash, local_hash, remote_hash)
     if status_action == "pull":
         return _item(skill_id, status_action, "pull", True, "remote changed and local is still at base", base_hash, local_hash, remote_hash)

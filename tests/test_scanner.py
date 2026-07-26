@@ -878,9 +878,9 @@ class ScannerTest(unittest.TestCase):
             status = build_sync_status(local_root, remote_snapshot, record_path)
             plan = build_sync_plan(status)
 
-            self.assertEqual(status["summary"], {"already_converged": 1})
-            self.assertEqual(status["items"][0]["action"], "already_converged")
-            self.assertEqual(status["items"][0]["remote_hash"], None)
+            self.assertEqual(status["summary"], {"central_deprecated": 1})
+            self.assertEqual(status["items"][0]["action"], "central_deprecated")
+            self.assertEqual(status["items"][0]["remote_hash"], content_hash)
             self.assertEqual(plan["blocked"], 0)
             self.assertTrue(plan["safe_to_apply"])
 
