@@ -1108,9 +1108,9 @@ def _operator_issue_action(
     if category == "conflict":
         return f"先处理 {target} 版本差异；生成只读差异报告后选择保留版本。"
     if category in {"delete", "delete_review"} or status_action == "local_deleted":
-        return f"先处理 {target} 缺失项；建议先从共享库找回，确认废弃时再单独删除。"
+        return f"先处理 {target} 缺失项；建议先从共享库找回，确认废弃时在共享库标记下架。"
     if status_action == "remote_deleted":
-        return f"先处理 {target} 删除差异；确认是否保留本机版本，或接受共享库删除。"
+        return f"先处理 {target} 删除差异；确认是否保留本机版本；物理删除只走中央仓库专门入口。"
     if category == "writer_policy" and status_action in {"push", "push_new"}:
         return f"先处理 {target}；确认后保存。"
     return f"先处理 {target}；查看确认清单。"
@@ -1199,13 +1199,13 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
                     "kind": "publish",
                 },
                 {
-                    "title": "确实废弃再删除",
-                    "detail": "只有确认 skill 已废弃时，才走单独删除审批；不要用普通保存流程处理删除。",
+                    "title": "确实废弃就下架",
+                    "detail": "只有确认 skill 已废弃时，才在共享库标记下架/软删除；物理删除只走中央仓库专门入口。",
                     "kind": "verify",
                 },
             ],
             "skills": skill_ids,
-            "note": "红色邮件提醒来自这类高风险删除确认；它需要你决定保留并恢复，还是单独审批删除。",
+            "note": "红色邮件提醒来自这类高风险删除确认；它需要你决定保留并恢复，还是在共享库标记下架。",
         }
     if health == "yellow" and openclaw_push_items:
         skill_ids = _operator_skill_ids(openclaw_push_items)
@@ -6629,7 +6629,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           `;
       } else if (deleteItems.length > 0) {
         title = "先处理缺失 skill";
-        summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是以后单独删除共享库版本。";
+        summary = "少掉不等于要删除。默认会保留共享库，先让你决定找回，还是把共享库版本标记下架。";
         primaryActions = `<button type="button" class="primary" onclick="openReviewDetails()">看看少了什么<span>只打开确认清单，不会删除。</span></button>`;
       }
       panel.innerHTML = `
@@ -6892,9 +6892,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             <summary>其他选择和风险说明</summary>
             <div class="conflict-choice-grid">
             <div class="conflict-choice">
-              <strong>我确认要删除共享库版</strong>
-              <span>这是高风险操作。当前面板不会一键删除共享库，避免误删共享版本。</span>
-              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '删除共享库属于高风险操作；请先确认这个 skill 已废弃，再走单独删除审批。')">查看删除说明</button>
+              <strong>我确认要下架共享库版</strong>
+              <span>这是中心生命周期操作。当前面板只会引导软删除/下架，不会物理删除共享库文件。</span>
+              <button type="button" onclick="showDecisionExplanation('${escapedSkill}', '请先确认这个 skill 已废弃；使用共享库标记废弃路径下架。物理删除只允许走中央仓库专门入口。')">查看下架说明</button>
             </div>
             <div class="conflict-choice">
               <strong>我手动处理</strong>
@@ -7888,9 +7888,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     function reviewNextStepText(item) {
       if (reviewIsSourceChangedItem(item)) return "下一步：可稍后处理；继续管理本机 skill，OpenClaw 改完后再检查最新版本。";
       if (item.category === "conflict") return "下一步：先生成只读差异报告，再按推荐恢复、保存或手动处理。";
-      if (item.status_action === "local_deleted") return `下一步：决定是恢复到 ${restoreDeviceLabel(item)}，还是单独确认删除共享库里的这个 skill。`;
-      if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新保存，还是接受共享库删除。";
-      if (reviewIsDeleteItem(item)) return "下一步：确认删除意图；当前面板不会自动删除共享库。";
+      if (item.status_action === "local_deleted") return `下一步：决定是恢复到 ${restoreDeviceLabel(item)}，还是在共享库标记下架/软删除。`;
+      if (item.status_action === "remote_deleted") return "下一步：决定是保留本机并重新保存，还是按中央仓库专门流程处理。";
+      if (reviewIsDeleteItem(item)) return "下一步：确认恢复或下架意图；当前面板不会物理删除共享库文件。";
       if (item.status_action === "push_new" || item.status_action === "local_new") return "下一步：检查内容和目标工具，确认后再保存。";
       if (item.status_action === "push") return "下一步：检查差异，通过后再保存到共享库。";
       return "下一步：查看检查输出和高级诊断。";
@@ -7961,10 +7961,10 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function reviewDecisionHtml(item) {
       if (item.status_action === "local_deleted") {
-        return `<strong>需要你决定</strong>如果这是误删，先从共享库/备份恢复到 ${escapeHtml(restoreDeviceLabel(item))}；如果确实废弃，走单独的删除审批。当前按钮不会删除共享库。`;
+        return `<strong>需要你决定</strong>如果这是误删，先从共享库/备份恢复到 ${escapeHtml(restoreDeviceLabel(item))}；如果确实废弃，在共享库标记下架/软删除。当前按钮不会物理删除共享库文件。`;
       }
       if (item.status_action === "remote_deleted") {
-        return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新保存；如果共享库删除是正确的，再接受删除。`;
+        return `<strong>需要你决定</strong>如果本机版本还要保留，把它作为本机变更重新保存；确需物理删除只走中央仓库专门入口。`;
       }
       if (item.category === "conflict") {
         return `<strong>需要确认版本</strong>不能一键保存；先查看只读差异报告，再按推荐恢复、保存或手动处理。`;
@@ -9556,8 +9556,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           "yellow",
           `${skillId} 是删除确认项`,
           reviewItem.status_action === "local_deleted"
-            ? `${restoreTarget} 缺失但共享库仍保留。下一步不是保存；请决定恢复到 ${restoreTarget}，或单独确认删除共享库。`
-            : "共享库已删除但本机仍保留。请决定重新保存本机版本，或接受共享库删除。",
+            ? `${restoreTarget} 缺失但共享库仍保留。下一步不是保存；请决定恢复到 ${restoreTarget}，或在共享库标记下架/软删除。`
+            : "共享库已删除但本机仍保留。请决定重新保存本机版本；物理删除只走中央仓库专门入口。",
         );
         showExecutorOutput(
           [
@@ -9565,9 +9565,9 @@ DASHBOARD_HTML = r"""<!doctype html>
             `status_action=${text(reviewItem.status_action)}`,
             `category=${text(reviewItem.category)}`,
             "safe_to_push=false",
-            "next_action=restore_local_or_confirm_delete",
+            "next_action=restore_local_or_central_deprecate",
             "",
-            "说明：删除类待审不会走保存按钮。sidecar 当前不会通过这个按钮删除共享库。",
+            "说明：删除类待审不会走保存按钮。sidecar 当前不会通过这个按钮物理删除共享库文件。",
           ].join("\n"),
         );
         return;

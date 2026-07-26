@@ -186,7 +186,7 @@ skill-sync rollback --record /tmp/skill-sync-target/.skill-sync-backups/<apply-i
 
 `conflict-package` is the handoff path for blocked conflicts. For each conflicting skill it writes a package containing `metadata.json`, current `local/` files, staged and hash-verified `remote/` files, and `base.json` with the common ancestor hash and source record. It does not modify local installs or remote storage.
 
-`tombstone` is the handoff path for one-sided deletes. For `local_deleted` it records a pending `delete_remote`; for `remote_deleted` it records a pending `delete_local`. Tombstones copy the surviving side's files plus base metadata, but do not execute deletion. Actual delete propagation requires a later explicit retention/rollback gate.
+`tombstone` is the handoff path for one-sided deletes. For `local_deleted` it records a pending `deprecate_remote` review: restore the skill to the missing device, or mark the central entry deprecated/soft-deleted while preserving archives. For `remote_deleted` it records a pending `delete_local`. Tombstones copy the surviving side's files plus base metadata, but do not execute deletion. Physical central deletion is never triggered by a device-side delete and must use a dedicated central repository/admin path.
 
 `blocked-report` is the handoff path for blocked sync-plan items, especially writer-policy blocks. It writes `blocked-report.json` and `blocked-report.md` with the blocked skill id, status action, plan action, local/remote/base hashes, category, and recommended next step. It does not copy skill contents or apply changes.
 

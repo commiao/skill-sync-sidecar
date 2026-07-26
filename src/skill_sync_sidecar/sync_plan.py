@@ -6,7 +6,7 @@ from typing import Dict, List
 
 WRITER_POLICIES = ("push-pull", "pull-only", "push-only", "no-writes")
 POLICY_ALLOWED_ACTIONS = {
-    "push-pull": {"noop", "pull", "pull_new", "push", "push_new", "delete_local", "delete_remote", "blocked"},
+    "push-pull": {"noop", "pull", "pull_new", "push", "push_new", "delete_local", "deprecate_remote", "blocked"},
     "pull-only": {"noop", "pull", "pull_new", "blocked"},
     "push-only": {"noop", "push", "push_new", "blocked"},
     "no-writes": {"noop", "blocked"},
@@ -109,9 +109,9 @@ def _plan_item(item: dict, allow_new: bool, allow_delete: bool) -> SyncPlanItem:
         return _item(
             skill_id,
             status_action,
-            "delete_remote" if allow_delete else "blocked",
+            "deprecate_remote" if allow_delete else "blocked",
             allow_delete,
-            "local deletion requires --allow-delete before remote deletion",
+            "local deletion requires restore or central deprecate review; remote files are not physically deleted",
             base_hash,
             local_hash,
             remote_hash,

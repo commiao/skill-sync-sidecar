@@ -84,7 +84,11 @@ def _recommendation(category: str, plan_action: str, status_action: str, writer_
     if category == "conflict":
         return "Materialize a conflict package and resolve local, remote, and base contents manually."
     if category == "delete_review":
-        return "Materialize a tombstone and require explicit retention or delete approval before propagating deletion."
+        if status_action == "local_deleted":
+            return "Restore the skill to the missing device, or mark it deprecated in the central library. Do not physically delete central files from a device-side deletion."
+        if status_action == "remote_deleted":
+            return "Review whether the local copy should be republished or removed locally after the central repository's dedicated deletion flow."
+        return "Review whether to restore the missing copy or mark the central skill deprecated; ordinary sync must not physically delete central files."
     if category == "new_skill_review":
         if status_action == "local_new":
             return "Review the local new skill before saving it to the shared library with --allow-new."
