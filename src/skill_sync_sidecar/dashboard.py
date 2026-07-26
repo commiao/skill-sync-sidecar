@@ -3277,6 +3277,48 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 10px;
       background: #f8fafc;
     }
+    .dashboard-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 12px 0;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+    .dashboard-tab-button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 780;
+      min-height: 38px;
+      padding: 8px 11px;
+    }
+    .dashboard-tab-button.active {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+    .dashboard-tab-button:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+    .tab-hidden {
+      display: none !important;
+    }
+    .support-drawer.tab-mode {
+      border: 0;
+      background: transparent;
+      margin: 0;
+      overflow: visible;
+    }
+    .support-drawer.tab-mode > summary {
+      display: none;
+    }
+    .support-drawer.tab-mode > .support-drawer-body {
+      padding: 0;
+      background: transparent;
+    }
     .easy-workspace {
       margin: 0;
       padding: 0;
@@ -4694,6 +4736,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       justify-items: start;
       min-width: 0;
     }
+    .skill-inventory-row-actions .inventory-publish-button {
+      width: 100%;
+      min-height: 38px;
+    }
     .skill-inventory-name {
       color: var(--ink);
       font-weight: 820;
@@ -4967,96 +5013,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-    }
-    .onboarding-wizard {
-      display: grid;
-      gap: 12px;
-      border: 1px solid var(--line);
-      border-left: 4px solid #2f7a52;
-      border-radius: 12px;
-      background: linear-gradient(180deg, #f4fbf6 0%, #ffffff 60%);
-      padding: 16px 18px;
-    }
-    .onboarding-wizard-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .onboarding-wizard-kicker {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: #2f7a52;
-      text-transform: uppercase;
-    }
-    .onboarding-wizard-title {
-      margin: 2px 0 0;
-      font-size: 18px;
-    }
-    .onboarding-wizard-subtitle {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.4;
-      margin-top: 2px;
-    }
-    .onboarding-wizard-list {
-      display: grid;
-      gap: 10px;
-    }
-    .onboarding-wizard-empty {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-      padding: 8px 0;
-    }
-    .onboarding-wizard-row {
-      display: grid;
-      gap: 10px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #ffffff;
-      padding: 12px 14px;
-    }
-    .onboarding-wizard-row-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .onboarding-wizard-name {
-      font-weight: 600;
-      font-size: 15px;
-    }
-    .onboarding-wizard-meta {
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    .onboarding-wizard-steps {
-      display: grid;
-      gap: 8px;
-    }
-    .onboarding-wizard-step {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .onboarding-wizard-step-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #334155;
-      min-width: 128px;
-    }
-    .onboarding-wizard-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    @media (max-width: 560px) {
-      .onboarding-wizard-step-label { min-width: 0; }
     }
     .local-skill-manager {
       border-top: 1px solid var(--line);
@@ -5570,20 +5526,16 @@ DASHBOARD_HTML = r"""<!doctype html>
   </header>
   <main>
     <div id="error" class="error"></div>
+    <nav class="dashboard-tabs" aria-label="Skill Sync 页面导航">
+      <button type="button" class="dashboard-tab-button active" data-dashboard-tab="next" onclick="selectDashboardTab('next')">推荐下一步</button>
+      <button type="button" class="dashboard-tab-button" data-dashboard-tab="skill-list" onclick="selectDashboardTab('skill-list')">查看 skill 列表和安装勾选</button>
+      <button type="button" class="dashboard-tab-button" data-dashboard-tab="manual-import" onclick="selectDashboardTab('manual-import')">手动导入 skill（高级）</button>
+      <button type="button" class="dashboard-tab-button" data-dashboard-tab="inventory" onclick="selectDashboardTab('inventory')">Skill 清单</button>
+      <button type="button" class="dashboard-tab-button" data-dashboard-tab="other" onclick="selectDashboardTab('other')">其他</button>
+    </nav>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
-    <section id="onboarding-wizard-panel" class="onboarding-wizard panel" aria-label="新 skill 上架向导" hidden>
-      <div class="onboarding-wizard-head">
-        <div>
-          <div class="onboarding-wizard-kicker">新 skill 上架</div>
-          <h2 class="onboarding-wizard-title">把本机新发现的 skill 一键上架</h2>
-          <div id="onboarding-wizard-subtitle" class="onboarding-wizard-subtitle">读取中…</div>
-        </div>
-        <span class="pill green">一条龙</span>
-      </div>
-      <div id="onboarding-wizard-list" class="onboarding-wizard-list"></div>
-    </section>
-    <details class="support-drawer">
+    <details class="support-drawer tab-mode" open>
       <summary>
         <span class="support-drawer-title">
           <strong>其他操作和详情</strong>
@@ -5595,7 +5547,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
           <strong>手动导入 skill（高级）</strong>
-          <span>顶部「新 skill 上架」会自动列出待上架的 skill；只有导入不在列表里的 skill 时才用这里粘贴路径。</span>
+          <span>只有导入不在 Skill 清单里的 skill 时才用这里粘贴路径。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </summary>
@@ -5603,7 +5555,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="easy-card">
           <div class="easy-card-label">手动导入（高级）</div>
           <h2>手动导入不在列表里的 skill</h2>
-          <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。日常上架请优先用顶部「新 skill 上架」向导。</p>
+          <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。日常管理请优先使用 Skill 清单页签。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">三步添加到本机</div>
@@ -5737,7 +5689,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
         </div>
         <div class="status-chip focus-side">
-          <div id="strip-action-note" class="focus-side-note">日常操作请用顶部「现在建议」和「新 skill 上架」；本区只展示状态。</div>
+          <div id="strip-action-note" class="focus-side-note">日常操作请用「推荐下一步」和「Skill 清单」；本区只展示状态。</div>
           <div class="focus-metrics" aria-label="同步范围摘要">
             <div class="focus-metric">
               <div class="status-chip-label">本机</div>
@@ -5781,7 +5733,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="workspace-step"><strong>2. 检查</strong><span>只看会改什么，不写共享库。</span></div>
             <div class="workspace-step"><strong>3. 保存</strong><span>确认无误后再写入共享库。</span></div>
           </div>
-          <div id="local-workspace-action-note" class="local-action-note">扫描/检查/保存已统一到顶部「现在建议」与「新 skill 上架」；这里只看本机明细。下方仍可重新扫描本机。</div>
+          <div id="local-workspace-action-note" class="local-action-note">扫描/检查/保存已统一到「推荐下一步」与「Skill 清单」；这里只看本机明细。下方仍可重新扫描本机。</div>
           <details class="workspace-secondary">
             <summary>查看数量和工具目录</summary>
             <div class="workspace-metrics">
@@ -5866,7 +5818,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div id="scope-local-count" class="scope-card-count">-</div>
         <div id="scope-local-note" class="scope-card-note">只扫描和处理当前浏览器所在设备。</div>
-        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，保存共享也必须你明确确认。扫描/检查/保存已统一到顶部主卡与「新 skill 上架」向导。</div>
+        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，保存共享也必须你明确确认。扫描/检查/保存已统一到「推荐下一步」与「Skill 清单」。</div>
       </div>
       <div class="scope-readonly-rail" aria-label="共享库和其他设备只读状态">
         <div class="scope-card readonly">
@@ -6073,6 +6025,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
     let staleRefreshTimer = null;
+    let currentDashboardTab = "next";
     const SOURCE_CHANGE_DEFERRALS_KEY = "skill-sync-source-change-deferrals-v1";
     let sourceChangeDeferrals = loadSourceChangeDeferrals();
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
@@ -7230,6 +7183,48 @@ DASHBOARD_HTML = r"""<!doctype html>
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
+    function selectDashboardTab(tab) {
+      currentDashboardTab = tab || "next";
+      document.querySelectorAll(".dashboard-tab-button").forEach((button) => {
+        const active = button.dataset.dashboardTab === currentDashboardTab;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      const support = document.querySelector(".support-drawer");
+      if (support) {
+        support.open = true;
+        support.hidden = currentDashboardTab === "next";
+      }
+      const simple = $("simple-action-panel");
+      if (simple) simple.classList.toggle("tab-hidden", currentDashboardTab !== "next");
+      const conflict = $("conflict-resolution-panel");
+      if (conflict) conflict.classList.toggle("tab-hidden", currentDashboardTab !== "next");
+      const easy = $("easy-workspace");
+      if (easy) {
+        easy.hidden = currentDashboardTab !== "manual-import";
+        easy.open = currentDashboardTab === "manual-import";
+      }
+      const inventory = document.querySelector(".skill-inventory-panel");
+      if (inventory) {
+        inventory.hidden = !(currentDashboardTab === "inventory" || currentDashboardTab === "skill-list");
+        inventory.open = currentDashboardTab === "inventory" || currentDashboardTab === "skill-list";
+      }
+      const listPanel = $("skill-inventory-list-panel");
+      if (listPanel) listPanel.open = currentDashboardTab === "skill-list";
+      const otherVisible = currentDashboardTab === "other";
+      [
+        ".quick-status-details",
+        ".advanced-workspace",
+        ".secondary-context",
+        ".advanced-diagnostics",
+      ].forEach((selector) => {
+        document.querySelectorAll(selector).forEach((node) => {
+          node.hidden = !otherVisible;
+          if (otherVisible && selector !== ".advanced-diagnostics") node.open = true;
+        });
+      });
+    }
+
     function simpleActionStep(index, value) {
       return `
         <li class="simple-action-step">
@@ -7264,7 +7259,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openAdvancedDetails() {
-      openSupportDrawer();
+      selectDashboardTab("other");
       const target = document.querySelector(".advanced-workspace");
       if (!target) return;
       target.open = true;
@@ -7273,7 +7268,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function openReviewDetails() {
       reviewDetailsUserOpened = true;
-      openSupportDrawer();
+      selectDashboardTab("other");
       const advanced = document.querySelector(".advanced-workspace");
       const technical = document.querySelector(".technical-workspace");
       if (advanced) advanced.open = true;
@@ -7341,7 +7336,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openTechnicalWorkspace() {
-      openSupportDrawer();
+      selectDashboardTab("other");
       const advanced = document.querySelector(".advanced-workspace");
       const technical = document.querySelector(".technical-workspace");
       if (advanced) advanced.open = true;
@@ -7354,17 +7349,19 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openSupportDrawer() {
+      if (currentDashboardTab === "next") selectDashboardTab("other");
       const drawer = document.querySelector(".support-drawer");
       if (drawer) drawer.open = true;
     }
 
     function openSkillInventoryListPanel() {
+      selectDashboardTab("skill-list");
       const panel = $("skill-inventory-list-panel");
       if (panel) panel.open = true;
     }
 
     function openLocalSkillWorkbench() {
-      openSupportDrawer();
+      selectDashboardTab("manual-import");
       const workspace = $("easy-workspace");
       if (workspace) workspace.open = true;
       const inventory = document.querySelector(".skill-inventory-panel");
@@ -7385,7 +7382,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function openLocalSkillInventory(toolId) {
-      openSupportDrawer();
+      selectDashboardTab("skill-list");
       const inventory = document.querySelector(".skill-inventory-panel");
       if (inventory) inventory.open = true;
       currentSkillInventoryQuick = toolId ? "all" : "local_installed";
@@ -8379,7 +8376,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           button,
           !available
             ? "等待本机助手"
-            : (!executorAllowPublish ? "开启保存权限" : "保存到共享库"),
+            : (!executorAllowPublish ? "开启保存权限" : "发布到中央仓库"),
           !available
             ? "本机助手在线后可继续。"
             : (!executorAllowPublish ? "查看说明；不会写共享库。" : "先检查，再确认。"),
@@ -8389,7 +8386,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowPublish
             ? "保存权限未开启；点击查看开启方法"
-            : "先检查，再确认，把这个本机 skill 保存到共享库");
+            : "先检查，再确认，把这个本机 skill 发布到中央仓库");
       });
       document.querySelectorAll(".inventory-local-install-button").forEach((button) => {
         const toolLabel = button.dataset.toolLabel || "工具";
@@ -9673,7 +9670,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const central = dashboard.central_repository || {};
       const map = dashboard.device_map || {};
       const deviceCount = otherDeviceItems(map.items).length;
-      $("workspace-overview-summary").textContent = `这里只是高级明细；日常操作请回到页面顶部两个入口。共享库和 ${text(deviceCount)} 台其他设备只读展示。`;
+      $("workspace-overview-summary").textContent = `这里只是高级明细；日常操作请回到页面顶部页签。共享库和 ${text(deviceCount)} 台其他设备只读展示。`;
     }
 
     function renderPlainDetails(dashboard) {
@@ -9742,71 +9739,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryWorkbench(model.items || []);
       renderSkillInventoryToolOverview(model.items || []);
       renderSkillInventoryTriage(model.items || []);
-      renderOnboardingWizard(model.items || []);
       renderSkillInventoryFiltered();
-    }
-
-    function onboardingWizardCandidates(items) {
-      return (Array.isArray(items) ? items : []).filter((item) => {
-        const centralState = text((item.central || {}).state || "unpublished");
-        return centralState === "unpublished" && item.scope !== "project";
-      });
-    }
-
-    function renderOnboardingWizardRow(item) {
-      const installed = macInstalledToolIds(item);
-      const publishPath = macPublishSourcePath(item);
-      const skillId = text(item.skill_id);
-      const desc = skillShortDesc(item.skill_id);
-      const badges = skillSourceBadges(item);
-      const publishButton = publishPath
-        ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(skillId)}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>保存到共享库</button>`
-        : `<span class="skill-tool-check">等待本机路径</span>`;
-      const installTools = publishPath ? macUnpublishedInstallTools(item, installed) : [];
-      const installButtons = installTools
-        .map((tool) => `<button type="button" class="inventory-local-install-button" data-skill-id="${escapeHtml(skillId)}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" data-source-path="${escapeHtml(publishPath)}" onclick="installLocalSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`)
-        .join("");
-      const installStep = installButtons
-        ? `<div class="onboarding-wizard-buttons">${installButtons}</div>`
-        : (publishPath
-          ? `<span class="skill-tool-check">已在本机所有支持的工具中</span>`
-          : `<span class="skill-tool-check">等待本机路径</span>`);
-      return `
-        <article class="onboarding-wizard-row">
-          <div class="onboarding-wizard-row-head">
-            <div class="onboarding-wizard-name">${escapeHtml(skillId)}${desc ? `<span class="skill-short-desc">${escapeHtml(desc)}</span>` : ""}${badges}</div>
-            <div class="onboarding-wizard-meta">${escapeHtml(skillScopeLabel(item.scope))} · 未在共享库</div>
-          </div>
-          <div class="onboarding-wizard-steps">
-            <div class="onboarding-wizard-step">
-              <span class="onboarding-wizard-step-label">① 发布到共享库</span>
-              <div class="onboarding-wizard-buttons">${publishButton}</div>
-            </div>
-            <div class="onboarding-wizard-step">
-              <span class="onboarding-wizard-step-label">② 安装到其他工具</span>
-              ${installStep}
-            </div>
-          </div>
-        </article>`;
-    }
-
-    function renderOnboardingWizard(items) {
-      const panel = $("onboarding-wizard-panel");
-      if (!panel) return;
-      const subtitle = $("onboarding-wizard-subtitle");
-      const list = $("onboarding-wizard-list");
-      const candidates = onboardingWizardCandidates(items);
-      panel.hidden = false;
-      if (candidates.length === 0) {
-        if (subtitle) subtitle.textContent = "没有待上架的新 skill：本机发现的 skill 都已进入共享库或为项目级。";
-        if (list) list.innerHTML = `<div class="onboarding-wizard-empty">没有待上架的新 skill。发现本机新增的 skill 后会自动出现在这里，无需粘贴路径。</div>`;
-        return;
-      }
-      if (subtitle) {
-        subtitle.textContent = `发现 ${candidates.length} 个本机新增、未进共享库的 skill。每个都能一步发布到共享库，并安装到其他工具，无需粘贴路径。`;
-      }
-      if (list) list.innerHTML = candidates.map(renderOnboardingWizardRow).join("");
-      setExecutorButtons(executorAvailable);
     }
 
     const SKILL_SHORT_DESC = {
@@ -10747,8 +10680,11 @@ DASHBOARD_HTML = r"""<!doctype html>
         ? (item.scope === "project"
           ? `<span class="skill-tool-check">项目级随项目仓维护</span>`
           : (publishPath
-            ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>保存到共享库</button>`
+            ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
+        : "";
+      const visiblePublishAction = centralState === "unpublished" && item.scope !== "project" && publishPath
+        ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
         : "";
       const localInstallButtons = (centralState === "unpublished" && item.scope !== "project" && publishPath)
         ? macUnpublishedInstallTools(item, installed)
@@ -10775,6 +10711,7 @@ DASHBOARD_HTML = r"""<!doctype html>
                 <strong>推荐</strong>
                 <span>${escapeHtml(recommendation.title)}</span>
               </div>
+              ${visiblePublishAction}
             </div>
           </div>
           <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
@@ -11077,7 +11014,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const source = localWorkspaceFromExecutor ? "本机实时扫描" : (workspace.reported ? `最近一次 ${deviceName} 上报` : "等待本机授权");
       renderCurrentClientBoundary(workspace, tools);
       $("local-workspace-pill").outerHTML = pill(source, localWorkspaceFromExecutor ? "green" : deviceKind(workspace.health)).replace("<span", "<span id=\"local-workspace-pill\"");
-      $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。日常操作请用页面顶部两个入口。`;
+      $("local-workspace-summary").textContent = `${deviceName} 是当前页面唯一能直接操作的设备。日常操作请用页面顶部页签。`;
       $("local-workspace-total").textContent = text(total);
       $("local-workspace-blocked").textContent = text(blocked);
       $("local-workspace-source").textContent = localWorkspaceFromExecutor ? "实时" : (workspace.reported ? "上报" : "未授权");
@@ -11723,6 +11660,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     });
     $("skill-inventory-reset").addEventListener("click", resetSkillInventoryFilters);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
+    selectDashboardTab("next");
     refresh(true);
     setInterval(() => refresh(false), 30000);
   </script>

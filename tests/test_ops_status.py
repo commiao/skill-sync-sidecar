@@ -534,9 +534,18 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("/api/summary", DASHBOARD_HTML)
             self.assertIn("Skill 管理", DASHBOARD_HTML)
             self.assertIn("日常只看第一张卡片：它会告诉你现在要不要操作。", DASHBOARD_HTML)
-            self.assertIn("<details class=\"support-drawer\">", DASHBOARD_HTML)
-            self.assertIn("其他操作和详情", DASHBOARD_HTML)
-            self.assertIn("只有要新增 skill、安装到工具、保存共享库或排查问题时再打开。", DASHBOARD_HTML)
+            self.assertIn("class=\"dashboard-tabs\"", DASHBOARD_HTML)
+            self.assertIn("data-dashboard-tab=\"next\"", DASHBOARD_HTML)
+            self.assertIn("data-dashboard-tab=\"skill-list\"", DASHBOARD_HTML)
+            self.assertIn("data-dashboard-tab=\"manual-import\"", DASHBOARD_HTML)
+            self.assertIn("data-dashboard-tab=\"inventory\"", DASHBOARD_HTML)
+            self.assertIn("data-dashboard-tab=\"other\"", DASHBOARD_HTML)
+            self.assertIn("推荐下一步", DASHBOARD_HTML)
+            self.assertIn("查看 skill 列表和安装勾选", DASHBOARD_HTML)
+            self.assertIn("手动导入 skill（高级）", DASHBOARD_HTML)
+            self.assertIn("Skill 清单", DASHBOARD_HTML)
+            self.assertIn("<details class=\"support-drawer tab-mode\" open>", DASHBOARD_HTML)
+            self.assertIn("selectDashboardTab", DASHBOARD_HTML)
             self.assertIn("support-drawer-body", DASHBOARD_HTML)
             self.assertIn("quick-status-details", DASHBOARD_HTML)
             self.assertIn("二级详情：状态数字", DASHBOARD_HTML)
@@ -563,28 +572,15 @@ class OpsStatusTest(unittest.TestCase):
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
                 DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
             )
-            self.assertIn("id=\"onboarding-wizard-panel\"", DASHBOARD_HTML)
-            self.assertIn("新 skill 上架", DASHBOARD_HTML)
-            self.assertIn("把本机新发现的 skill 一键上架", DASHBOARD_HTML)
-            self.assertIn("renderOnboardingWizard", DASHBOARD_HTML)
-            self.assertIn("onboardingWizardCandidates", DASHBOARD_HTML)
-            self.assertIn("① 发布到共享库", DASHBOARD_HTML)
-            self.assertIn("② 安装到其他工具", DASHBOARD_HTML)
-            self.assertIn("没有待上架的新 skill", DASHBOARD_HTML)
+            self.assertNotIn("id=\"onboarding-wizard-panel\"", DASHBOARD_HTML)
+            self.assertNotIn("新 skill 上架", DASHBOARD_HTML)
+            self.assertNotIn("一条龙", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
-                DASHBOARD_HTML.index("id=\"onboarding-wizard-panel\""),
+                DASHBOARD_HTML.index("class=\"support-drawer tab-mode\""),
             )
             self.assertLess(
-                DASHBOARD_HTML.index("id=\"onboarding-wizard-panel\""),
-                DASHBOARD_HTML.index("class=\"support-drawer\""),
-            )
-            self.assertLess(
-                DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
-                DASHBOARD_HTML.index("class=\"support-drawer\""),
-            )
-            self.assertLess(
-                DASHBOARD_HTML.index("class=\"support-drawer\""),
+                DASHBOARD_HTML.index("class=\"support-drawer tab-mode\""),
                 DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
             )
             self.assertLess(
@@ -803,13 +799,13 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("if (advanced) advanced.open = true;", DASHBOARD_HTML)
             self.assertIn("const technical = document.querySelector(\".technical-workspace\");", DASHBOARD_HTML)
             self.assertIn("if (technical) technical.open = true;", DASHBOARD_HTML)
-            self.assertIn("function openReviewDetails() {\n      reviewDetailsUserOpened = true;\n      openSupportDrawer();", DASHBOARD_HTML)
+            self.assertIn("function openReviewDetails() {\n      reviewDetailsUserOpened = true;\n      selectDashboardTab(\"other\");", DASHBOARD_HTML)
             self.assertIn("openSupportDrawer", DASHBOARD_HTML)
             self.assertIn("<details class=\"advanced-workspace\">", DASHBOARD_HTML)
             self.assertIn("<details id=\"easy-workspace\" class=\"easy-workspace panel\"", DASHBOARD_HTML)
             self.assertIn("<summary class=\"easy-workspace-head\">", DASHBOARD_HTML)
             self.assertIn("手动导入 skill（高级）", DASHBOARD_HTML)
-            self.assertIn("顶部「新 skill 上架」会自动列出待上架的 skill；只有导入不在列表里的 skill 时才用这里粘贴路径。", DASHBOARD_HTML)
+            self.assertIn("只有导入不在 Skill 清单里的 skill 时才用这里粘贴路径。", DASHBOARD_HTML)
             self.assertNotIn("场景 1", DASHBOARD_HTML)
             self.assertNotIn("场景 2", DASHBOARD_HTML)
             self.assertIn("手动导入（高级）", DASHBOARD_HTML)
@@ -991,9 +987,9 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("高级：工具目录、版本号、原始队列", DASHBOARD_HTML)
             self.assertIn("workspace-overview", DASHBOARD_HTML)
             self.assertIn("只操作本机", DASHBOARD_HTML)
-            self.assertIn("这里只是高级明细；日常操作请回到页面顶部两个入口", DASHBOARD_HTML)
-            self.assertIn("日常操作请用页面顶部两个入口", DASHBOARD_HTML)
-            self.assertIn("只有导入不在列表里的 skill 时才用这里粘贴路径", DASHBOARD_HTML)
+            self.assertIn("这里只是高级明细；日常操作请回到页面顶部页签", DASHBOARD_HTML)
+            self.assertIn("日常操作请用页面顶部页签", DASHBOARD_HTML)
+            self.assertIn("只有导入不在 Skill 清单里的 skill 时才用这里粘贴路径", DASHBOARD_HTML)
             self.assertNotIn("常用操作", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"simple-action-panel\""),
@@ -1001,10 +997,10 @@ class OpsStatusTest(unittest.TestCase):
             )
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"conflict-resolution-panel\""),
-                DASHBOARD_HTML.index("class=\"support-drawer\""),
+                DASHBOARD_HTML.index("class=\"support-drawer tab-mode\""),
             )
             self.assertLess(
-                DASHBOARD_HTML.index("class=\"support-drawer\""),
+                DASHBOARD_HTML.index("class=\"support-drawer tab-mode\""),
                 DASHBOARD_HTML.index("class=\"easy-workspace panel\""),
             )
             self.assertLess(
@@ -1135,6 +1131,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("uninstallFilteredSkillsFromTool", DASHBOARD_HTML)
             self.assertIn("showInventoryPublishGateHelp", DASHBOARD_HTML)
             self.assertIn("showCentralMutationGateHelp", DASHBOARD_HTML)
+            self.assertIn("发布到中央仓库", DASHBOARD_HTML)
+            self.assertIn("先检查，再确认，把这个本机 skill 发布到中央仓库", DASHBOARD_HTML)
             self.assertIn("保存权限未开启；点击查看开启方法", DASHBOARD_HTML)
             self.assertIn("开启保存权限", DASHBOARD_HTML)
             self.assertIn("查看说明；不会改共享库。", DASHBOARD_HTML)
