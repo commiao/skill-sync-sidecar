@@ -32,6 +32,7 @@ MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "codex": ("codex-global", (".codex", "skills"), "Codex"),
     "cursor": ("cursor-global", (".cursor", "skills-cursor"), "Cursor"),
     "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),
+    "qoder": ("qoder-global", (".qoder", "skills"), "Qoder"),
 }
 
 

@@ -36,6 +36,7 @@ DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
     LocalToolTarget("codex", "Codex", Path.home() / ".codex" / "skills", "codex"),
     LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills-cursor", "cursor"),
     LocalToolTarget("claude-code", "Claude Code", Path.home() / ".claude" / "skills", "claude-code"),
+    LocalToolTarget("qoder", "Qoder", Path.home() / ".qoder" / "skills", "qoder"),
 )
 
 DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "skillshub", "cursor", "claude-code", "openclaw"]

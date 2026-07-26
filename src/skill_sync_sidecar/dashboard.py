@@ -3374,18 +3374,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       color: #fff;
       border-color: var(--ink);
     }
-    .easy-sync-empty {
-      border: 1px solid #cce4d6;
-      background: #f5fbf7;
-      border-radius: 8px;
-      padding: 10px 12px;
-      color: var(--green);
-      font-weight: 760;
-      line-height: 1.35;
-    }
-    .easy-sync-empty.has-work {
-      display: none;
-    }
     .easy-steps {
       display: grid;
       gap: 8px;
@@ -4654,6 +4642,32 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 500;
       color: var(--muted, #667);
     }
+    .skill-source-badges {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .skill-source-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.25;
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #f1f5f9;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .skill-source-badge.tool-cc-switch { border-color: #cdd9f0; background: #eef3fb; color: #33507d; }
+    .skill-source-badge.tool-skillshub { border-color: #d6d0ef; background: #f2effb; color: #574a86; }
+    .skill-source-badge.tool-codex { border-color: #c7e4d4; background: #eefaf2; color: #2f7a52; }
+    .skill-source-badge.tool-cursor { border-color: #cfe0ef; background: #eef6fb; color: #2f6389; }
+    .skill-source-badge.tool-claude-code { border-color: #f0d9c4; background: #fdf3ea; color: #96552a; }
+    .skill-source-badge.tool-qoder { border-color: #d8d2c0; background: #f7f4ea; color: #6f6636; }
+    .skill-source-badge.tool-openclaw { border-color: #e2cbd6; background: #fbeef4; color: #8a3d63; }
     .skill-inventory-row {
       display: grid;
       gap: 8px;
@@ -4929,9 +4943,120 @@ DASHBOARD_HTML = r"""<!doctype html>
     .central-reactivate-button,
     .tool-install-button,
     .tool-uninstall-button,
+    .inventory-local-install-button,
     .codex-install-button {
       padding: 5px 9px;
       font-size: 12px;
+    }
+    .skill-inventory-local-install {
+      display: grid;
+      gap: 6px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      padding: 8px;
+      min-width: 0;
+    }
+    .skill-inventory-local-install-hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .skill-inventory-local-install-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .onboarding-wizard {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid #2f7a52;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f4fbf6 0%, #ffffff 60%);
+      padding: 16px 18px;
+    }
+    .onboarding-wizard-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .onboarding-wizard-kicker {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #2f7a52;
+      text-transform: uppercase;
+    }
+    .onboarding-wizard-title {
+      margin: 2px 0 0;
+      font-size: 18px;
+    }
+    .onboarding-wizard-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+      margin-top: 2px;
+    }
+    .onboarding-wizard-list {
+      display: grid;
+      gap: 10px;
+    }
+    .onboarding-wizard-empty {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 8px 0;
+    }
+    .onboarding-wizard-row {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 12px 14px;
+    }
+    .onboarding-wizard-row-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .onboarding-wizard-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .onboarding-wizard-meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .onboarding-wizard-steps {
+      display: grid;
+      gap: 8px;
+    }
+    .onboarding-wizard-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .onboarding-wizard-step-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      min-width: 128px;
+    }
+    .onboarding-wizard-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    @media (max-width: 560px) {
+      .onboarding-wizard-step-label { min-width: 0; }
     }
     .local-skill-manager {
       border-top: 1px solid var(--line);
@@ -5447,6 +5572,17 @@ DASHBOARD_HTML = r"""<!doctype html>
     <div id="error" class="error"></div>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
+    <section id="onboarding-wizard-panel" class="onboarding-wizard panel" aria-label="新 skill 上架向导" hidden>
+      <div class="onboarding-wizard-head">
+        <div>
+          <div class="onboarding-wizard-kicker">新 skill 上架</div>
+          <h2 class="onboarding-wizard-title">把本机新发现的 skill 一键上架</h2>
+          <div id="onboarding-wizard-subtitle" class="onboarding-wizard-subtitle">读取中…</div>
+        </div>
+        <span class="pill green">一条龙</span>
+      </div>
+      <div id="onboarding-wizard-list" class="onboarding-wizard-list"></div>
+    </section>
     <details class="support-drawer">
       <summary>
         <span class="support-drawer-title">
@@ -5458,16 +5594,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     <details id="easy-workspace" class="easy-workspace panel" aria-label="可选操作">
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
-          <strong>添加或同步 skill</strong>
-          <span>粘贴本机路径，安装到工具；需要共享时再保存到共享库。</span>
+          <strong>手动导入 skill（高级）</strong>
+          <span>顶部「新 skill 上架」会自动列出待上架的 skill；只有导入不在列表里的 skill 时才用这里粘贴路径。</span>
         </div>
         <span class="pill green">只操作本机</span>
       </summary>
       <div class="easy-workspace-grid">
         <div class="easy-card">
-          <div class="easy-card-label">新增/安装</div>
-          <h2>让某个 skill 在本机可用</h2>
-          <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。</p>
+          <div class="easy-card-label">手动导入（高级）</div>
+          <h2>手动导入不在列表里的 skill</h2>
+          <p>粘贴一个 skill 文件夹或 SKILL.md 路径，sidecar 会判断能安装到哪些本机工具。日常上架请优先用顶部「新 skill 上架」向导。</p>
           <div class="local-skill-manager" aria-label="导入本地 Skill">
             <div class="local-skill-manager-head">
               <div class="local-skill-manager-title">三步添加到本机</div>
@@ -5495,22 +5631,6 @@ DASHBOARD_HTML = r"""<!doctype html>
             </details>
             <div id="local-skill-tools" class="local-skill-tools"></div>
           </div>
-        </div>
-        <div class="easy-card">
-          <div class="easy-card-label">同步更新</div>
-          <h2>把已确认的更新同步出去</h2>
-          <p>有设备更新时，这里会出现“先检查”和“保存到共享库”。没有需要确认的事项时不用点任何按钮。</p>
-          <div id="easy-sync-empty" class="easy-sync-empty">当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。</div>
-          <div id="easy-sync-actions" class="easy-action-row pending" hidden>
-            <button type="button" class="primary" onclick="refreshLocalWorkspace()">刷新本机</button>
-            <button id="easy-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>先检查</button>
-            <button id="easy-publish" type="button" onclick="runExecutorAction('publish')" disabled>保存到共享库</button>
-          </div>
-          <ol id="easy-sync-steps" class="easy-steps" aria-label="保存流程" hidden>
-            <li><strong>1</strong><span>先检查会同步哪些 skill；这一步不会写入。</span></li>
-            <li><strong>2</strong><span>确认同步；保存前还会要求输入确认词。</span></li>
-            <li><strong>3</strong><span>看到“现在不用做任何事”才算完成。</span></li>
-          </ol>
         </div>
       </div>
     </details>
@@ -5617,11 +5737,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div id="strip-focus-note" class="focus-note">正在读取同步状态。</div>
         </div>
         <div class="status-chip focus-side">
-          <div class="focus-side-actions">
-            <button id="strip-scan-local" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-            <button id="strip-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查同步</button>
-          </div>
-          <div id="strip-action-note" class="focus-side-note">只操作当前设备；共享库和其他设备只读。</div>
+          <div id="strip-action-note" class="focus-side-note">日常操作请用顶部「现在建议」和「新 skill 上架」；本区只展示状态。</div>
           <div class="focus-metrics" aria-label="同步范围摘要">
             <div class="focus-metric">
               <div class="status-chip-label">本机</div>
@@ -5665,12 +5781,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="workspace-step"><strong>2. 检查</strong><span>只看会改什么，不写共享库。</span></div>
             <div class="workspace-step"><strong>3. 保存</strong><span>确认无误后再写入共享库。</span></div>
           </div>
-          <div class="workspace-actions">
-            <button id="local-workspace-refresh" type="button" class="primary" onclick="refreshLocalWorkspace()">1 扫描本机</button>
-            <button id="local-workspace-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>2 检查</button>
-            <button id="local-workspace-publish" type="button" onclick="runExecutorAction('publish')" disabled>3 保存共享库</button>
-          </div>
-          <div id="local-workspace-action-note" class="local-action-note">正在检查本机助手。</div>
+          <div id="local-workspace-action-note" class="local-action-note">扫描/检查/保存已统一到顶部「现在建议」与「新 skill 上架」；这里只看本机明细。下方仍可重新扫描本机。</div>
           <details class="workspace-secondary">
             <summary>查看数量和工具目录</summary>
             <div class="workspace-metrics">
@@ -5755,12 +5866,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
         <div id="scope-local-count" class="scope-card-count">-</div>
         <div id="scope-local-note" class="scope-card-note">只扫描和处理当前浏览器所在设备。</div>
-        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，保存共享也必须你明确确认。</div>
-        <div class="scope-card-actions">
-          <button id="scope-scan" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
-          <button id="scope-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>检查同步</button>
-          <button id="scope-publish" type="button" onclick="runExecutorAction('publish')" disabled>保存共享库</button>
-        </div>
+        <div class="scope-card-focus">授权发现本机目录是管理本地 skill 的必要权限；这里的操作只影响当前设备，保存共享也必须你明确确认。扫描/检查/保存已统一到顶部主卡与「新 skill 上架」向导。</div>
       </div>
       <div class="scope-readonly-rail" aria-label="共享库和其他设备只读状态">
         <div class="scope-card readonly">
@@ -5813,8 +5919,6 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div id="executor-status" class="executor-status">正在检查本机助手。</div>
             <div class="executor-actions">
               <button id="executor-check" type="button" onclick="checkExecutor()">重新检查</button>
-              <button id="executor-dry-run" type="button" onclick="runExecutorAction('dry_run')" disabled>一键检查</button>
-              <button id="executor-publish" type="button" onclick="runExecutorAction('publish')" disabled>保存到共享库</button>
             </div>
             <pre id="executor-output" class="executor-output mono"></pre>
           </div>
@@ -8033,34 +8137,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const reviewReady = allReviewPublishCandidatesReady();
       const actionableItems = actionableReviewItems(currentReviewQueueItems);
       const sourceChangedCount = reviewSourceChangedItems(actionableItems).length;
-      const deferredCount = currentReviewQueueItems.filter((item) => isDeferredSourceChange(item)).length;
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
-      $("executor-dry-run").disabled = !available || actionSkills.length === 0;
-      $("executor-publish").disabled = !canPublishApprovedPush;
-      $("strip-dry-run").disabled = !available || actionSkills.length === 0;
-      $("scope-dry-run").disabled = !available || actionSkills.length === 0;
-      $("scope-publish").disabled = !canPublishApprovedPush;
-      $("easy-dry-run").disabled = !available || actionSkills.length === 0;
-      $("easy-publish").disabled = !canPublishApprovedPush;
-      const easySyncActions = $("easy-sync-actions");
-      const easySyncEmpty = $("easy-sync-empty");
-      const easySyncSteps = $("easy-sync-steps");
-      if (easySyncActions && easySyncEmpty) {
-        const showSyncActions = actionSkills.length > 0;
-        easySyncActions.hidden = !showSyncActions;
-        easySyncActions.classList.toggle("ready", showSyncActions);
-        easySyncEmpty.classList.toggle("has-work", showSyncActions);
-        if (easySyncSteps) easySyncSteps.hidden = !showSyncActions;
-        easySyncEmpty.textContent = showSyncActions
-          ? (sourceChangedCount > 0
-            ? "普通待审：OpenClaw 有新修改；不影响本机工作区，改完后点检查最新版本。"
-            : "检测到待确认更新。先检查，确认安全后再保存到共享库。")
-          : (deferredCount > 0
-            ? "当前不用处理；普通待审已搁置，可以继续管理本机 skill。"
-            : "当前没有待同步更新。顶部显示“现在不用做任何事”时，可以关闭页面或继续工作。");
-      }
-      $("local-workspace-dry-run").disabled = !available || actionSkills.length === 0;
-      $("local-workspace-publish").disabled = !canPublishApprovedPush;
       const reviewDryRunAll = $("review-dry-run-all");
       const reviewPublishAll = $("review-publish-all");
       const simpleDryRun = $("simple-dry-run");
@@ -8078,13 +8155,6 @@ DASHBOARD_HTML = r"""<!doctype html>
               ? "请先完成检查，确认结果显示可以保存"
               : "写入共享库"));
       }
-      $("easy-publish").title = !available
-        ? "本机助手未在线"
-        : (!executorAllowPublish
-          ? "保存开关未打开；当前只能检查，不能写入共享库"
-          : (!reviewReady && !lastDryRunSafe
-            ? "没有已检查通过的待保存更新"
-            : "保存到共享库"));
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
         setButtonLabel(
@@ -8320,6 +8390,25 @@ DASHBOARD_HTML = r"""<!doctype html>
           : (!executorAllowPublish
             ? "保存权限未开启；点击查看开启方法"
             : "先检查，再确认，把这个本机 skill 保存到共享库");
+      });
+      document.querySelectorAll(".inventory-local-install-button").forEach((button) => {
+        const toolLabel = button.dataset.toolLabel || "工具";
+        const clientName = currentClientName();
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowLocalWrites ? "开启本机写入" : `安装到 ${toolLabel}`),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowLocalWrites ? "查看说明；不会写本机。" : ""),
+        );
+        button.disabled = !available || !button.dataset.skillId || !button.dataset.sourcePath;
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowLocalWrites
+            ? "本机写入权限未开启；点击查看开启方法"
+            : `先检查，再确认，把本机来源安装到 ${clientName} 的 ${toolLabel}`);
       });
       document.querySelectorAll(".inventory-bulk-install-button").forEach((button) => {
         const toolLabel = button.dataset.toolLabel || "工具";
@@ -8760,6 +8849,98 @@ DASHBOARD_HTML = r"""<!doctype html>
         rememberLocalToolChanges([skillId], toolId, "installed");
         rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false });
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
+        setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        rememberSkillRowFeedback(skillId, "red", `安装到 ${toolLabel} 失败`, String(err));
+        setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
+        setExecutorStatus("failed", `安装到 ${toolLabel} 失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function installLocalSkillToTool(button) {
+      const skillId = button.dataset.skillId || "";
+      const toolId = button.dataset.toolId || "";
+      const toolLabel = button.dataset.toolLabel || toolId || "工具";
+      const sourcePath = button.dataset.sourcePath || "";
+      const clientName = currentClientName();
+      if (!skillId || !toolId || !sourcePath) return;
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
+        setExecutorStatus("not ready", "本机助手未在线，不能执行安装检查。", "yellow");
+        return;
+      }
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp(`${toolLabel} skill 目录`);
+        return;
+      }
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", `正在检查安装 ${skillId}`, `检查只读；先确认本机来源可以安装到 ${clientName} 的 ${toolLabel}。`);
+      setExecutorStatus("install check", `正在检查从本机来源安装 ${skillId} 到 ${toolLabel}。`, "yellow");
+      try {
+        const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/local-skill/analyze`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: sourcePath, tool_ids: [toolId] }),
+        });
+        const dryRunPayload = await dryRunResponse.json();
+        showExecutorOutput(formatExecutorResult(dryRunPayload));
+        if (!dryRunResponse.ok || !dryRunPayload.ok) {
+          throw new Error(executorErrorDetail(dryRunPayload));
+        }
+        const toolPlan = (Array.isArray(dryRunPayload.tools) ? dryRunPayload.tools : [])
+          .find((entry) => text(entry.tool_id) === toolId);
+        if (!toolPlan || !toolPlan.allowed || toolPlan.action === "skip") {
+          throw new Error((toolPlan && text(toolPlan.reason)) || `无法安装到 ${toolLabel}（本机可能未安装该工具）。`);
+        }
+        if (toolPlan.action === "noop") {
+          rememberSkillRowFeedback(skillId, "green", `${toolLabel} 已是最新`, "本机来源与目标内容一致，无需安装。", { render: false });
+          setReviewFeedback("green", `${toolLabel} 已是最新`, "本机来源与目标内容一致，无需安装。");
+          setExecutorStatus("noop", `${skillId} 在 ${toolLabel} 已是最新。`, "green");
+          await refreshLocalWorkspace();
+          await refresh(true);
+          return;
+        }
+        setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会从本机来源安装到 ${clientName} 的 ${toolLabel}。共享库不会被修改。`);
+        if (!confirmProtectedWrite({
+          word: "INSTALL",
+          title: `确认安装到 ${toolLabel}：${skillId}`,
+          will: [
+            `把本机来源的 ${skillId} 安装到 ${clientName} 的 ${toolLabel}。`,
+            "只处理这一个 skill。",
+            "完成后自动刷新本机工具状态。",
+          ],
+          willNot: [
+            "不会保存或修改共享库内容。",
+            `不会修改 ${toolLabel} 之外的其他工具目录。`,
+            "不会安装项目级 skill 到全局工具目录。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", `安装到 ${toolLabel} 已取消。`, "yellow");
+          rememberSkillRowFeedback(skillId, "yellow", "安装已取消", `没有写入 ${toolLabel} 目录。`);
+          setReviewFeedback("yellow", "已取消", `没有写入 ${toolLabel} 目录。`);
+          return;
+        }
+        setReviewFeedback("yellow", `正在安装 ${skillId}`, `正在写入 ${clientName} 的 ${toolLabel} skill 目录；原目录会保留备份。`);
+        setExecutorStatus("installing", `正在安装 ${skillId} 到 ${toolLabel}。`, "yellow");
+        const installResponse = await fetch(`${EXECUTOR_URL}/api/local-skill/install`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: sourcePath, tool_ids: [toolId], confirm: "INSTALL" }),
+        });
+        const installPayload = await installResponse.json();
+        showExecutorOutput(formatExecutorResult(installPayload));
+        if (!installResponse.ok || !installPayload.ok) {
+          throw new Error(executorErrorDetail(installPayload));
+        }
+        rememberLocalToolChanges([skillId], toolId, "installed");
+        rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false });
+        setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机来源已安装到 ${clientName} 的 ${toolLabel}；状态正在刷新。`);
         setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
         await refreshLocalWorkspace();
         await refresh(true);
@@ -9561,7 +9742,71 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryWorkbench(model.items || []);
       renderSkillInventoryToolOverview(model.items || []);
       renderSkillInventoryTriage(model.items || []);
+      renderOnboardingWizard(model.items || []);
       renderSkillInventoryFiltered();
+    }
+
+    function onboardingWizardCandidates(items) {
+      return (Array.isArray(items) ? items : []).filter((item) => {
+        const centralState = text((item.central || {}).state || "unpublished");
+        return centralState === "unpublished" && item.scope !== "project";
+      });
+    }
+
+    function renderOnboardingWizardRow(item) {
+      const installed = macInstalledToolIds(item);
+      const publishPath = macPublishSourcePath(item);
+      const skillId = text(item.skill_id);
+      const desc = skillShortDesc(item.skill_id);
+      const badges = skillSourceBadges(item);
+      const publishButton = publishPath
+        ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(skillId)}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>保存到共享库</button>`
+        : `<span class="skill-tool-check">等待本机路径</span>`;
+      const installTools = publishPath ? macUnpublishedInstallTools(item, installed) : [];
+      const installButtons = installTools
+        .map((tool) => `<button type="button" class="inventory-local-install-button" data-skill-id="${escapeHtml(skillId)}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" data-source-path="${escapeHtml(publishPath)}" onclick="installLocalSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`)
+        .join("");
+      const installStep = installButtons
+        ? `<div class="onboarding-wizard-buttons">${installButtons}</div>`
+        : (publishPath
+          ? `<span class="skill-tool-check">已在本机所有支持的工具中</span>`
+          : `<span class="skill-tool-check">等待本机路径</span>`);
+      return `
+        <article class="onboarding-wizard-row">
+          <div class="onboarding-wizard-row-head">
+            <div class="onboarding-wizard-name">${escapeHtml(skillId)}${desc ? `<span class="skill-short-desc">${escapeHtml(desc)}</span>` : ""}${badges}</div>
+            <div class="onboarding-wizard-meta">${escapeHtml(skillScopeLabel(item.scope))} · 未在共享库</div>
+          </div>
+          <div class="onboarding-wizard-steps">
+            <div class="onboarding-wizard-step">
+              <span class="onboarding-wizard-step-label">① 发布到共享库</span>
+              <div class="onboarding-wizard-buttons">${publishButton}</div>
+            </div>
+            <div class="onboarding-wizard-step">
+              <span class="onboarding-wizard-step-label">② 安装到其他工具</span>
+              ${installStep}
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function renderOnboardingWizard(items) {
+      const panel = $("onboarding-wizard-panel");
+      if (!panel) return;
+      const subtitle = $("onboarding-wizard-subtitle");
+      const list = $("onboarding-wizard-list");
+      const candidates = onboardingWizardCandidates(items);
+      panel.hidden = false;
+      if (candidates.length === 0) {
+        if (subtitle) subtitle.textContent = "没有待上架的新 skill：本机发现的 skill 都已进入共享库或为项目级。";
+        if (list) list.innerHTML = `<div class="onboarding-wizard-empty">没有待上架的新 skill。发现本机新增的 skill 后会自动出现在这里，无需粘贴路径。</div>`;
+        return;
+      }
+      if (subtitle) {
+        subtitle.textContent = `发现 ${candidates.length} 个本机新增、未进共享库的 skill。每个都能一步发布到共享库，并安装到其他工具，无需粘贴路径。`;
+      }
+      if (list) list.innerHTML = candidates.map(renderOnboardingWizardRow).join("");
+      setExecutorButtons(executorAvailable);
     }
 
     const SKILL_SHORT_DESC = {
@@ -9749,6 +9994,31 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function skillShortDesc(id) {
       return SKILL_SHORT_DESC[String(id || "")] || "";
+    }
+
+    const SKILL_SOURCE_TOOL_LABELS = {
+      "cc-switch": "cc-switch",
+      "skillshub": "skillshub",
+      "codex": "Codex",
+      "cursor": "Cursor",
+      "claude-code": "Claude",
+      "qoder": "Qoder",
+      "openclaw": "OpenClaw",
+    };
+
+    function skillSourceToolLabel(toolId) {
+      const id = text(toolId).toLowerCase();
+      return SKILL_SOURCE_TOOL_LABELS[id] || text(toolId);
+    }
+
+    function skillSourceBadges(item) {
+      const tools = Array.isArray(item.installed_tools) ? item.installed_tools : [];
+      const badges = tools
+        .map((toolId) => text(toolId))
+        .filter(Boolean)
+        .map((id) => `<span class="skill-source-badge tool-${escapeHtml(id.toLowerCase())}">${escapeHtml(skillSourceToolLabel(id))}</span>`);
+      if (badges.length === 0) return "";
+      return `<span class="skill-source-badges" aria-label="工具来源">${badges.join("")}</span>`;
     }
 
     const SKILL_GROUP_LABELS = {
@@ -10480,11 +10750,22 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>保存到共享库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
         : "";
+      const localInstallButtons = (centralState === "unpublished" && item.scope !== "project" && publishPath)
+        ? macUnpublishedInstallTools(item, installed)
+          .map((tool) => `<button type="button" class="inventory-local-install-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" data-source-path="${escapeHtml(publishPath)}" onclick="installLocalSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`)
+          .join("")
+        : "";
+      const localInstallSection = localInstallButtons
+        ? `<div class="skill-inventory-local-install">
+             <div class="skill-inventory-local-install-hint">未在共享库：可直接从本机来源安装到其他工具（也可先保存到共享库再安装）。</div>
+             <div class="skill-inventory-local-install-buttons">${localInstallButtons}</div>
+           </div>`
+        : "";
       return `
         <article class="skill-inventory-row">
           <div class="skill-inventory-row-main">
             <div>
-              <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}</div>
+              <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}${skillSourceBadges(item)}</div>
               <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
               ${skillInventoryToolSummary(item, installed, installableTools)}
             </div>
@@ -10517,6 +10798,7 @@ DASHBOARD_HTML = r"""<!doctype html>
                 ${deprecateAction}
                 ${reactivateAction}
               </div>
+              ${localInstallSection}
               ${skillInventoryInstallationRows(item)}
             </div>
           </details>
@@ -10683,6 +10965,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     function macUninstallableTools(item, installed) {
       return skillInventoryLocalInstallTools()
         .filter((tool) => installed.has(tool.id));
+    }
+
+    function macUnpublishedInstallTools(item, installed) {
+      return skillInventoryLocalInstallTools()
+        .filter((tool) => !installed.has(tool.id));
     }
 
     function macInstalledToolIds(item) {

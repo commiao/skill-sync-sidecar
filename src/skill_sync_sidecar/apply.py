@@ -62,6 +62,12 @@ GLOBAL_TOOL_TARGETS = {
         "aliases": {"claude-code", "claude"},
         "scope_skip": "project-scoped skills are not installed into Claude Code global root",
     },
+    "qoder-global": {
+        "default_root": Path.home() / ".qoder" / "skills",
+        "scopes": {"global"},
+        "aliases": {"qoder"},
+        "scope_skip": "project-scoped skills are not installed into Qoder global root",
+    },
 }
 
 
