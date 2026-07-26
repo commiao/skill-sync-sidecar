@@ -4720,6 +4720,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 9px 10px;
       min-width: 0;
     }
+    .skill-inventory-row-select {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+      min-height: 28px;
+    }
+    .skill-inventory-row-select input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--blue);
+    }
     .skill-inventory-row-main {
       display: grid;
       gap: 8px;
@@ -5675,7 +5689,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-list-body">
           <div id="skill-inventory-active-view" class="skill-inventory-active-view"></div>
           <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
-          <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量操作"></div>
+          <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="已勾选项批量操作"></div>
           <div id="skill-inventory-list" class="skill-inventory-list"></div>
         </div>
       </details>
@@ -6017,6 +6031,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentSkillInventoryModel = null;
     let currentSkillInventoryTriage = "all";
     let currentSkillInventoryQuick = "all";
+    let selectedSkillInventoryIds = new Set();
     let recentLocalToolChanges = [];
     let recentSkillRowFeedback = [];
     let lastOperationFeedback = null;
@@ -8423,7 +8438,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
             ? "本机写入权限未开启；点击查看开启方法"
-            : `先检查，再确认，把当前筛选结果安装到 ${toolLabel}`);
+            : `先检查，再确认，把已勾选项安装到 ${toolLabel}`);
       });
       document.querySelectorAll(".inventory-bulk-remove-button").forEach((button) => {
         const toolLabel = button.dataset.toolLabel || "工具";
@@ -8441,7 +8456,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowLocalWrites
             ? "本机写入权限未开启；点击查看开启方法"
-            : `先检查，再确认，把当前筛选结果从 ${toolLabel} 移除并保留备份`);
+            : `先检查，再确认，把已勾选项从 ${toolLabel} 移除并保留备份`);
       });
       document.querySelectorAll(".inventory-bulk-publish-button").forEach((button) => {
         setButtonLabel(
@@ -8458,7 +8473,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           ? "本机助手未在线"
           : (!executorAllowPublish
             ? "保存权限未开启；点击查看开启方法"
-            : "先检查当前筛选结果，再一次确认发布到中央仓库");
+            : "先检查已勾选项，再一次确认发布到中央仓库");
       });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
         setButtonLabel(
@@ -8967,7 +8982,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    async function installFilteredSkillsToTool(button) {
+    async function installSelectedSkillsToTool(button) {
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
@@ -8975,10 +8990,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!tool) return;
       const model = currentSkillInventoryModel || { items: [] };
       const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
-      const candidates = bulkInstallCandidatesForTool(filtered, tool);
+      const candidates = bulkInstallCandidatesForTool(selectedSkillInventoryItems(filtered), tool);
       const skillIds = candidates.map((item) => text(item.skill_id)).filter(Boolean);
       if (skillIds.length === 0) {
-        setReviewFeedback("yellow", `没有可安装到 ${toolLabel} 的 skill`, "当前筛选结果里没有符合条件的共享库 skill。");
+        setReviewFeedback("yellow", `没有可安装到 ${toolLabel} 的 skill`, "已勾选项里没有符合条件的共享库 skill。");
         setExecutorStatus("no changes", `没有可安装到 ${toolLabel} 的 skill。`, "yellow");
         return;
       }
@@ -8993,7 +9008,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const names = compactSkillList(skillIds);
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查批量安装到 ${toolLabel}`, `检查只读；当前筛选结果会安装 ${names}。`);
+      setReviewFeedback("yellow", `正在检查批量安装到 ${toolLabel}`, `检查只读；已勾选项会安装 ${names}。`);
       setExecutorStatus("install check", `正在检查安装 ${skillIds.length} 个 skill 到 ${toolLabel}。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-install-from-central-dry-run`, {
@@ -9012,7 +9027,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           word: "INSTALL",
           title: `确认批量安装到 ${toolLabel}`,
           will: [
-            `把当前筛选结果里的 ${skillIds.length} 个共享库 skill 安装到 ${clientName} 的 ${toolLabel}。`,
+            `把已勾选的 ${skillIds.length} 个共享库 skill 安装到 ${clientName} 的 ${toolLabel}。`,
             `本次包括：${names}。`,
             "完成后自动刷新本机工具状态。",
           ],
@@ -9057,7 +9072,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    async function uninstallFilteredSkillsFromTool(button) {
+    async function uninstallSelectedSkillsFromTool(button) {
       const toolId = button.dataset.toolId || "";
       const toolLabel = button.dataset.toolLabel || toolId || "工具";
       const tool = skillInventoryLocalInstallTools().find((entry) => entry.id === toolId);
@@ -9065,10 +9080,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!tool) return;
       const model = currentSkillInventoryModel || { items: [] };
       const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
-      const candidates = bulkUninstallCandidatesForTool(filtered, tool);
+      const candidates = bulkUninstallCandidatesForTool(selectedSkillInventoryItems(filtered), tool);
       const skillIds = candidates.map((item) => text(item.skill_id)).filter(Boolean);
       if (skillIds.length === 0) {
-        setReviewFeedback("yellow", `没有可从 ${toolLabel} 移除的 skill`, "当前筛选结果里没有已安装到这个工具的 skill。");
+        setReviewFeedback("yellow", `没有可从 ${toolLabel} 移除的 skill`, "已勾选项里没有已安装到这个工具的 skill。");
         setExecutorStatus("no changes", `没有可从 ${toolLabel} 移除的 skill。`, "yellow");
         return;
       }
@@ -9083,7 +9098,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const names = compactSkillList(skillIds);
       setExecutorButtons(false);
-      setReviewFeedback("yellow", `正在检查批量从 ${toolLabel} 移除`, `检查只读；当前筛选结果会移除 ${names}。`);
+      setReviewFeedback("yellow", `正在检查批量从 ${toolLabel} 移除`, `检查只读；已勾选项会移除 ${names}。`);
       setExecutorStatus("remove check", `正在检查从 ${toolLabel} 移除 ${skillIds.length} 个 skill。`, "yellow");
       try {
         const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/mac-tool-uninstall-dry-run`, {
@@ -9102,7 +9117,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           word: "REMOVE",
           title: `确认批量从 ${toolLabel} 移除`,
           will: [
-            `把当前筛选结果里的 ${skillIds.length} 个 skill 从 ${clientName} 的 ${toolLabel} 可发现目录移走。`,
+            `把已勾选的 ${skillIds.length} 个 skill 从 ${clientName} 的 ${toolLabel} 可发现目录移走。`,
             `本次包括：${names}。`,
             "把原目录放进 .skill-sync-removed 备份目录。",
             "完成后自动刷新本机工具状态。",
@@ -9148,10 +9163,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }
 
-    async function publishFilteredSkillsToCentral(button) {
+    async function publishSelectedSkillsToCentral(button) {
       const model = currentSkillInventoryModel || { items: [] };
       const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
-      const candidates = bulkPublishCandidates(filtered)
+      const candidates = bulkPublishCandidates(selectedSkillInventoryItems(filtered))
         .map((item) => ({
           skillId: text(item.skill_id),
           sourcePath: macPublishSourcePath(item),
@@ -9159,7 +9174,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         .filter((entry) => entry.skillId && entry.sourcePath);
       const skillIds = candidates.map((entry) => entry.skillId);
       if (skillIds.length === 0) {
-        setReviewFeedback("yellow", "没有可发布的 skill", "当前筛选结果里没有本机有路径、可发布到中央仓库的公用 skill。");
+        setReviewFeedback("yellow", "没有可发布的 skill", "已勾选项里没有本机有路径、可发布到中央仓库的 skill。");
         setExecutorStatus("no changes", "没有可发布到中央仓库的 skill。", "yellow");
         return;
       }
@@ -9174,7 +9189,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       const names = compactSkillList(skillIds);
       setExecutorButtons(false);
-      setReviewFeedback("yellow", "正在检查批量发布", `检查只读；当前筛选结果会检查 ${names}。`);
+      setReviewFeedback("yellow", "正在检查批量发布", `检查只读；已勾选项会检查 ${names}。`);
       setExecutorStatus("publish check", `正在检查 ${skillIds.length} 个 skill 是否可发布到中央仓库。`, "yellow");
       try {
         const checked = [];
@@ -9198,12 +9213,12 @@ DASHBOARD_HTML = r"""<!doctype html>
           skill_ids: checked,
           safe_to_push: true,
         }));
-        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, "下一步确认后，会把当前筛选结果发布到中央仓库。");
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, "下一步确认后，会把已勾选项发布到中央仓库。");
         if (!confirmProtectedWrite({
           word: "PUBLISH",
           title: "确认批量发布到中央仓库",
           will: [
-            `把当前筛选结果里的 ${skillIds.length} 个本机 skill 发布到中央仓库。`,
+            `把已勾选的 ${skillIds.length} 个本机 skill 发布到中央仓库。`,
             `本次包括：${names}。`,
             "完成后自动刷新本机和中央仓库状态。",
           ],
@@ -10198,6 +10213,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const filtered = filterSkillInventoryItems(items, skillInventoryFilters());
       const displayLimit = 300;
       const visible = filtered.slice(0, displayLimit);
+      pruneSelectedSkillInventoryIds(visible);
       const quickNote = currentSkillInventoryQuick === "all" ? "" : `当前工作区：${skillInventoryQuickLabel(currentSkillInventoryQuick)}。`;
       const triageNote = currentSkillInventoryTriage === "all" ? "" : `当前整理视图：${skillInventoryTriageLabel(currentSkillInventoryTriage)}。`;
       renderSkillInventoryActiveView(skillInventoryActiveViewModel(skillInventoryFilters(), filtered.length, items.length));
@@ -10211,6 +10227,28 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `<div class="empty">没有匹配的 skill。清空筛选或换个关键词。</div>`)
         : `<div class="empty">暂无可展示 skill。先点“扫描本机”，或等待设备 Agent 上报。</div>`;
       setExecutorButtons(executorAvailable);
+    }
+
+    function pruneSelectedSkillInventoryIds(visibleItems) {
+      const visibleIds = new Set((Array.isArray(visibleItems) ? visibleItems : []).map((item) => text(item.skill_id)).filter(Boolean));
+      selectedSkillInventoryIds = new Set([...selectedSkillInventoryIds].filter((skillId) => visibleIds.has(skillId)));
+    }
+
+    function toggleSkillInventorySelection(input) {
+      const skillId = input.dataset.skillId || "";
+      if (!skillId) return;
+      if (input.checked) selectedSkillInventoryIds.add(skillId);
+      else selectedSkillInventoryIds.delete(skillId);
+      renderSkillInventoryFiltered();
+    }
+
+    function selectedSkillInventoryItems(items) {
+      return (Array.isArray(items) ? items : []).filter((item) => selectedSkillInventoryIds.has(text(item.skill_id)));
+    }
+
+    function clearSkillInventorySelection() {
+      selectedSkillInventoryIds.clear();
+      renderSkillInventoryFiltered();
     }
 
     function renderSkillInventoryActiveView(view) {
@@ -10240,7 +10278,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (quick === "publishable" || triage === "publishable") {
         return {
           title: `正在看：可保存共享 (${filtered})`,
-          detail: "下一步：点“发布到中央仓库”；会先检查当前筛选结果，全部安全后再要求 PUBLISH。",
+          detail: "下一步：先勾选要发布的 skill，再点“发布到中央仓库”；会先检查，安全后再要求 PUBLISH。",
         };
       }
       if (quick === "pending") {
@@ -10270,7 +10308,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (query || (filters || {}).central !== "all" || (filters || {}).scope !== "all" || (filters || {}).tool !== "all" || (filters || {}).sync !== "all") {
         return {
           title: `正在看：筛选结果 (${filtered}/${all})`,
-          detail: "下一步：筛选只影响显示；需要安装、移除或发布共享时，用上方批量按钮或每行按钮确认。",
+          detail: "下一步：筛选只影响显示；需要安装、移除或发布共享时，先勾选，再用上方按钮或每行按钮确认。",
         };
       }
       return {
@@ -10283,27 +10321,28 @@ DASHBOARD_HTML = r"""<!doctype html>
       const target = $("skill-inventory-bulk-actions");
       if (!target) return;
       const items = Array.isArray(filtered) ? filtered : [];
+      const selectedItems = selectedSkillInventoryItems(items);
       const installTools = skillInventoryLocalInstallTools()
-        .map((tool) => ({ tool, candidates: bulkInstallCandidatesForTool(items, tool) }))
+        .map((tool) => ({ tool, candidates: bulkInstallCandidatesForTool(selectedItems, tool) }))
         .filter((entry) => entry.candidates.length > 0);
       const removeTools = skillInventoryLocalInstallTools()
-        .map((tool) => ({ tool, candidates: bulkUninstallCandidatesForTool(items, tool) }))
+        .map((tool) => ({ tool, candidates: bulkUninstallCandidatesForTool(selectedItems, tool) }))
         .filter((entry) => entry.candidates.length > 0);
-      const publishCandidates = bulkPublishCandidates(items);
-      if (installTools.length === 0 && removeTools.length === 0 && publishCandidates.length === 0) {
+      const publishCandidates = bulkPublishCandidates(selectedItems);
+      if (items.length === 0) {
         target.hidden = true;
         target.innerHTML = "";
         return;
       }
       target.hidden = false;
       target.innerHTML = [
-        `<span class="skill-inventory-bulk-label">批量处理当前筛选结果</span>`,
+        `<span class="skill-inventory-bulk-label">已勾选 ${escapeHtml(text(selectedItems.length))} 项</span>`,
         publishCandidates.length > 0
           ? `<button
               type="button"
               class="inventory-bulk-publish-button"
               data-count="${escapeHtml(text(publishCandidates.length))}"
-              onclick="publishFilteredSkillsToCentral(this)"
+              onclick="publishSelectedSkillsToCentral(this)"
               disabled>发布到中央仓库 (${escapeHtml(text(publishCandidates.length))})</button>`
           : "",
         ...installTools.map(({ tool, candidates }) => `
@@ -10313,7 +10352,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             data-tool-id="${escapeHtml(tool.id)}"
             data-tool-label="${escapeHtml(tool.label)}"
             data-count="${escapeHtml(text(candidates.length))}"
-            onclick="installFilteredSkillsToTool(this)"
+            onclick="installSelectedSkillsToTool(this)"
             disabled>安装到 ${escapeHtml(tool.label)} (${escapeHtml(text(candidates.length))})</button>
         `),
         ...removeTools.map(({ tool, candidates }) => `
@@ -10323,9 +10362,12 @@ DASHBOARD_HTML = r"""<!doctype html>
             data-tool-id="${escapeHtml(tool.id)}"
             data-tool-label="${escapeHtml(tool.label)}"
             data-count="${escapeHtml(text(candidates.length))}"
-            onclick="uninstallFilteredSkillsFromTool(this)"
+            onclick="uninstallSelectedSkillsFromTool(this)"
             disabled>从 ${escapeHtml(tool.label)} 移除 (${escapeHtml(text(candidates.length))})</button>
         `),
+        selectedItems.length > 0
+          ? `<button type="button" onclick="clearSkillInventorySelection()">清空勾选</button>`
+          : `<span class="skill-inventory-bulk-label">先在下方勾选 skill，再发布或安装。</span>`,
       ].join("");
     }
 
@@ -10333,8 +10375,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       return (Array.isArray(items) ? items : []).filter((item) => {
         const centralState = text((item.central || {}).state || "unpublished");
         return centralState === "unpublished"
-          && item.scope !== "project"
-          && unpublishedTriageKind(item) === "publishable"
+          && item.scope !== "device-private"
           && !!macPublishSourcePath(item);
       });
     }
@@ -10821,13 +10862,13 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       const publishPath = macPublishSourcePath(item);
       const publishAction = centralState === "unpublished"
-        ? (item.scope === "project"
-          ? `<span class="skill-tool-check">项目级随项目仓维护</span>`
+        ? (item.scope === "device-private"
+          ? `<span class="skill-tool-check">设备私有不共享</span>`
           : (publishPath
             ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
         : "";
-      const visiblePublishAction = centralState === "unpublished" && item.scope !== "project" && publishPath
+      const visiblePublishAction = centralState === "unpublished" && item.scope !== "device-private" && publishPath
         ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
         : "";
       const localInstallButtons = (centralState === "unpublished" && item.scope !== "project" && publishPath)
@@ -10843,6 +10884,15 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       return `
         <article class="skill-inventory-row">
+          <label class="skill-inventory-row-select">
+            <input
+              type="checkbox"
+              class="skill-inventory-select"
+              data-skill-id="${escapeHtml(text(item.skill_id))}"
+              onchange="toggleSkillInventorySelection(this)"
+              ${selectedSkillInventoryIds.has(text(item.skill_id)) ? "checked" : ""}>
+            <span>选择 ${escapeHtml(text(item.skill_id))}</span>
+          </label>
           <div class="skill-inventory-row-main">
             <div>
               <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}${skillSourceBadges(item)}</div>
