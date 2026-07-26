@@ -22,6 +22,7 @@ from .config import ConfigError, load_cc_switch_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .remote import open_remote
 from .restore import RestoreError, restore_from_central
+from .sync_state import SyncStateError
 from .tool_status import build_device_tool_status
 
 
@@ -890,7 +891,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     self._send_json(200, result)
                     return
                 self._send_json(404, {"ok": False, "error": "not found"})
-            except (OperatorExecutorError, LocalSkillError, RestoreError, CentralLifecycleError, ConfigError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
+            except (OperatorExecutorError, LocalSkillError, RestoreError, CentralLifecycleError, ConfigError, SyncStateError, RuntimeError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
 
         def _read_json(self) -> dict:

@@ -38,9 +38,10 @@ def build_sync_status(
     last_applied_record: Optional[Path] = None,
     source_name: str = "local",
     local_overrides: Optional[Path] = None,
+    local_skill_ids: Optional[Iterable[str]] = None,
 ) -> Dict[str, object]:
     local_root = local_root.expanduser()
-    local = _local_entries_by_skill_id(local_root, source_name)
+    local = _local_entries_by_skill_id(local_root, source_name, local_skill_ids=local_skill_ids)
     remote = _snapshot_entries_by_skill_id(remote_snapshot_dir)
     base = _base_entries_by_skill_id(last_applied_record) if last_applied_record else {}
     overrides = _load_local_overrides(local_root, local_overrides)
@@ -168,8 +169,9 @@ def _item(
     return SyncStateItem(skill_id, action, base_hash, local_hash, remote_hash, reason)
 
 
-def _local_entries_by_skill_id(local_root: Path, source_name: str) -> Dict[str, dict]:
+def _local_entries_by_skill_id(local_root: Path, source_name: str, local_skill_ids: Optional[Iterable[str]] = None) -> Dict[str, dict]:
     summary = scan_roots([f"{source_name}={local_root}"])
+    selected = {str(skill_id).strip() for skill_id in (local_skill_ids or []) if str(skill_id).strip()}
     return _unique_by_skill_id(
         (
             {
@@ -179,6 +181,7 @@ def _local_entries_by_skill_id(local_root: Path, source_name: str) -> Dict[str, 
                 "path": str(skill.path),
             }
             for skill in summary.skills
+            if not selected or skill.skill_id in selected
         ),
         "local",
     )
