@@ -10,6 +10,24 @@ from skill_sync_sidecar.snapshot import write_snapshot
 
 
 class LocalSkillTest(unittest.TestCase):
+    def test_qoder_wired_into_tool_target_maps(self):
+        from skill_sync_sidecar.local_skill import DEFAULT_LOCAL_TOOL_TARGETS
+        from skill_sync_sidecar.operator_executor import MAC_TOOL_INSTALL_TARGETS
+        from skill_sync_sidecar.apply import GLOBAL_TOOL_TARGETS
+
+        local_ids = {target.tool_id for target in DEFAULT_LOCAL_TOOL_TARGETS}
+        self.assertIn("qoder", local_ids)
+        qoder_local = next(t for t in DEFAULT_LOCAL_TOOL_TARGETS if t.tool_id == "qoder")
+        self.assertEqual(qoder_local.root.name, "skills")
+        self.assertEqual(qoder_local.root.parent.name, ".qoder")
+
+        self.assertIn("qoder", MAC_TOOL_INSTALL_TARGETS)
+        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["qoder"][0], "qoder-global")
+        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["qoder"][1], (".qoder", "skills"))
+
+        self.assertIn("qoder-global", GLOBAL_TOOL_TARGETS)
+        self.assertIn("qoder", GLOBAL_TOOL_TARGETS["qoder-global"]["aliases"])
+
     def test_analyze_generates_global_manifest_for_tool_root_skill(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
