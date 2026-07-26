@@ -5675,7 +5675,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div class="skill-inventory-list-body">
           <div id="skill-inventory-active-view" class="skill-inventory-active-view"></div>
           <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
-          <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量安装"></div>
+          <div id="skill-inventory-bulk-actions" class="skill-inventory-bulk-actions" hidden aria-label="当前筛选结果批量操作"></div>
           <div id="skill-inventory-list" class="skill-inventory-list"></div>
         </div>
       </details>
@@ -8443,6 +8443,23 @@ DASHBOARD_HTML = r"""<!doctype html>
             ? "本机写入权限未开启；点击查看开启方法"
             : `先检查，再确认，把当前筛选结果从 ${toolLabel} 移除并保留备份`);
       });
+      document.querySelectorAll(".inventory-bulk-publish-button").forEach((button) => {
+        setButtonLabel(
+          button,
+          !available
+            ? "等待本机助手"
+            : (!executorAllowPublish ? "开启保存权限" : `发布到中央仓库 (${text(button.dataset.count || 0)})`),
+          !available
+            ? "本机助手在线后可继续。"
+            : (!executorAllowPublish ? "查看说明；不会写共享库。" : "先检查，再确认。"),
+        );
+        button.disabled = !available || Number(button.dataset.count || 0) <= 0;
+        button.title = !available
+          ? "本机助手未在线"
+          : (!executorAllowPublish
+            ? "保存权限未开启；点击查看开启方法"
+            : "先检查当前筛选结果，再一次确认发布到中央仓库");
+      });
       document.querySelectorAll(".central-reactivate-button").forEach((button) => {
         setButtonLabel(
           button,
@@ -9126,6 +9143,114 @@ DASHBOARD_HTML = r"""<!doctype html>
         renderSkillInventoryFiltered();
         setReviewFeedback("red", `批量从 ${toolLabel} 移除失败`, String(err));
         setExecutorStatus("failed", `批量从 ${toolLabel} 移除失败，请查看执行输出。`, "red");
+      } finally {
+        setExecutorButtons(executorAvailable);
+      }
+    }
+
+    async function publishFilteredSkillsToCentral(button) {
+      const model = currentSkillInventoryModel || { items: [] };
+      const filtered = filterSkillInventoryItems(Array.isArray(model.items) ? model.items : [], skillInventoryFilters());
+      const candidates = bulkPublishCandidates(filtered)
+        .map((item) => ({
+          skillId: text(item.skill_id),
+          sourcePath: macPublishSourcePath(item),
+        }))
+        .filter((entry) => entry.skillId && entry.sourcePath);
+      const skillIds = candidates.map((entry) => entry.skillId);
+      if (skillIds.length === 0) {
+        setReviewFeedback("yellow", "没有可发布的 skill", "当前筛选结果里没有本机有路径、可发布到中央仓库的公用 skill。");
+        setExecutorStatus("no changes", "没有可发布到中央仓库的 skill。", "yellow");
+        return;
+      }
+      if (!executorAvailable) {
+        setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线。`);
+        setExecutorStatus("not ready", "本机助手未在线，不能执行批量发布检查。", "yellow");
+        return;
+      }
+      if (!executorAllowPublish) {
+        showInventoryPublishGateHelp(skillIds[0]);
+        return;
+      }
+      const names = compactSkillList(skillIds);
+      setExecutorButtons(false);
+      setReviewFeedback("yellow", "正在检查批量发布", `检查只读；当前筛选结果会检查 ${names}。`);
+      setExecutorStatus("publish check", `正在检查 ${skillIds.length} 个 skill 是否可发布到中央仓库。`, "yellow");
+      try {
+        const checked = [];
+        for (const candidate of candidates) {
+          const dryRunResponse = await fetch(`${EXECUTOR_URL}/api/local-skill/publish-dry-run`, {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: candidate.sourcePath }),
+          });
+          const dryRunPayload = await dryRunResponse.json();
+          checked.push(candidate.skillId);
+          if (!dryRunResponse.ok || !dryRunPayload.ok || !dryRunPayload.safe_to_push) {
+            throw new Error(`${candidate.skillId}: ${executorErrorDetail(dryRunPayload)}`);
+          }
+        }
+        showExecutorOutput(formatExecutorResult({
+          ok: true,
+          mode: "bulk_publish_dry_run",
+          checked: checked.length,
+          skill_ids: checked,
+          safe_to_push: true,
+        }));
+        setReviewFeedback("green", `检查通过：${skillIds.length} 个 skill`, "下一步确认后，会把当前筛选结果发布到中央仓库。");
+        if (!confirmProtectedWrite({
+          word: "PUBLISH",
+          title: "确认批量发布到中央仓库",
+          will: [
+            `把当前筛选结果里的 ${skillIds.length} 个本机 skill 发布到中央仓库。`,
+            `本次包括：${names}。`,
+            "完成后自动刷新本机和中央仓库状态。",
+          ],
+          willNot: [
+            "不会安装到 OpenClaw、Windows 或其他工具。",
+            "不会删除中央仓库已有内容。",
+            "不会把项目级 skill 当作全局发布动作。",
+          ],
+        })) {
+          setExecutorStatus("cancelled", "批量发布已取消。", "yellow");
+          skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "yellow", "发布已取消", "没有写入中央仓库。", { render: false }));
+          renderSkillInventoryFiltered();
+          setReviewFeedback("yellow", "已取消", "没有写入中央仓库。");
+          return;
+        }
+        setReviewFeedback("yellow", "正在批量发布", `正在把 ${names} 写入中央仓库；完成后会刷新状态。`);
+        setExecutorStatus("publishing", `正在发布 ${skillIds.length} 个 skill 到中央仓库。`, "yellow");
+        const published = [];
+        for (const candidate of candidates) {
+          const response = await fetch(`${EXECUTOR_URL}/api/local-skill/publish`, {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: candidate.sourcePath, confirm: "PUBLISH" }),
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            throw new Error(`${candidate.skillId}: ${executorErrorDetail(payload)}`);
+          }
+          published.push(candidate.skillId);
+          rememberSkillRowFeedback(candidate.skillId, "green", "已发布到中央仓库", "中央仓库状态正在刷新；需要安装到工具时再在清单中勾选。", { render: false });
+        }
+        showExecutorOutput(formatExecutorResult({
+          ok: true,
+          mode: "bulk_publish",
+          published: published.length,
+          skill_ids: published,
+        }));
+        setReviewFeedback("green", `已发布 ${published.length} 个 skill`, "中央仓库状态正在刷新；需要安装到工具时再在清单中勾选。");
+        setExecutorStatus("published", `${published.length} 个 skill 已发布到中央仓库。`, "green");
+        await refreshLocalWorkspace();
+        await refresh(true);
+      } catch (err) {
+        skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", "批量发布失败", String(err), { render: false }));
+        renderSkillInventoryFiltered();
+        setReviewFeedback("red", "批量发布失败", String(err));
+        setExecutorStatus("failed", "批量发布失败，请查看执行输出。", "red");
       } finally {
         setExecutorButtons(executorAvailable);
       }
@@ -10115,7 +10240,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (quick === "publishable" || triage === "publishable") {
         return {
           title: `正在看：可保存共享 (${filtered})`,
-          detail: "下一步：逐个点“保存到共享库”；会先检查并要求 PUBLISH。",
+          detail: "下一步：点“发布到中央仓库”；会先检查当前筛选结果，全部安全后再要求 PUBLISH。",
         };
       }
       if (quick === "pending") {
@@ -10145,7 +10270,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (query || (filters || {}).central !== "all" || (filters || {}).scope !== "all" || (filters || {}).tool !== "all" || (filters || {}).sync !== "all") {
         return {
           title: `正在看：筛选结果 (${filtered}/${all})`,
-          detail: "下一步：筛选只影响显示；需要安装、移除或保存共享时，再用每行按钮确认。",
+          detail: "下一步：筛选只影响显示；需要安装、移除或发布共享时，用上方批量按钮或每行按钮确认。",
         };
       }
       return {
@@ -10164,14 +10289,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       const removeTools = skillInventoryLocalInstallTools()
         .map((tool) => ({ tool, candidates: bulkUninstallCandidatesForTool(items, tool) }))
         .filter((entry) => entry.candidates.length > 0);
-      if (installTools.length === 0 && removeTools.length === 0) {
+      const publishCandidates = bulkPublishCandidates(items);
+      if (installTools.length === 0 && removeTools.length === 0 && publishCandidates.length === 0) {
         target.hidden = true;
         target.innerHTML = "";
         return;
       }
       target.hidden = false;
       target.innerHTML = [
-        `<span class="skill-inventory-bulk-label">批量安装/移除当前筛选结果</span>`,
+        `<span class="skill-inventory-bulk-label">批量处理当前筛选结果</span>`,
+        publishCandidates.length > 0
+          ? `<button
+              type="button"
+              class="inventory-bulk-publish-button"
+              data-count="${escapeHtml(text(publishCandidates.length))}"
+              onclick="publishFilteredSkillsToCentral(this)"
+              disabled>发布到中央仓库 (${escapeHtml(text(publishCandidates.length))})</button>`
+          : "",
         ...installTools.map(({ tool, candidates }) => `
           <button
             type="button"
@@ -10193,6 +10327,16 @@ DASHBOARD_HTML = r"""<!doctype html>
             disabled>从 ${escapeHtml(tool.label)} 移除 (${escapeHtml(text(candidates.length))})</button>
         `),
       ].join("");
+    }
+
+    function bulkPublishCandidates(items) {
+      return (Array.isArray(items) ? items : []).filter((item) => {
+        const centralState = text((item.central || {}).state || "unpublished");
+        return centralState === "unpublished"
+          && item.scope !== "project"
+          && unpublishedTriageKind(item) === "publishable"
+          && !!macPublishSourcePath(item);
+      });
     }
 
     function bulkInstallCandidatesForTool(items, tool) {
