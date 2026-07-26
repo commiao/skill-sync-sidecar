@@ -75,7 +75,7 @@ def _write_tombstone(
         raise TombstoneError(f"tombstone already exists: {tombstone_dir}")
     tombstone_dir.mkdir(parents=True)
 
-    propagation = "delete_remote" if action == "local_deleted" else "delete_local"
+    propagation = "deprecate_remote" if action == "local_deleted" else "delete_local"
     metadata = {
         "protocol_version": 0,
         "record_type": "skill-sync-tombstone",
@@ -91,6 +91,7 @@ def _write_tombstone(
         "remote_snapshot": str(remote_snapshot_dir.resolve()),
         "last_applied_record": str(last_applied_record.resolve()) if last_applied_record else None,
         "state": "pending",
+        "note": "Device-side deletion can only request restore or central deprecate review; it must not physically delete central files.",
     }
     (tombstone_dir / "tombstone.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     _write_local_material(tombstone_dir, local_root, skill_id)
@@ -136,7 +137,7 @@ def _write_base_material(tombstone_dir: Path, item: dict, last_applied_record: O
         "skill_id": item.get("skill_id"),
         "base_hash": item.get("base_hash"),
         "last_applied_record": str(last_applied_record.resolve()) if last_applied_record else None,
-        "note": "Tombstones are non-destructive markers. Delete execution must use a later explicit retention/rollback gate.",
+        "note": "Tombstones are non-destructive markers. Device-side local deletion may lead to restore or central deprecate review, never automatic central file deletion.",
     }
     (tombstone_dir / "base.json").write_text(json.dumps(base, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

@@ -733,7 +733,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("报告判断：OpenClaw 当前缺失，共享库仍有完整版本", DASHBOARD_HTML)
             self.assertIn("恢复共享库版到 OpenClaw", DASHBOARD_HTML)
             self.assertIn("其他选择和风险说明", DASHBOARD_HTML)
-            self.assertIn("当前面板不会一键删除共享库", DASHBOARD_HTML)
+            self.assertIn("当前面板只会引导软删除/下架", DASHBOARD_HTML)
             self.assertIn("报告判断：共享库缺失，OpenClaw 仍有版本", DASHBOARD_HTML)
             self.assertIn("保存 OpenClaw 版到共享库", DASHBOARD_HTML)
             self.assertIn("先看版本差异", DASHBOARD_HTML)
@@ -1566,8 +1566,8 @@ class OpsStatusTest(unittest.TestCase):
                                     "plan_action": "blocked",
                                     "allowed": False,
                                     "category": "delete_review",
-                                    "reason": "local deletion requires --allow-delete before remote deletion",
-                                    "recommendation": "Require explicit retention or delete approval.",
+                                    "reason": "local deletion requires restore or central deprecate review; remote files are not physically deleted",
+                                    "recommendation": "Restore to the missing device or mark deprecated in central.",
                                     "base_hash": "delete-base",
                                     "local_hash": None,
                                     "remote_hash": "delete-base",
@@ -1599,10 +1599,12 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["skill_id"], "session-knowledge-manager")
             self.assertEqual(status["dashboard"]["operator"]["top_issue"]["category"], "delete_review")
             self.assertIn("建议先从共享库找回", status["dashboard"]["operator"]["top_issue"]["action"])
+            self.assertIn("标记下架", status["dashboard"]["operator"]["top_issue"]["action"])
             self.assertEqual(guide["title"], "先处理缺失/删除确认")
             self.assertIn("session-knowledge-manager", guide["summary"])
             self.assertIn("不会静默删除", guide["summary"])
             self.assertIn("红色邮件提醒", guide["note"])
+            self.assertIn("标记下架", guide["note"])
 
     def test_dashboard_hub_import_preview_response_is_non_writing_dry_run(self):
         with TemporaryDirectory() as tmp:

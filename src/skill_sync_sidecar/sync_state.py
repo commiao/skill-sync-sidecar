@@ -268,7 +268,19 @@ def _snapshot_entries_by_skill_id(snapshot_dir: Path) -> Dict[str, dict]:
     if not index_path.exists():
         raise SyncStateError(f"remote snapshot has no index.json: {snapshot_dir}")
     index = json.loads(index_path.read_text(encoding="utf-8"))
-    return _unique_by_skill_id(index.get("skills", []), "remote")
+    return _unique_by_skill_id(
+        (skill for skill in index.get("skills", []) if _central_lifecycle_state(skill) != "deprecated"),
+        "remote",
+    )
+
+
+def _central_lifecycle_state(skill: dict) -> str:
+    lifecycle = skill.get("lifecycle")
+    if isinstance(lifecycle, dict) and lifecycle.get("state"):
+        return str(lifecycle["state"])
+    if skill.get("state"):
+        return str(skill["state"])
+    return "published"
 
 
 def _base_entries_by_skill_id(record_path: Path) -> Dict[str, dict]:

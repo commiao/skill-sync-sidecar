@@ -16,7 +16,7 @@ class SyncCycleError(RuntimeError):
     pass
 
 
-DELETE_PLAN_ACTIONS = {"delete_local", "delete_remote"}
+DELETE_PLAN_ACTIONS = {"delete_local", "deprecate_remote"}
 
 
 def run_sync_cycle(
@@ -148,7 +148,7 @@ def _reason(
     if conflicts and conflicts.get("total_conflicts", 0):
         return "conflicts were materialized for manual review"
     if delete_actions:
-        return "delete propagation is staged as tombstones and not executed automatically"
+        return "delete/deprecate review is staged as tombstones and not executed automatically"
     if plan.get("blocked"):
         return "sync plan has blocked items"
     if tombstones and tombstones.get("total_tombstones", 0):
