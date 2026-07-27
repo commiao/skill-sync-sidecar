@@ -1833,6 +1833,54 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(inventory["items"][0]["skill_id"], "demo")
             self.assertIn("codex", inventory["items"][0]["installed_tools"])
 
+    def test_skill_inventory_prefers_central_scope_for_published_skill(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "kg-use", "kg-use", "KG workflow")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-central-global")
+
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "oc-vps": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "green",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "pull-only", "blocked": 0},
+                        "tools": [
+                            {
+                                "id": "openclaw",
+                                "name": "OpenClaw",
+                                "state": "detected",
+                                "skills": 1,
+                                "skill_items": [
+                                    {
+                                        "skill_id": "kg-use",
+                                        "name": "kg-use",
+                                        "scope": "project",
+                                        "path": "/home/admin/clawd/skills/kg-use",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                },
+            )
+
+            item = status["dashboard"]["skill_inventory"]["items"][0]
+            self.assertEqual(item["skill_id"], "kg-use")
+            self.assertEqual(item["central"]["state"], "published")
+            self.assertEqual(item["central"]["scope"], "global")
+            self.assertEqual(item["scope"], "global")
+            self.assertIn("openclaw", item["installed_tools"])
+            self.assertEqual(item["action"], "可选择安装到本机工具。")
+
     def test_dashboard_summary_keeps_ui_data_without_heavy_projection(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

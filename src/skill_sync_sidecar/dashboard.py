@@ -1463,6 +1463,7 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         entry["scope"] = skill.get("scope") or entry.get("scope") or "global"
         entry["central"] = {
             "state": _central_skill_state(skill),
+            "scope": skill.get("scope") or "global",
             "content_hash": skill.get("content_hash"),
             "targets": skill.get("targets") or [],
             "lifecycle": skill.get("lifecycle") if isinstance(skill.get("lifecycle"), dict) else {},
@@ -1488,7 +1489,13 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
                 entry = by_skill.setdefault(skill_id, _empty_skill_inventory_item(skill_id))
                 entry["name"] = entry.get("name") or skill.get("name") or skill_id
                 entry["description"] = entry.get("description") or skill.get("description")
-                entry["scope"] = _merge_skill_scope(entry.get("scope"), skill.get("scope"))
+                central = entry.get("central") if isinstance(entry.get("central"), dict) else {}
+                central_state = central.get("state")
+                central_scope = central.get("scope")
+                if central_state in {"published", "deprecated"} and central_scope:
+                    entry["scope"] = str(central_scope)
+                else:
+                    entry["scope"] = _merge_skill_scope(entry.get("scope"), skill.get("scope"))
                 entry["installations"].append(
                     {
                         "device_id": device_id,
@@ -10375,7 +10382,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       return (Array.isArray(items) ? items : []).filter((item) => {
         const centralState = text((item.central || {}).state || "unpublished");
         return centralState === "unpublished"
-          && item.scope !== "device-private"
+          && effectiveSkillScope(item) !== "device-private"
           && !!macPublishSourcePath(item);
       });
     }
@@ -10385,7 +10392,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const installed = macInstalledToolIds(item);
         const centralState = text((item.central || {}).state || "unpublished");
         return centralState === "published"
-          && item.scope !== "project"
+          && effectiveSkillScope(item) !== "project"
           && !installed.has(tool.id)
           && skillTargetsTool(item, tool);
       });
@@ -10490,7 +10497,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           const installed = macInstalledToolIds(item);
           const centralState = text((item.central || {}).state || "unpublished");
           if (installed.has(tool.id)) installedCount += 1;
-          else if (centralState === "published" && item.scope !== "project" && skillTargetsTool(item, tool)) installableCount += 1;
+          else if (centralState === "published" && effectiveSkillScope(item) !== "project" && skillTargetsTool(item, tool)) installableCount += 1;
         });
         return { tool, installedCount, installableCount };
       });
@@ -10674,7 +10681,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         if (filters.quick === "pending" && Number(item.pending || 0) <= 0) return false;
         if (filters.triage !== "all" && unpublishedTriageKind(item) !== filters.triage) return false;
         if (filters.central !== "all" && centralState !== filters.central) return false;
-        if (filters.scope !== "all" && text(item.scope || "global") !== filters.scope) return false;
+        if (filters.scope !== "all" && effectiveSkillScope(item) !== filters.scope) return false;
         if (filters.sync === "pending" && Number(item.pending || 0) <= 0) return false;
         if (filters.sync === "clean" && Number(item.pending || 0) > 0) return false;
         if (filters.tool === "mac-none" && installed.size > 0) return false;
@@ -10692,7 +10699,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             item.skill_id,
             item.name,
             item.description,
-            item.scope,
+            effectiveSkillScope(item),
             centralState,
             ...(Array.isArray(item.installed_tools) ? item.installed_tools : []),
             ...(Array.isArray(item.installed_devices) ? item.installed_devices : []),
@@ -10776,7 +10783,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             });
           }
           entry.name = entry.name || skill.name || skillId;
-          entry.scope = entry.scope === "project" || skill.scope === "project" ? "project" : (entry.scope || skill.scope || "global");
+          entry.scope = mergeInventoryScope(entry, skill.scope);
           bySkill[skillId] = entry;
         });
       });
@@ -10800,7 +10807,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         total: items.length,
         published: items.filter((item) => (item.central || {}).state === "published").length,
         unpublished: items.filter((item) => (item.central || {}).state === "unpublished").length,
-        project: items.filter((item) => item.scope === "project").length,
+        project: items.filter((item) => effectiveSkillScope(item) === "project").length,
         items,
       };
     }
@@ -10809,6 +10816,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const installed = macInstalledToolIds(item);
       const pending = Number(item.pending || 0) > 0;
       const centralState = text((item.central || {}).state || "unpublished");
+      const effectiveScope = effectiveSkillScope(item);
       const installableTools = macInstallableTools(item, installed, centralState);
       const uninstallableTools = macUninstallableTools(item, installed);
       const recommendation = skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools);
@@ -10816,7 +10824,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         const active = installed.has(tool.id);
         const recentChange = recentLocalToolChangeFor(item.skill_id, tool.id);
         const targetsThisTool = skillTargetsTool(item, tool);
-        const canInstall = centralState === "published" && item.scope !== "project" && targetsThisTool;
+        const canInstall = centralState === "published" && effectiveScope !== "project" && targetsThisTool;
         const canToggle = tool.localInstall && (active || canInstall);
         const labelClass = [
           "skill-tool-toggle-label",
@@ -10862,16 +10870,16 @@ DASHBOARD_HTML = r"""<!doctype html>
         : "";
       const publishPath = macPublishSourcePath(item);
       const publishAction = centralState === "unpublished"
-        ? (item.scope === "device-private"
+        ? (effectiveScope === "device-private"
           ? `<span class="skill-tool-check">设备私有不共享</span>`
           : (publishPath
             ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
             : `<span class="skill-tool-check">等待本机路径</span>`))
         : "";
-      const visiblePublishAction = centralState === "unpublished" && item.scope !== "device-private" && publishPath
+      const visiblePublishAction = centralState === "unpublished" && effectiveScope !== "device-private" && publishPath
         ? `<button type="button" class="inventory-publish-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-source-path="${escapeHtml(publishPath)}" onclick="publishInventorySkill(this)" disabled>发布到中央仓库</button>`
         : "";
-      const localInstallButtons = (centralState === "unpublished" && item.scope !== "project" && publishPath)
+      const localInstallButtons = (centralState === "unpublished" && effectiveScope !== "project" && publishPath)
         ? macUnpublishedInstallTools(item, installed)
           .map((tool) => `<button type="button" class="inventory-local-install-button" data-skill-id="${escapeHtml(text(item.skill_id))}" data-tool-id="${escapeHtml(tool.id)}" data-tool-label="${escapeHtml(tool.label)}" data-source-path="${escapeHtml(publishPath)}" onclick="installLocalSkillToTool(this)" disabled>安装到 ${escapeHtml(tool.label)}</button>`)
           .join("")
@@ -10896,7 +10904,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="skill-inventory-row-main">
             <div>
               <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}${skillSourceBadges(item)}</div>
-              <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(item.scope))} · ${escapeHtml(centralLabel(centralState))}</div>
+              <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(effectiveScope))} · ${escapeHtml(centralLabel(centralState))}</div>
               ${skillInventoryToolSummary(item, installed, installableTools)}
             </div>
             <div class="skill-inventory-row-actions">
@@ -10954,7 +10962,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
       if (installableLabels.length > 0) {
         chips.push(`<span>可装：${escapeHtml(compactSkillList(installableLabels))}</span>`);
-      } else if (item.scope === "project") {
+      } else if (effectiveSkillScope(item) === "project") {
         chips.push(`<span>项目级不装全局</span>`);
       }
       if (deviceSummary) {
@@ -11015,6 +11023,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function skillInventoryRecommendation(item, installed, centralState, installableTools, uninstallableTools) {
       const pending = Number(item.pending || 0);
+      const effectiveScope = effectiveSkillScope(item);
       if (pending > 0) {
         return {
           kind: "pending",
@@ -11030,7 +11039,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         };
       }
       if (centralState === "unpublished") {
-        if (item.scope === "project") {
+        if (effectiveScope === "project") {
           return {
             kind: "muted",
             title: "项目级：随项目仓维护",
@@ -11074,13 +11083,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     function codexInstallStatus(item, installed, centralState) {
       if (installed.has("codex")) return "Codex 已安装";
       if (centralState !== "published") return "先保存共享库";
-      if (item.scope === "project") return "项目级不装全局";
+      if (effectiveSkillScope(item) === "project") return "项目级不装全局";
       return "可安装到 Codex";
     }
 
     function toolInstallStatus(item, installed, centralState) {
       if (centralState !== "published") return "先保存共享库";
-      if (item.scope === "project") return "项目级不装全局";
+      if (effectiveSkillScope(item) === "project") return "项目级不装全局";
       const localTools = skillInventoryLocalInstallTools();
       const allInstalled = localTools.every((tool) => installed.has(tool.id) || !skillTargetsTool(item, tool));
       if (allInstalled) return "本机兼容工具已安装";
@@ -11088,7 +11097,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function macInstallableTools(item, installed, centralState) {
-      if (centralState !== "published" || item.scope === "project") return [];
+      if (centralState !== "published" || effectiveSkillScope(item) === "project") return [];
       return skillInventoryLocalInstallTools()
         .filter((tool) => !installed.has(tool.id) && skillTargetsTool(item, tool));
     }
@@ -11125,7 +11134,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function unpublishedTriageKind(item) {
       const centralState = text((item.central || {}).state || "unpublished");
       if (centralState !== "unpublished") return "";
-      const scope = text(item.scope || "global");
+      const scope = effectiveSkillScope(item);
       if (scope === "project") return "project";
       if (scope === "device-private") return "private";
       if (macPublishSourcePath(item)) return "publishable";
@@ -11172,6 +11181,26 @@ DASHBOARD_HTML = r"""<!doctype html>
       return "公用";
     }
 
+    function effectiveSkillScope(item) {
+      const central = item && item.central ? item.central : {};
+      const centralState = text(central.state || "");
+      const centralScope = text(central.scope || "");
+      if ((centralState === "published" || centralState === "deprecated") && centralScope) return centralScope;
+      return text((item || {}).scope || "global");
+    }
+
+    function mergeInventoryScope(entry, incomingScope) {
+      const central = entry && entry.central ? entry.central : {};
+      const centralState = text(central.state || "");
+      const centralScope = text(central.scope || "");
+      if ((centralState === "published" || centralState === "deprecated") && centralScope) return centralScope;
+      const existingScope = text((entry || {}).scope || "");
+      const nextScope = text(incomingScope || "");
+      if (existingScope === "project" || nextScope === "project") return "project";
+      if (existingScope === "device-private" || nextScope === "device-private") return "device-private";
+      return existingScope || nextScope || "global";
+    }
+
     function centralLabel(state) {
       if (state === "published") return "已在共享库";
       if (state === "deprecated") return "已废弃";
@@ -11190,7 +11219,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (Number(item.pending || 0) > 0) return "先查看待审详情；不会自动写入或删除。";
       if (state === "deprecated") return "需要重新使用时，先点恢复可用。";
       if (state === "unpublished") {
-        if (item.scope === "project") return "保持在项目仓维护，不走全局安装。";
+        if (effectiveSkillScope(item) === "project") return "保持在项目仓维护，不走全局安装。";
         if (macPublishSourcePath(item)) return "点保存到共享库；会先检查，再要求 PUBLISH。";
         return "等待本机扫描到路径后，再决定是否共享。";
       }
