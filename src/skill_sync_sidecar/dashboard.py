@@ -6039,6 +6039,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentSkillInventoryTriage = "all";
     let currentSkillInventoryQuick = "all";
     let selectedSkillInventoryIds = new Set();
+    let openSkillInventoryGroups = new Set();
+    let openSkillInventoryDetails = new Set();
     let recentLocalToolChanges = [];
     let recentSkillRowFeedback = [];
     let lastOperationFeedback = null;
@@ -8886,8 +8888,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false });
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机状态正在刷新；Skill 清单里 ${toolLabel} 标记会变成已安装。`);
         setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
-        await refreshLocalWorkspace();
-        await refresh(true);
+        await refreshAfterLocalToolOperation();
       } catch (err) {
         rememberSkillRowFeedback(skillId, "red", `安装到 ${toolLabel} 失败`, String(err));
         setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
@@ -8937,8 +8938,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           rememberSkillRowFeedback(skillId, "green", `${toolLabel} 已是最新`, "本机来源与目标内容一致，无需安装。", { render: false });
           setReviewFeedback("green", `${toolLabel} 已是最新`, "本机来源与目标内容一致，无需安装。");
           setExecutorStatus("noop", `${skillId} 在 ${toolLabel} 已是最新。`, "green");
-          await refreshLocalWorkspace();
-          await refresh(true);
+          await refreshAfterLocalToolOperation();
           return;
         }
         setReviewFeedback("green", `检查通过：${skillId}`, `下一步确认后，会从本机来源安装到 ${clientName} 的 ${toolLabel}。共享库不会被修改。`);
@@ -8978,8 +8978,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false });
         setReviewFeedback("green", `${skillId} 已安装到 ${toolLabel}`, `本机来源已安装到 ${clientName} 的 ${toolLabel}；状态正在刷新。`);
         setExecutorStatus("installed", `${skillId} 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
-        await refreshLocalWorkspace();
-        await refresh(true);
+        await refreshAfterLocalToolOperation();
       } catch (err) {
         rememberSkillRowFeedback(skillId, "red", `安装到 ${toolLabel} 失败`, String(err));
         setReviewFeedback("red", `安装到 ${toolLabel} 失败`, String(err));
@@ -9067,8 +9066,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "green", `已安装到 ${toolLabel}`, "本机状态正在刷新；完成后这一行会显示为已安装。", { render: false }));
         setReviewFeedback("green", `已安装到 ${toolLabel}`, `已处理 ${names}；本机状态正在刷新。`);
         setExecutorStatus("installed", `${skillIds.length} 个 skill 已安装到 ${clientName} 的 ${toolLabel}。`, "green");
-        await refreshLocalWorkspace();
-        await refresh(true);
+        await refreshAfterLocalToolOperation();
       } catch (err) {
         skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", `批量安装到 ${toolLabel} 失败`, String(err), { render: false }));
         renderSkillInventoryFiltered();
@@ -9158,8 +9156,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "green", `已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。", { render: false }));
         setReviewFeedback("green", `已从 ${toolLabel} 移除`, `已处理 ${names}；文件已保留在移除备份目录，本机状态正在刷新。`);
         setExecutorStatus("removed", `${skillIds.length} 个 skill 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
-        await refreshLocalWorkspace();
-        await refresh(true);
+        await refreshAfterLocalToolOperation();
       } catch (err) {
         skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", `批量从 ${toolLabel} 移除失败`, String(err), { render: false }));
         renderSkillInventoryFiltered();
@@ -9266,7 +9263,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         }));
         setReviewFeedback("green", `已发布 ${published.length} 个 skill`, "中央仓库状态正在刷新；需要安装到工具时再在清单中勾选。");
         setExecutorStatus("published", `${published.length} 个 skill 已发布到中央仓库。`, "green");
-        await refreshLocalWorkspace();
+        await refreshLocalWorkspace({ quiet: true });
         await refresh(true);
       } catch (err) {
         skillIds.forEach((skillId) => rememberSkillRowFeedback(skillId, "red", "批量发布失败", String(err), { render: false }));
@@ -9354,8 +9351,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         rememberSkillRowFeedback(skillId, "green", `已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。", { render: false });
         setReviewFeedback("green", `${skillId} 已从 ${toolLabel} 移除`, "本机状态正在刷新；文件已保留在移除备份目录。");
         setExecutorStatus("removed", `${skillId} 已从 ${clientName} 的 ${toolLabel} 移除。`, "green");
-        await refreshLocalWorkspace();
-        await refresh(true);
+        await refreshAfterLocalToolOperation();
       } catch (err) {
         rememberSkillRowFeedback(skillId, "red", `从 ${toolLabel} 移除失败`, String(err));
         setReviewFeedback("red", `从 ${toolLabel} 移除失败`, String(err));
@@ -10203,7 +10199,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       return named.map((g) => {
         const rows = g.items.map((item) => renderSkillInventoryRow(item)).join("");
         return `
-          <details class="skill-group">
+          <details class="skill-group" data-skill-group-id="${escapeHtml(g.id)}"${openSkillInventoryGroups.has(g.id) ? " open" : ""}>
             <summary class="skill-group-summary">
               <span class="skill-group-name">${escapeHtml(g.label)}</span>
               <span class="skill-group-count">${g.items.length}</span>
@@ -10920,7 +10916,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <div class="skill-tool-matrix-title">本机工具</div>
             <div class="skill-tool-checks">${toolChecks}</div>
           </div>
-          <details class="skill-inventory-detail">
+          <details class="skill-inventory-detail" data-skill-id="${escapeHtml(text(item.skill_id))}"${openSkillInventoryDetails.has(text(item.skill_id)) ? " open" : ""}>
             <summary>高级详情</summary>
             <div class="skill-inventory-detail-body">
               <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
@@ -11355,7 +11351,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       return (Array.isArray(items) ? items : []).filter((device) => device && device.operation_scope !== "local");
     }
 
-    async function refreshLocalWorkspace() {
+    async function refreshAfterLocalToolOperation() {
+      await refreshLocalWorkspace({ quiet: true });
+    }
+
+    async function refreshLocalWorkspace(options) {
+      const quiet = Boolean(options && options.quiet);
       try {
         const response = await fetch(`${EXECUTOR_URL}/api/local-workspace`, { method: "GET", cache: "no-store" });
         const payload = await response.json();
@@ -11368,7 +11369,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           executorDeviceName = text(payload.device_name || executorDeviceName || "本机客户端");
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
           renderSkillInventory(window.lastDashboard ? window.lastDashboard.skill_inventory || {} : {});
-          setExecutorStatus("online", payload.allow_publish ? `${currentClientHelperName()}在线：本机扫描可用，保存已开启。` : `${currentClientHelperName()}在线：本机扫描和检查可用，保存未开启。`, "green");
+          if (!quiet) {
+            setExecutorStatus("online", payload.allow_publish ? `${currentClientHelperName()}在线：本机扫描可用，保存已开启。` : `${currentClientHelperName()}在线：本机扫描和检查可用，保存未开启。`, "green");
+          }
           setExecutorButtons(true);
         } else {
           throw new Error(payload.error || "local workspace scan failed");
@@ -11882,10 +11885,32 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (element) element.addEventListener(id === "skill-inventory-search" ? "input" : "change", renderSkillInventoryFiltered);
     });
     $("skill-inventory-reset").addEventListener("click", resetSkillInventoryFilters);
+    document.addEventListener("toggle", (event) => {
+      const target = event.target;
+      if (!target || target.tagName !== "DETAILS") return;
+      if (target.classList.contains("skill-group")) {
+        const groupId = target.dataset.skillGroupId || "";
+        if (!groupId) return;
+        if (target.open) openSkillInventoryGroups.add(groupId);
+        else openSkillInventoryGroups.delete(groupId);
+      }
+      if (target.classList.contains("skill-inventory-detail")) {
+        const skillId = target.dataset.skillId || "";
+        if (!skillId) return;
+        if (target.open) openSkillInventoryDetails.add(skillId);
+        else openSkillInventoryDetails.delete(skillId);
+      }
+    }, true);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
     selectDashboardTab("next");
     refresh(true);
-    setInterval(() => refresh(false), 30000);
+    setInterval(() => {
+      if (currentDashboardTab === "skill-list") {
+        refreshLocalWorkspace({ quiet: true });
+      } else {
+        refresh(false);
+      }
+    }, 30000);
   </script>
 </body>
 </html>
