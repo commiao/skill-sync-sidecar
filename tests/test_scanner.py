@@ -1886,6 +1886,65 @@ class ScannerTest(unittest.TestCase):
             self.assertTrue((work_dir / "conflicts" / "conflict-index.json").exists())
             self.assertIn("local change", (local_root / "demo" / "SKILL.md").read_text(encoding="utf-8"))
 
+    def test_sync_cycle_replaces_stale_conflict_packages(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            cache_dir = base / "cache"
+            work_dir = base / "work"
+            record_path = base / "apply-record.json"
+            prefix = "snapshots/current"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(local_root, "local change")
+            self._write_demo_skill(remote_source, "remote change")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            stale_package = work_dir / "conflicts" / "stale-package"
+            stale_package.mkdir(parents=True)
+            (stale_package / "old.txt").write_text("old\n", encoding="utf-8")
+
+            result = run_sync_cycle(local_root, remote, prefix, cache_dir, work_dir, record_path, dry_run=True)
+
+            self.assertEqual(result["conflicts"]["total_conflicts"], 1)
+            self.assertFalse(stale_package.exists())
+            packages = [item for item in (work_dir / "conflicts").iterdir() if item.is_dir()]
+            self.assertEqual(len(packages), 1)
+
+    def test_sync_cycle_clears_stale_conflict_packages_when_clean(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            local_root = base / "local"
+            remote_source = base / "remote-source"
+            remote_snapshot = base / "remote-snapshot"
+            remote_dir = base / "remote"
+            cache_dir = base / "cache"
+            work_dir = base / "work"
+            record_path = base / "apply-record.json"
+            prefix = "snapshots/current"
+
+            base_hash = self._write_demo_skill(local_root, "base")
+            self._write_apply_record(record_path, {"demo": base_hash})
+            self._write_demo_skill(remote_source, "base")
+            write_snapshot(scan_roots([f"cc-switch={remote_source}"]), remote_snapshot, "remote-snapshot")
+            remote = open_remote(f"file://{remote_dir}")
+            upload_snapshot(remote_snapshot, remote, prefix)
+
+            stale_package = work_dir / "conflicts" / "stale-package"
+            stale_package.mkdir(parents=True)
+            (stale_package / "old.txt").write_text("old\n", encoding="utf-8")
+
+            result = run_sync_cycle(local_root, remote, prefix, cache_dir, work_dir, record_path, dry_run=True)
+
+            self.assertIsNone(result["conflicts"])
+            self.assertFalse((work_dir / "conflicts").exists())
+
     def test_sync_cycle_writes_blocked_report_for_policy_block(self):
         with TemporaryDirectory() as tmp:
             base = Path(tmp)

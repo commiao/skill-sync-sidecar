@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -95,7 +96,9 @@ def _build_conflicts_if_needed(
     last_applied_record: Optional[Path],
 ) -> Optional[Dict[str, object]]:
     if not status.get("has_conflicts"):
+        _reset_generated_report_dir(work_dir / "conflicts")
         return None
+    _reset_generated_report_dir(work_dir / "conflicts")
     return build_conflict_packages(local_root, cache_dir, work_dir / "conflicts", last_applied_record)
 
 
@@ -107,8 +110,15 @@ def _build_tombstones_if_needed(
     last_applied_record: Optional[Path],
 ) -> Optional[Dict[str, object]]:
     if not any(item["action"] in {"local_deleted", "remote_deleted"} for item in status.get("items", [])):
+        _reset_generated_report_dir(work_dir / "tombstones")
         return None
+    _reset_generated_report_dir(work_dir / "tombstones")
     return build_tombstones(local_root, cache_dir, work_dir / "tombstones", last_applied_record)
+
+
+def _reset_generated_report_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
 
 
 def _write_blocked_report(
