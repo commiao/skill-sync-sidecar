@@ -2789,6 +2789,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       margin-bottom: 10px;
       overflow-wrap: anywhere;
     }
+    .review-item.focused {
+      border-color: #4aa3ff;
+      box-shadow: 0 0 0 3px rgba(74, 163, 255, 0.18);
+    }
     .review-recommendation {
       display: grid;
       gap: 8px;
@@ -4761,6 +4765,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       width: 100%;
       min-height: 38px;
     }
+    .skill-inventory-row-actions .inventory-review-button {
+      width: 100%;
+      min-height: 34px;
+    }
     .skill-inventory-name {
       color: var(--ink);
       font-weight: 820;
@@ -6045,6 +6053,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let recentSkillRowFeedback = [];
     let lastOperationFeedback = null;
     let currentReviewQueueItems = [];
+    let focusedReviewSkillId = "";
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
@@ -7303,6 +7312,28 @@ DASHBOARD_HTML = r"""<!doctype html>
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    function openReviewDetailsForSkill(skillId) {
+      focusedReviewSkillId = text(skillId || "");
+      openReviewDetails();
+      focusReviewSkill(focusedReviewSkillId);
+    }
+
+    function focusReviewSkill(skillId) {
+      window.setTimeout(() => {
+        const cleanSkillId = text(skillId || "");
+        document.querySelectorAll(".review-item.focused").forEach((node) => node.classList.remove("focused"));
+        const matches = Array.from(document.querySelectorAll(".review-item"))
+          .filter((node) => text(node.dataset.reviewSkillId || "") === cleanSkillId);
+        matches.forEach((node) => node.classList.add("focused"));
+        if (matches[0] && matches[0].scrollIntoView) {
+          matches[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        if (matches.length > 0) {
+          setReviewFeedback("yellow", `${cleanSkillId} 待确认`, "已定位到确认清单；按该项按钮生成报告、检查或恢复。");
+        }
+      }, 50);
+    }
+
     function showPublishGateHelp(detail) {
       setReviewFeedback(
         "yellow",
@@ -7606,11 +7637,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       const command = item.operator_command || "";
       const reviewKey = reviewItemKey(item);
       const deferred = isDeferredSourceChange(item);
-      const className = ["review-item", reviewItemClass(item)].filter(Boolean).join(" ");
+      const skillId = text(item.skill_id);
+      const focused = focusedReviewSkillId && skillId === focusedReviewSkillId;
+      const className = ["review-item", reviewItemClass(item), focused ? "focused" : ""].filter(Boolean).join(" ");
       return `
-        <div class="${escapeHtml(className)}">
+        <div class="${escapeHtml(className)}" data-review-skill-id="${escapeHtml(skillId)}" data-review-key="${escapeHtml(reviewKey)}">
           <div>
-            <div class="review-skill">${escapeHtml(text(item.skill_id))}</div>
+            <div class="review-skill">${escapeHtml(skillId)}</div>
             <div class="review-source">${escapeHtml(text(item.peer_name || item.peer_id))}</div>
             <div class="review-meta">
               <span class="review-meta-item">${escapeHtml(reviewSourceText(item))}</span>
@@ -10858,6 +10891,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         `;
       }).join("");
       const stateClass = pending ? "pending" : (centralState === "published" ? "installed" : "");
+      const reviewAction = pending
+        ? `<button type="button" class="inventory-review-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="openReviewDetailsForSkill(this.dataset.skillId)">去处理待确认</button>`
+        : "";
       const deprecateAction = centralState === "published"
         ? `<button type="button" class="central-deprecate-button" data-skill-id="${escapeHtml(text(item.skill_id))}" onclick="deprecateCentralSkill(this)" disabled>标记废弃</button>`
         : "";
@@ -10905,6 +10941,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             </div>
             <div class="skill-inventory-row-actions">
               <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
+              ${reviewAction}
               <div class="skill-inventory-action">
                 <strong>推荐</strong>
                 <span>${escapeHtml(recommendation.title)}</span>
