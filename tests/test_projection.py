@@ -90,7 +90,7 @@ class ToolProjectionTest(unittest.TestCase):
         deepseek = adapters["deepseek-harness"]
         self.assertEqual(deepseek.name, "DeepSeek Harness")
         self.assertEqual(deepseek.target_aliases, ["deepseek-harness", "deepseek"])
-        self.assertTrue(any(root.name == "skills" and root.parent.name == ".deepseek-harness" for root in deepseek.roots))
+        self.assertTrue(any(root.name == "skills" and root.parent.name == ".dsh" for root in deepseek.roots))
 
     def test_parse_tool_adapter_spec_uses_deepseek_harness_default_metadata(self):
         adapter = parse_tool_adapter_spec("deepseek-harness=/tmp/deepseek-harness-skills")

@@ -37,7 +37,7 @@ DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
     LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills-cursor", "cursor"),
     LocalToolTarget("claude-code", "Claude Code", Path.home() / ".claude" / "skills", "claude-code"),
     LocalToolTarget("qoder", "Qoder", Path.home() / ".qoder" / "skills", "qoder"),
-    LocalToolTarget("deepseek-harness", "DeepSeek Harness", Path.home() / ".deepseek-harness" / "skills", "deepseek-harness"),
+    LocalToolTarget("deepseek-harness", "DeepSeek Harness", Path.home() / ".dsh" / "skills", "deepseek-harness"),
 )
 
 DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "skillshub", "cursor", "claude-code", "qoder", "deepseek-harness", "openclaw"]
@@ -266,7 +266,7 @@ def _infer_scope(source: Path) -> str:
         home / ".claude" / "skills",
         home / ".cursor" / "skills-cursor",
         home / ".qoder" / "skills",
-        home / ".deepseek-harness" / "skills",
+        home / ".dsh" / "skills",
     ]
     for root in global_roots:
         try:

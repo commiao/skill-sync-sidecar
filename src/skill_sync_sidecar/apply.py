@@ -69,7 +69,7 @@ GLOBAL_TOOL_TARGETS = {
         "scope_skip": "project-scoped skills are not installed into Qoder global root",
     },
     "deepseek-harness-global": {
-        "default_root": Path.home() / ".deepseek-harness" / "skills",
+        "default_root": Path.home() / ".dsh" / "skills",
         "scopes": {"global"},
         "aliases": {"deepseek-harness", "deepseek"},
         "scope_skip": "project-scoped skills are not installed into DeepSeek Harness global root",

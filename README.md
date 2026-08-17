@@ -178,7 +178,7 @@ The sidecar scans existing local roots when they exist:
 - `~/.cursor/skills-cursor`
 - `~/.claude/skills`
 - `~/.qoder/skills`
-- `~/.deepseek-harness/skills`
+- `~/.dsh/skills`
 
 ## Sync Boundary
 

@@ -46,13 +46,13 @@ class LocalSkillTest(unittest.TestCase):
         deepseek_local = next(t for t in DEFAULT_LOCAL_TOOL_TARGETS if t.tool_id == "deepseek-harness")
         self.assertEqual(deepseek_local.name, "DeepSeek Harness")
         self.assertEqual(deepseek_local.root.name, "skills")
-        self.assertEqual(deepseek_local.root.parent.name, ".deepseek-harness")
+        self.assertEqual(deepseek_local.root.parent.name, ".dsh")
         self.assertEqual(deepseek_local.target_alias, "deepseek-harness")
 
         self.assertIn("deepseek-harness", DEFAULT_GLOBAL_TARGETS)
         self.assertIn("deepseek-harness", MAC_TOOL_INSTALL_TARGETS)
         self.assertEqual(MAC_TOOL_INSTALL_TARGETS["deepseek-harness"][0], "deepseek-harness-global")
-        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["deepseek-harness"][1], (".deepseek-harness", "skills"))
+        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["deepseek-harness"][1], (".dsh", "skills"))
 
         self.assertIn("deepseek-harness-global", GLOBAL_TOOL_TARGETS)
         self.assertIn("deepseek-harness", GLOBAL_TOOL_TARGETS["deepseek-harness-global"]["aliases"])

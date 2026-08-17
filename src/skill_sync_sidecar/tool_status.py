@@ -14,7 +14,7 @@ DEFAULT_TOOL_ROOTS: tuple[tuple[str, str, tuple[Path, ...], str], ...] = (
     ("cursor", "Cursor", (Path.home() / ".cursor" / "skills-cursor",), "Cursor 技能目录"),
     ("claude-code", "Claude Code", (Path.home() / ".claude" / "skills",), "Claude Code 技能目录"),
     ("qoder", "Qoder", (Path.home() / ".qoder" / "skills",), "Qoder 技能目录"),
-    ("deepseek-harness", "DeepSeek Harness", (Path.home() / ".deepseek-harness" / "skills",), "DeepSeek Harness 技能目录"),
+    ("deepseek-harness", "DeepSeek Harness", (Path.home() / ".dsh" / "skills",), "DeepSeek Harness 技能目录"),
 )
 
 

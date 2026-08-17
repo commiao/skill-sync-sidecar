@@ -30,7 +30,7 @@ def default_tool_adapters() -> List[ToolAdapter]:
         ToolAdapter("cursor", "Cursor", [home / ".cursor" / "skills-cursor"], ["cursor"], ["global"]),
         ToolAdapter("claude-code", "Claude Code", [home / ".claude" / "skills"], ["claude-code", "claude"], ["global"]),
         ToolAdapter("qoder", "Qoder", [home / ".qoder" / "skills"], ["qoder"], ["global"]),
-        ToolAdapter("deepseek-harness", "DeepSeek Harness", [home / ".deepseek-harness" / "skills"], ["deepseek-harness", "deepseek"], ["global"]),
+        ToolAdapter("deepseek-harness", "DeepSeek Harness", [home / ".dsh" / "skills"], ["deepseek-harness", "deepseek"], ["global"]),
     ]
 
 
