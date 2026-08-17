@@ -14,6 +14,8 @@ class LocalSkillTest(unittest.TestCase):
         from skill_sync_sidecar.local_skill import DEFAULT_LOCAL_TOOL_TARGETS
         from skill_sync_sidecar.operator_executor import MAC_TOOL_INSTALL_TARGETS
         from skill_sync_sidecar.apply import GLOBAL_TOOL_TARGETS
+        from skill_sync_sidecar.cli import APPLY_TARGETS
+        from skill_sync_sidecar.sync_apply import TARGET_ALIASES, TARGET_SCOPES
 
         local_ids = {target.tool_id for target in DEFAULT_LOCAL_TOOL_TARGETS}
         self.assertIn("qoder", local_ids)
@@ -27,6 +29,41 @@ class LocalSkillTest(unittest.TestCase):
 
         self.assertIn("qoder-global", GLOBAL_TOOL_TARGETS)
         self.assertIn("qoder", GLOBAL_TOOL_TARGETS["qoder-global"]["aliases"])
+        self.assertIn("qoder-global", APPLY_TARGETS)
+        self.assertEqual(TARGET_SCOPES["qoder-global"], "global")
+        self.assertIn("qoder", TARGET_ALIASES["qoder-global"])
+
+    def test_deepseek_harness_wired_into_tool_target_maps(self):
+        from skill_sync_sidecar.apply import GLOBAL_TOOL_TARGETS
+        from skill_sync_sidecar.cli import APPLY_TARGETS
+        from skill_sync_sidecar.local_skill import DEFAULT_LOCAL_TOOL_TARGETS, DEFAULT_GLOBAL_TARGETS
+        from skill_sync_sidecar.operator_executor import MAC_TOOL_INSTALL_TARGETS
+        from skill_sync_sidecar.sync_apply import TARGET_ALIASES, TARGET_SCOPES
+        from skill_sync_sidecar.tool_status import DEFAULT_TOOL_ROOTS
+
+        local_ids = {target.tool_id for target in DEFAULT_LOCAL_TOOL_TARGETS}
+        self.assertIn("deepseek-harness", local_ids)
+        deepseek_local = next(t for t in DEFAULT_LOCAL_TOOL_TARGETS if t.tool_id == "deepseek-harness")
+        self.assertEqual(deepseek_local.name, "DeepSeek Harness")
+        self.assertEqual(deepseek_local.root.name, "skills")
+        self.assertEqual(deepseek_local.root.parent.name, ".deepseek-harness")
+        self.assertEqual(deepseek_local.target_alias, "deepseek-harness")
+
+        self.assertIn("deepseek-harness", DEFAULT_GLOBAL_TARGETS)
+        self.assertIn("deepseek-harness", MAC_TOOL_INSTALL_TARGETS)
+        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["deepseek-harness"][0], "deepseek-harness-global")
+        self.assertEqual(MAC_TOOL_INSTALL_TARGETS["deepseek-harness"][1], (".deepseek-harness", "skills"))
+
+        self.assertIn("deepseek-harness-global", GLOBAL_TOOL_TARGETS)
+        self.assertIn("deepseek-harness", GLOBAL_TOOL_TARGETS["deepseek-harness-global"]["aliases"])
+        self.assertIn("deepseek", GLOBAL_TOOL_TARGETS["deepseek-harness-global"]["aliases"])
+        self.assertIn("deepseek-harness-global", APPLY_TARGETS)
+        self.assertEqual(TARGET_SCOPES["deepseek-harness-global"], "global")
+        self.assertIn("deepseek-harness", TARGET_ALIASES["deepseek-harness-global"])
+        self.assertIn("deepseek", TARGET_ALIASES["deepseek-harness-global"])
+
+        status_ids = {item[0] for item in DEFAULT_TOOL_ROOTS}
+        self.assertIn("deepseek-harness", status_ids)
 
     def test_analyze_generates_global_manifest_for_tool_root_skill(self):
         with TemporaryDirectory() as tmp:

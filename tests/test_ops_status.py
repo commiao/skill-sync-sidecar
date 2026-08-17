@@ -1340,6 +1340,8 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("macInstallableTools", DASHBOARD_HTML)
             self.assertIn("macUninstallableTools", DASHBOARD_HTML)
             self.assertIn("macInstalledToolIds", DASHBOARD_HTML)
+            self.assertIn("deepseek-harness", DASHBOARD_HTML)
+            self.assertIn("DeepSeek Harness", DASHBOARD_HTML)
             self.assertIn("uninstallMacToolSkill", DASHBOARD_HTML)
             self.assertIn("toolInstallStatus", DASHBOARD_HTML)
             self.assertIn("本机兼容工具已安装", DASHBOARD_HTML)

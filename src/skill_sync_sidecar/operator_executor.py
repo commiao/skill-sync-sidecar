@@ -34,6 +34,7 @@ MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "cursor": ("cursor-global", (".cursor", "skills-cursor"), "Cursor"),
     "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),
     "qoder": ("qoder-global", (".qoder", "skills"), "Qoder"),
+    "deepseek-harness": ("deepseek-harness-global", (".deepseek-harness", "skills"), "DeepSeek Harness"),
 }
 
 
@@ -563,6 +564,8 @@ def _normalize_tool_id(tool_id: object) -> str:
     normalized = str(tool_id or "").strip().lower()
     if normalized == "claude":
         normalized = "claude-code"
+    if normalized in {"deepseek", "deepseek harness"}:
+        normalized = "deepseek-harness"
     if normalized not in MAC_TOOL_INSTALL_TARGETS:
         raise OperatorExecutorError(f"unsupported Mac tool id: {normalized or '<empty>'}")
     return normalized

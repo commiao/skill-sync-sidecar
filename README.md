@@ -1,6 +1,6 @@
 # Skill Sync Sidecar
 
-Skill Sync Sidecar is a WebDAV-backed tool for scanning, validating, staging, and syncing agent skills across local tools such as cc-switch, skillshub, Codex, and OpenClaw.
+Skill Sync Sidecar is a WebDAV-backed tool for scanning, validating, staging, and syncing agent skills across local tools such as cc-switch, skillshub, Codex, Cursor, Claude Code, Qoder, DeepSeek Harness, and OpenClaw.
 
 The MVP keeps writes behind explicit confirmation flags:
 
@@ -174,6 +174,11 @@ The sidecar scans existing local roots when they exist:
 - `~/.cc-switch/skills`
 - `~/.skillshub`
 - `~/.codex/skills`
+- `~/.agents/skills`
+- `~/.cursor/skills-cursor`
+- `~/.claude/skills`
+- `~/.qoder/skills`
+- `~/.deepseek-harness/skills`
 
 ## Sync Boundary
 

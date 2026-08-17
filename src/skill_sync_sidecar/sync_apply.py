@@ -29,6 +29,8 @@ TARGET_SCOPES = {
     "codex-global": "global",
     "cursor-global": "global",
     "claude-code-global": "global",
+    "qoder-global": "global",
+    "deepseek-harness-global": "global",
     "codex-project": "project",
     "mixed-scope-root": None,
 }
@@ -38,6 +40,8 @@ TARGET_ALIASES = {
     "codex-global": {"codex"},
     "cursor-global": {"cursor"},
     "claude-code-global": {"claude-code", "claude"},
+    "qoder-global": {"qoder"},
+    "deepseek-harness-global": {"deepseek-harness", "deepseek"},
     "codex-project": {"codex"},
     "mixed-scope-root": set(),
 }

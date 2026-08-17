@@ -63,10 +63,12 @@ APPLY_TARGETS = [
     "codex-global",
     "cursor-global",
     "claude-code-global",
+    "qoder-global",
+    "deepseek-harness-global",
     "codex-project",
     "mixed-scope-root",
 ]
-TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global"}
+TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global", "qoder-global", "deepseek-harness-global"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -191,13 +193,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     local_skill_analyze = subcommands.add_parser("local-skill-analyze", help="Analyze a local skill directory and infer one-click install metadata.")
     local_skill_analyze.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
-    local_skill_analyze.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, or claude-code.")
+    local_skill_analyze.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, or deepseek-harness.")
     local_skill_analyze.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     local_skill_analyze.set_defaults(func=cmd_local_skill_analyze)
 
     local_skill_install = subcommands.add_parser("local-skill-install", help="Install a local skill into selected local tool roots with backups.")
     local_skill_install.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
-    local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, or claude-code.")
+    local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, or deepseek-harness.")
     local_skill_install.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     local_skill_install_mode = local_skill_install.add_mutually_exclusive_group(required=True)
     local_skill_install_mode.add_argument("--dry-run", action="store_true", help="Only print the install plan.")

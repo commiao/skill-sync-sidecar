@@ -4756,6 +4756,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-source-badge.tool-cursor { border-color: #cfe0ef; background: #eef6fb; color: #2f6389; }
     .skill-source-badge.tool-claude-code { border-color: #f0d9c4; background: #fdf3ea; color: #96552a; }
     .skill-source-badge.tool-qoder { border-color: #d8d2c0; background: #f7f4ea; color: #6f6636; }
+    .skill-source-badge.tool-deepseek-harness { border-color: #bfdbe1; background: #eef9fb; color: #276977; }
     .skill-source-badge.tool-openclaw { border-color: #e2cbd6; background: #fbeef4; color: #8a3d63; }
     .skill-inventory-row {
       display: grid;
@@ -5714,6 +5715,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             <option value="claude-code">Claude 已安装</option>
             <option value="cursor">Cursor 已安装</option>
             <option value="qoder">Qoder 已安装</option>
+            <option value="deepseek-harness">DeepSeek Harness 已安装</option>
             <option value="cc-switch">cc-switch 已安装</option>
             <option value="skillshub">skillshub 已安装</option>
             <option value="mac-none">本机未安装</option>
@@ -10180,6 +10182,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       "cursor": "Cursor",
       "claude-code": "Claude",
       "qoder": "Qoder",
+      "deepseek-harness": "DeepSeek Harness",
       "openclaw": "OpenClaw",
     };
 
@@ -11224,7 +11227,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function macPublishSourcePath(item) {
       const installations = Array.isArray(item.installations) ? item.installations : [];
       const local = installations.filter((installed) => text(installed.device_id) === currentClientId() && text(installed.path));
-      const order = ["cc-switch", "codex", "cursor", "claude-code", "skillshub"];
+      const order = ["cc-switch", "codex", "cursor", "claude-code", "qoder", "deepseek-harness", "skillshub"];
       for (const toolId of order) {
         const found = local.find((installed) => text(installed.tool_id) === toolId);
         if (found) return text(found.path);
@@ -11259,6 +11262,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         { id: "claude-code", label: "Claude", aliases: ["claude-code", "claude"], localInstall: true },
         { id: "cursor", label: "Cursor", aliases: ["cursor"], localInstall: true },
         { id: "qoder", label: "Qoder", aliases: ["qoder"], localInstall: true },
+        { id: "deepseek-harness", label: "DeepSeek Harness", aliases: ["deepseek-harness", "deepseek"], localInstall: true },
         { id: "cc-switch", label: "cc-switch", aliases: ["cc-switch"], localInstall: true },
         { id: "skillshub", label: "skillshub", aliases: ["skillshub"], localInstall: true },
         { id: "openclaw", label: "OpenClaw", aliases: ["openclaw"], localInstall: false },
@@ -11391,6 +11395,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (name.includes("codex")) return "codex";
       if (name.includes("claude")) return "claude-code";
       if (name.includes("cursor")) return "cursor";
+      if (name.includes("qoder")) return "qoder";
+      if (name.includes("deepseek")) return "deepseek-harness";
       if (name.includes("cc-switch")) return "cc-switch";
       if (name.includes("skillshub")) return "skillshub";
       return "";

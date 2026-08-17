@@ -30,6 +30,7 @@ def default_tool_adapters() -> List[ToolAdapter]:
         ToolAdapter("cursor", "Cursor", [home / ".cursor" / "skills-cursor"], ["cursor"], ["global"]),
         ToolAdapter("claude-code", "Claude Code", [home / ".claude" / "skills"], ["claude-code", "claude"], ["global"]),
         ToolAdapter("qoder", "Qoder", [home / ".qoder" / "skills"], ["qoder"], ["global"]),
+        ToolAdapter("deepseek-harness", "DeepSeek Harness", [home / ".deepseek-harness" / "skills"], ["deepseek-harness", "deepseek"], ["global"]),
     ]
 
 
@@ -164,4 +165,3 @@ def _targets_tool(targets: Sequence[str], adapter: ToolAdapter) -> bool:
 
 def _list_value(value: object) -> Iterable[object]:
     return value if isinstance(value, list) else []
-

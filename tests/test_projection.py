@@ -83,6 +83,22 @@ class ToolProjectionTest(unittest.TestCase):
         self.assertEqual(adapter.name, "Qoder")
         self.assertEqual(adapter.target_aliases, ["qoder"])
 
+    def test_default_tool_adapters_include_deepseek_harness(self):
+        adapters = {adapter.tool_id: adapter for adapter in default_tool_adapters()}
+
+        self.assertIn("deepseek-harness", adapters)
+        deepseek = adapters["deepseek-harness"]
+        self.assertEqual(deepseek.name, "DeepSeek Harness")
+        self.assertEqual(deepseek.target_aliases, ["deepseek-harness", "deepseek"])
+        self.assertTrue(any(root.name == "skills" and root.parent.name == ".deepseek-harness" for root in deepseek.roots))
+
+    def test_parse_tool_adapter_spec_uses_deepseek_harness_default_metadata(self):
+        adapter = parse_tool_adapter_spec("deepseek-harness=/tmp/deepseek-harness-skills")
+
+        self.assertEqual(adapter.tool_id, "deepseek-harness")
+        self.assertEqual(adapter.name, "DeepSeek Harness")
+        self.assertEqual(adapter.target_aliases, ["deepseek-harness", "deepseek"])
+
     def test_hub_import_diagnosis_classifies_duplicates_updates_and_imports(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
