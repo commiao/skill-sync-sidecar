@@ -4657,13 +4657,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-list-body {
       padding: 0 12px 12px;
     }
-    .skill-inventory-tool-overview {
+    .skill-inventory-tool-overview,
+    .skill-inventory-device-tool-overview {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 8px;
       margin: 10px 0;
     }
-    .skill-inventory-tool-overview button {
+    .skill-inventory-tool-overview button,
+    .skill-inventory-device-tool-overview button {
       display: grid;
       gap: 3px;
       justify-items: start;
@@ -4671,17 +4673,20 @@ DASHBOARD_HTML = r"""<!doctype html>
       padding: 9px 10px;
       background: #fff;
     }
-    .skill-inventory-tool-overview strong {
+    .skill-inventory-tool-overview strong,
+    .skill-inventory-device-tool-overview strong {
       color: var(--ink);
       font-size: 15px;
       line-height: 1.15;
     }
-    .skill-inventory-tool-overview span {
+    .skill-inventory-tool-overview span,
+    .skill-inventory-device-tool-overview span {
       color: var(--muted);
       font-size: 12px;
       line-height: 1.25;
     }
-    .skill-inventory-tool-overview em {
+    .skill-inventory-tool-overview em,
+    .skill-inventory-device-tool-overview em {
       color: var(--blue);
       font-size: 11px;
       font-style: normal;
@@ -5436,7 +5441,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-client { grid-template-columns: 1fr 1fr; }
       .skill-inventory-guide { grid-template-columns: 1fr; }
       .skill-inventory-guide button { width: 100%; }
-      .skill-inventory-tool-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .skill-inventory-tool-overview,
+      .skill-inventory-device-tool-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .local-skill-input-row { grid-template-columns: 1fr; }
@@ -5752,6 +5758,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       </details>
       <div id="skill-inventory-workbench" class="skill-inventory-workbench" aria-label="本机工作区快捷操作"></div>
       <div id="skill-inventory-tool-overview" class="skill-inventory-tool-overview" aria-label="本机工具覆盖概览"></div>
+      <div id="skill-inventory-device-tool-overview" class="skill-inventory-device-tool-overview" aria-label="多设备工具覆盖概览"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未共享整理"></div>
       <details class="skill-inventory-filter-panel">
         <summary>高级筛选和搜索</summary>
@@ -10044,6 +10051,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       $("skill-inventory-project").textContent = text(model.project);
       renderSkillInventoryWorkbench(model.items || []);
       renderSkillInventoryToolOverview(model.items || []);
+      renderSkillInventoryDeviceToolOverview(model.items || []);
       renderSkillInventoryTriage(model.items || []);
       renderSkillInventoryFiltered();
     }
@@ -10668,6 +10676,85 @@ DASHBOARD_HTML = r"""<!doctype html>
           <em>${escapeHtml(text(installableCount))} 可安装</em>
         </button>
       `).join("");
+    }
+
+    function renderSkillInventoryDeviceToolOverview(items) {
+      const target = $("skill-inventory-device-tool-overview");
+      if (!target) return;
+      const counts = {};
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        const pairs = Array.isArray(item.installed_device_tools)
+          ? item.installed_device_tools
+          : installedDeviceToolPairsFromInstallations(item.installations);
+        const seen = new Set();
+        pairs.forEach((entry) => {
+          const deviceId = text(entry && entry.device_id);
+          const toolId = text(entry && entry.tool_id);
+          if (!deviceId || !toolId) return;
+          const key = `${deviceId}/${toolId}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          counts[deviceId] = counts[deviceId] || {};
+          counts[deviceId][toolId] = (counts[deviceId][toolId] || 0) + 1;
+        });
+      });
+      const rows = Object.entries(counts)
+        .flatMap(([deviceId, tools]) => Object.entries(tools).map(([toolId, count]) => ({ deviceId, toolId, count })))
+        .sort((a, b) => deviceSortWeight(a.deviceId) - deviceSortWeight(b.deviceId)
+          || inventoryDeviceLabel(a.deviceId).localeCompare(inventoryDeviceLabel(b.deviceId))
+          || toolLabel(a.toolId).localeCompare(toolLabel(b.toolId)));
+      if (rows.length === 0) {
+        target.innerHTML = "";
+        return;
+      }
+      target.innerHTML = rows.map((row) => `
+        <button type="button" onclick="openDeviceToolInventory('${escapeHtml(row.deviceId)}', '${escapeHtml(row.toolId)}')" title="查看 ${escapeHtml(inventoryDeviceLabel(row.deviceId))} / ${escapeHtml(toolLabel(row.toolId))} 的 skill">
+          <strong>${escapeHtml(inventoryDeviceLabel(row.deviceId))} / ${escapeHtml(toolLabel(row.toolId))}</strong>
+          <span>${escapeHtml(text(row.count))} 个 skill</span>
+          <em>设备和工具分开统计</em>
+        </button>
+      `).join("");
+    }
+
+    function installedDeviceToolPairsFromInstallations(installations) {
+      return [...new Map((Array.isArray(installations) ? installations : [])
+        .map((installed) => {
+          const deviceId = text(installed && installed.device_id);
+          const toolId = text(installed && installed.tool_id);
+          if (!deviceId || !toolId) return null;
+          return [`${deviceId}/${toolId}`, { device_id: deviceId, tool_id: toolId, key: `${deviceId}/${toolId}` }];
+        })
+        .filter(Boolean)).values()];
+    }
+
+    function openDeviceToolInventory(deviceId, toolId) {
+      currentSkillInventoryQuick = "all";
+      currentSkillInventoryTriage = "all";
+      $("skill-inventory-search").value = `${text(deviceId)}/${text(toolId)}`;
+      $("skill-inventory-central-filter").value = "all";
+      $("skill-inventory-scope-filter").value = "all";
+      $("skill-inventory-tool-filter").value = "all";
+      $("skill-inventory-device-filter").value = text(deviceId);
+      $("skill-inventory-sync-filter").value = "all";
+      renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
+      renderSkillInventoryFiltered();
+      openSkillInventoryListPanel();
+    }
+
+    function deviceSortWeight(deviceId) {
+      const clean = text(deviceId);
+      if (clean === currentClientId()) return 0;
+      if (clean === "mac") return 1;
+      if (clean === "oc-vps" || clean === "openclaw") return 2;
+      if (clean === "win" || clean === "windows") return 3;
+      return 9;
+    }
+
+    function toolLabel(toolId) {
+      const clean = text(toolId);
+      const found = skillInventoryTools().find((tool) => tool.id === clean);
+      return found ? found.label : clean || "未知工具";
     }
 
     function renderSkillInventoryGuide(counts) {
