@@ -1850,6 +1850,73 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(inventory["items"][0]["skill_id"], "demo")
             self.assertIn("codex", inventory["items"][0]["installed_tools"])
 
+    def test_gateway_status_keeps_duplicate_tools_separate_by_device(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-device-tools")
+
+            peer_tools = [
+                {
+                    "id": "codex",
+                    "name": "Codex",
+                    "state": "detected",
+                    "skills": 1,
+                    "skill_items": [{"skill_id": "demo", "name": "Demo", "scope": "global"}],
+                }
+            ]
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "mac": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "green",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                        "tools": peer_tools,
+                    },
+                    "win": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "health": "green",
+                        "device": {"id": "win", "name": "Windows"},
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                        "tools": peer_tools,
+                    },
+                },
+            )
+
+            device_tools = {group["device_id"]: group for group in status["dashboard"]["device_tools"]}
+            self.assertIn("mac", device_tools)
+            self.assertIn("win", device_tools)
+            self.assertEqual(device_tools["mac"]["tools"][0]["id"], "codex")
+            self.assertEqual(device_tools["win"]["tools"][0]["id"], "codex")
+            self.assertNotIn("win", {device["id"] for device in status["dashboard"]["planned_devices"]})
+
+            item = status["dashboard"]["skill_inventory"]["items"][0]
+            self.assertEqual(item["installed_tools"], ["codex"])
+            self.assertEqual(item["installed_devices"], ["mac", "win"])
+            self.assertEqual(item["device_tool_count"], 2)
+            self.assertEqual(
+                {entry["key"] for entry in item["installed_device_tools"]},
+                {"mac/codex", "win/codex"},
+            )
+
+            overview = build_dashboard_overview(status)
+            summary = overview["dashboard"]["skill_inventory"]["summary"]
+            self.assertEqual(summary["installed_by_tool"]["codex"], 1)
+            self.assertEqual(summary["installed_by_device"]["mac"], 1)
+            self.assertEqual(summary["installed_by_device"]["win"], 1)
+            self.assertEqual(summary["installed_by_device_tool"]["mac"]["codex"], 1)
+            self.assertEqual(summary["installed_by_device_tool"]["win"]["codex"], 1)
+
     def test_skill_inventory_prefers_central_scope_for_published_skill(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

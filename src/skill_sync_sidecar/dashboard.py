@@ -254,7 +254,11 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     projection = _safe_tool_projection(config.remote_snapshot)
     hub_import = _safe_hub_import_diagnosis()
     local_tools = build_device_tool_status()
-    planned_devices = _planned_device_overview()
+    planned_devices = [
+        device
+        for device in _planned_device_overview()
+        if device.get("id") not in {item.get("id") for item in devices}
+    ]
     device_tools = _device_tool_overview(devices, {"mac": {"tools": local_tools, "published_at": _status_last_seen_at(status)}, **peers})
     tool_projection = _merge_tool_projection(local_tools, projection)
     dashboard_health = _aggregate_health([status.get("health")] + [device.get("health") for device in devices])
@@ -343,7 +347,11 @@ def build_gateway_status(
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(snapshot_dir)
     hub_import = _safe_hub_import_diagnosis()
-    planned_devices = _planned_device_overview()
+    planned_devices = [
+        device
+        for device in _planned_device_overview()
+        if device.get("id") not in {item.get("id") for item in devices}
+    ]
     tools = _gateway_tool_overview(projection)
     device_tools = _device_tool_overview(devices, peers)
     dashboard_health = _aggregate_health([status.get("health")] + [device.get("health") for device in devices])
@@ -517,6 +525,7 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
     publishable = 0
     installed_by_tool: dict[str, int] = {}
     installed_by_device: dict[str, int] = {}
+    installed_by_device_tool: dict[str, dict[str, int]] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -531,6 +540,7 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
             installed += 1
         item_tool_ids: set[str] = set()
         item_device_ids: set[str] = set()
+        item_device_tool_ids: set[tuple[str, str]] = set()
         for inst in installations:
             if not isinstance(inst, dict):
                 continue
@@ -540,10 +550,15 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
                 item_tool_ids.add(tool_id)
             if device_id:
                 item_device_ids.add(device_id)
+            if device_id and tool_id:
+                item_device_tool_ids.add((device_id, tool_id))
         for tool_id in item_tool_ids:
             installed_by_tool[tool_id] = installed_by_tool.get(tool_id, 0) + 1
         for device_id in item_device_ids:
             installed_by_device[device_id] = installed_by_device.get(device_id, 0) + 1
+        for device_id, tool_id in item_device_tool_ids:
+            tools = installed_by_device_tool.setdefault(device_id, {})
+            tools[tool_id] = tools.get(tool_id, 0) + 1
         central = item.get("central") if isinstance(item.get("central"), dict) else {}
         if central.get("state") == "unpublished" and item.get("scope") != "project" and any(inst.get("path") for inst in installations if isinstance(inst, dict)):
             publishable += 1
@@ -554,6 +569,10 @@ def _compact_skill_inventory_summary(inventory: object) -> dict:
         "pending_blocking": pending_blocking,
         "installed_by_tool": dict(sorted(installed_by_tool.items())),
         "installed_by_device": dict(sorted(installed_by_device.items())),
+        "installed_by_device_tool": {
+            device_id: dict(sorted(tools.items()))
+            for device_id, tools in sorted(installed_by_device_tool.items())
+        },
     }
 
 
@@ -880,7 +899,7 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
     mac = peers.get("mac")
     openclaw = peers.get("oc-vps") or peers.get("openclaw")
     gateway_last_seen_at = datetime.now(timezone.utc).isoformat()
-    return [
+    devices = [
         {
             "id": "gateway",
             "name": "Gateway / NAS",
@@ -914,6 +933,31 @@ def _gateway_device_overview(snapshot: dict, peers: Dict[str, dict]) -> list[dic
             fallback_local_policy=["disk-cleanup", "lark-cli-adapter"],
         ),
     ]
+    known_peer_ids = {"mac", "oc-vps", "openclaw"}
+    for peer_id in sorted(str(key) for key in peers.keys() if str(key) not in known_peer_ids):
+        peer = peers.get(peer_id)
+        devices.append(
+            _peer_device(
+                peer_id,
+                _peer_display_name(peer_id, peer),
+                "已接入设备",
+                peer,
+                fallback_policy="peer-reported",
+                fallback_note="gateway 尚未读取到该设备 peer status；等待 Agent 上报",
+                fallback_local_policy=[],
+            )
+        )
+    return devices
+
+
+def _peer_display_name(peer_id: str, peer: Optional[dict]) -> str:
+    device = peer.get("device") if isinstance(peer, dict) and isinstance(peer.get("device"), dict) else {}
+    for value in (device.get("name"), peer.get("device_name") if isinstance(peer, dict) else None):
+        if value:
+            return str(value)
+    if peer_id in {"win", "windows"}:
+        return "Windows"
+    return peer_id
 
 
 def _planned_device_overview() -> list[dict]:
@@ -1528,10 +1572,26 @@ def _skill_inventory_model(device_tools: list[dict], *, central_skills: object, 
         installs = entry.get("installations") if isinstance(entry.get("installations"), list) else []
         devices = sorted({str(item.get("device_id")) for item in installs if item.get("device_id")})
         tools = sorted({str(item.get("tool_id")) for item in installs if item.get("tool_id")})
+        device_tools = sorted(
+            {
+                (str(item.get("device_id")), str(item.get("tool_id")))
+                for item in installs
+                if item.get("device_id") and item.get("tool_id")
+            }
+        )
         entry["installed_devices"] = devices
         entry["installed_tools"] = tools
+        entry["installed_device_tools"] = [
+            {
+                "device_id": device_id,
+                "tool_id": tool_id,
+                "key": f"{device_id}/{tool_id}",
+            }
+            for device_id, tool_id in device_tools
+        ]
         entry["tool_count"] = len(tools)
         entry["device_count"] = len(devices)
+        entry["device_tool_count"] = len(device_tools)
         entry["action"] = _inventory_action(entry)
         items.append(entry)
     items.sort(key=lambda item: (0 if item.get("pending") else 1, str(item.get("skill_id") or "")))
@@ -10790,7 +10850,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           const installedDevices = new Set((Array.isArray(item.installed_devices) ? item.installed_devices : []).map((value) => text(value)));
           if (filters.device === "none") {
             if (installedDevices.size > 0) return false;
-          } else if (!installedDevices.has(filters.device) && !(filters.device === "openclaw" && installedDevices.has("oc-vps"))) {
+          } else if (!deviceFilterMatches(installedDevices, filters.device)) {
             return false;
           }
         }
@@ -10803,11 +10863,22 @@ DASHBOARD_HTML = r"""<!doctype html>
             centralState,
             ...(Array.isArray(item.installed_tools) ? item.installed_tools : []),
             ...(Array.isArray(item.installed_devices) ? item.installed_devices : []),
+            ...(Array.isArray(item.installed_device_tools) ? item.installed_device_tools.map((entry) => entry && (entry.key || `${entry.device_id}/${entry.tool_id}`)) : []),
           ].map((value) => String(value || "").toLowerCase()).join(" ");
           if (!haystack.includes(filters.query)) return false;
         }
         return true;
       });
+    }
+
+    function deviceFilterMatches(installedDevices, filterDevice) {
+      const clean = text(filterDevice);
+      if (installedDevices.has(clean)) return true;
+      if (clean === "openclaw") return installedDevices.has("oc-vps");
+      if (clean === "oc-vps") return installedDevices.has("openclaw");
+      if (clean === "windows") return installedDevices.has("win");
+      if (clean === "win") return installedDevices.has("windows");
+      return false;
     }
 
     function resetSkillInventoryFilters() {
@@ -10891,12 +10962,22 @@ DASHBOARD_HTML = r"""<!doctype html>
         const installations = Array.isArray(item.installations) ? item.installations : [];
         const installedTools = [...new Set(installations.map((installed) => text(installed.tool_id)).filter(Boolean))].sort();
         const installedDevices = [...new Set(installations.map((installed) => text(installed.device_id)).filter(Boolean))].sort();
+        const installedDeviceTools = [...new Map(installations
+          .map((installed) => {
+            const deviceId = text(installed.device_id);
+            const toolId = text(installed.tool_id);
+            if (!deviceId || !toolId) return null;
+            return [`${deviceId}/${toolId}`, { device_id: deviceId, tool_id: toolId, key: `${deviceId}/${toolId}` }];
+          })
+          .filter(Boolean)).values()].sort((a, b) => text(a.key).localeCompare(text(b.key)));
         return {
           ...item,
           installed_tools: installedTools,
           installed_devices: installedDevices,
+          installed_device_tools: installedDeviceTools,
           tool_count: installedTools.length,
           device_count: installedDevices.length,
+          device_tool_count: installedDeviceTools.length,
         };
       }).sort((a, b) => {
         const pendingA = Number(a.pending || 0) > 0 ? 0 : 1;
