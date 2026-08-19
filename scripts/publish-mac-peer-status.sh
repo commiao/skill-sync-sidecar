@@ -41,4 +41,23 @@ if [ "${SKILL_SYNC_ALLOW_DELETE:-0}" = "1" ]; then
   args+=(--allow-delete)
 fi
 
-PYTHONPATH="$repo_root/src" "$python_bin" "${args[@]}"
+max_attempts="${SKILL_SYNC_PUBLISH_RETRY_ATTEMPTS:-3}"
+retry_delays="${SKILL_SYNC_PUBLISH_RETRY_DELAYS:-15 45}"
+attempt=1
+
+while true; do
+  if PYTHONPATH="$repo_root/src" "$python_bin" "${args[@]}"; then
+    exit 0
+  else
+    status=$?
+  fi
+  if [ "$attempt" -ge "$max_attempts" ]; then
+    echo "publish-peer-status failed after ${attempt} attempt(s); last exit=${status}" >&2
+    exit "$status"
+  fi
+  delay="$(printf '%s\n' $retry_delays | sed -n "${attempt}p")"
+  delay="${delay:-45}"
+  echo "publish-peer-status attempt ${attempt}/${max_attempts} failed with exit=${status}; retrying in ${delay}s" >&2
+  sleep "$delay"
+  attempt=$((attempt + 1))
+done
