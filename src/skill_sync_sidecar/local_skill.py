@@ -155,32 +155,41 @@ def publish_local_skill(
     local_risk = _risk_summary(local_record, local_skill_dir)
     if local_risk.get("level") == "error":
         raise LocalSkillError(f"risk check failed; shared-library save is blocked for: {normalized}")
-    status = build_sync_status(local_root, remote_snapshot_dir, last_applied_record, local_skill_ids={normalized})
-    plan = build_sync_plan(status, allow_new=True, writer_policy="push-pull")
-    item = next((dict(value) for value in plan.get("items", []) if value.get("skill_id") == normalized), None)
-    if item is None:
-        raise LocalSkillError(f"skill is not present in the sync plan: {normalized}")
-    if item.get("plan_action") == "noop":
-        return {
-            "ok": True,
-            "record_type": "skill-sync-local-skill-publish",
-            "mode": "noop",
-            "dry_run": not yes,
-            "skill_id": normalized,
-            "safe_to_push": True,
-            "item": item,
-            "uploaded_files": 0,
-            "reason": "central snapshot already matches local skill",
-        }
-    if item.get("plan_action") not in PUSH_ACTIONS or not item.get("allowed"):
-        raise LocalSkillError(f"skill is not publishable without manual review: {normalized}")
-
-    if yes:
-        _assert_remote_matches_cache(remote, remote_prefix, remote_snapshot_dir)
-
+    analysis = analyze_local_skill(local_skill_dir)
     with TemporaryDirectory(prefix="skill-sync-local-skill-publish-") as tmp:
+        isolated_root = Path(tmp) / "selected-skill"
+        isolated_skill = isolated_root / normalized
+        shutil.copytree(local_skill_dir, isolated_skill, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
+        (isolated_skill / "manifest.json").write_text(
+            json.dumps(analysis["manifest"], ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        # A local tool root can contain nested packages with the same skill id.
+        # For a single-skill save, inspect and package only the explicitly chosen directory.
+        status = build_sync_status(isolated_root, remote_snapshot_dir, last_applied_record, local_skill_ids={normalized})
+        plan = build_sync_plan(status, allow_new=True, writer_policy="push-pull")
+        item = next((dict(value) for value in plan.get("items", []) if value.get("skill_id") == normalized), None)
+        if item is None:
+            raise LocalSkillError(f"skill is not present in the sync plan: {normalized}")
+        if item.get("plan_action") == "noop":
+            return {
+                "ok": True,
+                "record_type": "skill-sync-local-skill-publish",
+                "mode": "noop",
+                "dry_run": not yes,
+                "skill_id": normalized,
+                "safe_to_push": True,
+                "item": item,
+                "uploaded_files": 0,
+                "reason": "central snapshot already matches local skill",
+            }
+        if item.get("plan_action") not in PUSH_ACTIONS or not item.get("allowed"):
+            raise LocalSkillError(f"skill is not publishable without manual review: {normalized}")
+
+        if yes:
+            _assert_remote_matches_cache(remote, remote_prefix, remote_snapshot_dir)
         merged = _build_merged_snapshot(
-            local_root,
+            isolated_root,
             remote_snapshot_dir,
             {normalized},
             Path(tmp) / "merged-snapshot",

@@ -249,6 +249,28 @@ class LocalSkillTest(unittest.TestCase):
             self.assertEqual(preview["skill_id"], "demo")
             self.assertEqual(preview["item"]["plan_action"], "push_new")
 
+    def test_publish_local_skill_ignores_nested_duplicate_of_the_selected_skill(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "local"
+            canonical_root = root / "canonical"
+            remote_snapshot = root / "cache"
+            remote_root = root / "remote"
+            self._write_skill(local_root / "demo", "demo", body="selected")
+            self._write_manifest(local_root / "demo", "demo")
+            self._write_skill(local_root / "bundle" / "demo", "demo", body="nested duplicate")
+            self._write_manifest(local_root / "bundle" / "demo", "demo")
+            self._write_skill(canonical_root / "existing", "existing", body="remote")
+            self._write_manifest(canonical_root / "existing", "existing")
+            write_snapshot(scan_roots([f"canonical={canonical_root}"]), remote_snapshot, "remote-base")
+            remote = FileRemote(remote_root)
+            upload_snapshot(remote_snapshot, remote)
+
+            preview = publish_local_skill(local_root, remote_snapshot, "demo", remote)
+
+            self.assertTrue(preview["ok"])
+            self.assertEqual(preview["item"]["plan_action"], "push_new")
+
     def test_secret_like_file_blocks_central_publish(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
