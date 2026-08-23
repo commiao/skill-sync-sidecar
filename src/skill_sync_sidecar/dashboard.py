@@ -5814,6 +5814,29 @@ DASHBOARD_HTML = r"""<!doctype html>
         </div>
       </details>
     </details>
+    <details id="legacy-skillshub-migration-panel" class="panel">
+      <summary class="easy-workspace-head">
+        <div class="easy-workspace-title">
+          <strong>旧 Skillshub 目录迁移</strong>
+          <span>检查哪些工具仍依赖旧目录；只迁移中央仓库已验证一致的 skill。</span>
+        </div>
+        <span class="pill">可回滚</span>
+      </summary>
+      <div class="panel-head">
+        <div class="mini-label">旧目录不会在这里删除。中央缺失或版本不同的 skill 需要先在 Skill 清单中处理。</div>
+        <button id="legacy-skillshub-check-button" type="button">检查迁移状态</button>
+      </div>
+      <div id="legacy-skillshub-summary" class="kv"></div>
+      <div id="legacy-skillshub-status" class="operator-text">先检查，确认哪些 skill 仍依赖旧目录。</div>
+      <div id="legacy-skillshub-actions" class="executor-actions" hidden>
+        <button id="legacy-skillshub-migrate-button" type="button" onclick="migrateSelectedLegacySkillshubLinks()" disabled>迁移已选</button>
+      </div>
+      <table id="legacy-skillshub-table" hidden>
+        <thead><tr><th>Skill</th><th>中央仓库</th><th>依赖工具</th><th>下一步</th></tr></thead>
+        <tbody id="legacy-skillshub-body"></tbody>
+      </table>
+      <div id="legacy-skillshub-empty" class="empty">尚未检查旧目录迁移状态。</div>
+    </details>
     <details class="quick-status-details">
       <summary>二级详情：状态数字</summary>
       <section class="status-strip" aria-label="状态摘要">
@@ -6094,25 +6117,6 @@ DASHBOARD_HTML = r"""<!doctype html>
         <tbody id="hub-import-body"></tbody>
       </table>
       <div id="hub-import-empty" class="empty">暂无外部可导入项。</div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div>
-          <h2>旧 Skillshub 目录迁移</h2>
-          <div class="mini-label">只替换已验证与中央仓库一致的工具软链接；旧目录不会在这里删除。</div>
-        </div>
-        <button id="legacy-skillshub-check-button" type="button">检查迁移状态</button>
-      </div>
-      <div id="legacy-skillshub-summary" class="kv"></div>
-      <div id="legacy-skillshub-status" class="operator-text">先检查，确认哪些 skill 仍依赖旧目录。</div>
-      <div id="legacy-skillshub-actions" class="executor-actions" hidden>
-        <button id="legacy-skillshub-migrate-button" type="button" onclick="migrateSelectedLegacySkillshubLinks()" disabled>迁移已选</button>
-      </div>
-      <table id="legacy-skillshub-table" hidden>
-        <thead><tr><th>Skill</th><th>中央仓库</th><th>依赖工具</th><th>下一步</th></tr></thead>
-        <tbody id="legacy-skillshub-body"></tbody>
-      </table>
-      <div id="legacy-skillshub-empty" class="empty">尚未检查旧目录迁移状态。</div>
     </div>
     <section class="grid">
       <div class="stack">
