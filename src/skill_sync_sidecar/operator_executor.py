@@ -20,6 +20,13 @@ from .central_lifecycle import (
 )
 from .config import ConfigError, load_cc_switch_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
+from .legacy_skillshub_migration import (
+    LegacySkillshubMigrationError,
+    build_legacy_skillshub_migration_preview,
+    default_central_snapshot_root,
+    default_legacy_skillshub_root,
+    execute_legacy_skillshub_migration,
+)
 from .remote import open_remote
 from .restore import RestoreError, restore_from_central
 from .sync_state import SyncStateError
@@ -402,6 +409,30 @@ def run_openclaw_central_restore(
     }
 
 
+def run_mac_legacy_skillshub_migration(
+    skill_ids: Sequence[str] = (),
+    *,
+    yes: bool = False,
+    allow_local_writes: bool = False,
+) -> dict:
+    if yes and not allow_local_writes:
+        raise OperatorExecutorError("legacy Skillshub migration is disabled; start operator-executor with --allow-local-writes")
+    legacy_root = default_legacy_skillshub_root()
+    central_snapshot = default_central_snapshot_root()
+    if not yes:
+        result = build_legacy_skillshub_migration_preview(legacy_root, central_snapshot)
+    else:
+        result = execute_legacy_skillshub_migration(
+            legacy_root,
+            central_snapshot,
+            skill_ids,
+            yes=True,
+            allow_local_writes=True,
+        )
+    result["operation"] = "mac-legacy-skillshub-migration"
+    return result
+
+
 def run_openclaw_conflict_package(
     repo_root: Path,
     skill_ids: Sequence[str],
@@ -643,12 +674,17 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                             "scan_local": True,
                             "dry_run": True,
                             "analyze_local_skill": True,
-                            "install_local_skill": allow_local_writes,
-                            "publish_to_central": allow_publish,
-                            "operate_other_devices": False,
+                        "install_local_skill": allow_local_writes,
+                        "publish_to_central": allow_publish,
+                        "migrate_legacy_skillshub_links": allow_local_writes,
+                        "operate_other_devices": False,
                         },
                     },
                 )
+                return
+            if path == "/api/legacy-skillshub-migration":
+                result = run_mac_legacy_skillshub_migration()
+                self._send_json(200, result)
                 return
             self._send_json(404, {"ok": False, "error": "not found"})
 
@@ -893,8 +929,22 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     )
                     self._send_json(200, result)
                     return
+                if path == "/api/legacy-skillshub-migration":
+                    confirm = payload.get("confirm") if isinstance(payload, dict) else None
+                    if confirm != "MIGRATE":
+                        self._send_json(400, {"ok": False, "error": "confirm must be MIGRATE"})
+                        return
+                    result = run_mac_legacy_skillshub_migration(
+                        skill_ids or [],
+                        yes=True,
+                        allow_local_writes=allow_local_writes,
+                    )
+                    refresh = run_mac_peer_status_refresh(repo)
+                    result["peer_status_refresh"] = refresh
+                    self._send_json(200 if result["ok"] and refresh["ok"] else 500, result)
+                    return
                 self._send_json(404, {"ok": False, "error": "not found"})
-            except (OperatorExecutorError, LocalSkillError, RestoreError, CentralLifecycleError, ConfigError, SyncStateError, RuntimeError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
+            except (OperatorExecutorError, LocalSkillError, LegacySkillshubMigrationError, RestoreError, CentralLifecycleError, ConfigError, SyncStateError, RuntimeError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as exc:
                 self._send_json(500, {"ok": False, "error": str(exc)})
 
         def _read_json(self) -> dict:

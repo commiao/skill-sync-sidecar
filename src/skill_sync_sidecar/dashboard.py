@@ -6095,6 +6095,25 @@ DASHBOARD_HTML = r"""<!doctype html>
       </table>
       <div id="hub-import-empty" class="empty">暂无外部可导入项。</div>
     </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>旧 Skillshub 目录迁移</h2>
+          <div class="mini-label">只替换已验证与中央仓库一致的工具软链接；旧目录不会在这里删除。</div>
+        </div>
+        <button id="legacy-skillshub-check-button" type="button">检查迁移状态</button>
+      </div>
+      <div id="legacy-skillshub-summary" class="kv"></div>
+      <div id="legacy-skillshub-status" class="operator-text">先检查，确认哪些 skill 仍依赖旧目录。</div>
+      <div id="legacy-skillshub-actions" class="executor-actions" hidden>
+        <button id="legacy-skillshub-migrate-button" type="button" onclick="migrateSelectedLegacySkillshubLinks()" disabled>迁移已选</button>
+      </div>
+      <table id="legacy-skillshub-table" hidden>
+        <thead><tr><th>Skill</th><th>中央仓库</th><th>依赖工具</th><th>下一步</th></tr></thead>
+        <tbody id="legacy-skillshub-body"></tbody>
+      </table>
+      <div id="legacy-skillshub-empty" class="empty">尚未检查旧目录迁移状态。</div>
+    </div>
     <section class="grid">
       <div class="stack">
         <div class="panel">
@@ -6158,6 +6177,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let recentSkillRowFeedback = [];
     let lastOperationFeedback = null;
     let currentReviewQueueItems = [];
+    let legacySkillshubMigrationPreview = null;
+    let selectedLegacySkillshubMigrationIds = new Set();
     let focusedReviewSkillId = "";
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewDetailsUserOpened = false;
@@ -12112,6 +12133,142 @@ DASHBOARD_HTML = r"""<!doctype html>
       return `${text(item.path)}; 同名来源 ${duplicateSources.length} 个`;
     }
 
+    async function loadLegacySkillshubMigration() {
+      const button = $("legacy-skillshub-check-button");
+      if (!executorAvailable) {
+        setExecutorStatus("offline", `${currentClientHelperName()}未连接，无法检查旧目录。`, "yellow");
+        return;
+      }
+      button.disabled = true;
+      $("legacy-skillshub-status").textContent = "正在只读检查旧目录依赖和中央仓库版本...";
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/legacy-skillshub-migration`, { method: "GET", cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "legacy migration check failed");
+        legacySkillshubMigrationPreview = payload;
+        selectedLegacySkillshubMigrationIds.clear();
+        renderLegacySkillshubMigration(payload);
+      } catch (error) {
+        $("legacy-skillshub-status").textContent = `检查失败：${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderLegacySkillshubMigration(payload) {
+      const summary = payload.summary || {};
+      $("legacy-skillshub-summary").innerHTML = [
+        row("旧目录 skill", summary.legacy_skills || 0),
+        row("中央一致", summary.central_match || 0),
+        row("中央缺失", summary.central_missing || 0),
+        row("内容不同", summary.central_changed || 0),
+        row("可迁移软链接", summary.detachable_links || 0),
+      ].join("");
+      $("legacy-skillshub-status").textContent = payload.operator_action || "检查完成。";
+      const items = (Array.isArray(payload.items) ? payload.items : []).filter((item) => (item.links || []).length > 0);
+      $("legacy-skillshub-empty").hidden = items.length > 0;
+      $("legacy-skillshub-table").hidden = items.length === 0;
+      $("legacy-skillshub-body").innerHTML = items.map((item) => {
+        const detachable = Array.isArray(item.detachable_links) && item.detachable_links.length > 0;
+        const links = (item.links || []).map((link) => link.tool_id).join("、") || "-";
+        const state = legacyCentralStateLabel(item.central_state);
+        const action = detachable
+          ? `<label><input type="checkbox" data-legacy-skill-id="${escapeHtml(text(item.skill_id))}" onchange="toggleLegacySkillshubMigration(this)"> 选择迁移</label>`
+          : `<button type="button" onclick="openLegacySkillshubItem('${escapeHtml(text(item.skill_id))}', '${escapeHtml(text(item.central_state))}')">${escapeHtml(legacyActionLabel(item.central_state))}</button>`;
+        return `
+          <tr>
+            <td class="mono">${escapeHtml(text(item.skill_id))}<div class="mini-label">${escapeHtml(text(item.name))}</div></td>
+            <td>${pill(state, legacyCentralStateKind(item.central_state))}<div class="mini-label">${escapeHtml(text(item.central_reason))}</div></td>
+            <td>${escapeHtml(links)}<div class="mini-label">${detachable ? `可迁移 ${item.detachable_links.length} 个` : escapeHtml(text(item.action_detail))}</div></td>
+            <td>${action}</td>
+          </tr>
+        `;
+      }).join("");
+      $("legacy-skillshub-actions").hidden = !items.some((item) => Array.isArray(item.detachable_links) && item.detachable_links.length > 0);
+      updateLegacySkillshubMigrationButton();
+    }
+
+    function legacyCentralStateLabel(state) {
+      if (state === "match") return "已验证一致";
+      if (state === "missing") return "未在中央库";
+      if (state === "changed") return "版本不同";
+      return "未知";
+    }
+
+    function legacyCentralStateKind(state) {
+      if (state === "match") return "green";
+      if (state === "missing" || state === "changed") return "yellow";
+      return "";
+    }
+
+    function legacyActionLabel(state) {
+      if (state === "missing") return "去保存到中央库";
+      if (state === "changed") return "去检查差异";
+      return "查看 Skill 清单";
+    }
+
+    function toggleLegacySkillshubMigration(input) {
+      const skillId = input.dataset.legacySkillId || "";
+      if (!skillId) return;
+      if (input.checked) selectedLegacySkillshubMigrationIds.add(skillId);
+      else selectedLegacySkillshubMigrationIds.delete(skillId);
+      updateLegacySkillshubMigrationButton();
+    }
+
+    function updateLegacySkillshubMigrationButton() {
+      const button = $("legacy-skillshub-migrate-button");
+      if (!button) return;
+      const count = selectedLegacySkillshubMigrationIds.size;
+      button.textContent = count > 0 ? `迁移已选 (${count})` : "迁移已选";
+      button.disabled = count === 0 || !executorAvailable || !executorAllowLocalWrites;
+      button.title = !executorAllowLocalWrites ? "需要本机写入权限" : "只替换选中的已验证软链接";
+    }
+
+    function openLegacySkillshubItem(skillId, state) {
+      selectDashboardTab("inventory");
+      const search = $("skill-inventory-search");
+      const central = $("skill-inventory-central-filter");
+      if (search) search.value = skillId;
+      if (central) central.value = state === "missing" ? "unpublished" : "all";
+      renderSkillInventoryFiltered();
+      const panel = $("skill-inventory-list-panel");
+      if (panel) {
+        panel.open = true;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    async function migrateSelectedLegacySkillshubLinks() {
+      const skillIds = [...selectedLegacySkillshubMigrationIds];
+      if (skillIds.length === 0) return;
+      if (!executorAllowLocalWrites) {
+        showLocalWriteGateHelp("旧 Skillshub 软链接");
+        return;
+      }
+      const typed = window.prompt(`将把 ${skillIds.length} 个已验证 skill 从旧目录软链接替换为中央仓库副本。旧目录保留，并可按记录回滚。请输入 MIGRATE 确认：`);
+      if (typed !== "MIGRATE") return;
+      $("legacy-skillshub-status").textContent = "正在迁移选中的工具软链接...";
+      updateLegacySkillshubMigrationButton();
+      try {
+        const response = await fetch(`${EXECUTOR_URL}/api/legacy-skillshub-migration`, {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skill_ids: skillIds, confirm: "MIGRATE" }),
+        });
+        const payload = await response.json();
+        showExecutorOutput(formatExecutorResult(payload));
+        if (!response.ok || !payload.ok) throw new Error(executorErrorDetail(payload));
+        $("legacy-skillshub-status").textContent = `迁移完成：已替换 ${text(payload.migrated_links)} 个软链接；旧目录仍保留。`;
+        await refreshLocalWorkspace({ quiet: true });
+        await loadLegacySkillshubMigration();
+      } catch (error) {
+        $("legacy-skillshub-status").textContent = `迁移失败：${error.message}`;
+      } finally {
+        updateLegacySkillshubMigrationButton();
+      }
+    }
+
     function projectionGap(projection) {
       if (!projection) return "-";
       return `${text(projection.missing)} / ${text(projection.drift)}`;
@@ -12159,6 +12316,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     $("refresh").addEventListener("click", () => refresh(true));
     $("hub-import-preview-button").addEventListener("click", generateHubImportPreview);
+    $("legacy-skillshub-check-button").addEventListener("click", loadLegacySkillshubMigration);
     ["skill-inventory-search", "skill-inventory-central-filter", "skill-inventory-scope-filter", "skill-inventory-tool-filter", "skill-inventory-device-filter", "skill-inventory-sync-filter"].forEach((id) => {
       const element = $(id);
       if (element) element.addEventListener(id === "skill-inventory-search" ? "input" : "change", renderSkillInventoryFiltered);

@@ -30,6 +30,14 @@ from .hub_import import (
     render_hub_import_preview_text,
 )
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
+from .legacy_skillshub_migration import (
+    LegacySkillshubMigrationError,
+    build_legacy_skillshub_migration_preview,
+    default_central_snapshot_root,
+    default_legacy_skillshub_root,
+    execute_legacy_skillshub_migration,
+    rollback_legacy_skillshub_migration,
+)
 from .monitor import (
     DEFAULT_FETCH_FAILURE_ALERT_THRESHOLD,
     DEFAULT_FETCH_RETRIES,
@@ -217,6 +225,29 @@ def build_parser() -> argparse.ArgumentParser:
     local_skill_publish_mode.add_argument("--dry-run", action="store_true", help="Only preview the selective save.")
     local_skill_publish_mode.add_argument("--yes", action="store_true", help="Save the selected local skill and merged index to the shared library.")
     local_skill_publish.set_defaults(func=cmd_local_skill_publish)
+
+    legacy_migration = subcommands.add_parser(
+        "legacy-skillshub-migration",
+        help="Preview or detach verified tool symlinks from the legacy ~/.skillshub root.",
+    )
+    legacy_migration.add_argument("--legacy-root", default=str(default_legacy_skillshub_root()), help="Legacy Skillshub root to inspect.")
+    legacy_migration.add_argument("--remote-snapshot", default=str(default_central_snapshot_root()), help="Local cache of the central snapshot.")
+    legacy_migration.add_argument("--skill-id", action="append", default=[], help="Verified skill id to detach. Repeat for multiple skills.")
+    legacy_migration.add_argument("--record-out", help="Migration record path. Defaults to Application Support.")
+    legacy_migration.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    legacy_migration_mode = legacy_migration.add_mutually_exclusive_group(required=True)
+    legacy_migration_mode.add_argument("--dry-run", action="store_true", help="Only inspect the legacy root and migration candidates.")
+    legacy_migration_mode.add_argument("--yes", action="store_true", help="Replace only selected verified symlinks and write a rollback record.")
+    legacy_migration.set_defaults(func=cmd_legacy_skillshub_migration)
+
+    legacy_migration_rollback = subcommands.add_parser(
+        "legacy-skillshub-migration-rollback",
+        help="Restore legacy symlinks from one completed migration record.",
+    )
+    legacy_migration_rollback.add_argument("--record", required=True, help="Completed legacy migration record JSON.")
+    legacy_migration_rollback.add_argument("--yes", action="store_true", help="Confirm rollback of this migration record.")
+    legacy_migration_rollback.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    legacy_migration_rollback.set_defaults(func=cmd_legacy_skillshub_migration_rollback)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
     tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
@@ -821,6 +852,56 @@ def cmd_local_skill_publish(args: argparse.Namespace) -> int:
         print(f"snapshot_id: {result.get('snapshot_id')}")
         if result.get("base_record_path"):
             print(f"base_record: {result['base_record_path']}")
+    return 0
+
+
+def cmd_legacy_skillshub_migration(args: argparse.Namespace) -> int:
+    try:
+        if args.dry_run:
+            result = build_legacy_skillshub_migration_preview(
+                Path(args.legacy_root),
+                Path(args.remote_snapshot),
+            )
+        else:
+            result = execute_legacy_skillshub_migration(
+                Path(args.legacy_root),
+                Path(args.remote_snapshot),
+                args.skill_id,
+                record_out=Path(args.record_out) if args.record_out else None,
+                yes=True,
+                allow_local_writes=True,
+            )
+    except LegacySkillshubMigrationError as exc:
+        print(f"legacy-skillshub-migration failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        summary = result.get("summary") or {}
+        print(result.get("operator_action") or "legacy Skillshub migration preview")
+        print(f"legacy_skills={summary.get('legacy_skills', 0)}")
+        print(f"central_missing={summary.get('central_missing', 0)}")
+        print(f"central_changed={summary.get('central_changed', 0)}")
+        print(f"detachable_links={summary.get('detachable_links', 0)}")
+        if result.get("record_path"):
+            print(f"record={result['record_path']}")
+    return 0
+
+
+def cmd_legacy_skillshub_migration_rollback(args: argparse.Namespace) -> int:
+    if not args.yes:
+        print("legacy-skillshub-migration-rollback requires --yes", file=sys.stderr)
+        return 2
+    try:
+        result = rollback_legacy_skillshub_migration(Path(args.record))
+    except LegacySkillshubMigrationError as exc:
+        print(f"legacy-skillshub-migration-rollback failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(f"rolled_back={result.get('total', 0)}")
+        print(f"rollback_record={result.get('rollback_record_path')}")
     return 0
 
 
