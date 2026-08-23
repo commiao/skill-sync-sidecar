@@ -103,6 +103,64 @@ def build_legacy_skillshub_migration_preview(
     }
 
 
+def build_legacy_skillshub_peer_report(
+    legacy_root: Path,
+    remote_snapshot_dir: Path,
+    *,
+    consumer_roots: Optional[dict[str, Path]] = None,
+    measured_at: Optional[str] = None,
+) -> dict:
+    """Return a WebDAV-safe legacy dependency report without local paths."""
+    observed_at = measured_at or datetime.now(timezone.utc).isoformat()
+    try:
+        preview = build_legacy_skillshub_migration_preview(
+            legacy_root,
+            remote_snapshot_dir,
+            consumer_roots=consumer_roots,
+        )
+    except (LegacySkillshubMigrationError, OSError, ValueError):
+        return {
+            "legacy_skillshub_report_version": 1,
+            "available": False,
+            "measured_at": observed_at,
+            "reason": "旧 Skillshub 目录或共享库快照不可读取。",
+            "summary": {},
+            "items": [],
+        }
+
+    items = []
+    for item in preview["items"]:
+        links = item.get("links") if isinstance(item.get("links"), list) else []
+        tools = sorted(
+            {
+                str(link.get("tool_id"))
+                for link in links
+                if isinstance(link, dict) and link.get("tool_id")
+            }
+        )
+        items.append(
+            {
+                "skill_id": item["skill_id"],
+                "name": item["name"],
+                "central_state": item["central_state"],
+                "central_reason": item["central_reason"],
+                "tools": tools,
+                "link_count": len(links),
+                "detachable_link_count": len(item.get("detachable_links") or []),
+                "action": item["action"],
+                "action_detail": item["action_detail"],
+            }
+        )
+    return {
+        "legacy_skillshub_report_version": 1,
+        "available": True,
+        "measured_at": observed_at,
+        "snapshot_id": preview.get("snapshot_id"),
+        "summary": preview["summary"],
+        "items": items,
+    }
+
+
 def execute_legacy_skillshub_migration(
     legacy_root: Path,
     remote_snapshot_dir: Path,

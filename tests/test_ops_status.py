@@ -1769,6 +1769,43 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(device_tools["mac"]["tools"][0]["state"], "unknown")
             self.assertEqual(device_tools["oc-vps"]["tools"][0]["state"], "unknown")
 
+    def test_gateway_status_exposes_mac_legacy_skillshub_report(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-legacy-report")
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "mac": {
+                        "peer_status_version": 1,
+                        "published_at": "2026-08-23T00:02:00+00:00",
+                        "health": "green",
+                        "remote_snapshot": {"total": 1},
+                        "sync_plan": {"writer_policy": "push-pull", "blocked": 0},
+                        "legacy_skillshub": {
+                            "legacy_skillshub_report_version": 1,
+                            "available": True,
+                            "measured_at": "2026-08-23T00:01:00+00:00",
+                            "snapshot_id": "snap-legacy-report",
+                            "summary": {"legacy_skills": 77, "linked_skills": 64, "linked_entries": 130, "central_missing": 58, "central_changed": 6},
+                            "items": [{"skill_id": "demo", "name": "Demo", "central_state": "missing", "tools": ["codex"], "link_count": 1}],
+                        },
+                    }
+                },
+            )
+
+            report = status["dashboard"]["legacy_skillshub"]
+            self.assertTrue(report["available"])
+            self.assertEqual(report["source"], "Mac Agent")
+            self.assertEqual(report["summary"]["linked_entries"], 130)
+            self.assertEqual(report["items"][0]["skill_id"], "demo")
+
     def test_remote_snapshot_cache_force_refresh_bypasses_interval(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2453,12 +2490,15 @@ class OpsStatusTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             local_root = root / "skills"
+            legacy_root = root / ".skillshub"
             snapshot_dir = root / "snapshot"
             remote_dir = root / "remote"
             base_record = root / "base-record.json"
             state_file = root / "state.json"
+            legacy_report = root / "legacy-skillshub-report.json"
 
             self._write_skill(local_root / "demo", "Demo", "Demo skill")
+            self._write_skill(legacy_root / "legacy-demo", "Legacy demo", "Legacy skill")
             index = write_snapshot(scan_roots([f"cc-switch={local_root}"]), snapshot_dir, "snap-publish")
             self._write_base_record(base_record, index)
             state_file.write_text(
@@ -2493,6 +2533,10 @@ class OpsStatusTest(unittest.TestCase):
                     str(base_record),
                     "--state-file",
                     str(state_file),
+                    "--legacy-skillshub-root",
+                    str(legacy_root),
+                    "--legacy-skillshub-report-file",
+                    str(legacy_report),
                     "--allow-new",
                 ]
             )
@@ -2507,6 +2551,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIsInstance(payload["tools"], list)
             self.assertTrue(any(tool["id"] == "cc-switch" for tool in payload["tools"]))
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-publish")
+            self.assertTrue(payload["legacy_skillshub"]["available"])
+            self.assertEqual(payload["legacy_skillshub"]["summary"]["legacy_skills"], 1)
+            self.assertTrue(legacy_report.exists())
+            self.assertEqual(json.loads(legacy_report.read_text(encoding="utf-8"))["snapshot_id"], "snap-publish")
 
     def test_publish_peer_status_uses_configured_device_identity_by_default(self):
         with TemporaryDirectory() as tmp:

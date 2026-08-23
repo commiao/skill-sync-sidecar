@@ -32,6 +32,7 @@ from .hub_import import (
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .legacy_skillshub_migration import (
     LegacySkillshubMigrationError,
+    build_legacy_skillshub_peer_report,
     build_legacy_skillshub_migration_preview,
     default_central_snapshot_root,
     default_legacy_skillshub_root,
@@ -127,6 +128,8 @@ def build_parser() -> argparse.ArgumentParser:
     publish_peer_status.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
     publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
     publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
+    publish_peer_status.add_argument("--legacy-skillshub-root", default="~/.skillshub", help="Legacy Skills Hub root to audit when publishing Mac status.")
+    publish_peer_status.add_argument("--legacy-skillshub-report-file", default="~/Library/Application Support/skill-sync-sidecar/peers/legacy-skillshub-report.json", help="Local cache for the sanitized legacy dependency report.")
     publish_peer_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
     publish_peer_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
     publish_peer_status.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
@@ -142,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     dashboard.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
     dashboard.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    dashboard.add_argument("--legacy-skillshub-report-file", default="~/Library/Application Support/skill-sync-sidecar/peers/legacy-skillshub-report.json", help="Sanitized Mac legacy dependency report cached by publish-peer-status.")
     dashboard.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
     dashboard.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
     dashboard.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
@@ -683,6 +687,19 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
                 "tools": build_device_tool_status(),
             }
         )
+        if peer_id == "mac":
+            legacy_report = build_legacy_skillshub_peer_report(
+                Path(args.legacy_skillshub_root),
+                Path(args.remote_snapshot),
+            )
+            payload["legacy_skillshub"] = legacy_report
+            report_path = Path(args.legacy_skillshub_report_file).expanduser()
+            try:
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(json.dumps(legacy_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            except OSError:
+                # The WebDAV payload remains valid even when the local dashboard cache cannot be refreshed.
+                pass
     payload.update(
         {
             "record_type": "skill-sync-peer-status",
@@ -739,6 +756,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         allow_delete=args.allow_delete,
         writer_policy=args.writer_policy,
         peer_status_files=peer_status_files,
+        legacy_skillshub_report_file=Path(args.legacy_skillshub_report_file) if args.legacy_skillshub_report_file else None,
     )
     serve_dashboard(args.host, args.port, config)
     return 0

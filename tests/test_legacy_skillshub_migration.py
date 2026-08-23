@@ -6,6 +6,7 @@ import unittest
 
 from skill_sync_sidecar.legacy_skillshub_migration import (
     LegacySkillshubMigrationError,
+    build_legacy_skillshub_peer_report,
     build_legacy_skillshub_migration_preview,
     execute_legacy_skillshub_migration,
     rollback_legacy_skillshub_migration,
@@ -50,6 +51,38 @@ class LegacySkillshubMigrationTest(unittest.TestCase):
             self.assertEqual(by_id["missing"]["action"], "publish_to_central")
             self.assertEqual(by_id["changed"]["action"], "review_central_difference")
             self.assertEqual(by_id["same"]["links"][0]["tool_id"], "codex")
+
+    def test_peer_report_keeps_the_migration_counts_without_local_paths(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            legacy = root / ".skillshub"
+            codex = root / ".codex" / "skills"
+            central = root / "central"
+            source = root / "source"
+            self._write_skill(legacy / "missing", "missing", "local body")
+            self._link(codex / "missing", legacy / "missing")
+            write_snapshot(scan_roots([f"central={source}"]), central, "central-snapshot")
+
+            report = build_legacy_skillshub_peer_report(
+                legacy,
+                central,
+                consumer_roots={"codex": codex},
+                measured_at="2026-08-23T00:00:00+00:00",
+            )
+
+            self.assertTrue(report["available"])
+            self.assertEqual(report["legacy_skillshub_report_version"], 1)
+            self.assertEqual(report["snapshot_id"], "central-snapshot")
+            self.assertEqual(report["summary"]["linked_skills"], 1)
+            self.assertEqual(report["summary"]["linked_entries"], 1)
+            self.assertEqual(report["summary"]["central_missing"], 1)
+            self.assertEqual(report["items"][0]["tools"], ["codex"])
+            self.assertNotIn("legacy_path", report["items"][0])
+            self.assertNotIn(str(root), json.dumps(report, ensure_ascii=False))
+
+            unavailable = build_legacy_skillshub_peer_report(root / "missing", central)
+            self.assertFalse(unavailable["available"])
+            self.assertNotIn(str(root), json.dumps(unavailable, ensure_ascii=False))
 
     def test_execute_replaces_only_matching_symlink_and_rollback_restores_link(self):
         with TemporaryDirectory() as tmp:

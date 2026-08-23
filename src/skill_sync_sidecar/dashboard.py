@@ -33,6 +33,7 @@ class DashboardConfig:
     writer_policy: str = "push-pull"
     peer_status_files: Optional[Dict[str, Path]] = None
     hub_import_work_dir: Optional[Path] = None
+    legacy_skillshub_report_file: Optional[Path] = None
 
 
 @dataclass(frozen=True)
@@ -253,6 +254,7 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(config.remote_snapshot)
     hub_import = _safe_hub_import_diagnosis()
+    legacy_skillshub = _legacy_skillshub_dashboard_model(_load_legacy_skillshub_report(config.legacy_skillshub_report_file))
     local_tools = build_device_tool_status()
     planned_devices = [
         device
@@ -275,6 +277,7 @@ def build_dashboard_status(config: DashboardConfig) -> dict:
         "device_tools": device_tools,
         "tool_projection": projection,
         "hub_import": hub_import,
+        "legacy_skillshub": legacy_skillshub,
         "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
         "central_repository": _central_repository_model(status, snapshot=status.get("remote_snapshot"), tools=tool_projection, blocked_items=blocked_items),
         "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
@@ -347,6 +350,8 @@ def build_gateway_status(
     operator = _operator_summary(status, devices, blocked_items)
     projection = _safe_tool_projection(snapshot_dir)
     hub_import = _safe_hub_import_diagnosis()
+    mac_peer = peers.get("mac") if isinstance(peers.get("mac"), dict) else {}
+    legacy_skillshub = _legacy_skillshub_dashboard_model(mac_peer.get("legacy_skillshub"))
     planned_devices = [
         device
         for device in _planned_device_overview()
@@ -368,6 +373,7 @@ def build_gateway_status(
         "device_tools": device_tools,
         "tool_projection": projection,
         "hub_import": hub_import,
+        "legacy_skillshub": legacy_skillshub,
         "local_workspace": _local_workspace_model(devices, device_tools, blocked_items),
         "central_repository": _central_repository_model(status, snapshot=snapshot, tools=tools, blocked_items=blocked_items),
         "device_map": _device_map_model(devices, planned_devices, device_tools, blocked_items),
@@ -455,6 +461,7 @@ def build_dashboard_summary(status: dict) -> dict:
             "device_map": dashboard.get("device_map", {}),
             "skill_inventory": dashboard.get("skill_inventory", {}),
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
+            "legacy_skillshub": dashboard.get("legacy_skillshub", {}),
         },
     }
 
@@ -510,6 +517,7 @@ def build_dashboard_overview(summary: dict) -> dict:
                 "summary": _compact_skill_inventory_summary(inventory),
             },
             "hub_import": _compact_hub_import(dashboard.get("hub_import")),
+            "legacy_skillshub": _compact_legacy_skillshub(dashboard.get("legacy_skillshub")),
         },
         "summary_cache": summary.get("summary_cache"),
     }
@@ -632,6 +640,28 @@ def _compact_hub_import(hub_import: object) -> dict:
     }
 
 
+def _compact_legacy_skillshub(report: object) -> dict:
+    if not isinstance(report, dict):
+        return {}
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    return {
+        "available": report.get("available"),
+        "source": report.get("source"),
+        "measured_at": report.get("measured_at"),
+        "freshness": report.get("freshness"),
+        "snapshot_id": report.get("snapshot_id"),
+        "note": report.get("note"),
+        "summary": {
+            "legacy_skills": summary.get("legacy_skills"),
+            "linked_skills": summary.get("linked_skills"),
+            "linked_entries": summary.get("linked_entries"),
+            "central_missing": summary.get("central_missing"),
+            "central_changed": summary.get("central_changed"),
+            "detachable_links": summary.get("detachable_links"),
+        },
+    }
+
+
 def _compact_hub_import_items(items: object, *, per_status_limit: int = 12) -> list[dict]:
     if not isinstance(items, list):
         return []
@@ -742,6 +772,61 @@ def _safe_hub_import_diagnosis() -> dict:
         return data
     except Exception as exc:  # pragma: no cover - diagnosis should not break dashboard
         return {"ok": False, "error": str(exc), "summary": {}, "items": []}
+
+
+def _load_legacy_skillshub_report(report_file: Optional[Path]) -> Optional[dict]:
+    if report_file is None:
+        return None
+    try:
+        data = json.loads(report_file.expanduser().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _legacy_skillshub_dashboard_model(report: object) -> dict:
+    if not isinstance(report, dict):
+        return {
+            "available": False,
+            "source": "Mac Agent",
+            "measured_at": None,
+            "freshness": _freshness_info(None),
+            "snapshot_id": None,
+            "summary": {},
+            "items": [],
+            "note": "Mac Agent 尚未上报旧 Skillshub 目录依赖报告。",
+        }
+    available = bool(report.get("available"))
+    measured_at = report.get("measured_at")
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    raw_items = report.get("items") if isinstance(report.get("items"), list) else []
+    items = []
+    for item in raw_items:
+        if not isinstance(item, dict) or not item.get("skill_id"):
+            continue
+        items.append(
+            {
+                "skill_id": str(item["skill_id"]),
+                "name": item.get("name") or item["skill_id"],
+                "central_state": item.get("central_state"),
+                "central_reason": item.get("central_reason"),
+                "tools": [str(tool) for tool in item.get("tools", []) if tool],
+                "link_count": int(item.get("link_count") or 0),
+                "detachable_link_count": int(item.get("detachable_link_count") or 0),
+                "action": item.get("action"),
+                "action_detail": item.get("action_detail"),
+            }
+        )
+    return {
+        "available": available,
+        "source": "Mac Agent",
+        "measured_at": measured_at,
+        "freshness": _freshness_info(measured_at),
+        "snapshot_id": report.get("snapshot_id"),
+        "summary": summary,
+        "items": items,
+        "note": "由 Mac Agent 扫描旧目录并与当前共享库快照比对；NAS 只读展示这一份结果。" if available else str(report.get("reason") or "Mac Agent 无法读取旧 Skillshub 目录。"),
+    }
 
 
 def _default_hub_import_work_dir() -> Path:
@@ -5818,13 +5903,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       <summary class="easy-workspace-head">
         <div class="easy-workspace-title">
           <strong>旧 Skillshub 目录迁移</strong>
-          <span>检查哪些工具仍依赖旧目录；只迁移中央仓库已验证一致的 skill。</span>
+          <span>由 Mac Agent 上报哪些工具仍依赖旧目录；只有中央仓库已验证一致的 skill 才能解除链接。</span>
         </div>
         <span class="pill">可回滚</span>
       </summary>
       <div class="panel-head">
-        <div class="mini-label">旧目录不会在这里删除。中央缺失或版本不同的 skill 需要先在 Skill 清单中处理。</div>
-        <button id="legacy-skillshub-check-button" type="button">检查迁移状态</button>
+        <div class="mini-label">这里默认显示 Mac 最近一次上报的结果。旧目录不会删除；在 Mac 本机点“检查”可获取即时扫描。</div>
+        <button id="legacy-skillshub-check-button" type="button">检查最新版本</button>
       </div>
       <div id="legacy-skillshub-summary" class="kv"></div>
       <div id="legacy-skillshub-status" class="operator-text">先检查，确认哪些 skill 仍依赖旧目录。</div>
@@ -6282,6 +6367,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderTools(Array.isArray(dashboard.tools) ? dashboard.tools : []);
       renderDeviceTools(Array.isArray(dashboard.device_tools) ? dashboard.device_tools : []);
       renderHubImport(dashboard.hub_import || {});
+      renderLegacySkillshubMigration(dashboard.legacy_skillshub || {});
 
       const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : (Array.isArray(blockedReport.items) ? blockedReport.items : []);
       renderSimpleActionPanel(dashboard, blockedItems);
@@ -12161,20 +12247,29 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function renderLegacySkillshubMigration(payload) {
       const summary = payload.summary || {};
+      const livePreview = payload.mode === "dry_run" && payload.record_type === "skill-sync-legacy-skillshub-migration-preview";
+      const linkedSkills = Number(summary.linked_skills || 0);
+      const linkedEntries = Number(summary.linked_entries || 0);
       $("legacy-skillshub-summary").innerHTML = [
         row("旧目录 skill", summary.legacy_skills || 0),
-        row("中央一致", summary.central_match || 0),
+        row("仍依赖旧目录", `${linkedSkills} 个 skill / ${linkedEntries} 条链接`),
         row("中央缺失", summary.central_missing || 0),
         row("内容不同", summary.central_changed || 0),
-        row("可迁移软链接", summary.detachable_links || 0),
+        row("可立即解除", summary.detachable_links || 0),
       ].join("");
-      $("legacy-skillshub-status").textContent = payload.operator_action || "检查完成。";
-      const items = (Array.isArray(payload.items) ? payload.items : []).filter((item) => (item.links || []).length > 0);
+      const measuredAt = payload.measured_at ? `更新于 ${new Date(payload.measured_at).toLocaleString()}` : "";
+      $("legacy-skillshub-status").textContent = payload.operator_action || payload.note || (payload.available === false ? "Mac Agent 尚未上报旧目录依赖报告。" : `检查完成。${measuredAt ? ` ${measuredAt}` : ""}`);
+      const items = (Array.isArray(payload.items) ? payload.items : []).filter((item) => {
+        const links = Array.isArray(item.links) ? item.links : (Array.isArray(item.tools) ? item.tools : []);
+        return links.length > 0;
+      });
       $("legacy-skillshub-empty").hidden = items.length > 0;
       $("legacy-skillshub-table").hidden = items.length === 0;
       $("legacy-skillshub-body").innerHTML = items.map((item) => {
-        const detachable = Array.isArray(item.detachable_links) && item.detachable_links.length > 0;
-        const links = (item.links || []).map((link) => link.tool_id).join("、") || "-";
+        const detachedLinkCount = Number(item.detachable_link_count || (Array.isArray(item.detachable_links) ? item.detachable_links.length : 0));
+        const detachable = livePreview && detachedLinkCount > 0;
+        const rawLinks = Array.isArray(item.links) ? item.links : (Array.isArray(item.tools) ? item.tools : []);
+        const links = rawLinks.map((link) => typeof link === "string" ? link : link.tool_id).filter(Boolean).join("、") || "-";
         const state = legacyCentralStateLabel(item.central_state);
         const action = detachable
           ? `<label><input type="checkbox" data-legacy-skill-id="${escapeHtml(text(item.skill_id))}" onchange="toggleLegacySkillshubMigration(this)"> 选择迁移</label>`
@@ -12183,12 +12278,12 @@ DASHBOARD_HTML = r"""<!doctype html>
           <tr>
             <td class="mono">${escapeHtml(text(item.skill_id))}<div class="mini-label">${escapeHtml(text(item.name))}</div></td>
             <td>${pill(state, legacyCentralStateKind(item.central_state))}<div class="mini-label">${escapeHtml(text(item.central_reason))}</div></td>
-            <td>${escapeHtml(links)}<div class="mini-label">${detachable ? `可迁移 ${item.detachable_links.length} 个` : escapeHtml(text(item.action_detail))}</div></td>
+            <td>${escapeHtml(links)}<div class="mini-label">${detachable ? `可迁移 ${detachedLinkCount} 个` : escapeHtml(text(item.action_detail))}</div></td>
             <td>${action}</td>
           </tr>
         `;
       }).join("");
-      $("legacy-skillshub-actions").hidden = !items.some((item) => Array.isArray(item.detachable_links) && item.detachable_links.length > 0);
+      $("legacy-skillshub-actions").hidden = !livePreview || !items.some((item) => Number(item.detachable_link_count || (Array.isArray(item.detachable_links) ? item.detachable_links.length : 0)) > 0);
       updateLegacySkillshubMigrationButton();
     }
 
