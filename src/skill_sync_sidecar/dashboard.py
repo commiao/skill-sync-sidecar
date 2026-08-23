@@ -3465,6 +3465,131 @@ DASHBOARD_HTML = r"""<!doctype html>
     .tab-hidden {
       display: none !important;
     }
+    .simple-workbench {
+      margin: 12px 0;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+    .simple-workbench-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px;
+      background: #f8fafc;
+    }
+    .simple-workbench-head-copy {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+    .simple-workbench-eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 780;
+    }
+    .simple-workbench-head h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 20px;
+      line-height: 1.2;
+    }
+    .simple-workbench-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .simple-workbench-primary-action {
+      flex: 0 0 auto;
+      min-height: 38px;
+    }
+    .simple-workbench-body {
+      display: grid;
+    }
+    .simple-workbench-section {
+      display: grid;
+      grid-template-columns: minmax(150px, .7fr) minmax(0, 2fr) auto;
+      align-items: center;
+      gap: 18px;
+      padding: 16px 18px;
+      border-top: 1px solid var(--line);
+    }
+    .simple-workbench-section-copy {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+    .simple-workbench-section-copy strong {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 840;
+    }
+    .simple-workbench-section-copy span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .simple-workbench-summary {
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .simple-workbench-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .simple-workbench-actions button {
+      min-height: 34px;
+      white-space: nowrap;
+    }
+    .simple-workbench-actions .primary {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+    .simple-workbench-tool-list,
+    .simple-workbench-device-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .simple-workbench-tool,
+    .simple-workbench-device {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 32px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 740;
+    }
+    .simple-workbench-tool:hover,
+    .simple-workbench-device:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+    .simple-workbench-tool em,
+    .simple-workbench-device em {
+      color: var(--muted);
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 650;
+    }
+    .simple-workbench-device .pill {
+      padding: 2px 5px;
+      font-size: 11px;
+    }
     .support-drawer.tab-mode {
       border: 0;
       background: transparent;
@@ -5530,6 +5655,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-device-tool-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-inventory-triage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .simple-workbench-section { grid-template-columns: 1fr; gap: 10px; }
+      .simple-workbench-actions { justify-content: flex-start; }
       .local-skill-input-row { grid-template-columns: 1fr; }
       .local-skill-followup.ready { grid-template-columns: 1fr; }
       .local-skill-tools { grid-template-columns: 1fr; }
@@ -5561,6 +5688,23 @@ DASHBOARD_HTML = r"""<!doctype html>
       #updated { display: none; }
       .toolbar button { padding: 6px 9px; }
       main { padding: 14px; }
+      .simple-workbench-head { flex-direction: column; gap: 12px; }
+      .simple-workbench-primary-action { width: 100%; }
+      .simple-workbench-tool-list,
+      .simple-workbench-device-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .simple-workbench-tool,
+      .simple-workbench-device {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      .simple-workbench-tool span,
+      .simple-workbench-device span { min-width: 0; overflow-wrap: anywhere; }
+      .simple-workbench-tool em,
+      .simple-workbench-device em { flex: 0 0 auto; white-space: nowrap; }
       .status-strip { grid-template-columns: 1fr; gap: 8px; }
       .focus-main { padding: 12px; }
       .focus-title { font-size: 18px; }
@@ -5744,12 +5888,56 @@ DASHBOARD_HTML = r"""<!doctype html>
   <main>
     <div id="error" class="error"></div>
     <nav class="dashboard-tabs" aria-label="Skill Sync 页面导航">
-      <button type="button" class="dashboard-tab-button active" data-dashboard-tab="next" onclick="selectDashboardTab('next')">推荐下一步</button>
+      <button type="button" class="dashboard-tab-button active" data-dashboard-tab="workbench" onclick="selectDashboardTab('workbench')">工作台</button>
+      <button type="button" class="dashboard-tab-button" data-dashboard-tab="next" onclick="selectDashboardTab('next')">推荐下一步</button>
       <button type="button" class="dashboard-tab-button" data-dashboard-tab="skill-list" onclick="selectDashboardTab('skill-list')">查看 skill 列表和安装勾选</button>
       <button type="button" class="dashboard-tab-button" data-dashboard-tab="manual-import" onclick="selectDashboardTab('manual-import')">手动导入 skill（高级）</button>
       <button type="button" class="dashboard-tab-button" data-dashboard-tab="inventory" onclick="selectDashboardTab('inventory')">Skill 清单</button>
       <button type="button" class="dashboard-tab-button" data-dashboard-tab="other" onclick="selectDashboardTab('other')">其他</button>
     </nav>
+    <section id="simple-workbench-panel" class="simple-workbench panel" aria-label="Skill 工作台">
+      <div class="simple-workbench-head">
+        <div class="simple-workbench-head-copy">
+          <span id="simple-workbench-eyebrow" class="simple-workbench-eyebrow">当前设备</span>
+          <h2 id="simple-workbench-title">读取中</h2>
+          <p id="simple-workbench-detail">正在读取本机工具、共享库和其他设备状态。</p>
+        </div>
+        <button id="simple-workbench-primary-action" class="simple-workbench-primary-action" type="button">查看技能库</button>
+      </div>
+      <div class="simple-workbench-body">
+        <section class="simple-workbench-section" aria-label="技能库">
+          <div class="simple-workbench-section-copy">
+            <strong>技能库</strong>
+            <span>只显示你当前设备能管理的技能。</span>
+          </div>
+          <div id="simple-workbench-library" class="simple-workbench-summary">读取中</div>
+          <div class="simple-workbench-actions">
+            <button type="button" onclick="openSimpleWorkbenchLibrary()">浏览 skill</button>
+            <button type="button" onclick="openSimpleWorkbenchPublish()">查看可发布</button>
+          </div>
+        </section>
+        <section class="simple-workbench-section" aria-label="本机工具">
+          <div class="simple-workbench-section-copy">
+            <strong>本机工具</strong>
+            <span>点一个工具，只看它已安装的 skill。</span>
+          </div>
+          <div id="simple-workbench-tools" class="simple-workbench-tool-list">读取中</div>
+          <div class="simple-workbench-actions">
+            <button type="button" onclick="openSimpleWorkbenchLibrary()">管理安装</button>
+          </div>
+        </section>
+        <section class="simple-workbench-section" aria-label="其他设备">
+          <div class="simple-workbench-section-copy">
+            <strong>其他设备</strong>
+            <span>这里只读展示；操作由对应设备客户端完成。</span>
+          </div>
+          <div id="simple-workbench-devices" class="simple-workbench-device-list">读取中</div>
+          <div class="simple-workbench-actions">
+            <button type="button" onclick="openSimpleWorkbenchDevices()">查看设备状态</button>
+          </div>
+        </section>
+      </div>
+    </section>
     <section id="simple-action-panel" class="simple-action-panel panel" aria-label="现在建议"></section>
     <section id="conflict-resolution-panel" class="conflict-resolution" hidden aria-label="版本差异处理向导"></section>
     <details class="support-drawer tab-mode" open>
@@ -6273,7 +6461,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
     let staleRefreshTimer = null;
-    let currentDashboardTab = "next";
+    let currentDashboardTab = "workbench";
     const SOURCE_CHANGE_DEFERRALS_KEY = "skill-sync-source-change-deferrals-v1";
     let sourceChangeDeferrals = loadSourceChangeDeferrals();
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
@@ -6354,6 +6542,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderStatusStrip(dashboard, health);
       renderScopeSwitchboard(dashboard);
       renderWorkbench(dashboard);
+      renderSimpleWorkbench(dashboard, { ...status, health });
       $("operator-next").textContent = conciseOperatorNext(dashboard, operator, { ...status, health });
       $("operator-path").textContent = "本机可操作；共享库只接收确认后的保存；其他设备只读。";
       $("operator-snapshot").textContent = `当前共享库版本：${text(operator.snapshot_id)}`;
@@ -6702,7 +6891,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       const conflictOnly = blocked > 0 && conflictItems.length === blocked;
       const ordinaryOnly = blocked > 0 && sourceChangedItems.length === blocked;
       const kind = blocked === 0 ? "green" : (ordinaryOnly ? "deferrable" : (conflictOnly ? "version-difference" : "yellow"));
-      panel.className = `simple-action-panel panel ${kind}`;
+      panel.className = `simple-action-panel panel ${kind}${currentDashboardTab === "next" ? "" : " tab-hidden"}`;
       if (blocked === 0) {
         if (deferredSourceChangedItems.length > 0) {
           const deferredNames = compactSkillList(deferredSourceChangedItems.map((item) => item.skill_id));
@@ -7435,7 +7624,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function selectDashboardTab(tab) {
-      currentDashboardTab = tab || "next";
+      currentDashboardTab = tab || "workbench";
       document.querySelectorAll(".dashboard-tab-button").forEach((button) => {
         const active = button.dataset.dashboardTab === currentDashboardTab;
         button.classList.toggle("active", active);
@@ -7444,8 +7633,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const support = document.querySelector(".support-drawer");
       if (support) {
         support.open = true;
-        support.hidden = currentDashboardTab === "next";
+        support.hidden = currentDashboardTab === "next" || currentDashboardTab === "workbench";
       }
+      const workbench = $("simple-workbench-panel");
+      if (workbench) workbench.classList.toggle("tab-hidden", currentDashboardTab !== "workbench");
       const simple = $("simple-action-panel");
       if (simple) simple.classList.toggle("tab-hidden", currentDashboardTab !== "next");
       const conflict = $("conflict-resolution-panel");
@@ -7474,6 +7665,116 @@ DASHBOARD_HTML = r"""<!doctype html>
           if (otherVisible && selector !== ".advanced-diagnostics") node.open = true;
         });
       });
+    }
+
+    function renderSimpleWorkbench(dashboard, status) {
+      const inventory = currentSkillInventoryModel || inventoryWithLiveLocal(dashboard.skill_inventory || {});
+      const items = Array.isArray(inventory.items) ? inventory.items : [];
+      const workspace = dashboard.local_workspace || {};
+      const blockedItems = Array.isArray(dashboard.blocked_items) ? dashboard.blocked_items : [];
+      const pending = blockedItems.filter((item) => !isDeferredSourceChange(item));
+      const urgent = pending.filter((item) => !reviewIsSourceChangedItem(item));
+      const ordinary = pending.filter((item) => reviewIsSourceChangedItem(item));
+      const deviceName = text((localWorkspaceFromExecutor || {}).device_name || workspace.device_name || currentClientName());
+      const published = items.filter((item) => text((item.central || {}).state) === "published").length;
+      const installed = items.filter((item) => macInstalledToolIds(item).size > 0).length;
+      const publishable = items.filter((item) => unpublishedTriageKind(item) === "publishable").length;
+
+      $("simple-workbench-eyebrow").textContent = `当前客户端：${deviceName}`;
+      const primary = $("simple-workbench-primary-action");
+      if (urgent.length > 0) {
+        $("simple-workbench-title").textContent = `有 ${urgent.length} 项需要你确认`;
+        $("simple-workbench-detail").textContent = "先查看这些 skill 的差异；确认前不会写入共享库或删除本机内容。";
+        primary.textContent = "处理待确认";
+        primary.onclick = () => openReviewDetails();
+      } else if (ordinary.length > 0) {
+        $("simple-workbench-title").textContent = `有 ${ordinary.length} 个其他设备更新`;
+        $("simple-workbench-detail").textContent = "这些是普通更新，不影响本机使用；需要时再检查版本差异。";
+        primary.textContent = "查看更新";
+        primary.onclick = () => openReviewDetails();
+      } else if (publishable > 0) {
+        $("simple-workbench-title").textContent = `有 ${publishable} 个本机 skill 可发布`;
+        $("simple-workbench-detail").textContent = "先在列表里查看来源和范围，再明确保存到中央仓库。";
+        primary.textContent = "查看可发布";
+        primary.onclick = () => openSimpleWorkbenchPublish();
+      } else {
+        $("simple-workbench-title").textContent = "当前没有需要处理的同步事项";
+        $("simple-workbench-detail").textContent = "可以直接管理本机工具安装，或按需要浏览共享技能库。";
+        primary.textContent = "查看技能库";
+        primary.onclick = () => openSimpleWorkbenchLibrary();
+      }
+
+      $("simple-workbench-library").textContent = `共享库收录 ${published} 个 skill；本机工具已安装 ${installed} 个。${publishable > 0 ? "需要共享本机 skill 时，可查看可发布清单。" : ""}`;
+      renderSimpleWorkbenchTools(items, workspace);
+      renderSimpleWorkbenchDevices(dashboard.device_map || {});
+    }
+
+    function renderSimpleWorkbenchTools(items, workspace) {
+      const target = $("simple-workbench-tools");
+      if (!target) return;
+      const live = localWorkspaceFromExecutor || {};
+      const reportedTools = Array.isArray(live.tools) ? live.tools : (Array.isArray(workspace.tools) ? workspace.tools : []);
+      const reportedById = new Map(reportedTools.map((tool) => [localWorkspaceToolInventoryId(tool), tool]));
+      const rows = skillInventoryLocalInstallTools().map((tool) => {
+        const reported = reportedById.get(tool.id) || {};
+        const count = (Array.isArray(items) ? items : []).filter((item) => macInstalledToolIds(item).has(tool.id)).length;
+        const detected = reported.state === "detected" || reported.installed || Number(reported.skills || 0) > 0;
+        return { tool, count, detected };
+      }).filter((row) => row.detected || row.count > 0);
+      if (rows.length === 0) {
+        target.innerHTML = `<span class="simple-workbench-summary">等待本机助手上报可管理工具。</span>`;
+        return;
+      }
+      target.innerHTML = rows.map(({ tool, count }) => `
+        <button type="button" class="simple-workbench-tool" onclick="openLocalSkillInventory('${escapeHtml(tool.id)}')" title="查看 ${escapeHtml(tool.label)} 已安装的 skill">
+          <span>${escapeHtml(tool.label)}</span><em>${escapeHtml(text(count))} 已安装</em>
+        </button>
+      `).join("");
+    }
+
+    function renderSimpleWorkbenchDevices(deviceMap) {
+      const target = $("simple-workbench-devices");
+      if (!target) return;
+      const currentId = currentClientId();
+      const devices = Array.isArray(deviceMap.items) ? deviceMap.items : [];
+      const visible = devices.filter((device) => text(device.id) && text(device.id) !== currentId);
+      if (visible.length === 0) {
+        target.innerHTML = `<span class="simple-workbench-summary">暂无其他设备状态。</span>`;
+        return;
+      }
+      target.innerHTML = visible.map((device) => {
+        const freshness = device.freshness && device.freshness.label ? text(device.freshness.label) : plainHealthLabel(device.health);
+        return `
+          <button type="button" class="simple-workbench-device" onclick="openSimpleWorkbenchDevices()">
+            <span>${escapeHtml(simpleWorkbenchDeviceLabel(device))}</span>
+            ${pill(freshness, deviceKind(device.health))}
+          </button>
+        `;
+      }).join("");
+    }
+
+    function simpleWorkbenchDeviceLabel(device) {
+      const id = text((device || {}).id);
+      if (id === "oc-vps" || id === "openclaw") return "OpenClaw（oc-vps）";
+      if (id === "win" || id === "windows") return "Windows";
+      if (id === "gateway") return "NAS";
+      return text((device || {}).name || inventoryDeviceLabel(id));
+    }
+
+    function openSimpleWorkbenchLibrary() {
+      resetSkillInventoryFilters();
+      openSkillInventoryListPanel();
+    }
+
+    function openSimpleWorkbenchPublish() {
+      if (currentSkillInventoryTriage !== "publishable") setSkillInventoryTriage("publishable");
+      else openSkillInventoryListPanel();
+    }
+
+    function openSimpleWorkbenchDevices() {
+      selectDashboardTab("other");
+      const target = document.querySelector(".workspace-overview");
+      if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function simpleActionStep(index, value) {
@@ -11759,6 +12060,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           executorDeviceName = text(payload.device_name || executorDeviceName || "本机客户端");
           renderLocalWorkspace(window.lastDashboard ? window.lastDashboard.local_workspace || {} : {});
           renderSkillInventory(window.lastDashboard ? window.lastDashboard.skill_inventory || {} : {});
+          if (window.lastDashboard) renderSimpleWorkbench(window.lastDashboard, { health: window.lastDashboard.health || "unknown" });
           if (!quiet) {
             setExecutorStatus("online", payload.allow_publish ? `${currentClientHelperName()}在线：本机扫描可用，保存已开启。` : `${currentClientHelperName()}在线：本机扫描和检查可用，保存未开启。`, "green");
           }
@@ -12438,7 +12740,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }, true);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
-    selectDashboardTab("next");
+    selectDashboardTab("workbench");
     refresh(true);
     setInterval(() => {
       if (currentDashboardTab === "skill-list") {
