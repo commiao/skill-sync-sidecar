@@ -12207,7 +12207,7 @@ DASHBOARD_HTML = r"""<!doctype html>
 
     function legacyActionLabel(state) {
       if (state === "missing") return "去保存到中央库";
-      if (state === "changed") return "去检查差异";
+      if (state === "changed") return "查看 Skill 清单";
       return "查看 Skill 清单";
     }
 
