@@ -30,6 +30,7 @@ SKILL_SYNC_WEBDAV_PASSWORD=your-webdav-password
 SKILL_SYNC_GATEWAY_PREFIX=skill-sync-sidecar-dev/current-mac
 SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_MAC=mac=skill-sync-sidecar-peer-status/mac.json
 SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_OPENCLAW=oc-vps=skill-sync-sidecar-peer-status/oc-vps.json
+SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_NAS_DSH=nas-deepseek-harness=skill-sync-sidecar-peer-status/nas-deepseek-harness.json
 ```
 
 The container listens on:
@@ -210,6 +211,19 @@ Peer status v1 separates responsibilities:
 
 See [peer-status-v1.md](peer-status-v1.md) for the JSON contract.
 See [agent-day2-runbook.md](agent-day2-runbook.md) for the operator recovery path and how to interpret canonical projection counts versus device-measured tool counts.
+
+### NAS DeepSeek Harness observer
+
+The compose file includes `skill-sync-nas-deepseek-harness-agent` for a local
+Harness container whose `HOME` is `/data/home`. It bind-mounts only
+`/volume1/docker/dsh-personal/data/home` as read-only and observes the standard
+Harness root `/dsh-home/.dsh/skills`. The Agent publishes
+`skill-sync-sidecar-peer-status/nas-deepseek-harness.json` every five minutes.
+
+It is observation-only: it cannot write into the Harness container, install a
+skill, delete a skill, or upload skill content to WebDAV. Until Harness creates
+its first skill directory, the dashboard correctly shows `DeepSeek Harness: not_found`
+under `NAS / DeepSeek Harness` rather than guessing it is a Mac tool.
 
 On Mac:
 

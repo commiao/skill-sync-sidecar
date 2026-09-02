@@ -63,7 +63,7 @@ from .sync_cycle import run_sync_cycle
 from .sync_plan import WRITER_POLICIES, build_sync_plan
 from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
-from .tool_status import build_device_status, build_device_tool_status, build_peer_capabilities
+from .tool_status import build_device_status, build_device_tool_status, build_peer_capabilities, select_device_tool_roots
 
 
 APPLY_TARGETS = [
@@ -125,7 +125,10 @@ def build_parser() -> argparse.ArgumentParser:
     publish_peer_status.add_argument("--peer-id", help="Stable peer id, for example mac, oc-vps, or win. Defaults to SKILL_SYNC_DEVICE_ID or mac.")
     publish_peer_status.add_argument("--peer-name", help="Human-readable device name. Defaults to SKILL_SYNC_DEVICE_NAME when peer-id matches this client.")
     publish_peer_status.add_argument("--status-path", required=True, help="Remote JSON path, for example skill-sync-sidecar-peer-status/mac.json.")
-    publish_peer_status.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
+    publish_status_mode = publish_peer_status.add_mutually_exclusive_group()
+    publish_status_mode.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
+    publish_status_mode.add_argument("--status-only", action="store_true", help="Publish only local tool observation; do not create a sync plan or manage skills.")
+    publish_peer_status.add_argument("--tool-root", action="append", default=[], metavar="TOOL_ID=PATH", help="Restrict v1 tool observation to this tool root. Repeat for multiple roots.")
     publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
     publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     publish_peer_status.add_argument("--legacy-skillshub-root", default="~/.skillshub", help="Legacy Skills Hub root to audit when publishing Mac status.")
@@ -653,6 +656,11 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
     identity = local_device_identity()
     peer_id = args.peer_id or identity["device_id"]
     peer_name = args.peer_name or (identity["device_name"] if peer_id == identity["device_id"] else None)
+    try:
+        tool_roots = parse_device_tool_roots(args.tool_root)
+    except ValueError as exc:
+        print(f"publish-peer-status failed: {exc}", file=sys.stderr)
+        return 2
 
     if args.status_file:
         try:
@@ -664,6 +672,8 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
             print("publish-peer-status failed: --status-file must contain a JSON object", file=sys.stderr)
             return 2
         peer_id = args.peer_id or str(status.get("peer_id") or status.get("id") or peer_id)
+    elif args.status_only:
+        status = build_observer_peer_status()
     else:
         status = build_ops_status(
             Path(args.local_root),
@@ -683,8 +693,11 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
             {
                 "peer_status_version": 1,
                 "device": build_device_status(peer_id, name=peer_name),
-                "capabilities": build_peer_capabilities(),
-                "tools": build_device_tool_status(),
+                "capabilities": build_peer_capabilities(
+                    sync_status=not args.status_only,
+                    blocked_report=not args.status_only,
+                ),
+                "tools": build_device_tool_status(tool_roots),
             }
         )
         if peer_id == "mac":
@@ -736,6 +749,28 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
         print(f"peer_status_version={result['peer_status_version']}")
         print(f"tools={result['tools']}")
     return 0
+
+
+def build_observer_peer_status() -> dict:
+    """Status for an Agent that can observe a local tool but must not sync it."""
+    return {
+        "ok": True,
+        "health": "green",
+        "mode": "peer-observer",
+        "writer_policy": "status-only",
+        "remote_snapshot": {"ok": True, "state": "not_applicable"},
+        "sync_plan": {
+            "writer_policy": "status-only",
+            "total": 0,
+            "allowed": 0,
+            "blocked": 0,
+            "safe_to_apply": False,
+            "blocked_items": [],
+        },
+        "blocked_report": {"ok": True, "total": 0, "items": []},
+        "daemon_state": {"ok": True, "status": "observer", "daemon_status": "running", "writer_policy": "status-only"},
+        "error_count": 0,
+    }
 
 
 def cmd_dashboard(args: argparse.Namespace) -> int:
@@ -1061,6 +1096,22 @@ def parse_peer_status_files(values: Sequence[str]) -> dict[str, Path]:
             raise ValueError(f"--peer-status must be id=/path/status.json: {value}")
         result[peer_id] = Path(raw_path).expanduser()
     return result
+
+
+def parse_device_tool_roots(values: Sequence[str]):
+    if not values:
+        return None
+    roots: dict[str, list[Path]] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--tool-root must be TOOL_ID=PATH: {value}")
+        tool_id, raw_path = value.split("=", 1)
+        tool_id = tool_id.strip()
+        raw_path = raw_path.strip()
+        if not tool_id or not raw_path:
+            raise ValueError(f"--tool-root must be TOOL_ID=PATH: {value}")
+        roots.setdefault(tool_id, []).append(Path(raw_path).expanduser())
+    return select_device_tool_roots(roots)
 
 
 def parse_remote_peer_status_paths(values: Sequence[str]) -> dict[str, str]:

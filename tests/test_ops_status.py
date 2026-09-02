@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
-from skill_sync_sidecar.cli import build_parser, parse_peer_status_files, parse_remote_peer_status_paths
+from skill_sync_sidecar.cli import build_parser, parse_device_tool_roots, parse_peer_status_files, parse_remote_peer_status_paths
 from skill_sync_sidecar.dashboard import (
     DASHBOARD_HTML,
     DashboardConfig,
@@ -75,6 +75,13 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(tools[0]["skills"], 1)
             self.assertEqual(tools[0]["skill_items"][0]["skill_id"], "demo")
             self.assertEqual(tools[0]["skill_items"][0]["scope"], "global")
+
+    def test_parse_device_tool_roots_limits_observer_to_configured_tool(self):
+        roots = parse_device_tool_roots(["deepseek-harness=/dsh-home/.dsh/skills"])
+
+        self.assertEqual(len(roots), 1)
+        self.assertEqual(roots[0][0], "deepseek-harness")
+        self.assertEqual(roots[0][2], (Path("/dsh-home/.dsh/skills"),))
 
     def test_build_ops_status_summarizes_clean_sync_state(self):
         with TemporaryDirectory() as tmp:
@@ -1963,6 +1970,48 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(summary["installed_by_device_tool"]["mac"]["codex"], 1)
             self.assertEqual(summary["installed_by_device_tool"]["win"]["codex"], 1)
 
+    def test_gateway_status_adds_nas_deepseek_harness_as_distinct_device(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_skills = root / "source-skills"
+            remote_dir = root / "remote"
+            cache_dir = root / "gateway-cache"
+
+            self._write_skill(source_skills / "demo", "Demo", "Demo skill")
+            write_snapshot(scan_roots([f"cc-switch={source_skills}"]), remote_dir, "snap-nas-dsh")
+            cache = RemoteSnapshotCache(FileRemote(remote_dir), "", cache_dir, refresh_interval_seconds=3600)
+            status = build_gateway_status(
+                cache,
+                remote_peer_status={
+                    "nas-deepseek-harness": {
+                        "peer_status_version": 1,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "mode": "peer-observer",
+                        "health": "green",
+                        "device": {"id": "nas-deepseek-harness", "name": "NAS / DeepSeek Harness"},
+                        "sync_plan": {"writer_policy": "status-only", "blocked": 0},
+                        "tools": [
+                            {
+                                "id": "deepseek-harness",
+                                "name": "DeepSeek Harness",
+                                "state": "not_found",
+                                "installed": False,
+                                "skills": 0,
+                                "skill_items": [],
+                                "risk": {"ok": 0, "warning": 0, "error": 0},
+                                "note": "未检测到目录",
+                            }
+                        ],
+                    }
+                },
+            )
+
+            devices = {item["id"]: item for item in status["dashboard"]["devices"]}
+            device_tools = {item["device_id"]: item for item in status["dashboard"]["device_tools"]}
+            self.assertEqual(devices["nas-deepseek-harness"]["name"], "NAS / DeepSeek Harness")
+            self.assertEqual(devices["nas-deepseek-harness"]["note"], "设备 Agent 已上报只读实测状态")
+            self.assertEqual(device_tools["nas-deepseek-harness"]["tools"][0]["id"], "deepseek-harness")
+
     def test_skill_inventory_prefers_central_scope_for_published_skill(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2799,6 +2848,40 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["peer_id"], "oc-vps")
             self.assertEqual(payload["remote_snapshot"]["snapshot_id"], "snap-openclaw")
             self.assertNotIn("tools", payload)
+
+    def test_publish_peer_status_status_only_reports_one_nas_tool(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            remote_dir = root / "remote"
+            harness_root = root / "dsh-home" / ".dsh" / "skills"
+            self._write_skill(harness_root / "nas-demo", "NAS Demo", "Harness skill")
+
+            parser = build_parser()
+            args = parser.parse_args(
+                [
+                    "publish-peer-status",
+                    "--remote",
+                    f"file://{remote_dir}",
+                    "--peer-id",
+                    "nas-deepseek-harness",
+                    "--peer-name",
+                    "NAS / DeepSeek Harness",
+                    "--status-path",
+                    "skill-sync-sidecar-peer-status/nas-deepseek-harness.json",
+                    "--status-only",
+                    "--tool-root",
+                    f"deepseek-harness={harness_root}",
+                ]
+            )
+
+            self.assertEqual(args.func(args), 0)
+            payload = json.loads((remote_dir / "skill-sync-sidecar-peer-status" / "nas-deepseek-harness.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["mode"], "peer-observer")
+            self.assertEqual(payload["device"]["name"], "NAS / DeepSeek Harness")
+            self.assertFalse(payload["capabilities"]["sync_status"])
+            self.assertEqual(payload["sync_plan"]["blocked"], 0)
+            self.assertEqual([tool["id"] for tool in payload["tools"]], ["deepseek-harness"])
+            self.assertEqual(payload["tools"][0]["skills"], 1)
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

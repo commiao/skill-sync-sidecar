@@ -37,6 +37,36 @@ services:
       - "${SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_MAC:-mac=skill-sync-sidecar-peer-status/mac.json}"
       - --remote-peer-status
       - "${SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_OPENCLAW:-oc-vps=skill-sync-sidecar-peer-status/oc-vps.json}"
+      - --remote-peer-status
+      - "${SKILL_SYNC_GATEWAY_REMOTE_PEER_STATUS_NAS_DSH:-nas-deepseek-harness=skill-sync-sidecar-peer-status/nas-deepseek-harness.json}"
+
+  skill-sync-nas-deepseek-harness-agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: skill-sync-sidecar:local
+    container_name: skill-sync-nas-deepseek-harness-agent
+    restart: unless-stopped
+    user: "1027:100"
+    environment:
+      SKILL_SYNC_WEBDAV_URL: "${SKILL_SYNC_WEBDAV_URL:?set SKILL_SYNC_WEBDAV_URL}"
+      SKILL_SYNC_WEBDAV_USER: "${SKILL_SYNC_WEBDAV_USER:?set SKILL_SYNC_WEBDAV_USER}"
+      SKILL_SYNC_WEBDAV_PASSWORD: "${SKILL_SYNC_WEBDAV_PASSWORD:?set SKILL_SYNC_WEBDAV_PASSWORD}"
+    volumes:
+      - /volume1/docker/dsh-personal/data/home:/dsh-home:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command: |
+      while true; do
+        skill-sync publish-peer-status \
+          --remote "$${SKILL_SYNC_WEBDAV_URL}" \
+          --prefix "" \
+          --peer-id nas-deepseek-harness \
+          --peer-name "NAS / DeepSeek Harness" \
+          --status-path skill-sync-sidecar-peer-status/nas-deepseek-harness.json \
+          --status-only \
+          --tool-root deepseek-harness=/dsh-home/.dsh/skills
+        sleep "$${SKILL_SYNC_NAS_DSH_PEER_STATUS_INTERVAL_SECONDS:-300}"
+      done
 
   skill-sync-monitor:
     build:

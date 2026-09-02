@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Mapping, Optional
 
 from .scanner import scan_roots
 
 
-DEFAULT_TOOL_ROOTS: tuple[tuple[str, str, tuple[Path, ...], str], ...] = (
+ToolRoot = tuple[str, str, tuple[Path, ...], str]
+
+
+DEFAULT_TOOL_ROOTS: tuple[ToolRoot, ...] = (
     ("cc-switch", "cc-switch", (Path.home() / ".cc-switch" / "skills",), "主同步目录"),
     ("skillshub", "skillshub", (Path.home() / ".skillshub",), "工具技能目录"),
     ("codex", "Codex", (Path.home() / ".codex" / "skills", Path.home() / ".agents" / "skills"), "Codex 可发现目录"),
@@ -16,6 +19,24 @@ DEFAULT_TOOL_ROOTS: tuple[tuple[str, str, tuple[Path, ...], str], ...] = (
     ("qoder", "Qoder", (Path.home() / ".qoder" / "skills",), "Qoder 技能目录"),
     ("deepseek-harness", "DeepSeek Harness", (Path.home() / ".dsh" / "skills",), "DeepSeek Harness 技能目录"),
 )
+
+
+def select_device_tool_roots(root_overrides: Mapping[str, Iterable[Path]]) -> tuple[ToolRoot, ...]:
+    """Build a restricted tool list for an Agent that owns only selected roots."""
+    defaults = {tool_id for tool_id, _name, _roots, _role in DEFAULT_TOOL_ROOTS}
+    unknown = sorted(set(root_overrides) - defaults)
+    if unknown:
+        raise ValueError(f"unknown tool id(s): {', '.join(unknown)}")
+
+    selected: list[ToolRoot] = []
+    for tool_id, name, _default_roots, role in DEFAULT_TOOL_ROOTS:
+        if tool_id not in root_overrides:
+            continue
+        roots = tuple(Path(root).expanduser() for root in root_overrides[tool_id])
+        if not roots:
+            raise ValueError(f"tool root list cannot be empty: {tool_id}")
+        selected.append((tool_id, name, roots, role))
+    return tuple(selected)
 
 
 def build_device_tool_status(
@@ -87,11 +108,11 @@ def build_device_status(peer_id: str, *, name: Optional[str] = None, measured_at
     }
 
 
-def build_peer_capabilities() -> dict:
+def build_peer_capabilities(*, sync_status: bool = True, blocked_report: bool = True) -> dict:
     return {
         "tool_status": True,
-        "sync_status": True,
-        "blocked_report": True,
+        "sync_status": sync_status,
+        "blocked_report": blocked_report,
     }
 
 

@@ -1098,7 +1098,7 @@ def _peer_device(
     if status.get("error"):
         note = f"读取 peer status 失败：{status.get('error')}"
     elif health == "green":
-        note = "远端同步已完成"
+        note = "设备 Agent 已上报只读实测状态" if status.get("mode") == "peer-observer" else "远端同步已完成"
     elif health == "yellow":
         if peer_blocked_items and all(item.get("operator_state") == "source_changed" for item in peer_blocked_items):
             note = "普通待审：OpenClaw 有新修改"

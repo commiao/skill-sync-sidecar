@@ -67,6 +67,14 @@ When `skill-sync publish-peer-status --status-file <file>` is used, the file is 
 
 For device-side Agents, `publish-peer-status` uses `SKILL_SYNC_DEVICE_ID` and `SKILL_SYNC_DEVICE_NAME` when `--peer-id` / `--peer-name` are not provided. Explicit CLI arguments still win, so an OpenClaw publish job can safely publish `oc-vps` even if it runs from a shell that has Mac defaults.
 
+## Observation-only Agents
+
+Some devices should report a tool without becoming a sync writer. Use
+`publish-peer-status --status-only --tool-root TOOL_ID=PATH` for those Agents.
+It emits only the named tool roots, reports `mode: peer-observer`, and sets
+`sync_status` / `blocked_report` capabilities to `false`. It does not build a
+sync plan, upload skill content, install skills, or delete anything.
+
 ## Ownership Boundaries
 
 - Agent scans local tool roots and publishes `tools[]`.
