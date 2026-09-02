@@ -63,7 +63,7 @@ from .sync_cycle import run_sync_cycle
 from .sync_plan import WRITER_POLICIES, build_sync_plan
 from .sync_state import SyncStateError, build_sync_status
 from .tombstones import TombstoneError, build_tombstones
-from .tool_status import build_device_status, build_device_tool_status, build_peer_capabilities, select_device_tool_roots
+from .tool_status import DEFAULT_TOOL_ROOTS, build_device_status, build_device_tool_status, build_peer_capabilities, select_device_tool_roots
 
 
 APPLY_TARGETS = [
@@ -129,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     publish_status_mode.add_argument("--status-file", help="Existing peer status JSON to publish instead of building status for this device.")
     publish_status_mode.add_argument("--status-only", action="store_true", help="Publish only local tool observation; do not create a sync plan or manage skills.")
     publish_peer_status.add_argument("--tool-root", action="append", default=[], metavar="TOOL_ID=PATH", help="Restrict v1 tool observation to this tool root. Repeat for multiple roots.")
+    publish_peer_status.add_argument("--tool-plugin-manifest", action="append", default=[], metavar="TOOL_ID=PATH", help="Read a tool's package manifest for installed plugins. Plugin data is observation-only.")
     publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
     publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     publish_peer_status.add_argument("--legacy-skillshub-root", default="~/.skillshub", help="Legacy Skills Hub root to audit when publishing Mac status.")
@@ -658,6 +659,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
     peer_name = args.peer_name or (identity["device_name"] if peer_id == identity["device_id"] else None)
     try:
         tool_roots = parse_device_tool_roots(args.tool_root)
+        tool_plugin_manifests = parse_tool_plugin_manifests(args.tool_plugin_manifest)
     except ValueError as exc:
         print(f"publish-peer-status failed: {exc}", file=sys.stderr)
         return 2
@@ -697,7 +699,7 @@ def cmd_publish_peer_status(args: argparse.Namespace) -> int:
                     sync_status=not args.status_only,
                     blocked_report=not args.status_only,
                 ),
-                "tools": build_device_tool_status(tool_roots),
+                "tools": build_device_tool_status(tool_roots, plugin_manifests=tool_plugin_manifests),
             }
         )
         if peer_id == "mac":
@@ -1112,6 +1114,25 @@ def parse_device_tool_roots(values: Sequence[str]):
             raise ValueError(f"--tool-root must be TOOL_ID=PATH: {value}")
         roots.setdefault(tool_id, []).append(Path(raw_path).expanduser())
     return select_device_tool_roots(roots)
+
+
+def parse_tool_plugin_manifests(values: Sequence[str]) -> dict[str, Path]:
+    manifests: dict[str, Path] = {}
+    known_tools = {tool_id for tool_id, _name, _roots, _role in DEFAULT_TOOL_ROOTS}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--tool-plugin-manifest must be TOOL_ID=PATH: {value}")
+        tool_id, raw_path = value.split("=", 1)
+        tool_id = tool_id.strip()
+        raw_path = raw_path.strip()
+        if not tool_id or not raw_path:
+            raise ValueError(f"--tool-plugin-manifest must be TOOL_ID=PATH: {value}")
+        if tool_id not in known_tools:
+            raise ValueError(f"unknown tool id for --tool-plugin-manifest: {tool_id}")
+        if tool_id in manifests:
+            raise ValueError(f"duplicate --tool-plugin-manifest for tool: {tool_id}")
+        manifests[tool_id] = Path(raw_path).expanduser()
+    return manifests
 
 
 def parse_remote_peer_status_paths(values: Sequence[str]) -> dict[str, str]:

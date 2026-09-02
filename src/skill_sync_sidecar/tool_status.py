@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
@@ -42,6 +43,7 @@ def select_device_tool_roots(root_overrides: Mapping[str, Iterable[Path]]) -> tu
 def build_device_tool_status(
     tool_roots: Optional[Iterable[tuple[str, str, Iterable[Path], str]]] = None,
     *,
+    plugin_manifests: Optional[Mapping[str, Path]] = None,
     measured_at: Optional[str] = None,
 ) -> list[dict]:
     measured = measured_at or datetime.now(timezone.utc).isoformat()
@@ -49,7 +51,8 @@ def build_device_tool_status(
     for tool_id, name, roots, role in tool_roots or DEFAULT_TOOL_ROOTS:
         root_paths = [Path(root).expanduser() for root in roots]
         installed_paths = [path for path in root_paths if path.exists()]
-        installed = bool(installed_paths)
+        plugins = _tool_plugin_inventory((plugin_manifests or {}).get(tool_id))
+        installed = bool(installed_paths) or bool(plugins and plugins.get("state") == "detected")
         count = 0
         risk = {"ok": 0, "warning": 0, "error": 0}
         skill_items: list[dict] = []
@@ -75,6 +78,7 @@ def build_device_tool_status(
                         "skills": 0,
                         "skill_items": [],
                         "risk": {},
+                        "plugins": plugins,
                         "measured_at": measured,
                         "note": str(exc),
                     }
@@ -92,8 +96,9 @@ def build_device_tool_status(
                 "skills": count,
                 "skill_items": sorted(skill_items, key=lambda item: str(item.get("skill_id") or "")),
                 "risk": risk,
+                "plugins": plugins,
                 "measured_at": measured,
-                "note": "已检测到目录" if installed else "未检测到目录",
+                "note": _tool_status_note(installed_paths, plugins),
             }
         )
     return tools
@@ -144,3 +149,39 @@ def _tool_skill_items(scan_data: dict) -> list[dict]:
             }
         )
     return items
+
+
+def _tool_plugin_inventory(manifest_path: Optional[Path]) -> Optional[dict]:
+    if manifest_path is None:
+        return None
+    path = Path(manifest_path).expanduser()
+    payload = {"path": str(path), "state": "not_found", "count": 0, "items": [], "note": "未检测到插件清单"}
+    if not path.is_file():
+        return payload
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        dependencies = data.get("dependencies") if isinstance(data, dict) else None
+        if not isinstance(dependencies, dict):
+            raise ValueError("dependencies is not an object")
+        items = [
+            {"name": str(name), "version": str(version)}
+            for name, version in dependencies.items()
+            if isinstance(name, str) and isinstance(version, (str, int, float))
+        ]
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        payload.update({"state": "error", "note": f"无法读取插件清单：{exc}"})
+        return payload
+    payload.update({"state": "detected", "count": len(items), "items": sorted(items, key=lambda item: item["name"]), "note": "已读取插件清单"})
+    return payload
+
+
+def _tool_status_note(installed_paths: list[Path], plugins: Optional[dict]) -> str:
+    plugin_count = plugins.get("count") if isinstance(plugins, dict) else None
+    plugin_detected = isinstance(plugin_count, int) and plugins.get("state") == "detected"
+    if installed_paths and plugin_detected:
+        return f"已检测到技能目录和 {plugin_count} 个插件"
+    if installed_paths:
+        return "已检测到目录"
+    if plugin_detected:
+        return f"已检测到 {plugin_count} 个插件；未检测到技能目录"
+    return "未检测到目录"

@@ -75,6 +75,10 @@ It emits only the named tool roots, reports `mode: peer-observer`, and sets
 `sync_status` / `blocked_report` capabilities to `false`. It does not build a
 sync plan, upload skill content, install skills, or delete anything.
 
+`tools[]` may also include an optional `plugins` inventory for tool-native
+extensions such as a Harness profile's npm dependencies. These are display-only
+observations: they do not become skills, central packages, or sync candidates.
+
 ## Ownership Boundaries
 
 - Agent scans local tool roots and publishes `tools[]`.

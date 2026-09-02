@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
-from skill_sync_sidecar.cli import build_parser, parse_device_tool_roots, parse_peer_status_files, parse_remote_peer_status_paths
+from skill_sync_sidecar.cli import build_parser, parse_device_tool_roots, parse_peer_status_files, parse_remote_peer_status_paths, parse_tool_plugin_manifests
 from skill_sync_sidecar.dashboard import (
     DASHBOARD_HTML,
     DashboardConfig,
@@ -82,6 +82,31 @@ class OpsStatusTest(unittest.TestCase):
         self.assertEqual(len(roots), 1)
         self.assertEqual(roots[0][0], "deepseek-harness")
         self.assertEqual(roots[0][2], (Path("/dsh-home/.dsh/skills"),))
+
+        manifests = parse_tool_plugin_manifests(["deepseek-harness=/dsh-data/profiles/web/package.json"])
+        self.assertEqual(manifests["deepseek-harness"], Path("/dsh-data/profiles/web/package.json"))
+
+    def test_device_tool_status_keeps_harness_plugins_separate_from_skills(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_root = root / ".dsh" / "skills"
+            manifest = root / "profiles" / "web" / "package.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                json.dumps({"dependencies": {"dshmarket": "1.40.0", "dsh-knowledge-base": "0.1.5"}}),
+                encoding="utf-8",
+            )
+
+            tools = build_device_tool_status(
+                [("deepseek-harness", "DeepSeek Harness", [skill_root], "DeepSeek Harness 技能目录")],
+                plugin_manifests={"deepseek-harness": manifest},
+            )
+
+            self.assertTrue(tools[0]["installed"])
+            self.assertEqual(tools[0]["state"], "detected")
+            self.assertEqual(tools[0]["skills"], 0)
+            self.assertEqual(tools[0]["plugins"]["count"], 2)
+            self.assertEqual([item["name"] for item in tools[0]["plugins"]["items"]], ["dsh-knowledge-base", "dshmarket"])
 
     def test_build_ops_status_summarizes_clean_sync_state(self):
         with TemporaryDirectory() as tmp:
@@ -1999,7 +2024,13 @@ class OpsStatusTest(unittest.TestCase):
                                 "skills": 0,
                                 "skill_items": [],
                                 "risk": {"ok": 0, "warning": 0, "error": 0},
-                                "note": "未检测到目录",
+                                "plugins": {
+                                    "state": "detected",
+                                    "count": 3,
+                                    "items": [{"name": "dshmarket", "version": "1.40.0"}],
+                                    "note": "已读取插件清单",
+                                },
+                                "note": "已检测到 3 个插件；未检测到技能目录",
                             }
                         ],
                     }
@@ -2011,6 +2042,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(devices["nas-deepseek-harness"]["name"], "NAS / DeepSeek Harness")
             self.assertEqual(devices["nas-deepseek-harness"]["note"], "设备 Agent 已上报只读实测状态")
             self.assertEqual(device_tools["nas-deepseek-harness"]["tools"][0]["id"], "deepseek-harness")
+            self.assertEqual(device_tools["nas-deepseek-harness"]["tools"][0]["plugins"]["count"], 3)
 
     def test_skill_inventory_prefers_central_scope_for_published_skill(self):
         with TemporaryDirectory() as tmp:
@@ -2854,7 +2886,10 @@ class OpsStatusTest(unittest.TestCase):
             root = Path(tmp)
             remote_dir = root / "remote"
             harness_root = root / "dsh-home" / ".dsh" / "skills"
+            plugin_manifest = root / "dsh-data" / "profiles" / "web" / "package.json"
             self._write_skill(harness_root / "nas-demo", "NAS Demo", "Harness skill")
+            plugin_manifest.parent.mkdir(parents=True)
+            plugin_manifest.write_text(json.dumps({"dependencies": {"dshmarket": "1.40.0"}}), encoding="utf-8")
 
             parser = build_parser()
             args = parser.parse_args(
@@ -2871,6 +2906,8 @@ class OpsStatusTest(unittest.TestCase):
                     "--status-only",
                     "--tool-root",
                     f"deepseek-harness={harness_root}",
+                    "--tool-plugin-manifest",
+                    f"deepseek-harness={plugin_manifest}",
                 ]
             )
 
@@ -2882,6 +2919,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertEqual(payload["sync_plan"]["blocked"], 0)
             self.assertEqual([tool["id"] for tool in payload["tools"]], ["deepseek-harness"])
             self.assertEqual(payload["tools"][0]["skills"], 1)
+            self.assertEqual(payload["tools"][0]["plugins"]["count"], 1)
 
     def _write_skill(self, skill: Path, name: str, description: str):
         skill.mkdir(parents=True, exist_ok=True)

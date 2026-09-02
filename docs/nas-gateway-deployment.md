@@ -215,15 +215,17 @@ See [agent-day2-runbook.md](agent-day2-runbook.md) for the operator recovery pat
 ### NAS DeepSeek Harness observer
 
 The compose file includes `skill-sync-nas-deepseek-harness-agent` for a local
-Harness container whose `HOME` is `/data/home`. It bind-mounts only
-`/volume1/docker/dsh-personal/data/home` as read-only and observes the standard
-Harness root `/dsh-home/.dsh/skills`. The Agent publishes
+Harness container whose `HOME` is `/data/home`. It bind-mounts
+`/volume1/docker/dsh-personal/data/home` and `/volume1/docker/dsh-personal/data/dsh`
+as read-only. It observes the standard Harness root `/dsh-home/.dsh/skills` and
+the web-profile plugin manifest at `/dsh-data/profiles/web/package.json`. The Agent publishes
 `skill-sync-sidecar-peer-status/nas-deepseek-harness.json` every five minutes.
 
 It is observation-only: it cannot write into the Harness container, install a
 skill, delete a skill, or upload skill content to WebDAV. Until Harness creates
-its first skill directory, the dashboard correctly shows `DeepSeek Harness: not_found`
-under `NAS / DeepSeek Harness` rather than guessing it is a Mac tool.
+its first skill directory, the dashboard shows `0 skills` separately from the
+installed Harness plugin count. Profile plugins are not cross-tool skills and
+are never added to the shared skill repository.
 
 On Mac:
 

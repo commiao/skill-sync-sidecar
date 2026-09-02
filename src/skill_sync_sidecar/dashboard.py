@@ -610,6 +610,7 @@ def _compact_device_tools_overview(device_tools: object) -> list[dict]:
                         "skills": tool.get("skills"),
                         "installed": tool.get("installed"),
                         "risk": tool.get("risk"),
+                        "plugins": _compact_tool_plugins(tool.get("plugins")),
                         "note": tool.get("note"),
                     }
                     for tool in tools
@@ -618,6 +619,16 @@ def _compact_device_tools_overview(device_tools: object) -> list[dict]:
             }
         )
     return groups
+
+
+def _compact_tool_plugins(value: object) -> Optional[dict]:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "state": value.get("state"),
+        "count": value.get("count"),
+        "note": value.get("note"),
+    }
 
 
 def _compact_hub_import(hub_import: object) -> dict:
@@ -12407,15 +12418,31 @@ DASHBOARD_HTML = r"""<!doctype html>
                 <div class="card-note mono">${escapeHtml(text(tool.path || (Array.isArray(tool.roots) ? tool.roots.join(", ") : "")))}</div>
                 <div class="card-stats">
                   <div class="mini-stat"><div class="mini-label">技能数</div><div class="mini-value">${escapeHtml(text(tool.skills))}</div></div>
-                  <div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>
+                  ${toolPluginInventory(tool) ? `<div class="mini-stat"><div class="mini-label">插件</div><div class="mini-value">${escapeHtml(text(toolPluginInventory(tool).count))}</div></div>` : `<div class="mini-stat"><div class="mini-label">风险</div><div class="mini-value">${escapeHtml(pretty(tool.risk))}</div></div>`}
                   <div class="mini-stat"><div class="mini-label">实测时间</div><div class="mini-value subtle">${escapeHtml(formatDateTime(tool.measured_at))}</div></div>
                   <div class="mini-stat"><div class="mini-label">说明</div><div class="mini-value subtle">${escapeHtml(text(tool.note))}</div></div>
                 </div>
+                ${toolPluginInventory(tool) ? `<div class="card-note">${escapeHtml(toolPluginDescription(tool))}</div>` : ""}
               </article>
             `).join("")}
           </div>
         </article>
       `).join("");
+    }
+
+    function toolPluginInventory(tool) {
+      const plugins = tool && tool.plugins;
+      return plugins && typeof plugins === "object" ? plugins : null;
+    }
+
+    function toolPluginDescription(tool) {
+      const plugins = toolPluginInventory(tool) || {};
+      const items = Array.isArray(plugins.items) ? plugins.items : [];
+      const names = items.map((item) => text(item && item.name)).filter(Boolean);
+      const count = text(plugins.count);
+      const detail = names.length ? `：${names.join("、")}` : "";
+      const note = text(plugins.note);
+      return `${count} 个 Harness 插件${detail}${note ? `（${note}）` : ""}`;
     }
 
     function toolStatePill(tool) {
