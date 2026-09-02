@@ -54,19 +54,9 @@ services:
       SKILL_SYNC_WEBDAV_PASSWORD: "${SKILL_SYNC_WEBDAV_PASSWORD:?set SKILL_SYNC_WEBDAV_PASSWORD}"
     volumes:
       - /volume1/docker/dsh-personal/data/home:/dsh-home:ro
-    entrypoint: ["/bin/sh", "-ec"]
-    command: |
-      while true; do
-        skill-sync publish-peer-status \
-          --remote "$${SKILL_SYNC_WEBDAV_URL}" \
-          --prefix "" \
-          --peer-id nas-deepseek-harness \
-          --peer-name "NAS / DeepSeek Harness" \
-          --status-path skill-sync-sidecar-peer-status/nas-deepseek-harness.json \
-          --status-only \
-          --tool-root deepseek-harness=/dsh-home/.dsh/skills
-        sleep "$${SKILL_SYNC_NAS_DSH_PEER_STATUS_INTERVAL_SECONDS:-300}"
-      done
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'while true; do skill-sync publish-peer-status --remote "$${SKILL_SYNC_WEBDAV_URL}" --prefix "" --peer-id nas-deepseek-harness --peer-name "NAS / DeepSeek Harness" --status-path skill-sync-sidecar-peer-status/nas-deepseek-harness.json --status-only --tool-root deepseek-harness=/dsh-home/.dsh/skills; sleep "$${SKILL_SYNC_NAS_DSH_PEER_STATUS_INTERVAL_SECONDS:-300}"; done'
 
   skill-sync-monitor:
     build:
