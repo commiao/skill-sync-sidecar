@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/_install-common.sh"
+repo_root="$(skill_sync_resolve_repo_root "$(dirname "${BASH_SOURCE[0]}")")"
 python_bin="${PYTHON:-python3}"
 label="${SKILL_SYNC_GATEWAY_LABEL:-com.skill-sync-sidecar.gateway}"
 host="${SKILL_SYNC_GATEWAY_HOST:-127.0.0.1}"

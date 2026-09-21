@@ -6,7 +6,8 @@ if [ "${SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD:-}" != "1" ]; then
   exit 2
 fi
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/_install-common.sh"
+repo_root="$(skill_sync_resolve_repo_root "$(dirname "${BASH_SOURCE[0]}")")"
 python_bin="${PYTHON:-python3}"
 local_root="${SKILL_SYNC_LOCAL_ROOT:-$HOME/.cc-switch/skills}"
 device_name="$(hostname -s | tr -c 'A-Za-z0-9._-' '-' | sed 's/-$//')"

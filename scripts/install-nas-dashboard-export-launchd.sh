@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/_install-common.sh"
+repo_root="$(skill_sync_resolve_repo_root "$(dirname "${BASH_SOURCE[0]}")")"
 label="${SKILL_SYNC_NAS_DASHBOARD_EXPORT_LABEL:-com.skill-sync-sidecar.nas-dashboard-export}"
 interval_seconds="${SKILL_SYNC_NAS_DASHBOARD_EXPORT_INTERVAL_SECONDS:-300}"
 out_dir="${SKILL_SYNC_NAS_DASHBOARD_OUT:-$HOME/public-sync/skill-sync-sidecar-dashboard}"

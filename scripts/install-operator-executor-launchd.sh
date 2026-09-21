@@ -2,7 +2,8 @@
 set -euo pipefail
 
 label="${SKILL_SYNC_EXECUTOR_LABEL:-com.skill-sync-sidecar.operator-executor}"
-repo_root="${SKILL_SYNC_EXECUTOR_REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+. "$(dirname "$0")/_install-common.sh"
+repo_root="${SKILL_SYNC_EXECUTOR_REPO_ROOT:-$(skill_sync_resolve_repo_root "$(dirname "$0")")}"
 host="${SKILL_SYNC_EXECUTOR_HOST:-127.0.0.1}"
 port="${SKILL_SYNC_EXECUTOR_PORT:-18765}"
 allow_local_writes="${SKILL_SYNC_EXECUTOR_ALLOW_LOCAL_WRITES:-1}"

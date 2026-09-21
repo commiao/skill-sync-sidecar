@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$(dirname "${BASH_SOURCE[0]}")/_install-common.sh"
+repo_root="$(skill_sync_resolve_repo_root "$(dirname "${BASH_SOURCE[0]}")")"
 interval_seconds="${OPENCLAW_PEER_REFRESH_INTERVAL_SECONDS:-300}"
 label="${OPENCLAW_PEER_REFRESH_LABEL:-com.skill-sync-sidecar.openclaw-peer-status}"
 launch_agents_dir="$HOME/Library/LaunchAgents"
