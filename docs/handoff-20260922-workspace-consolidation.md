@@ -7,8 +7,10 @@ worktree for future Skill Sync Sidecar work.
 
 - Source worktree: `/Users/mac/work-ai/skill-sync-sidecar`
 - Remote: `git@github.com:commiao/skill-sync-sidecar.git`
-- Branch and source HEAD: `work/shared` at `5288bf7`
+- Source branch: `work/shared`, containing `origin/main` through `70ec677`
+  plus the handoff commits. Read the current HEAD with `git rev-parse --short HEAD`.
 - Installed Mac runtime: `/Users/mac/.local/share/skill-sync-sidecar/current`
+  (release `70ec6770de2618df57d20d22f06d1e5ec89740dc`)
 - Mac WebDAV mirror/cache: `/Users/mac/public-sync/skill-sync-sidecar-dev`
 - NAS deployment root: `/volume1/docker/skill-sync-gateway`
 - NAS dashboard: `http://100.123.208.32:8765`
@@ -39,14 +41,14 @@ Then use read-only checks in this order:
 
 ```bash
 # Local source/test baseline.
-python3 -m unittest discover -s tests -q
+PYTHONPATH=src python3 -m unittest discover -s tests -q
 
 # Current Gateway decision summary. This does not write WebDAV.
 scripts/operator-status.sh
 
 # NAS deployment and dashboard provenance. This does not restart containers.
-SKILL_SYNC_NAS_HOST=100.123.208.32 \\
-SKILL_SYNC_NAS_SSH_USER=commiao \\
+SKILL_SYNC_NAS_HOST=100.123.208.32 \
+SKILL_SYNC_NAS_SSH_USER=commiao \
 /bin/bash scripts/validate-nas-sidecar.sh
 ```
 
@@ -78,9 +80,10 @@ local evidence, not deployable application source.
   dependencies are display-only and must never be published as skills.
 
 The NAS deployment record `a4a94e3` (plugin inventory support) is historical
-evidence, not a current health verdict. The source worktree is ahead at
-`5288bf7`; verify the live NAS commit before any new deployment instead of
-assuming it is current.
+evidence, not a current health verdict. The source branch now includes the
+later `4d8b781` monitor-noise fix and `70ec677` LaunchAgent reload fix, but
+verify the live NAS commit before any new deployment instead of assuming it is
+current.
 
 ## Verification Boundary - 2026-09-22
 

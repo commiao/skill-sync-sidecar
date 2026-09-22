@@ -54,8 +54,9 @@ The first screen is intentionally simple. Tool matrices, version details, raw qu
 The local browser executor must be running for dashboard actions:
 
 ```bash
-python3 -m skill_sync_sidecar operator-executor \
-  --repo-root /Users/mac/workspace_codex/skill-sync-sidecar \
+cd /Users/mac/work-ai/skill-sync-sidecar
+PYTHONPATH=src python3 -m skill_sync_sidecar operator-executor \
+  --repo-root "$PWD" \
   --allow-local-writes
 ```
 
