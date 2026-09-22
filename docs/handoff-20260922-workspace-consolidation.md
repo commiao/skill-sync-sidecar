@@ -77,15 +77,35 @@ local evidence, not deployable application source.
 - Last verified Harness observation: `0` skills and `3` plugins. Plugin
   dependencies are display-only and must never be published as skills.
 
-The last known NAS deployment was `a4a94e3` (plugin inventory support). The
-source worktree is ahead at `5288bf7`; verify the live NAS commit before any
-new deployment instead of assuming it is current.
+The NAS deployment record `a4a94e3` (plugin inventory support) is historical
+evidence, not a current health verdict. The source worktree is ahead at
+`5288bf7`; verify the live NAS commit before any new deployment instead of
+assuming it is current.
+
+## Verification Boundary - 2026-09-22
+
+- The latest reported source verification ran 213 tests successfully.
+- This execution environment cannot connect to `127.0.0.1:18765`, even though
+  the Mac executor process was reported as listening there. It therefore does
+  not establish an executor failure.
+- This execution environment also cannot reach the NAS address. Gateway,
+  deployment, and Harness health are currently **unverified**, not failed.
+
+Repeat the local executor and NAS checks from an environment permitted to make
+those connections. Do not turn an environment access restriction into a
+service incident.
 
 ## Deploy-Standard Work In This Session
 
 Source skill:
 
 `/Users/mac/workspace_claudeCode/fleet-ops/skills/deploy-standard`
+
+This `fleet-ops` source directory is the **content authority**. The sidecar
+canonical root, tool installations, and eventual WebDAV package are derived
+copies and must not be edited as competing sources. The central snapshot still
+contains 107 skills and does not contain `deploy-standard`, so it is not an
+authority for this skill yet.
 
 The source repository already has a user-owned edit to `SKILL.md`. This
 session added an uncommitted adjacent `manifest.json` only; it declares:
@@ -105,6 +125,16 @@ Claude Code's former symlink-backed version was preserved at:
 
 `~/.claude/skills/.skill-sync-backups/20260922-125900-154315/deploy-standard`
 
+Current content comparison is not fully converged:
+
+- `fleet-ops` source, cc-switch canonical copy, and Cursor copy match.
+- Codex and Claude Code copies differ from the current source.
+
+Do not overwrite those two divergent copies blindly. First have the source
+owner confirm the current uncommitted `fleet-ops` version is intended, then
+generate a read-only diff and install the confirmed source version through
+sidecar with its existing backup records.
+
 The central publish dry-run passed and would add only this skill, increasing
 the central snapshot from 107 to 108 skills. Actual WebDAV publishing was
 blocked by the execution safety gate because the package documents company
@@ -122,15 +152,17 @@ a backup/apply record, verifies the package hash, and does not restart
 
 ## Known Follow-Up Items
 
-1. Obtain explicit WebDAV publication approval for `deploy-standard`, then
+1. Stabilize the `deploy-standard` authority: have the source owner confirm or
+   commit the current `fleet-ops` edit, inspect the Codex/Claude differences,
+   and update only from the confirmed source.
+2. Obtain explicit WebDAV publication approval for `deploy-standard`, then
    publish only that package and verify its central hash.
-2. Implement and dry-run the narrow NAS Harness apply path described above;
+3. Implement and dry-run the narrow NAS Harness apply path described above;
    execute it only for the approved `deploy-standard` package.
-3. Investigate the Mac operator executor: LaunchAgent reports active but
-   `127.0.0.1:18765/healthz` refused connections in this session. The CLI is
-   usable directly, but dashboard actions should not silently depend on a dead
-   executor.
-4. Before any NAS deployment, validate current commit, Gateway health, agent
+4. From an environment with local and NAS network access, verify the Mac
+   executor health endpoint and NAS Gateway state. Treat them as unverified
+   until then, not as failed.
+5. Before any NAS deployment, validate current commit, Gateway health, agent
    logs, and `dsh-personal` uptime. Do not touch OpenClaw while working on NAS
    dashboard or Harness integration.
 
@@ -142,4 +174,5 @@ a backup/apply record, verifies the package hash, and does not restart
 - Do not delete central skills to clear dashboard warnings.
 - Do not treat Harness plugins as syncable skills.
 - Preserve user edits in the `fleet-ops` source repository; no commit has been
-  made there by this session.
+  made there by this session. The source working tree is intentionally still
+  dirty (`SKILL.md` plus the sidecar `manifest.json`).
