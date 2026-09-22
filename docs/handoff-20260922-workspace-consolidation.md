@@ -28,6 +28,13 @@ git log --oneline -5
 sed -n '1,180p' docs/handoff-20260922-workspace-consolidation.md
 ```
 
+When creating a fresh checkout rather than reusing the canonical worktree,
+start from the handoff branch:
+
+```bash
+git clone --branch work/shared git@github.com:commiao/skill-sync-sidecar.git
+```
+
 Then use read-only checks in this order:
 
 ```bash
