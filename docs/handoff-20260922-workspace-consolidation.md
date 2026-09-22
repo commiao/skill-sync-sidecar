@@ -1,0 +1,138 @@
+# Skill Sync Sidecar Handoff - 2026-09-22
+
+This document makes `/Users/mac/work-ai/skill-sync-sidecar` the only source
+worktree for future Skill Sync Sidecar work.
+
+## Canonical Locations
+
+- Source worktree: `/Users/mac/work-ai/skill-sync-sidecar`
+- Remote: `git@github.com:commiao/skill-sync-sidecar.git`
+- Branch and source HEAD: `work/shared` at `5288bf7`
+- Installed Mac runtime: `/Users/mac/.local/share/skill-sync-sidecar/current`
+- Mac WebDAV mirror/cache: `/Users/mac/public-sync/skill-sync-sidecar-dev`
+- NAS deployment root: `/volume1/docker/skill-sync-gateway`
+- NAS dashboard: `http://100.123.208.32:8765`
+
+The installed runtime and WebDAV paths are operational state, not source
+worktrees. Do not move, delete, or repoint them as part of workspace cleanup.
+
+## New Session Fast Start
+
+Start from the canonical worktree and read this handoff before taking a write
+action:
+
+```bash
+cd /Users/mac/work-ai/skill-sync-sidecar
+git status -sb
+git log --oneline -5
+sed -n '1,180p' docs/handoff-20260922-workspace-consolidation.md
+```
+
+Then use read-only checks in this order:
+
+```bash
+# Local source/test baseline.
+python3 -m unittest discover -s tests -q
+
+# Current Gateway decision summary. This does not write WebDAV.
+scripts/operator-status.sh
+
+# NAS deployment and dashboard provenance. This does not restart containers.
+SKILL_SYNC_NAS_HOST=100.123.208.32 \\
+SKILL_SYNC_NAS_SSH_USER=commiao \\
+/bin/bash scripts/validate-nas-sidecar.sh
+```
+
+Only after those checks should a session consider a publish, install, or NAS
+deploy. The `Deploy-Standard Work In This Session` section below is the current
+write boundary and takes precedence over any stale dashboard recommendation.
+
+## Workspace Consolidation
+
+The former source worktree
+`/Users/mac/workspace_claudeCode/skill-sync-sidecar` was byte-for-byte equal
+to this worktree at the same clean commit, and LaunchAgents point to the
+installed release rather than either checkout. It can therefore be retired
+after the archive move without losing source or runtime state.
+
+Historical dashboard screenshots, the original project kickoff export, and
+the early `skill-inventory` / `capability-reconciler` research are retained
+under `archive/2026-09-22/`. The archive is intentionally gitignored: it is
+local evidence, not deployable application source.
+
+## Current Product State
+
+- WebDAV is the central shared skill store.
+- The NAS Gateway is a read-only dashboard/aggregator.
+- Mac and OpenClaw publish peer status. Windows remains deferred.
+- NAS DeepSeek Harness is a distinct device with a read-only observer.
+  It reports Harness skills and Harness profile plugins separately.
+- Last verified Harness observation: `0` skills and `3` plugins. Plugin
+  dependencies are display-only and must never be published as skills.
+
+The last known NAS deployment was `a4a94e3` (plugin inventory support). The
+source worktree is ahead at `5288bf7`; verify the live NAS commit before any
+new deployment instead of assuming it is current.
+
+## Deploy-Standard Work In This Session
+
+Source skill:
+
+`/Users/mac/workspace_claudeCode/fleet-ops/skills/deploy-standard`
+
+The source repository already has a user-owned edit to `SKILL.md`. This
+session added an uncommitted adjacent `manifest.json` only; it declares:
+
+- `skill_id`: `deploy-standard`
+- `scope`: `global`
+- targets: Claude Code, Codex, Cursor, and DeepSeek Harness
+
+Local installation is complete:
+
+- sidecar canonical root: `~/.cc-switch/skills/deploy-standard`
+- Codex: `~/.codex/skills/deploy-standard`
+- Cursor: `~/.cursor/skills-cursor/deploy-standard`
+- Claude Code: `~/.claude/skills/deploy-standard`
+
+Claude Code's former symlink-backed version was preserved at:
+
+`~/.claude/skills/.skill-sync-backups/20260922-125900-154315/deploy-standard`
+
+The central publish dry-run passed and would add only this skill, increasing
+the central snapshot from 107 to 108 skills. Actual WebDAV publishing was
+blocked by the execution safety gate because the package documents company
+Codeup and local deployment information. Do not bypass that decision.
+Continue only after the user explicitly authorizes this exact action:
+
+`Allow the complete deploy-standard package to be published to the private WebDAV central repository and installed on NAS DeepSeek Harness.`
+
+DeepSeek Harness installation is not yet implemented or performed. Its NAS
+sidecar is intentionally observer-only with read-only binds. The safe follow-up
+is a narrowly scoped, one-shot apply operation that downloads the approved
+central snapshot, writes only `/data/home/.dsh/skills/deploy-standard`, creates
+a backup/apply record, verifies the package hash, and does not restart
+`dsh-personal`. Do not make the observer writable or add broad sync privileges.
+
+## Known Follow-Up Items
+
+1. Obtain explicit WebDAV publication approval for `deploy-standard`, then
+   publish only that package and verify its central hash.
+2. Implement and dry-run the narrow NAS Harness apply path described above;
+   execute it only for the approved `deploy-standard` package.
+3. Investigate the Mac operator executor: LaunchAgent reports active but
+   `127.0.0.1:18765/healthz` refused connections in this session. The CLI is
+   usable directly, but dashboard actions should not silently depend on a dead
+   executor.
+4. Before any NAS deployment, validate current commit, Gateway health, agent
+   logs, and `dsh-personal` uptime. Do not touch OpenClaw while working on NAS
+   dashboard or Harness integration.
+
+## Safety Rules
+
+- Do not replace OpenClaw's system Python or restart its gateway for sidecar
+  work.
+- Do not convert OpenClaw from pull-only unattended sync to push-pull.
+- Do not delete central skills to clear dashboard warnings.
+- Do not treat Harness plugins as syncable skills.
+- Preserve user edits in the `fleet-ops` source repository; no commit has been
+  made there by this session.
