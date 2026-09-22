@@ -87,7 +87,7 @@ current.
 
 ## Verification Boundary - 2026-09-22
 
-- The latest reported source verification ran 213 tests successfully.
+- The latest reported source verification ran 229 tests successfully.
 - This execution environment cannot connect to `127.0.0.1:18765`, even though
   the Mac executor process was reported as listening there. It therefore does
   not establish an executor failure.
@@ -106,9 +106,10 @@ Source skill:
 
 This `fleet-ops` source directory is the **content authority**. The sidecar
 canonical root, tool installations, and eventual WebDAV package are derived
-copies and must not be edited as competing sources. The central snapshot still
-contains 107 skills and does not contain `deploy-standard`, so it is not an
-authority for this skill yet.
+copies and must not be edited as competing sources. At last verification, the
+central snapshot contained 107 skills and did not contain `deploy-standard`;
+its current contents remain unverified, so it is not an authority for this
+skill yet.
 
 The source repository already has a user-owned edit to `SKILL.md`. This
 session added an uncommitted adjacent `manifest.json` only; it declares:
@@ -138,10 +139,11 @@ owner confirm the current uncommitted `fleet-ops` version is intended, then
 generate a read-only diff and install the confirmed source version through
 sidecar with its existing backup records.
 
-The central publish dry-run passed and would add only this skill, increasing
-the central snapshot from 107 to 108 skills. Actual WebDAV publishing was
-blocked by the execution safety gate because the package documents company
-Codeup and local deployment information. Do not bypass that decision.
+The central publish dry-run passed and would have added only this skill,
+increasing the snapshot from 107 to 108 skills at that time. Actual WebDAV
+publishing was blocked by the execution safety gate because the package
+documents company Codeup and local deployment information. Do not bypass that
+decision.
 Continue only after the user explicitly authorizes this exact action:
 
 `Allow the complete deploy-standard package to be published to the private WebDAV central repository and installed on NAS DeepSeek Harness.`
