@@ -63,8 +63,7 @@ payload = {
 plist.write_bytes(plistlib.dumps(payload, sort_keys=False))
 PY
 
-launchctl bootout "gui/$(id -u)" "$plist" >/dev/null 2>&1 || true
-launchctl bootstrap "gui/$(id -u)" "$plist"
+skill_sync_launchd_reload "$plist"
 launchctl enable "gui/$(id -u)/$label"
 
 echo "operator_executor_launchd_ok=true"

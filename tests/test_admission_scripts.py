@@ -205,7 +205,13 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("publish-openclaw-peer-status.sh", installer_text)
         self.assertIn("StartInterval", installer_text)
         self.assertIn("com.skill-sync-sidecar.openclaw-peer-status", installer_text)
-        self.assertIn("launchctl bootstrap", installer_text)
+        # The intent here is "the installer actually loads the job", not
+        # "the installer types bootstrap". T-0148 moved the load behind a
+        # shared helper so bootout/bootstrap are serialized in one place;
+        # asserting the raw command would now pin the very shape that was
+        # removed. tests/test_install_launchd_reload.py owns the stronger
+        # claim: no installer may issue those two commands itself.
+        self.assertIn("skill_sync_launchd_reload", installer_text)
 
         self.assertIn("ops-status", local_publish_text)
         self.assertIn("--writer-policy pull-only", local_publish_text)
