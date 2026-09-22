@@ -50,8 +50,7 @@ PY
 
 chmod +x "$repo_root/scripts/refresh-openclaw-peer-status.sh" "$repo_root/scripts/publish-openclaw-peer-status.sh"
 plutil -lint "$plist_path"
-launchctl bootout "gui/$(id -u)" "$plist_path" >/dev/null 2>&1 || true
-launchctl bootstrap "gui/$(id -u)" "$plist_path"
+skill_sync_launchd_reload "$plist_path"
 launchctl kickstart -k "gui/$(id -u)/$label"
 sleep 3
 
