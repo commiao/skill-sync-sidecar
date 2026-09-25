@@ -26,6 +26,7 @@ class NasDashboardReleaseContractTest(unittest.TestCase):
         git(repo, "config", "user.name", "release-test")
         git(repo, "config", "user.email", "release-test@example.invalid")
         repo.joinpath("README.md").write_text("base\n", encoding="utf-8")
+        repo.joinpath("setup.cfg").write_text("[metadata]\nname = skill-sync-sidecar\n", encoding="utf-8")
         commit(repo, "base")
         return repo, git(repo, "rev-parse", "HEAD")
 
@@ -48,6 +49,32 @@ class NasDashboardReleaseContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("nas_dashboard_contract=ok", result.stdout)
         self.assertIn("dashboard-sidebar", result.stdout)
+
+    def test_rejects_other_project_even_with_matching_dashboard_path(self):
+        with TemporaryDirectory() as tmp:
+            repo, base = self.make_repo(Path(tmp))
+            repo.joinpath("setup.cfg").write_text("[metadata]\nname = other-service\n", encoding="utf-8")
+            dashboard = repo / "src" / "skill_sync_sidecar" / "dashboard.py"
+            dashboard.parent.mkdir(parents=True)
+            dashboard.write_text("DASHBOARD_HTML = 'new-ui'\n", encoding="utf-8")
+            commit(repo, "other project dashboard")
+            result = self.verify(repo, base)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("belongs to skill-sync-sidecar", result.stderr)
+
+    def test_rejects_missing_project_identity(self):
+        with TemporaryDirectory() as tmp:
+            repo, base = self.make_repo(Path(tmp))
+            repo.joinpath("setup.cfg").unlink()
+            dashboard = repo / "src" / "skill_sync_sidecar" / "dashboard.py"
+            dashboard.parent.mkdir(parents=True)
+            dashboard.write_text("DASHBOARD_HTML = 'new-ui'\n", encoding="utf-8")
+            commit(repo, "dashboard without project identity")
+            result = self.verify(repo, base)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("belongs to skill-sync-sidecar", result.stderr)
 
     def test_rejects_sync_or_write_path(self):
         with TemporaryDirectory() as tmp:

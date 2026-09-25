@@ -70,6 +70,10 @@ profile:
 scripts/verify-release.sh nas-dashboard-only
 ```
 
+The profile belongs only to the `skill-sync-sidecar` project: its validator checks
+the repository package identity before applying the service-specific allowlist.
+Other projects use their own release contracts and the normal full gate.
+
 The profile always runs the full tests, compile check, and package smoke test.
 It rejects a dirty worktree and rejects every changed path outside its explicit
 allowlist (the dashboard template, its tests, and the contract implementation
