@@ -6228,7 +6228,41 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-row-actions .skill-inventory-action { display: none; }
     .skill-inventory-row-actions .skill-tool-check { min-width: 0; border-radius: 999px; white-space: nowrap; }
     .skill-inventory-row-actions button { white-space: nowrap; }
-    .skill-tool-matrix { margin: 0; }
+    .skill-tool-matrix {
+      grid-column: 3 / -1;
+      grid-row: 2;
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      margin: 0;
+      min-width: 0;
+      border-top: 1px solid #edf0f4;
+      padding-top: 9px;
+    }
+    .skill-tool-matrix-title {
+      color: #667085;
+      font-size: 12px;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+    .skill-tool-checks { gap: 7px; min-width: 0; }
+    .skill-tool-toggle-label {
+      min-height: 28px;
+      padding: 5px 8px;
+      border-color: #dfe5ec;
+      background: #f8fafc;
+      color: #5f6b7a;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, color .15s ease;
+    }
+    .skill-tool-toggle-label:hover { border-color: #9ebbe5; background: #f4f8ff; color: #1f5fbf; }
+    .skill-tool-toggle-label.installed { border-color: #9adabf; background: #ecfdf5; color: #087a50; }
+    .skill-tool-toggle-label.installed:hover { border-color: #52bd89; background: #e0f8ed; }
+    .skill-tool-toggle-label.disabled { cursor: not-allowed; }
+    .skill-tool-toggle-label.disabled:hover { border-color: #dfe5ec; background: #f8fafc; color: #5f6b7a; }
+    .skill-tool-toggle-label .mapping-state { font-size: 11px; font-weight: 720; opacity: .88; }
+    .skill-tool-toggle { flex: 0 0 auto; }
     .skill-inventory-detail {
       grid-column: auto;
       grid-row: 1;
@@ -6236,7 +6270,6 @@ DASHBOARD_HTML = r"""<!doctype html>
       border: 0;
       border-radius: 0;
     }
-    .skill-tool-matrix { display: none; }
     .skill-inventory-detail > summary {
       padding: 7px 9px;
       border: 1px solid #dfe5ec;
@@ -6248,13 +6281,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .skill-inventory-detail[open] {
       grid-column: 3 / -1;
-      grid-row: 2;
+      grid-row: 3;
       align-self: stretch;
       margin-top: 2px;
       border-top: 1px solid #edf0f4;
     }
     .skill-inventory-detail[open] > summary { margin-top: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }
-    .skill-inventory-detail[open] .skill-tool-matrix { display: grid; }
     .skill-inventory-detail-body { padding: 9px 0 0; }
     .simple-workbench,
     .simple-action-panel,
@@ -6290,7 +6322,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .app-header { position: static; }
       .skill-inventory-row { grid-template-columns: auto 34px minmax(0, 1fr) auto auto; }
       .skill-inventory-row-actions { grid-column: 3; grid-row: 2; justify-content: flex-start; }
-      .skill-inventory-detail[open] { grid-column: 1 / -1; grid-row: 3; }
+      .skill-tool-matrix { grid-column: 3 / -1; grid-row: 3; }
+      .skill-inventory-detail[open] { grid-column: 1 / -1; grid-row: 4; }
     }
     @media (max-width: 560px) {
       .dashboard-sidebar { display: block; }
@@ -6313,7 +6346,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-row-actions .skill-tool-check { font-size: 11px; }
       .skill-inventory-row-icon { width: 32px; height: 32px; }
       .skill-inventory-description { -webkit-line-clamp: 2; }
-      .skill-inventory-detail[open] { grid-column: 1 / -1; }
+      .skill-tool-matrix { grid-column: 1 / -1; grid-row: 3; grid-template-columns: 1fr; gap: 6px; }
+      .skill-inventory-detail[open] { grid-column: 1 / -1; grid-row: 4; }
       .skill-inventory-list-panel > summary span:last-child { display: none; }
     }
   </style>
@@ -12066,6 +12100,9 @@ DASHBOARD_HTML = r"""<!doctype html>
         const recentBadge = recentChange
           ? `<em>${recentChange.action === "installed" ? "刚安装" : "刚移除"}</em>`
           : "";
+        const mappingState = active
+          ? "已映射"
+          : (canToggle ? "未映射" : "不可映射");
         const title = !tool.localInstall
           ? `${tool.label} 由对应设备客户端管理`
           : (active
@@ -12088,7 +12125,7 @@ DASHBOARD_HTML = r"""<!doctype html>
               onchange="toggleMacToolSkill(this)"
               ${active ? "checked" : ""}
               disabled>
-            <span>${escapeHtml(tool.label)}</span>${recentBadge}
+            <span>${escapeHtml(tool.label)}</span><span class="mapping-state">${mappingState}</span>${recentBadge}
           </label>
         `;
       }).join("");
@@ -12152,16 +12189,16 @@ DASHBOARD_HTML = r"""<!doctype html>
             ${reviewAction}
             ${visiblePublishAction}
           </div>
+          <div class="skill-tool-matrix" aria-label="每个工具的 Skill 映射状态">
+            <div class="skill-tool-matrix-title">工具映射（点击切换）</div>
+            <div class="skill-tool-checks">${toolChecks}</div>
+          </div>
           <details class="skill-inventory-detail" data-skill-id="${escapeHtml(text(item.skill_id))}"${openSkillInventoryDetails.has(text(item.skill_id)) ? " open" : ""}>
             <summary title="查看安装状态与高级详情">更多</summary>
             <div class="skill-inventory-detail-body">
               <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
                 <strong>${escapeHtml(recommendation.title)}</strong>
                 <span>${escapeHtml(recommendation.detail)}</span>
-              </div>
-              <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
-                <div class="skill-tool-matrix-title">本机工具</div>
-                <div class="skill-tool-checks">${toolChecks}</div>
               </div>
               <div class="skill-inventory-action">
                 <strong>下一步</strong>
