@@ -1305,9 +1305,15 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("保持勾选即可使用；取消勾选会先检查并要求 REMOVE。", DASHBOARD_HTML)
             self.assertIn("先查看待审详情；不会自动写入或删除。", DASHBOARD_HTML)
             self.assertIn("skill-inventory-detail", DASHBOARD_HTML)
-            self.assertIn("本机工具安装矩阵", DASHBOARD_HTML)
+            self.assertIn("每个工具的 Skill 映射状态", DASHBOARD_HTML)
             self.assertIn("skill-tool-matrix", DASHBOARD_HTML)
-            self.assertIn("本机工具</div>", DASHBOARD_HTML)
+            self.assertIn("工具映射（点击切换）", DASHBOARD_HTML)
+            self.assertIn("已映射", DASHBOARD_HTML)
+            self.assertIn("未映射", DASHBOARD_HTML)
+            self.assertLess(
+                DASHBOARD_HTML.index('aria-label="每个工具的 Skill 映射状态"'),
+                DASHBOARD_HTML.index('<details class="skill-inventory-detail"'),
+            )
             self.assertIn("查看路径和状态", DASHBOARD_HTML)
             self.assertIn("skillInventoryInstallationRows", DASHBOARD_HTML)
             self.assertIn("skill-installation-row", DASHBOARD_HTML)
