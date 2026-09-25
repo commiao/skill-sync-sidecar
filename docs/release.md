@@ -59,6 +59,32 @@ scripts/status-current.sh
 
 The gate must be green before a release is promoted from the current Mac validation node.
 
+## Read-only NAS dashboard release
+
+The NAS Gateway is a read-only dashboard/aggregator. A release that changes
+only its dashboard presentation must not be blocked by unrelated skill-sync
+review items, but it may use the exception only through this machine-checked
+profile:
+
+```bash
+scripts/verify-release.sh nas-dashboard-only
+```
+
+The profile always runs the full tests, compile check, and package smoke test.
+It rejects a dirty worktree and rejects every changed path outside its explicit
+allowlist (the dashboard template, its tests, and the contract implementation
+and documentation). It does **not** accept `SKILL_SYNC_SKIP_OPS_STATUS=1` as a
+substitute. Changes to sync logic, WebDAV writes, device installs/removals, or
+OpenClaw policy must use the normal full gate and a green sync status.
+
+After deployment, verify the actual Gateway HTML contains the contract's new
+markers as well as the deployed commit and health endpoints:
+
+```bash
+SKILL_SYNC_NAS_HTML_CHECKS='dashboard-sidebar,skills-hub-header,selectSkillsHubView,renderSkillsHubChrome' \
+  scripts/verify-nas-gateway-deploy.sh <commit>
+```
+
 ## GitHub Publish
 
 Prerequisites:
