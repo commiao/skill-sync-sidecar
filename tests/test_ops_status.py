@@ -1310,6 +1310,10 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("工具映射（点击切换）", DASHBOARD_HTML)
             self.assertIn("已映射", DASHBOARD_HTML)
             self.assertIn("未映射", DASHBOARD_HTML)
+            self.assertIn(".skill-inventory-row-select {\n      grid-column: 1;\n      grid-row: 1;", DASHBOARD_HTML)
+            self.assertIn(".skill-inventory-row-main { grid-column: 3; grid-row: 1;", DASHBOARD_HTML)
+            self.assertIn(".skill-inventory-detail {\n      grid-column: 5;\n      grid-row: 1;", DASHBOARD_HTML)
+            self.assertIn(".skill-inventory-detail { grid-column: 1 / -1; grid-row: 4;", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index('aria-label="每个工具的 Skill 映射状态"'),
                 DASHBOARD_HTML.index('<details class="skill-inventory-detail"'),

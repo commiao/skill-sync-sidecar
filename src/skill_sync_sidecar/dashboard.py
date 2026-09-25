@@ -6176,6 +6176,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
     .skill-inventory-row:hover { border-color: #c3d1e5; background: #fcfdff; }
     .skill-inventory-row-select {
+      grid-column: 1;
+      grid-row: 1;
       display: grid;
       width: 18px;
       height: 18px;
@@ -6186,6 +6188,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-row-select span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
     .skill-inventory-row-select input { width: 16px; height: 16px; margin: 0; accent-color: var(--hub-blue); }
     .skill-inventory-row-icon {
+      grid-column: 2;
+      grid-row: 1;
       display: grid;
       width: 36px;
       height: 36px;
@@ -6197,7 +6201,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-size: 16px;
       font-weight: 850;
     }
-    .skill-inventory-row-main { display: block; min-width: 0; }
+    .skill-inventory-row-main { grid-column: 3; grid-row: 1; display: block; min-width: 0; }
     .skill-inventory-name { display: flex; align-items: center; gap: 7px; color: #202938; font-size: 15px; font-weight: 820; }
     .skill-inventory-name .skill-source-badges { display: none; }
     .skill-short-desc { color: #697586; font-size: 12px; font-weight: 550; }
@@ -6219,6 +6223,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-inventory-tool-summary { margin-top: 5px; }
     .skill-inventory-tool-summary span { padding: 0; border: 0; background: transparent; color: #8893a3; font-size: 11px; }
     .skill-inventory-row-actions {
+      grid-column: 4;
+      grid-row: 1;
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -6264,11 +6270,12 @@ DASHBOARD_HTML = r"""<!doctype html>
     .skill-tool-toggle-label .mapping-state { font-size: 11px; font-weight: 720; opacity: .88; }
     .skill-tool-toggle { flex: 0 0 auto; }
     .skill-inventory-detail {
-      grid-column: auto;
+      grid-column: 5;
       grid-row: 1;
       margin: 0;
       border: 0;
       border-radius: 0;
+      justify-self: end;
     }
     .skill-inventory-detail > summary {
       padding: 7px 9px;
@@ -6346,6 +6353,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       .skill-inventory-row-actions .skill-tool-check { font-size: 11px; }
       .skill-inventory-row-icon { width: 32px; height: 32px; }
       .skill-inventory-description { -webkit-line-clamp: 2; }
+      .skill-inventory-detail { grid-column: 1 / -1; grid-row: 4; justify-self: stretch; }
       .skill-tool-matrix { grid-column: 1 / -1; grid-row: 3; grid-template-columns: 1fr; gap: 6px; }
       .skill-inventory-detail[open] { grid-column: 1 / -1; grid-row: 4; }
       .skill-inventory-list-panel > summary span:last-child { display: none; }
