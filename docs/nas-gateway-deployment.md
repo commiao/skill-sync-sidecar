@@ -56,6 +56,17 @@ The browser dashboard refreshes from `/api/summary`, which keeps the fields
 needed for the UI workbench. Use `/api/status` when you need the complete
 diagnostic JSON.
 
+### Dashboard-only release contract
+
+This Gateway is read-only. For an interface-only release, use
+`scripts/verify-release.sh nas-dashboard-only` from a clean release worktree.
+That profile permits only the dashboard template, its tests, and its own
+contract/documentation files; it rejects all sync, WebDAV-write, and device
+operation changes. It still requires the full test suite, package smoke test,
+and post-deploy verification of the deployed commit, health endpoints, and new
+dashboard HTML markers. Existing sync review items remain visible in the
+dashboard but do not block this narrowly scoped release.
+
 `/healthz` is intentionally lightweight: it reports process health and summary
 cache metadata without reading WebDAV. Docker health checks should use
 `/healthz`, not `/api/summary`.

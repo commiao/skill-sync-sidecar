@@ -5882,22 +5882,512 @@ DASHBOARD_HTML = r"""<!doctype html>
         display: none;
       }
     }
+
+    /* Skills Hub-style management shell: keep decisions close to the list and
+       leave diagnostics available without making them the default experience. */
+    :root {
+      --hub-blue: #1477e8;
+      --hub-blue-soft: #eef6ff;
+      --hub-green: #07885a;
+      --hub-amber: #bd7500;
+      --hub-sidebar: #fbfcfe;
+      --hub-hover: #f1f5fa;
+    }
+    body { background: #f8fafc; }
+    .app-shell { display: flex; min-height: 100vh; }
+    .dashboard-sidebar {
+      position: sticky;
+      top: 0;
+      display: flex;
+      flex: 0 0 252px;
+      flex-direction: column;
+      width: 252px;
+      height: 100vh;
+      padding: 24px 12px 16px;
+      border-right: 1px solid #e5e9ef;
+      background: var(--hub-sidebar);
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 4px 10px 26px;
+    }
+    .sidebar-brand > div:last-child { display: grid; gap: 1px; }
+    .sidebar-brand strong { font-size: 17px; line-height: 1.2; letter-spacing: -.02em; }
+    .sidebar-brand span { color: var(--muted); font-size: 12px; }
+    .sidebar-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--hub-blue);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 850;
+    }
+    .sidebar-section-label {
+      margin: 0 10px 7px;
+      color: #98a2b3;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+    .sidebar-section-label:not(:first-of-type) { margin-top: 24px; }
+    .sidebar-nav { display: grid; gap: 3px; }
+    .dashboard-sidebar-link {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #526071;
+      font-weight: 720;
+      text-align: left;
+    }
+    .dashboard-sidebar-link:hover { border: 0; background: var(--hub-hover); color: var(--ink); }
+    .dashboard-sidebar-link.active { background: #fff; box-shadow: 0 1px 3px rgb(16 24 40 / 10%); color: var(--ink); }
+    .dashboard-sidebar-link:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
+    .sidebar-nav-icon { color: #718096; font-weight: 850; text-align: center; }
+    .dashboard-sidebar-link.active .sidebar-nav-icon { color: var(--hub-blue); }
+    .sidebar-count,
+    .sidebar-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #eef1f5;
+      color: #667085;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .sidebar-count.alert { background: #fff0f0; color: #c43232; }
+    .sidebar-status { font-weight: 700; }
+    .dashboard-sidebar .portal-link {
+      margin: auto 10px 0;
+      color: #667085;
+      font-size: 12px;
+    }
+    .app-page { min-width: 0; flex: 1; }
+    .app-header {
+      position: sticky;
+      z-index: 5;
+      top: 0;
+      min-height: 58px;
+      padding: 12px 30px;
+      border-bottom: 1px solid #e8ebf0;
+      background: rgb(255 255 255 / 94%);
+      backdrop-filter: blur(12px);
+    }
+    .app-header h1 { font-size: 16px; }
+    .app-header .brand-subtitle { display: none; }
+    main { max-width: none; padding: 26px 30px 48px; }
+    .dashboard-tabs { display: none; }
+    .skills-hub-header { margin: 0 0 18px; }
+    .skills-heading-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      min-height: 74px;
+    }
+    .eyebrow { color: var(--hub-blue); font-size: 12px; font-weight: 800; }
+    .skills-hub-header h2 { margin: 3px 0 3px; font-size: 24px; letter-spacing: -.025em; line-height: 1.2; }
+    .skills-hub-header p { margin: 0; color: var(--muted); font-size: 13px; }
+    .skills-heading-actions { display: flex; gap: 8px; }
+    .skills-heading-actions .primary,
+    #skills-primary-action.primary {
+      border-color: var(--hub-blue);
+      background: var(--hub-blue);
+      color: #fff;
+    }
+    .skills-view-tabs {
+      display: flex;
+      align-items: end;
+      gap: 28px;
+      min-height: 42px;
+      border-bottom: 1px solid #e6eaf0;
+    }
+    .skills-view-tab {
+      min-height: 42px;
+      padding: 0 1px 10px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: #667085;
+      font-weight: 720;
+    }
+    .skills-view-tab strong { margin-left: 4px; font-weight: 800; }
+    .skills-view-tab:hover { border-color: transparent; color: var(--ink); }
+    .skills-view-tab.active { border-bottom-color: var(--hub-blue); color: var(--hub-blue); }
+    .skills-view-tab:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -2px; }
+    .skills-sync-notice {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      width: 100%;
+      gap: 10px;
+      align-items: center;
+      margin-top: 16px;
+      padding: 11px 13px;
+      border-color: #f0c98d;
+      background: #fffaf0;
+      color: #9c5a00;
+      text-align: left;
+    }
+    .skills-sync-notice:hover { border-color: #d99c40; }
+    .skills-sync-notice[hidden] { display: none; }
+    .support-drawer.tab-mode { margin: 0; }
+    .skill-inventory-panel {
+      overflow: visible;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+    }
+    .skill-inventory-panel > .skill-inventory-head { display: none; }
+    .skill-inventory-simple,
+    .skill-inventory-client,
+    .skill-inventory-note,
+    .skill-inventory-guide,
+    .skill-inventory-project-note,
+    .skill-inventory-workbench,
+    .skill-inventory-tool-overview,
+    .skill-inventory-device-tool-overview,
+    .skill-inventory-triage { display: none; }
+    .skill-inventory-filter-panel {
+      display: block;
+      margin: 0 0 14px;
+      padding: 0;
+    }
+    .skills-toolbar-copy { display: none; }
+    .skills-toolbar-copy strong { font-size: 13px; }
+    .skills-toolbar-copy span { color: var(--muted); font-size: 12px; }
+    .skill-inventory-filters {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin: 0;
+    }
+    .skill-search-field {
+      display: flex;
+      flex: 1 1 290px;
+      align-items: center;
+      gap: 8px;
+      min-width: 220px;
+      height: 38px;
+      padding: 0 11px;
+      border: 1px solid #d9e0e8;
+      border-radius: 8px;
+      background: #fff;
+      color: #8b96a7;
+    }
+    .skill-search-field:focus-within { border-color: var(--hub-blue); box-shadow: 0 0 0 3px rgb(20 119 232 / 12%); }
+    .skill-search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; }
+    .skill-inventory-filters select {
+      width: auto;
+      max-width: 152px;
+      height: 38px;
+      margin: 0;
+      padding: 0 28px 0 10px;
+      border: 1px solid #d9e0e8;
+      border-radius: 8px;
+      background: #fff;
+      color: #475467;
+      font: inherit;
+      font-size: 12px;
+    }
+    #skill-inventory-device-filter,
+    #skill-inventory-sync-filter { display: none; }
+    #skill-inventory-reset { min-width: 52px; min-height: 38px; padding: 7px 10px; color: #667085; white-space: nowrap; }
+    .skill-inventory-list-panel {
+      overflow: visible;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    .skill-inventory-list-panel > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 8px;
+      padding: 0;
+      color: var(--ink);
+      cursor: default;
+      font-size: 14px;
+      font-weight: 800;
+      list-style: none;
+    }
+    .skill-inventory-list-panel > summary::-webkit-details-marker { display: none; }
+    .skill-inventory-list-panel > summary span:last-child { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .skill-inventory-list-body { padding: 0; }
+    .skill-inventory-active-view {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 9px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .skill-inventory-active-view strong { color: var(--ink); }
+    .skill-inventory-result-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+    .skill-inventory-bulk-actions {
+      position: sticky;
+      z-index: 3;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto 12px;
+      padding: 8px 10px;
+      border: 1px solid #d8e3f3;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 8px 22px rgb(16 24 40 / 12%);
+    }
+    .skill-group { border: 0; }
+    .skill-group > summary { display: none; }
+    .skill-group-body,
+    .skill-inventory-list { display: grid; gap: 8px; }
+    .skill-inventory-row {
+      display: grid;
+      grid-template-columns: auto 36px minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 84px;
+      padding: 12px 14px;
+      border: 1px solid #e0e5ec;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: none;
+    }
+    .skill-inventory-row:hover { border-color: #c3d1e5; background: #fcfdff; }
+    .skill-inventory-row-select {
+      display: grid;
+      width: 18px;
+      height: 18px;
+      place-items: center;
+      margin: 0;
+      overflow: hidden;
+    }
+    .skill-inventory-row-select span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .skill-inventory-row-select input { width: 16px; height: 16px; margin: 0; accent-color: var(--hub-blue); }
+    .skill-inventory-row-icon {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 1px solid #e1e6ed;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: #7a8798;
+      font-size: 16px;
+      font-weight: 850;
+    }
+    .skill-inventory-row-main { display: block; min-width: 0; }
+    .skill-inventory-name { display: flex; align-items: center; gap: 7px; color: #202938; font-size: 15px; font-weight: 820; }
+    .skill-inventory-name .skill-source-badges { display: none; }
+    .skill-short-desc { color: #697586; font-size: 12px; font-weight: 550; }
+    .skill-inventory-description {
+      display: -webkit-box;
+      margin-top: 2px;
+      overflow: hidden;
+      color: #7a8595;
+      font-size: 12px;
+      line-height: 1.35;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+    }
+    .skill-inventory-meta { display: flex; gap: 6px; margin-top: 6px; color: #667085; font-size: 11px; }
+    .skill-inventory-meta span { padding: 2px 7px; border: 1px solid #dfe6ee; border-radius: 999px; background: #f8fafc; }
+    .skill-inventory-meta .scope-global { border-color: #a9dfca; background: #f0fbf6; color: #087a50; }
+    .skill-inventory-meta .scope-project { border-color: #d8ddea; color: #56637a; }
+    .skill-inventory-meta .state-unpublished { border-color: #f2d29b; background: #fff9ed; color: #9a6400; }
+    .skill-inventory-tool-summary { margin-top: 5px; }
+    .skill-inventory-tool-summary span { padding: 0; border: 0; background: transparent; color: #8893a3; font-size: 11px; }
+    .skill-inventory-row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+    }
+    .skill-inventory-row-actions .skill-inventory-action { display: none; }
+    .skill-inventory-row-actions .skill-tool-check { min-width: 0; border-radius: 999px; white-space: nowrap; }
+    .skill-inventory-row-actions button { white-space: nowrap; }
+    .skill-tool-matrix { margin: 0; }
+    .skill-inventory-detail {
+      grid-column: auto;
+      grid-row: 1;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+    }
+    .skill-tool-matrix { display: none; }
+    .skill-inventory-detail > summary {
+      padding: 7px 9px;
+      border: 1px solid #dfe5ec;
+      border-radius: 7px;
+      color: #667085;
+      background: #fff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .skill-inventory-detail[open] {
+      grid-column: 3 / -1;
+      grid-row: 2;
+      align-self: stretch;
+      margin-top: 2px;
+      border-top: 1px solid #edf0f4;
+    }
+    .skill-inventory-detail[open] > summary { margin-top: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+    .skill-inventory-detail[open] .skill-tool-matrix { display: grid; }
+    .skill-inventory-detail-body { padding: 9px 0 0; }
+    .simple-workbench,
+    .simple-action-panel,
+    .conflict-resolution { margin-top: 0; }
+    .tab-hidden { display: none !important; }
+    @media (max-width: 1120px) {
+      .dashboard-sidebar { flex-basis: 220px; width: 220px; }
+      main { padding-right: 20px; padding-left: 20px; }
+      .app-header { padding-right: 20px; padding-left: 20px; }
+      .skill-inventory-filters { justify-content: flex-start; }
+    }
+    @media (max-width: 800px) {
+      .app-shell { display: block; }
+      .dashboard-sidebar {
+        position: static;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        width: 100%;
+        height: auto;
+        padding: 12px 14px;
+        border-right: 0;
+        border-bottom: 1px solid #e5e9ef;
+      }
+      .sidebar-brand { padding: 0; }
+      .sidebar-section-label,
+      .dashboard-sidebar .portal-link { display: none; }
+      .sidebar-nav { display: flex; justify-content: flex-end; gap: 4px; overflow-x: auto; }
+      .sidebar-nav + .sidebar-section-label + .sidebar-nav { display: none; }
+      .dashboard-sidebar-link { display: flex; min-height: 34px; padding: 6px 8px; white-space: nowrap; }
+      .sidebar-nav-icon { display: none; }
+      .dashboard-sidebar-link[data-dashboard-tab="manual-import"] { display: none; }
+      .sidebar-status { display: none; }
+      .app-header { position: static; }
+      .skill-inventory-row { grid-template-columns: auto 34px minmax(0, 1fr) auto auto; }
+      .skill-inventory-row-actions { grid-column: 3; grid-row: 2; justify-content: flex-start; }
+      .skill-inventory-detail[open] { grid-column: 1 / -1; grid-row: 3; }
+    }
+    @media (max-width: 560px) {
+      .dashboard-sidebar { display: block; }
+      .sidebar-brand { padding-bottom: 8px; }
+      .sidebar-nav { justify-content: flex-start; }
+      .sidebar-count { display: none; }
+      main { padding: 18px 14px 30px; }
+      .app-header { padding: 10px 14px; }
+      .skills-heading-row { min-height: 0; }
+      .skills-hub-header h2 { font-size: 21px; }
+      .skills-hub-header p { display: none; }
+      .skills-view-tabs { gap: 16px; overflow-x: auto; }
+      .skills-view-tab { flex: 0 0 auto; }
+      .skill-inventory-filters { flex-wrap: wrap; }
+      .skill-search-field { flex-basis: 100%; }
+      .skill-inventory-filters select { flex: 1 1 110px; max-width: none; }
+      #skill-inventory-scope-filter { display: none; }
+      .skill-inventory-row { grid-template-columns: auto 32px minmax(0, 1fr); gap: 9px; padding: 10px; }
+      .skill-inventory-row-actions { flex-wrap: wrap; }
+      .skill-inventory-row-actions .skill-tool-check { font-size: 11px; }
+      .skill-inventory-row-icon { width: 32px; height: 32px; }
+      .skill-inventory-description { -webkit-line-clamp: 2; }
+      .skill-inventory-detail[open] { grid-column: 1 / -1; }
+      .skill-inventory-list-panel > summary span:last-child { display: none; }
+    }
   </style>
 </head>
 <body>
-  <a class="portal-link" href="http://100.123.208.32:17172/portal">← 报表门户</a>
-  <header>
-    <div class="brand">
-      <h1>Skill 管理</h1>
-      <div class="brand-subtitle">日常只看第一张卡片：它会告诉你现在要不要操作。</div>
-    </div>
-    <div class="toolbar">
-      <span id="updated">读取中</span>
-      <button id="refresh" type="button" title="刷新状态">刷新</button>
-    </div>
-  </header>
-  <main>
+  <div class="app-shell">
+    <aside class="dashboard-sidebar" aria-label="Skill 管理导航">
+      <div class="sidebar-brand">
+        <div class="sidebar-mark" aria-hidden="true">S</div>
+        <div>
+          <strong>Skill Sync</strong>
+          <span>技能同步工作台</span>
+        </div>
+      </div>
+      <div class="sidebar-section-label">工作区</div>
+      <nav class="sidebar-nav">
+        <button type="button" class="dashboard-sidebar-link active" data-dashboard-tab="skill-list" onclick="selectDashboardTab('skill-list')">
+          <span class="sidebar-nav-icon" aria-hidden="true">▱</span><span>我的 Skills</span><strong id="sidebar-skills-count" class="sidebar-count">-</strong>
+        </button>
+        <button type="button" class="dashboard-sidebar-link" data-dashboard-tab="next" onclick="selectDashboardTab('next')">
+          <span class="sidebar-nav-icon" aria-hidden="true">!</span><span>待处理</span><strong id="sidebar-pending-count" class="sidebar-count alert" hidden>0</strong>
+        </button>
+        <button type="button" class="dashboard-sidebar-link" data-dashboard-tab="workbench" onclick="selectDashboardTab('workbench')">
+          <span class="sidebar-nav-icon" aria-hidden="true">⌘</span><span>本机工具</span><strong id="sidebar-tools-count" class="sidebar-count">-</strong>
+        </button>
+        <button type="button" class="dashboard-sidebar-link" data-dashboard-tab="manual-import" onclick="selectDashboardTab('manual-import')">
+          <span class="sidebar-nav-icon" aria-hidden="true">＋</span><span>导入 Skill</span>
+        </button>
+      </nav>
+      <div class="sidebar-section-label">管理中心</div>
+      <nav class="sidebar-nav">
+        <button type="button" class="dashboard-sidebar-link" data-dashboard-tab="inventory" onclick="selectDashboardTab('inventory')">
+          <span class="sidebar-nav-icon" aria-hidden="true">◌</span><span>安装覆盖</span>
+        </button>
+        <button type="button" class="dashboard-sidebar-link" data-dashboard-tab="other" onclick="selectDashboardTab('other')">
+          <span class="sidebar-nav-icon" aria-hidden="true">↻</span><span>同步与设备</span><span id="sidebar-sync-status" class="sidebar-status">读取中</span>
+        </button>
+      </nav>
+      <a class="portal-link" href="http://100.123.208.32:17172/portal">← 报表门户</a>
+    </aside>
+    <div class="app-page">
+      <header class="app-header">
+        <div class="brand">
+          <h1>Skill 管理</h1>
+          <div class="brand-subtitle">在这里查找、安装和整理当前设备的 Skills。</div>
+        </div>
+        <div class="toolbar">
+          <span id="updated">读取中</span>
+          <button id="refresh" type="button" title="刷新状态">刷新</button>
+        </div>
+      </header>
+      <main>
     <div id="error" class="error"></div>
+    <section id="skills-hub-header" class="skills-hub-header" aria-labelledby="skills-page-title">
+      <div class="skills-heading-row">
+        <div>
+          <div class="eyebrow">我的工作区</div>
+          <h2 id="skills-page-title">我的 Skills</h2>
+          <p id="skills-page-summary">正在读取当前设备可管理的 Skills。</p>
+        </div>
+        <div class="skills-heading-actions">
+          <button id="skills-primary-action" type="button" class="primary" onclick="refreshLocalWorkspace()">扫描本机</button>
+        </div>
+      </div>
+      <div class="skills-view-tabs" role="tablist" aria-label="Skill 快速筛选">
+        <button type="button" class="skills-view-tab active" data-skills-view="all" onclick="selectSkillsHubView('all')">全部 <strong id="skills-view-all">-</strong></button>
+        <button type="button" class="skills-view-tab" data-skills-view="pending" onclick="selectSkillsHubView('pending')">待处理 <strong id="skills-view-pending">0</strong></button>
+        <button type="button" class="skills-view-tab" data-skills-view="publishable" onclick="selectSkillsHubView('publishable')">可保存共享 <strong id="skills-view-publishable">0</strong></button>
+        <button type="button" class="skills-view-tab" data-skills-view="project" onclick="selectSkillsHubView('project')">项目 <strong id="skills-view-project">0</strong></button>
+      </div>
+      <button id="skills-sync-notice" class="skills-sync-notice" type="button" hidden onclick="selectDashboardTab('next')">
+        <span aria-hidden="true">△</span><span id="skills-sync-notice-text">有同步事项需要确认</span><span aria-hidden="true">→</span>
+      </button>
+    </section>
     <nav class="dashboard-tabs" aria-label="Skill Sync 页面导航">
       <button type="button" class="dashboard-tab-button active" data-dashboard-tab="workbench" onclick="selectDashboardTab('workbench')">工作台</button>
       <button type="button" class="dashboard-tab-button" data-dashboard-tab="next" onclick="selectDashboardTab('next')">推荐下一步</button>
@@ -6044,10 +6534,13 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div id="skill-inventory-tool-overview" class="skill-inventory-tool-overview" aria-label="本机工具覆盖概览"></div>
       <div id="skill-inventory-device-tool-overview" class="skill-inventory-device-tool-overview" aria-label="多设备工具覆盖概览"></div>
       <div id="skill-inventory-triage" class="skill-inventory-triage" aria-label="未共享整理"></div>
-      <details class="skill-inventory-filter-panel">
-        <summary>高级筛选和搜索</summary>
+      <section class="skill-inventory-filter-panel" aria-label="搜索和筛选">
+        <div class="skills-toolbar-copy">
+          <strong>筛选 Skills</strong>
+          <span>搜索结果只影响当前列表，不会修改任何目录。</span>
+        </div>
         <div class="skill-inventory-filters" aria-label="Skill 清单筛选">
-          <input id="skill-inventory-search" type="search" placeholder="搜索 skill 名称或描述">
+          <label class="skill-search-field"><span aria-hidden="true">⌕</span><input id="skill-inventory-search" type="search" placeholder="搜索 Skills…"></label>
           <select id="skill-inventory-central-filter" aria-label="共享库状态">
             <option value="all">全部状态</option>
             <option value="published">已在共享库</option>
@@ -6087,9 +6580,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           </select>
           <button id="skill-inventory-reset" type="button">清空</button>
         </div>
-      </details>
-      <details id="skill-inventory-list-panel" class="skill-inventory-list-panel">
-        <summary>查看 skill 列表和安装勾选</summary>
+      </section>
+      <details id="skill-inventory-list-panel" class="skill-inventory-list-panel" open>
+        <summary><span>Skills 列表</span><span>点开一项即可查看安装状态</span></summary>
         <div class="skill-inventory-list-body">
           <div id="skill-inventory-active-view" class="skill-inventory-active-view"></div>
           <div id="skill-inventory-result-note" class="skill-inventory-result-note">等待筛选。</div>
@@ -6440,7 +6933,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     </details>
       </div>
     </details>
-  </main>
+      </main>
+    </div>
+  </div>
   <script>
     const $ = (id) => document.getElementById(id);
     const EXECUTOR_URL = "http://127.0.0.1:18765";
@@ -6472,7 +6967,8 @@ DASHBOARD_HTML = r"""<!doctype html>
     let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
     let staleRefreshTimer = null;
-    let currentDashboardTab = "workbench";
+    let currentDashboardTab = "skill-list";
+    let currentSkillsHubView = "all";
     const SOURCE_CHANGE_DEFERRALS_KEY = "skill-sync-source-change-deferrals-v1";
     let sourceChangeDeferrals = loadSourceChangeDeferrals();
     const text = (value) => value === undefined || value === null || value === "" ? "-" : String(value);
@@ -6554,6 +7050,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderScopeSwitchboard(dashboard);
       renderWorkbench(dashboard);
       renderSimpleWorkbench(dashboard, { ...status, health });
+      renderSkillsHubChrome(dashboard);
       $("operator-next").textContent = conciseOperatorNext(dashboard, operator, { ...status, health });
       $("operator-path").textContent = "本机可操作；共享库只接收确认后的保存；其他设备只读。";
       $("operator-snapshot").textContent = `当前共享库版本：${text(operator.snapshot_id)}`;
@@ -7635,12 +8132,15 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function selectDashboardTab(tab) {
-      currentDashboardTab = tab || "workbench";
-      document.querySelectorAll(".dashboard-tab-button").forEach((button) => {
+      currentDashboardTab = tab || "skill-list";
+      document.querySelectorAll(".dashboard-tab-button, .dashboard-sidebar-link").forEach((button) => {
         const active = button.dataset.dashboardTab === currentDashboardTab;
         button.classList.toggle("active", active);
         button.setAttribute("aria-selected", active ? "true" : "false");
       });
+      const skillsHeader = $("skills-hub-header");
+      const showsSkills = currentDashboardTab === "skill-list" || currentDashboardTab === "inventory";
+      if (skillsHeader) skillsHeader.classList.toggle("tab-hidden", !showsSkills);
       const support = document.querySelector(".support-drawer");
       if (support) {
         support.open = true;
@@ -7663,7 +8163,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         inventory.open = currentDashboardTab === "inventory" || currentDashboardTab === "skill-list";
       }
       const listPanel = $("skill-inventory-list-panel");
-      if (listPanel) listPanel.open = currentDashboardTab === "skill-list";
+      if (listPanel) listPanel.open = showsSkills;
       const otherVisible = currentDashboardTab === "other";
       [
         ".quick-status-details",
@@ -7676,6 +8176,67 @@ DASHBOARD_HTML = r"""<!doctype html>
           if (otherVisible && selector !== ".advanced-diagnostics") node.open = true;
         });
       });
+    }
+
+    function selectSkillsHubView(view) {
+      const selected = view || "all";
+      currentSkillsHubView = selected;
+      currentSkillInventoryTriage = selected === "publishable" ? "publishable" : "all";
+      currentSkillInventoryQuick = selected === "pending" ? "pending" : "all";
+      const central = $("skill-inventory-central-filter");
+      const scope = $("skill-inventory-scope-filter");
+      const sync = $("skill-inventory-sync-filter");
+      if (central) central.value = selected === "publishable" ? "unpublished" : "all";
+      if (scope) scope.value = selected === "project" ? "project" : "all";
+      if (sync) sync.value = selected === "pending" ? "pending" : "all";
+      selectDashboardTab("skill-list");
+      renderSkillInventoryFiltered();
+      renderSkillsHubChrome(window.lastDashboard || {});
+    }
+
+    function renderSkillsHubChrome(dashboard) {
+      const model = currentSkillInventoryModel || inventoryWithLiveLocal((dashboard || {}).skill_inventory || {});
+      const items = Array.isArray(model.items) ? model.items : [];
+      const pending = items.filter((item) => Number(item.pending || 0) > 0).length;
+      const publishable = items.filter((item) => unpublishedTriageKind(item) === "publishable").length;
+      const project = items.filter((item) => effectiveSkillScope(item) === "project").length;
+      const tools = skillInventoryLocalInstallTools().length;
+      const blocked = Number((dashboard || {}).blocked || 0);
+      const health = (dashboard || {}).health || "unknown";
+      const setValue = (id, value) => {
+        const target = $(id);
+        if (target) target.textContent = text(value);
+      };
+      setValue("sidebar-skills-count", model.total || items.length);
+      setValue("sidebar-tools-count", tools);
+      setValue("skills-view-all", model.total || items.length);
+      setValue("skills-view-pending", pending);
+      setValue("skills-view-publishable", publishable);
+      setValue("skills-view-project", project);
+      const pendingBadge = $("sidebar-pending-count");
+      if (pendingBadge) {
+        pendingBadge.hidden = blocked <= 0;
+        pendingBadge.textContent = text(blocked);
+      }
+      const syncStatus = $("sidebar-sync-status");
+      if (syncStatus) syncStatus.textContent = health === "green" ? "正常" : (health === "yellow" ? "有提醒" : "待检查");
+      const pageSummary = $("skills-page-summary");
+      if (pageSummary) {
+        pageSummary.textContent = items.length > 0
+          ? `${items.length} 个 Skills 可在当前设备查找、安装或整理。`
+          : "等待当前设备或共享库上报 Skills。";
+      }
+      document.querySelectorAll(".skills-view-tab").forEach((button) => {
+        const active = button.dataset.skillsView === currentSkillsHubView;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      const notice = $("skills-sync-notice");
+      if (notice) {
+        notice.hidden = blocked <= 0;
+        const noticeText = $("skills-sync-notice-text");
+        if (noticeText) noticeText.textContent = `${blocked} 个同步事项需要确认，查看待处理`;
+      }
     }
 
     function renderSimpleWorkbench(dashboard, status) {
@@ -10775,34 +11336,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderSkillInventoryGroups(items) {
-      const groups = new Map();
-      (Array.isArray(items) ? items : []).forEach((item) => {
-        const g = skillGroupOf(text(item.skill_id));
-        if (!groups.has(g.id)) groups.set(g.id, { id: g.id, label: g.label, items: [] });
-        groups.get(g.id).items.push(item);
-      });
-      const named = [];
-      groups.forEach((g) => {
-        g.items.sort((a, b) => text(a.skill_id).localeCompare(text(b.skill_id)));
-        named.push(g);
-      });
-      named.sort((a, b) => {
-        if (a.id === "misc") return 1;
-        if (b.id === "misc") return -1;
-        return b.items.length - a.items.length || a.label.localeCompare(b.label);
-      });
-      return named.map((g) => {
-        const rows = g.items.map((item) => renderSkillInventoryRow(item)).join("");
-        return `
-          <details class="skill-group" data-skill-group-id="${escapeHtml(g.id)}"${openSkillInventoryGroups.has(g.id) ? " open" : ""}>
-            <summary class="skill-group-summary">
-              <span class="skill-group-name">${escapeHtml(g.label)}</span>
-              <span class="skill-group-count">${g.items.length}</span>
-            </summary>
-            <div class="skill-group-body">${rows}</div>
-          </details>
-        `;
-      }).join("");
+      // A management list should be scannable immediately. Group metadata is
+      // still available through filters, but no Skill starts hidden in a drawer.
+      return (Array.isArray(items) ? items : [])
+        .map((item) => renderSkillInventoryRow(item))
+        .join("");
     }
 
     function renderSkillInventoryFiltered() {
@@ -10927,7 +11465,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         .map((tool) => ({ tool, candidates: bulkUninstallCandidatesForTool(selectedItems, tool) }))
         .filter((entry) => entry.candidates.length > 0);
       const publishCandidates = bulkPublishCandidates(selectedItems);
-      if (items.length === 0) {
+      if (items.length === 0 || selectedItems.length === 0) {
         target.hidden = true;
         target.innerHTML = "";
         return;
@@ -10963,9 +11501,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             onclick="uninstallSelectedSkillsFromTool(this)"
             disabled>从 ${escapeHtml(tool.label)} 移除 (${escapeHtml(text(candidates.length))})</button>
         `),
-        selectedItems.length > 0
-          ? `<button type="button" onclick="clearSkillInventorySelection()">清空勾选</button>`
-          : `<span class="skill-inventory-bulk-label">先在下方勾选 skill，再发布或安装。</span>`,
+        `<button type="button" onclick="clearSkillInventorySelection()">清空勾选</button>`,
       ].join("");
     }
 
@@ -11317,6 +11853,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function setSkillInventoryTriage(kind) {
       currentSkillInventoryTriage = currentSkillInventoryTriage === kind ? "all" : kind;
       currentSkillInventoryQuick = "all";
+      currentSkillsHubView = currentSkillInventoryTriage === "publishable" ? "publishable" : "all";
       $("skill-inventory-central-filter").value = kind === "all" ? "all" : "unpublished";
       if (kind === "project") $("skill-inventory-scope-filter").value = "project";
       else if (kind === "private") $("skill-inventory-scope-filter").value = "device-private";
@@ -11325,6 +11862,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
+      renderSkillsHubChrome(window.lastDashboard || {});
       openSkillInventoryListPanel();
     }
 
@@ -11394,6 +11932,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     function resetSkillInventoryFilters() {
       currentSkillInventoryTriage = "all";
       currentSkillInventoryQuick = "all";
+      currentSkillsHubView = "all";
       $("skill-inventory-search").value = "";
       $("skill-inventory-central-filter").value = "all";
       $("skill-inventory-scope-filter").value = "all";
@@ -11404,6 +11943,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       renderSkillInventoryTriage((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryWorkbench((currentSkillInventoryModel || {}).items || []);
       renderSkillInventoryFiltered();
+      renderSkillsHubChrome(window.lastDashboard || {});
     }
 
     function textInputValue(id) {
@@ -11584,6 +12124,9 @@ DASHBOARD_HTML = r"""<!doctype html>
              <div class="skill-inventory-local-install-buttons">${localInstallButtons}</div>
            </div>`
         : "";
+      const description = text(item.description || item.name || "");
+      const scopeClass = effectiveScope === "global" ? "scope-global" : "scope-project";
+      const centralClass = centralState === "unpublished" ? "state-unpublished" : "state-published";
       return `
         <article class="skill-inventory-row">
           <label class="skill-inventory-row-select">
@@ -11592,35 +12135,33 @@ DASHBOARD_HTML = r"""<!doctype html>
               class="skill-inventory-select"
               data-skill-id="${escapeHtml(text(item.skill_id))}"
               onchange="toggleSkillInventorySelection(this)"
-              ${selectedSkillInventoryIds.has(text(item.skill_id)) ? "checked" : ""}>
+            ${selectedSkillInventoryIds.has(text(item.skill_id)) ? "checked" : ""}>
             <span>选择 ${escapeHtml(text(item.skill_id))}</span>
           </label>
+          <div class="skill-inventory-row-icon" aria-hidden="true">S</div>
           <div class="skill-inventory-row-main">
             <div>
               <div class="skill-inventory-name">${escapeHtml(text(item.skill_id))}${skillShortDesc(item.skill_id) ? `<span class="skill-short-desc">${escapeHtml(skillShortDesc(item.skill_id))}</span>` : ""}${skillSourceBadges(item)}</div>
-              <div class="skill-inventory-meta">${escapeHtml(skillScopeLabel(effectiveScope))} · ${escapeHtml(centralLabel(centralState))}</div>
+              ${description !== "-" ? `<div class="skill-inventory-description">${escapeHtml(description)}</div>` : ""}
+              <div class="skill-inventory-meta"><span class="${scopeClass}">${escapeHtml(skillScopeLabel(effectiveScope))}</span><span class="${centralClass}">${escapeHtml(centralLabel(centralState))}</span></div>
               ${skillInventoryToolSummary(item, installed, installableTools)}
             </div>
-            <div class="skill-inventory-row-actions">
-              <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
-              ${reviewAction}
-              <div class="skill-inventory-action">
-                <strong>推荐</strong>
-                <span>${escapeHtml(recommendation.title)}</span>
-              </div>
-              ${visiblePublishAction}
-            </div>
           </div>
-          <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
-            <div class="skill-tool-matrix-title">本机工具</div>
-            <div class="skill-tool-checks">${toolChecks}</div>
+          <div class="skill-inventory-row-actions">
+            <div class="skill-tool-check ${stateClass}">${escapeHtml(pending ? `${item.pending} 项待确认` : centralLabel(centralState))}</div>
+            ${reviewAction}
+            ${visiblePublishAction}
           </div>
           <details class="skill-inventory-detail" data-skill-id="${escapeHtml(text(item.skill_id))}"${openSkillInventoryDetails.has(text(item.skill_id)) ? " open" : ""}>
-            <summary>高级详情</summary>
+            <summary title="查看安装状态与高级详情">更多</summary>
             <div class="skill-inventory-detail-body">
               <div class="skill-inventory-primary-action ${escapeHtml(recommendation.kind)}">
                 <strong>${escapeHtml(recommendation.title)}</strong>
                 <span>${escapeHtml(recommendation.detail)}</span>
+              </div>
+              <div class="skill-tool-matrix" aria-label="本机工具安装矩阵">
+                <div class="skill-tool-matrix-title">本机工具</div>
+                <div class="skill-tool-checks">${toolChecks}</div>
               </div>
               <div class="skill-inventory-action">
                 <strong>下一步</strong>
@@ -12767,7 +13308,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       }
     }, true);
     window.addEventListener("resize", rerenderReviewQueueIfViewportModeChanged);
-    selectDashboardTab("workbench");
+    selectDashboardTab("skill-list");
     refresh(true);
     setInterval(() => {
       if (currentDashboardTab === "skill-list") {
