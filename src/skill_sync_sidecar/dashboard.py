@@ -8516,7 +8516,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         "scripts/install-operator-executor-launchd.sh",
         "",
         "手动启动时使用：",
-        "python3 -m skill_sync_sidecar operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-local-writes",
+        "python3 -m skill_sync_sidecar operator-executor --repo-root /Users/mac/work-ai/skill-sync-sidecar --allow-local-writes",
         "",
         "这只允许当前设备工具目录写入，不会开启共享库保存权限。",
       ].join("\n"));
