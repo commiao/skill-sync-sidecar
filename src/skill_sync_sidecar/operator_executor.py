@@ -38,7 +38,7 @@ MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "cc-switch": ("cc-switch-global", (".cc-switch", "skills"), "cc-switch"),
     "skillshub": ("skillshub-global", (".skillshub",), "skillshub"),
     "codex": ("codex-global", (".codex", "skills"), "Codex"),
-    "cursor": ("cursor-global", (".cursor", "skills-cursor"), "Cursor"),
+    "cursor": ("cursor-global", (".cursor", "skills"), "Cursor"),
     "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),
     "qoder": ("qoder-global", (".qoder", "skills"), "Qoder"),
     "deepseek-harness": ("deepseek-harness-global", (".dsh", "skills"), "DeepSeek Harness"),

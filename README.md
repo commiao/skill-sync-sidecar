@@ -175,7 +175,8 @@ The sidecar scans existing local roots when they exist:
 - `~/.skillshub`
 - `~/.codex/skills`
 - `~/.agents/skills`
-- `~/.cursor/skills-cursor`
+- `~/.cursor/skills`（Cursor 的用户技能目录。`~/.cursor/skills-cursor` 是 Cursor
+  自己的内置区，由它托管，不作为写入目标；Cursor 两个目录都会加载）
 - `~/.claude/skills`
 - `~/.qoder/skills`
 - `~/.dsh/skills`

@@ -51,7 +51,8 @@ GLOBAL_TOOL_TARGETS = {
         "scope_skip": "project-scoped skills are not installed into Codex global root",
     },
     "cursor-global": {
-        "default_root": Path.home() / ".cursor" / "skills-cursor",
+        # 用户技能进 ~/.cursor/skills；skills-cursor 是 Cursor 自己的内置区，见 local_skill.py
+        "default_root": Path.home() / ".cursor" / "skills",
         "scopes": {"global"},
         "aliases": {"cursor"},
         "scope_skip": "project-scoped skills are not installed into Cursor global root",
