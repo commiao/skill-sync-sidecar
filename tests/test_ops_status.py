@@ -29,6 +29,7 @@ from skill_sync_sidecar.central_lifecycle import (
 )
 from skill_sync_sidecar.remote import FileRemote
 from skill_sync_sidecar.operator_executor import (
+    MAC_TOOL_INSTALL_TARGETS,
     OperatorExecutorError,
     local_device_identity,
     local_publish_root_for_source,
@@ -2729,7 +2730,8 @@ class OpsStatusTest(unittest.TestCase):
             remote_source = root / "remote-source"
             remote_snapshot = root / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
             codex_root = root / ".codex" / "skills"
-            cursor_root = root / ".cursor" / "skills-cursor"
+            # 根从被测的那张表取，不在用例里再抄一份——抄的那份会和实现漂开
+            cursor_root = root.joinpath(*MAC_TOOL_INSTALL_TARGETS["cursor"][1])
             self._write_skill(remote_source / "demo", "demo", "Demo skill")
             (remote_source / "demo" / "manifest.json").write_text(
                 '{"protocol_version":0,"scope":"global","targets":["codex","cursor"]}',
@@ -2766,7 +2768,8 @@ class OpsStatusTest(unittest.TestCase):
     def test_mac_tool_uninstall_moves_skill_to_removed_backup(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            cursor_root = root / ".cursor" / "skills-cursor"
+            # 根从被测的那张表取，不在用例里再抄一份——抄的那份会和实现漂开
+            cursor_root = root.joinpath(*MAC_TOOL_INSTALL_TARGETS["cursor"][1])
             self._write_skill(cursor_root / "demo", "demo", "Demo skill")
 
             with patch("skill_sync_sidecar.operator_executor.Path.home", return_value=root):

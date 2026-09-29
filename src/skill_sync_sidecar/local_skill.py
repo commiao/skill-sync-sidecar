@@ -30,11 +30,20 @@ class LocalToolTarget:
     target_alias: str
 
 
+# Cursor 的用户技能目录是 ~/.cursor/skills；~/.cursor/skills-cursor 是它自己的
+# 内置区。判据取自 Cursor 本体而不是目录名（准则 22）：cursor-agent-host 里
+# 声明 {configDir:".cursor", subdir:"skills-cursor", builtin:true}，而
+# {configDir:".cursor", subdir:"skills", builtin:false} 才是用户那一格；
+# 它的 .gitignore 模板也把两者注释成「Built-in Cursor skills」与
+# 「User's personal skills」。往内置区写，等于把用户技能塞进 Cursor 托管的
+# 命名空间（那里有 .cursor-managed-skills-manifest.json 在列名单），
+# 随时可能被它清理。Cursor 两个目录都会加载，所以这不是「读不到」，
+# 是「放错了地方」。
 DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
     LocalToolTarget("cc-switch", "cc-switch", Path.home() / ".cc-switch" / "skills", "cc-switch"),
     LocalToolTarget("skillshub", "skillshub", Path.home() / ".skillshub", "skillshub"),
     LocalToolTarget("codex", "Codex", Path.home() / ".codex" / "skills", "codex"),
-    LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills-cursor", "cursor"),
+    LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills", "cursor"),
     LocalToolTarget("claude-code", "Claude Code", Path.home() / ".claude" / "skills", "claude-code"),
     LocalToolTarget("qoder", "Qoder", Path.home() / ".qoder" / "skills", "qoder"),
     LocalToolTarget("deepseek-harness", "DeepSeek Harness", Path.home() / ".dsh" / "skills", "deepseek-harness"),
@@ -273,7 +282,8 @@ def _infer_scope(source: Path) -> str:
         home / ".codex" / "skills",
         home / ".agents" / "skills",
         home / ".claude" / "skills",
-        home / ".cursor" / "skills-cursor",
+        home / ".cursor" / "skills",
+        home / ".cursor" / "skills-cursor",   # 存量：改目标之前装进内置区的那些
         home / ".qoder" / "skills",
         home / ".dsh" / "skills",
     ]

@@ -166,7 +166,7 @@ Installed local roots:
 /Users/mac/.codex/skills/read-wechat-article
 /Users/mac/.cc-switch/skills/read-wechat-article
 /Users/mac/.skillshub/read-wechat-article
-/Users/mac/.cursor/skills-cursor/read-wechat-article
+/Users/mac/.cursor/skills/read-wechat-article
 /Users/mac/.claude/skills/read-wechat-article
 ```
 
