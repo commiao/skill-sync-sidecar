@@ -827,7 +827,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("id=\"simple-action-disabled-note\"", DASHBOARD_HTML)
             self.assertIn("primaryButtonText", DASHBOARD_HTML)
             self.assertIn("检查只读，不会写入共享库。", DASHBOARD_HTML)
-            self.assertIn("下一步：点“保存到共享库”；输入 PUBLISH 后才会写入。", DASHBOARD_HTML)
+            self.assertIn("下一步：点“保存到共享库”；会先检查，预览确认后才写入。", DASHBOARD_HTML)
             self.assertIn("setButtonLabel", DASHBOARD_HTML)
             self.assertIn("先检查更新", DASHBOARD_HTML)
             self.assertIn("可以保存更新", DASHBOARD_HTML)
@@ -890,21 +890,27 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("review-recommendation", DASHBOARD_HTML)
             self.assertIn("下一步", DASHBOARD_HTML)
             self.assertIn("确认缺失项是恢复还是删除", DASHBOARD_HTML)
-            self.assertIn("可稍后处理：OpenClaw 普通待审", DASHBOARD_HTML)
+            self.assertIn("待同步：OpenClaw 普通待审", DASHBOARD_HTML)
             self.assertIn("OpenClaw 有新修改，可稍后处理", DASHBOARD_HTML)
             self.assertIn("reviewSourceChangedItems", DASHBOARD_HTML)
             self.assertIn("reviewIsSourceChangedItem", DASHBOARD_HTML)
             self.assertIn("先检查", DASHBOARD_HTML)
-            self.assertIn("先处理缺失/删除确认", DASHBOARD_HTML)
-            self.assertIn("再处理可保存更新", DASHBOARD_HTML)
-            self.assertIn("id=\"review-dry-run-all\"", DASHBOARD_HTML)
-            self.assertIn("id=\"review-publish-all\"", DASHBOARD_HTML)
-            self.assertIn("reviewTargetListHtml", DASHBOARD_HTML)
-            self.assertIn("review-target-chip", DASHBOARD_HTML)
-            self.assertIn("本次检查/保存对象", DASHBOARD_HTML)
-            self.assertIn("保存：${publishNames}", DASHBOARD_HTML)
-            self.assertNotIn("保存 ${publishItems.length} 个更新", DASHBOARD_HTML)
-            self.assertIn("下一步就是点“保存到共享库”", DASHBOARD_HTML)
+            self.assertIn("需单独处理：缺失/删除确认", DASHBOARD_HTML)
+            self.assertIn("待同步：可保存更新", DASHBOARD_HTML)
+            self.assertLess(DASHBOARD_HTML.index("待同步：OpenClaw 普通待审"), DASHBOARD_HTML.index("需单独处理：缺失/删除确认"))
+            self.assertIn("<button id=\"review-sync-all\" type=\"button\" class=\"primary\" onclick=\"runExecutorAction('sync')\" disabled>", DASHBOARD_HTML)
+            self.assertNotIn("id=\"review-dry-run-all\"", DASHBOARD_HTML)
+            self.assertNotIn("id=\"review-publish-all\"", DASHBOARD_HTML)
+            self.assertIn("同步 ${syncSkillIds.length} 个 skill", DASHBOARD_HTML)
+            self.assertIn("reviewSyncListHtml", DASHBOARD_HTML)
+            self.assertIn("review-target-chip sync-${escapeHtml(state)}", DASHBOARD_HTML)
+            for state_class in ("sync-conflict", "sync-delete", "sync-changed", "sync-ready", "sync-deferred"):
+                self.assertIn(f".review-target-chip.{state_class}", DASHBOARD_HTML)
+            self.assertIn("同步清单：", DASHBOARD_HTML)
+            self.assertIn("syncPreviewConfirmText", DASHBOARD_HTML)
+            self.assertIn("expected_local_hashes: expectedLocalHashes", DASHBOARD_HTML)
+            self.assertIn("本次跳过（OpenClaw 仍在修改）", DASHBOARD_HTML)
+            self.assertNotIn("保存会写入共享库。请输入 PUBLISH 确认", DASHBOARD_HTML)
             self.assertIn("allReviewPublishCandidatesReady", DASHBOARD_HTML)
             self.assertIn("publishCandidateSkillIds", DASHBOARD_HTML)
             self.assertIn("currentActionSkillIds", DASHBOARD_HTML)
@@ -917,7 +923,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("refreshOpenclawPeerStatus", DASHBOARD_HTML)
             self.assertIn("/api/openclaw-peer-status-refresh", DASHBOARD_HTML)
             self.assertIn("executorErrorDetail", DASHBOARD_HTML)
-            self.assertIn("等待上方“保存到共享库”写入共享库", DASHBOARD_HTML)
+            self.assertIn("点上方“同步”，预览确认后写入共享库", DASHBOARD_HTML)
             self.assertIn("重新检查", DASHBOARD_HTML)
             self.assertIn("renderReviewGroup", DASHBOARD_HTML)
             self.assertIn("renderReviewItem", DASHBOARD_HTML)
@@ -938,7 +944,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("服务正常；OpenClaw 有新版本：${sourceChangedNames}。这是普通待审，可以稍后处理，不影响你继续管理当前设备的 skill。", DASHBOARD_HTML)
             self.assertIn("服务正常，普通待审", DASHBOARD_HTML)
             self.assertIn("可稍后处理", DASHBOARD_HTML)
-            self.assertIn("可稍后处理：OpenClaw 普通待审", DASHBOARD_HTML)
+            self.assertIn("待同步：OpenClaw 普通待审", DASHBOARD_HTML)
             self.assertIn(".review-item.deferrable", DASHBOARD_HTML)
             self.assertIn(".review-group.deferrable", DASHBOARD_HTML)
             self.assertIn(".simple-action-panel.deferrable", DASHBOARD_HTML)
@@ -992,7 +998,6 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("个普通待审", DASHBOARD_HTML)
             self.assertIn("可稍后处理；继续管理本机 skill，OpenClaw 改完后再检查最新版本。", DASHBOARD_HTML)
             self.assertIn("检查最新版本", DASHBOARD_HTML)
-            self.assertIn("sourceChangedOnly", DASHBOARD_HTML)
             self.assertNotIn("sourceChangedOnly) {\\n        panel.hidden = true", DASHBOARD_HTML)
             self.assertIn("保护性拒绝写入共享库", DASHBOARD_HTML)
             self.assertIn("保存已被拒绝；这里只重新读取 OpenClaw 最新队列。", DASHBOARD_HTML)
@@ -1370,7 +1375,7 @@ class OpsStatusTest(unittest.TestCase):
             self.assertIn("不会自动安装到 Mac、OpenClaw 或其他设备", DASHBOARD_HTML)
             self.assertIn("row(\"已废弃\"", DASHBOARD_HTML)
             self.assertIn("查看详细清单和技术状态", DASHBOARD_HTML)
-            self.assertIn("查看原因", DASHBOARD_HTML)
+            self.assertIn("同步会做什么", DASHBOARD_HTML)
             self.assertLess(
                 DASHBOARD_HTML.index("id=\"review-recommendation\""),
                 DASHBOARD_HTML.index("id=\"review-progress\""),
@@ -1381,9 +1386,9 @@ class OpsStatusTest(unittest.TestCase):
             )
             self.assertIn("按下方推荐按钮走；详情可以稍后再看。", DASHBOARD_HTML)
             self.assertIn("检查一下", DASHBOARD_HTML)
-            self.assertIn("检查：${publishNames}", DASHBOARD_HTML)
+            self.assertIn("检查 ${syncSkillIds.length} 个（保存权限未开启）", DASHBOARD_HTML)
             self.assertIn("rerenderTopActionPanel", DASHBOARD_HTML)
-            self.assertIn("现在可以点“保存到共享库”完成同步", DASHBOARD_HTML)
+            self.assertIn("现在可以点“同步”写入共享库", DASHBOARD_HTML)
             self.assertIn("涉及 skill", DASHBOARD_HTML)
             self.assertIn("<button id=\"simple-defer-source\" type=\"button\" title=\"只隐藏首页提醒\" onclick=\"deferSourceChangedItems()\">先不提醒", DASHBOARD_HTML)
             self.assertNotIn("source-change-actions", DASHBOARD_HTML)
@@ -2459,6 +2464,43 @@ class OpsStatusTest(unittest.TestCase):
 
             with self.assertRaises(OperatorExecutorError):
                 run_openclaw_approved_push_batch(repo, ["finance-auto-bookkeeping"], yes=True)
+
+    def test_operator_executor_pins_reviewed_hashes_and_reports_changed_skips(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            scripts = repo / "scripts"
+            scripts.mkdir()
+            helper = scripts / "openclaw-approved-push-batch.sh"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo \"args=$*\"\n"
+                "printf '{\"approved\":1,\"approved_skill_ids\":[\"finance-auto-bookkeeping\"],"
+                "\"changed_skipped_skill_ids\":[\"kg-use\"],\"stale_skipped_skill_ids\":[]}\\n'\n",
+                encoding="utf-8",
+            )
+            os.chmod(helper, 0o755)
+
+            result = run_openclaw_approved_push_batch(
+                repo,
+                ["finance-auto-bookkeeping", "kg-use"],
+                yes=True,
+                allow_publish=True,
+                expected_local_hashes={"finance-auto-bookkeeping": "sha256:aaa", "kg-use": "sha256:old"},
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertIn("--expect finance-auto-bookkeeping=sha256:aaa", result["command"])
+            self.assertIn("--expect kg-use=sha256:old", result["command"])
+            self.assertEqual(result["approved_skill_ids"], ["finance-auto-bookkeeping"])
+            self.assertEqual(result["changed_skipped_skill_ids"], ["kg-use"])
+            self.assertEqual(result["stale_skipped_skill_ids"], [])
+
+            with self.assertRaises(OperatorExecutorError):
+                run_openclaw_approved_push_batch(repo, ["kg-use"], expected_local_hashes={"other-skill": "sha256:x"})
+            with self.assertRaises(OperatorExecutorError):
+                run_openclaw_approved_push_batch(repo, ["kg-use"], expected_local_hashes={"kg-use": "bad hash; rm -rf"})
+            with self.assertRaises(OperatorExecutorError):
+                run_openclaw_approved_push_batch(repo, ["kg-use"], expected_local_hashes=["kg-use"])
 
     def test_operator_executor_publish_refreshes_openclaw_peer_status(self):
         with TemporaryDirectory() as tmp:

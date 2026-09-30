@@ -11,10 +11,13 @@ machine-verifiable instead of accepting an operator-supplied bypass flag.
 from __future__ import annotations
 
 import argparse
+import configparser
 import subprocess
 import sys
 from pathlib import Path
 
+
+PROJECT_NAME = "skill-sync-sidecar"
 
 ALLOWED_PATHS = frozenset(
     {
@@ -38,12 +41,25 @@ DASHBOARD_HTML_CHECKS = (
 )
 
 
+def project_name(repo: Path) -> str | None:
+    metadata = configparser.ConfigParser()
+    if not metadata.read(repo / "setup.cfg", encoding="utf-8"):
+        return None
+    return metadata.get("metadata", "name", fallback=None)
+
+
 def run_git(repo: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
 
 
 def validate(repo: Path, base: str) -> list[str]:
     errors: list[str] = []
+    if project_name(repo) != PROJECT_NAME:
+        errors.append(
+            f"nas-dashboard-only belongs to {PROJECT_NAME}; "
+            "the release repository does not identify as that project"
+        )
+        return errors
     if run_git(repo, "status", "--porcelain"):
         errors.append("release worktree must be clean")
 
@@ -78,6 +94,7 @@ def main() -> int:
         return 2
 
     print("nas_dashboard_contract=ok")
+    print(f"project={PROJECT_NAME}")
     print("allowed_paths=" + ",".join(sorted(ALLOWED_PATHS)))
     print("html_checks=" + ",".join(DASHBOARD_HTML_CHECKS))
     return 0

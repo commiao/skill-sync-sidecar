@@ -34,6 +34,7 @@ from .tool_status import build_device_tool_status
 
 
 SKILL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+CONTENT_HASH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$")
 MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "cc-switch": ("cc-switch-global", (".cc-switch", "skills"), "cc-switch"),
     "skillshub": ("skillshub-global", (".skillshub",), "skillshub"),
@@ -68,17 +69,21 @@ def run_openclaw_approved_push_batch(
     allow_publish: bool = False,
     allow_conflict_local_wins: bool = False,
     refresh_peer_status: bool = False,
+    expected_local_hashes: Optional[dict] = None,
 ) -> dict:
     repo = repo_root.expanduser().resolve()
     script = repo / "scripts" / "openclaw-approved-push-batch.sh"
     if not script.exists():
         raise OperatorExecutorError(f"approved-push helper not found: {script}")
     normalized = _normalize_skill_ids(skill_ids)
+    expectations = _normalize_expected_local_hashes(expected_local_hashes, normalized)
     if yes and not allow_publish:
         raise OperatorExecutorError("publish is disabled; set SKILL_SYNC_EXECUTOR_ALLOW_PUBLISH=1 to enable --yes")
     command = [str(script), "--yes" if yes else "--dry-run"]
     if allow_conflict_local_wins:
         command.append("--allow-conflict-local-wins")
+    for skill_id, local_hash in expectations.items():
+        command.extend(["--expect", f"{skill_id}={local_hash}"])
     command.extend(normalized)
     started_at = datetime.now(timezone.utc).isoformat()
     proc = subprocess.run(
@@ -103,6 +108,8 @@ def run_openclaw_approved_push_batch(
         "safe_to_push": bool(parsed.get("safe_to_push")) if isinstance(parsed, dict) else False,
         "approved": parsed.get("approved") if isinstance(parsed, dict) else None,
         "approved_skill_ids": parsed.get("approved_skill_ids") if isinstance(parsed, dict) else normalized,
+        "stale_skipped_skill_ids": parsed.get("stale_skipped_skill_ids", []) if isinstance(parsed, dict) else [],
+        "changed_skipped_skill_ids": parsed.get("changed_skipped_skill_ids", []) if isinstance(parsed, dict) else [],
         "allow_conflict_local_wins": allow_conflict_local_wins,
         "result": parsed,
         "result_reason": parsed_reason,
@@ -591,6 +598,21 @@ def _normalize_skill_ids(skill_ids: Sequence[str]) -> list[str]:
     return result
 
 
+def _normalize_expected_local_hashes(raw: object, skill_ids: Sequence[str]) -> dict[str, str]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise OperatorExecutorError("expected_local_hashes must be an object of skill_id -> local_hash")
+    result: dict[str, str] = {}
+    for skill_id, local_hash in raw.items():
+        if skill_id not in skill_ids:
+            raise OperatorExecutorError(f"expected hash given for unrequested skill: {skill_id}")
+        if not isinstance(local_hash, str) or not CONTENT_HASH_RE.match(local_hash):
+            raise OperatorExecutorError(f"invalid expected local hash for {skill_id}")
+        result[skill_id] = local_hash
+    return result
+
+
 def _normalize_tool_id(tool_id: object) -> str:
     normalized = str(tool_id or "").strip().lower()
     if normalized == "claude":
@@ -694,12 +716,14 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                 payload = self._read_json()
                 skill_ids = payload.get("skill_ids") if isinstance(payload, dict) else None
                 allow_conflict_local_wins = bool(payload.get("allow_conflict_local_wins")) if isinstance(payload, dict) else False
+                expected_local_hashes = payload.get("expected_local_hashes") if isinstance(payload, dict) else None
                 if path == "/api/openclaw-approved-push-dry-run":
                     result = run_openclaw_approved_push_batch(
                         repo,
                         skill_ids or [],
                         yes=False,
                         allow_conflict_local_wins=allow_conflict_local_wins,
+                        expected_local_hashes=expected_local_hashes,
                     )
                     self._send_json(200 if result["ok"] else 500, result)
                     return
@@ -715,6 +739,7 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                         allow_publish=allow_publish,
                         allow_conflict_local_wins=allow_conflict_local_wins,
                         refresh_peer_status=True,
+                        expected_local_hashes=expected_local_hashes,
                     )
                     self._send_json(200 if result["ok"] else 500, result)
                     return

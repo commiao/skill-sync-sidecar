@@ -15,6 +15,10 @@ worktree for future Skill Sync Sidecar work.
 - NAS deployment root: `/volume1/docker/skill-sync-gateway`
 - NAS dashboard: `http://100.123.208.32:8765`
 
+On 2026-09-23, the dashboard's manual operator executor command was updated
+to use this source worktree. Older handoff documents may still show the former
+`workspace_codex` path and should be treated as historical records.
+
 The installed runtime and WebDAV paths are operational state, not source
 worktrees. Do not move, delete, or repoint them as part of workspace cleanup.
 
