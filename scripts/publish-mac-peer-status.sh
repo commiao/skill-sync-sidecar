@@ -84,7 +84,7 @@ write_failures() {
   printf '%s\n' "$1" >"$failure_state" 2>/dev/null || true
 }
 
-stderr_capture="$(mktemp -t publish-peer-status-stderr)"
+stderr_capture="$(mktemp "${TMPDIR:-/tmp}/publish-peer-status-stderr.XXXXXX")"
 trap 'rm -f "$stderr_capture"' EXIT
 
 attempt=1

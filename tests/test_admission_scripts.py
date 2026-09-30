@@ -363,8 +363,101 @@ class AdmissionScriptsTest(unittest.TestCase):
         self.assertIn("SKILL_SYNC_APPROVED_PUSH_REFRESH_STATUS", help_text)
         self.assertIn("SKILL_ID", help_text)
         self.assertIn("repo_root", text)
+        self.assertIn("--expect", help_text)
         self.assertNotIn("systemctl", text)
         self.assertNotIn("launchctl", text)
+
+    def run_approved_push_batch_with_fake_ssh(self, tmp: Path, report_items, args):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "openclaw-approved-push-batch.sh"
+        bin_dir = tmp / "bin"
+        bin_dir.mkdir()
+        report = tmp / "blocked-report.json"
+        report.write_text(json.dumps({"total": len(report_items), "items": report_items}), encoding="utf-8")
+        calls = tmp / "calls.log"
+        fake_ssh = bin_dir / "ssh"
+        fake_ssh.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, os, shlex, sys\n"
+            "command = sys.argv[-1]\n"
+            "with open(os.environ['FAKE_SSH_CALLS'], 'a', encoding='utf-8') as fh:\n"
+            "    fh.write(command + '\\n')\n"
+            "words = shlex.split(command)\n"
+            "if 'cat' in words:\n"
+            "    sys.stdout.write(open(os.environ['FAKE_BLOCKED_REPORT'], encoding='utf-8').read())\n"
+            "elif 'approved-push' in words:\n"
+            "    ids = [words[i + 1] for i, word in enumerate(words) if word == '--skill-id']\n"
+            "    print(json.dumps({'dry_run': '--dry-run' in words, 'safe_to_push': True, 'approved': len(ids), 'approved_skill_ids': ids}, indent=2))\n"
+            "else:\n"
+            "    print('{}')\n",
+            encoding="utf-8",
+        )
+        os.chmod(fake_ssh, 0o755)
+        env = {
+            **os.environ,
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+            "FAKE_SSH_CALLS": str(calls),
+            "FAKE_BLOCKED_REPORT": str(report),
+        }
+        output = subprocess.check_output(["bash", str(script), *args], env=env, text=True)
+        decoder = json.JSONDecoder()
+        start = output.rfind("\n{") + 1
+        result, _ = decoder.raw_decode(output[start:])
+        return result, calls.read_text(encoding="utf-8")
+
+    def test_openclaw_approved_push_batch_skips_skills_changed_since_review(self):
+        report_items = [
+            {"skill_id": "finance-auto-bookkeeping", "category": "writer_policy", "status_action": "push", "local_hash": "sha256:aaa"},
+            {"skill_id": "kg-use", "category": "writer_policy", "status_action": "push", "local_hash": "sha256:new"},
+        ]
+        with TemporaryDirectory() as tmp:
+            result, calls = self.run_approved_push_batch_with_fake_ssh(
+                Path(tmp),
+                report_items,
+                [
+                    "--yes",
+                    "--expect", "finance-auto-bookkeeping=sha256:aaa",
+                    "--expect", "kg-use=sha256:old",
+                    "finance-auto-bookkeeping", "kg-use", "task-hub",
+                ],
+            )
+
+        self.assertEqual(result["approved_skill_ids"], ["finance-auto-bookkeeping"])
+        self.assertEqual(result["changed_skipped_skill_ids"], ["kg-use"])
+        self.assertEqual(result["stale_skipped_skill_ids"], ["task-hub"])
+        self.assertEqual(result["requested_skill_ids"], ["finance-auto-bookkeeping", "kg-use", "task-hub"])
+        approved_call = next(line for line in calls.splitlines() if "approved-push" in line)
+        self.assertIn("--skill-id finance-auto-bookkeeping", approved_call)
+        self.assertNotIn("kg-use", approved_call)
+        self.assertIn("--yes", approved_call)
+
+    def test_openclaw_approved_push_batch_reports_all_skipped_without_approved_push(self):
+        report_items = [
+            {"skill_id": "kg-use", "category": "writer_policy", "status_action": "push", "local_hash": "sha256:new"},
+        ]
+        with TemporaryDirectory() as tmp:
+            result, calls = self.run_approved_push_batch_with_fake_ssh(
+                Path(tmp),
+                report_items,
+                ["--yes", "--expect", "kg-use=sha256:old", "kg-use"],
+            )
+
+        self.assertEqual(result["approved"], 0)
+        self.assertEqual(result["mode"], "publish")
+        self.assertEqual(result["changed_skipped_skill_ids"], ["kg-use"])
+        self.assertNotIn("approved-push", calls)
+
+    def test_openclaw_approved_push_batch_without_expectations_keeps_all_current_candidates(self):
+        report_items = [
+            {"skill_id": "kg-use", "category": "writer_policy", "status_action": "push", "local_hash": "sha256:new"},
+        ]
+        with TemporaryDirectory() as tmp:
+            result, _ = self.run_approved_push_batch_with_fake_ssh(Path(tmp), report_items, ["kg-use"])
+
+        self.assertEqual(result["approved_skill_ids"], ["kg-use"])
+        self.assertEqual(result["changed_skipped_skill_ids"], [])
+        self.assertEqual(result["stale_skipped_skill_ids"], [])
+        self.assertTrue(result["dry_run"])
 
     def test_openclaw_approved_push_batch_all_script_is_cli_ready(self):
         repo_root = Path(__file__).resolve().parents[1]

@@ -1358,7 +1358,7 @@ def _operator_action_guide(health: str, blocked_items: list[dict]) -> dict:
             summary = f"服务正常；OpenClaw 有 {source_changed_count} 个 skill 又产生新版本{skill_hint}。这只是普通待审，可以稍后处理；不影响管理当前设备的 skill。"
             first_step = "改完后检查最新版本"
             first_detail = "检查只读，不写共享库；如果检查期间 skill 又变化，系统会自动拒绝写入。"
-            second_detail = "检查结果显示可以保存后，再输入 PUBLISH 写入共享库。"
+            second_detail = "点同步会先检查，预览确认后才写入共享库。"
             note = "黄色在这里表示普通待审、可稍后处理，不是服务故障。反复出现同一个 skill 时，通常表示源端还在写文件；这只会保护该 skill，不应阻塞其他独立更新。"
         else:
             title = "OpenClaw 更新需要确认"
@@ -3808,6 +3808,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .review-target-chip {
       display: inline-flex;
       align-items: center;
+      gap: 6px;
       max-width: 100%;
       min-height: 28px;
       padding: 5px 9px;
@@ -3819,6 +3820,19 @@ DASHBOARD_HTML = r"""<!doctype html>
       font-weight: 820;
       overflow-wrap: anywhere;
     }
+    .review-target-chip-state {
+      padding: 0 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+      font-size: 11px;
+      font-weight: 860;
+      white-space: nowrap;
+    }
+    .review-target-chip.sync-conflict,
+    .review-target-chip.sync-delete { border-color: #efb8b8; background: #fff1f1; color: var(--red); }
+    .review-target-chip.sync-changed { border-color: #f3c89b; background: #fff4e8; color: #9a4a00; }
+    .review-target-chip.sync-ready { border-color: #b8d8c8; background: #f1faf5; color: var(--green); }
+    .review-target-chip.sync-deferred { border-color: var(--line); background: var(--soft); color: var(--muted); }
     .simple-action-eyebrow {
       color: var(--muted);
       font-size: 12px;
@@ -7008,6 +7022,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     let currentReviewQueueIsMobile = window.matchMedia("(max-width: 560px)").matches;
     let reviewDetailsUserOpened = false;
     let reviewTaskResults = {};
+    let lastSyncChangedSkillIds = new Set();
     let staleRefreshTimer = null;
     let currentDashboardTab = "skill-list";
     let currentSkillsHubView = "all";
@@ -7532,7 +7547,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `服务正常；OpenClaw 有新版本：${sourceChangedNames}。这是普通待审，可以稍后处理，不影响你继续管理当前设备的 skill。`;
         primaryActions = allSourceChangedReady
           ? (executorAllowPublish ? `
-            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
+            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>检查后预览确认再写入。</span></button>
           ` : `
             <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
           `)
@@ -7563,7 +7578,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           : `先检查这批更新：${publishNames}。这一步只看结果，不会写入。检查通过后按钮会变成“保存到共享库”。`;
         primaryActions = allPublishReady
           ? (executorAllowPublish ? `
-            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>会要求输入 PUBLISH。</span></button>
+            <button id="simple-publish" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>保存到共享库<span>检查后预览确认再写入。</span></button>
           ` : `
             <button type="button" class="primary" onclick="showPublishGateHelp()">开启保存权限<span>查看怎么开启；不会写共享库。</span></button>
           `)
@@ -8516,7 +8531,7 @@ DASHBOARD_HTML = r"""<!doctype html>
         "scripts/install-operator-executor-launchd.sh",
         "",
         "手动启动时使用：",
-        "python3 -m skill_sync_sidecar operator-executor --repo-root /Users/mac/workspace_codex/skill-sync-sidecar --allow-local-writes",
+        "python3 -m skill_sync_sidecar operator-executor --repo-root /Users/mac/work-ai/skill-sync-sidecar --allow-local-writes",
         "",
         "这只允许当前设备工具目录写入，不会开启共享库保存权限。",
       ].join("\n"));
@@ -8629,27 +8644,27 @@ DASHBOARD_HTML = r"""<!doctype html>
       } else {
         $("review-queue").innerHTML = [
           renderReviewGroup(
-            "先处理缺失/删除确认",
-            deleteItems,
-            "这些不是保存按钮要处理的内容；当前面板不会删除共享库。",
-            "risky"
-          ),
-          renderReviewGroup(
-            "可稍后处理：OpenClaw 普通待审",
+            "待同步：OpenClaw 普通待审",
             sourceChangedItems,
-            "这些项是普通待审，不是服务故障；可以继续管理本机 skill，OpenClaw 改完后再检查最新版本。",
+            "这些项是普通待审，不是服务故障；点上方“同步”一次处理，检查后又改过的会自动跳过。",
             "deferrable"
           ),
           renderReviewGroup(
-            "再处理可保存更新",
+            "待同步：可保存更新",
             regularPublishItems,
-            "逐项检查，结果显示可以保存后再保存到共享库。"
+            "点上方“同步”一次处理；也可以逐项检查。"
           ),
           renderReviewGroup(
-            "最后处理版本差异/未知项",
+            "需单独处理：版本差异/未知项",
             conflictItems.length ? conflictItems : otherItems,
-            "版本差异或未知项先看只读报告，不进入一键保存。",
+            "版本差异或未知项先看只读报告，不进入同步。",
             conflictItems.length ? "risky" : ""
+          ),
+          renderReviewGroup(
+            "需单独处理：缺失/删除确认",
+            deleteItems,
+            "这些不进入同步；当前面板不会删除共享库。",
+            "risky"
           ),
         ].filter(Boolean).join("");
       }
@@ -8689,79 +8704,48 @@ DASHBOARD_HTML = r"""<!doctype html>
       const deferredItems = Array.isArray(items) ? items.filter((item) => isDeferredSourceChange(item)) : [];
       const actionableItems = actionableReviewItems(items);
       const deleteItems = reviewDeleteItems(actionableItems);
-      const sourceChangedItems = reviewSourceChangedItems(actionableItems);
-      const publishItems = reviewPublishItems(actionableItems);
       const conflictItems = reviewConflictItems(actionableItems);
-      const checkedCount = publishItems.filter((item) => reviewTaskResults[reviewItemKey(item)]).length;
-      const readyCount = publishItems.filter((item) => {
-        const result = reviewTaskResults[reviewItemKey(item)];
-        return result && result.publishReady;
-      }).length;
-      const remainingPrecheck = Math.max(publishItems.length - checkedCount, 0);
-      const remainingReady = Math.max(publishItems.length - readyCount, 0);
-      const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
-      const sourceChangedNames = compactSkillList(sourceChangedItems.map((item) => item.skill_id));
+      const syncSkillIds = publishCandidateSkillIds();
+      const syncNames = compactSkillList(syncSkillIds);
       const conflictNames = compactSkillList(conflictItems.map((item) => item.skill_id));
-      const publishNames = compactSkillList(publishItems.map((item) => item.skill_id));
-      const sourceChangedOnly = sourceChangedItems.length > 0 && sourceChangedItems.length === publishItems.length;
-      const summary = conflictItems.length > 0
-        ? `先处理版本差异：${conflictNames}。生成只读报告后再决定保留哪一版。`
-        : (sourceChangedItems.length > 0
-          ? `普通待审：OpenClaw 有新修改：${sourceChangedNames}。不影响本机工作区，改完后直接检查最新版本。`
-          : (publishItems.length > 0
-          ? `先检查这批更新：${publishNames}；通过后再保存到共享库。`
-          : (deferredItems.length > 0
-          ? `已暂时搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。当前不用处理；需要重新处理时再取消搁置。`
-          : `先处理少掉的 skill；默认保留共享库，不会自动删除。`)));
-      const publishActionLabel = !executorAvailable
+      const deleteNames = compactSkillList(deleteItems.map((item) => item.skill_id));
+      const summary = syncSkillIds.length > 0
+        ? `待同步：${syncNames}。点“同步”会先检查，确认预览后才写入共享库；不影响本机工作区。`
+        : (conflictItems.length > 0
+          ? `先处理版本差异：${conflictNames}。生成只读报告后再决定保留哪一版。`
+          : (deleteItems.length > 0
+            ? `确认缺失项是恢复还是删除：${deleteNames}。默认保留共享库，不会自动删除。`
+            : `已暂时搁置：${compactSkillList(deferredItems.map((item) => item.skill_id))}。当前不用处理；需要重新处理时再取消搁置。`));
+      const syncActionLabel = !executorAvailable
         ? "等待本机助手"
-        : (!executorAllowPublish
-          ? "只能检查"
-          : (sourceChangedItems.length > 0 && remainingReady > 0
-            ? `检查：${publishNames}`
-            : `保存：${publishNames}`));
-      const publishActionNote = publishItems.length === 0
-        ? "当前没有东西可保存；如果点保存到共享库，也不会写入共享库。"
-        : (!executorAvailable
-          ? "本机助手未在线，先启动本机助手。"
+        : (syncSkillIds.length === 0
+          ? "没有可同步的 skill"
           : (!executorAllowPublish
-            ? "当前只能检查，不能写入共享库；需要重新安装本机助手并打开保存开关。"
-            : (sourceChangedItems.length > 0 && remainingReady > 0
-              ? "改完后先检查最新版本；检查期间又变化会自动拒绝写入。"
-              : (remainingReady > 0 ? "保存按钮会在所有更新检查通过后解锁。" : "下一步就是点“保存到共享库”，确认后写入共享库。"))));
-      const firstDetail = conflictItems.length
-          ? `版本差异：${conflictNames}。先看只读报告。`
-          : (deleteItems.length
-          ? `确认缺失项是恢复还是删除：${deleteNames}。默认保留共享库，不会自动删除。`
-          : (sourceChangedItems.length ? `源端仍有新改动：${sourceChangedNames}。` : "当前没有缺失/删除确认。"));
-      const secondDetail = sourceChangedOnly
-        ? `点“检查”只会读取 ${sourceChangedNames} 的最新版本，不会写入共享库。`
-        : (remainingPrecheck > 0 ? `还有 ${remainingPrecheck} 个更新没检查。` : (publishItems.length ? "更新已完成检查。" : (deferredItems.length ? "已搁置项不会进入批量检查/保存；可以继续本机 skill 管理。" : "当前没有可保存更新。")));
-      const thirdDetail = publishItems.length === 0
-        ? "不要点保存；先完成版本差异/缺失决策。"
-        : (!executorAllowPublish ? "当前保存开关未打开；检查通过后也不会自动写入。" : (remainingReady > 0 ? `保存前还差 ${remainingReady} 个检查通过：${publishNames}。` : `可以保存到共享库：${publishNames}。`));
-      const targetItems = conflictItems.length
-        ? conflictItems
-        : (publishItems.length ? publishItems : (deleteItems.length ? deleteItems : deferredItems));
-      const targetLabel = conflictItems.length
-        ? "版本差异"
-        : (publishItems.length ? "本次检查/保存对象" : (deleteItems.length ? "缺失/删除确认" : "已搁置"));
+            ? `检查 ${syncSkillIds.length} 个（保存权限未开启）`
+            : `同步 ${syncSkillIds.length} 个 skill`));
+      const syncSteps = syncSkillIds.length === 0
+        ? "同步按钮只处理蓝色“待同步”项；版本冲突和缺失确认需要在下方清单单独处理。"
+        : (!executorAllowPublish
+          ? "保存权限未开启：点击只会检查，不会写入共享库。需要重新安装本机助手并打开保存开关。"
+          : "点“同步”后：1. 自动检查（只读）；2. 弹出预览，列出要写入和跳过的 skill；3. 确认后只写入预览里的版本。");
+      const skipNote = "检查后 OpenClaw 又改过的 skill 会标成橙色“仍在修改”并跳过，其余照常写入；改完后再点同步即可。";
+      const exclusionNote = conflictItems.length || deleteItems.length
+        ? `不进入同步：${[conflictItems.length ? `版本冲突 ${conflictNames}` : "", deleteItems.length ? `缺失确认 ${deleteNames}` : ""].filter(Boolean).join("；")}。`
+        : "";
       target.innerHTML = `
         <div class="review-recommendation-title">下一步</div>
         <div class="review-recommendation-summary">
           ${escapeHtml(summary)}
         </div>
-        ${reviewTargetListHtml(targetLabel, targetItems)}
+        ${reviewSyncListHtml(items)}
         <div class="review-recommendation-actions">
-          <button id="review-dry-run-all" type="button" onclick="runExecutorAction('dry_run')" disabled>${checkedCount > 0 ? `重新检查` : `检查一下`}</button>
-          <button id="review-publish-all" type="button" class="primary" onclick="runExecutorAction('publish')" disabled>${escapeHtml(publishActionLabel)}</button>
+          <button id="review-sync-all" type="button" class="primary" onclick="runExecutorAction('sync')" disabled>${escapeHtml(syncActionLabel)}</button>
         </div>
         <details class="review-recommendation-detail">
-          <summary>查看原因</summary>
-          <div>${escapeHtml(publishActionNote)}</div>
-          <div>${escapeHtml(firstDetail)}</div>
-          <div>${escapeHtml(secondDetail)}</div>
-          <div>${escapeHtml(thirdDetail)}</div>
+          <summary>同步会做什么</summary>
+          <div>${escapeHtml(syncSteps)}</div>
+          <div>${escapeHtml(skipNote)}</div>
+          ${exclusionNote ? `<div>${escapeHtml(exclusionNote)}</div>` : ""}
         </details>
       `;
     }
@@ -8866,10 +8850,10 @@ DASHBOARD_HTML = r"""<!doctype html>
       const publishKind = publishReady > 0 ? "green" : "yellow";
       const publishNote = deleteTotal > 0
         ? `${deleteTotal} 个删除项不会自动保存；需恢复缺失设备或单独确认删除。`
-        : "保存前会再次确认。";
+        : "检查后弹出预览，确认后才写入；检查后又改过的 skill 会跳过。";
       $("review-progress").innerHTML = [
         reviewStage("1", "连接本机助手", executorState, executorKind, executorAvailable ? "可以直接在面板检查。" : `先确认${currentClientHelperName()}在线。`),
-        reviewStage("2", "检查可保存更新", `${checked}/${publishableTotal} 已检查`, dryRunKind, publishableTotal > 0 ? "检查只读，不会写共享库。" : "当前没有可保存项；不要反复点保存。"),
+        reviewStage("2", "自动检查", `${checked}/${publishableTotal} 已检查`, dryRunKind, publishableTotal > 0 ? "点同步时自动检查，只读，不会写共享库。" : "当前没有待同步项。"),
         reviewStage("3", conflictTotal > 0 ? "版本确认" : "保存共享库", conflictTotal > 0 ? `${conflictTotal} 个需选择` : `${publishReady}/${publishableTotal} 可保存`, conflictTotal > 0 ? "yellow" : publishKind, conflictTotal > 0 ? "先生成只读差异报告，再按推荐处理。" : publishNote),
       ].join("");
     }
@@ -8960,19 +8944,56 @@ DASHBOARD_HTML = r"""<!doctype html>
       return hidden > 0 ? `${visible.join("、")} 等 ${cleanNames.length} 个` : visible.join("、");
     }
 
-    function reviewTargetListHtml(label, items) {
-      const names = Array.isArray(items)
-        ? [...new Set(items.map((item) => text(item && item.skill_id)).filter(Boolean))]
-        : [];
-      if (names.length === 0) return "";
-      const visible = names.slice(0, 6);
-      const hidden = names.length - visible.length;
+    const REVIEW_SYNC_STATES = {
+      pending: { order: 0, severity: 2, label: "待同步", title: "OpenClaw 有新版本；点同步会检查并写入共享库" },
+      ready: { order: 1, severity: 1, label: "检查通过", title: "已检查通过；点同步确认后写入共享库" },
+      changed: { order: 2, severity: 3, label: "仍在修改", title: "检查后 OpenClaw 又改过；上次同步已跳过，改完后再同步" },
+      conflict: { order: 3, severity: 5, label: "版本冲突", title: "两边都改过；同步按钮不处理，需先看差异报告" },
+      delete: { order: 4, severity: 4, label: "缺失确认", title: "需要决定恢复还是下架；同步按钮不处理" },
+      deferred: { order: 5, severity: 0, label: "已搁置", title: "首页已搁置；不进入同步" },
+    };
+    const REVIEW_SYNC_DEFERRED_VISIBLE = 3;
+
+    function reviewSyncState(item) {
+      if (isDeferredSourceChange(item)) return "deferred";
+      if (item.category === "conflict" || item.status_action === "conflict") return "conflict";
+      if (reviewIsDeleteItem(item)) return "delete";
+      const result = reviewTaskResults[reviewItemKey(item)];
+      if (result && result.publishReady) return "ready";
+      if (lastSyncChangedSkillIds.has(text(item.skill_id))) return "changed";
+      return "pending";
+    }
+
+    function reviewSyncListHtml(items) {
+      const bySkill = new Map();
+      (Array.isArray(items) ? items : []).forEach((item) => {
+        const skillId = text(item && item.skill_id);
+        if (!skillId) return;
+        const state = reviewSyncState(item);
+        const current = bySkill.get(skillId);
+        if (!current || REVIEW_SYNC_STATES[state].severity > REVIEW_SYNC_STATES[current].severity) bySkill.set(skillId, state);
+      });
+      if (bySkill.size === 0) return "";
+      const entries = [...bySkill.entries()].sort((a, b) =>
+        (REVIEW_SYNC_STATES[a[1]].order - REVIEW_SYNC_STATES[b[1]].order) || a[0].localeCompare(b[0]));
+      const counts = {};
+      entries.forEach(([, state]) => { counts[state] = (counts[state] || 0) + 1; });
+      const countText = Object.keys(REVIEW_SYNC_STATES)
+        .filter((state) => counts[state])
+        .map((state) => `${REVIEW_SYNC_STATES[state].label} ${counts[state]}`)
+        .join(" · ");
+      const deferredEntries = entries.filter(([, state]) => state === "deferred");
+      const hiddenDeferred = Math.max(deferredEntries.length - REVIEW_SYNC_DEFERRED_VISIBLE, 0);
+      const visible = hiddenDeferred > 0 ? entries.slice(0, entries.length - hiddenDeferred) : entries;
       return `
-        <div class="review-targets" aria-label="${escapeHtml(label)}">
-          <div class="review-targets-label">${escapeHtml(label)}：${escapeHtml(compactSkillList(names))}</div>
+        <div class="review-targets" aria-label="同步清单">
+          <div class="review-targets-label">同步清单：${escapeHtml(countText)}</div>
           <div class="review-target-list">
-            ${visible.map((name) => `<span class="review-target-chip">${escapeHtml(name)}</span>`).join("")}
-            ${hidden > 0 ? `<span class="review-target-chip">另 ${escapeHtml(text(hidden))} 个</span>` : ""}
+            ${visible.map(([name, state]) => `
+              <span class="review-target-chip sync-${escapeHtml(state)}" title="${escapeHtml(REVIEW_SYNC_STATES[state].title)}">
+                <span class="review-target-chip-state">${escapeHtml(REVIEW_SYNC_STATES[state].label)}</span>${escapeHtml(name)}
+              </span>`).join("")}
+            ${hiddenDeferred > 0 ? `<span class="review-target-chip sync-deferred">另 ${escapeHtml(text(hiddenDeferred))} 个已搁置</span>` : ""}
           </div>
         </div>
       `;
@@ -9189,16 +9210,16 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (reviewIsSourceChangedItem(item)) {
         const result = reviewTaskResults[reviewItemKey(item)];
         if (result && result.publishReady) {
-          return `<strong>已通过检查</strong>如果 OpenClaw 已停止修改，可以保存到共享库。`;
+          return `<strong>已通过检查</strong>如果 OpenClaw 已停止修改，点上方“同步”写入共享库。`;
         }
         return `<strong>可重新检查</strong>这不是上次保存失败；OpenClaw 又产生了新版本。改完后点检查最新版本。`;
       }
       if (item.status_action === "push" || item.status_action === "push_new" || item.status_action === "local_new") {
         const result = reviewTaskResults[reviewItemKey(item)];
         if (result && result.publishReady) {
-          return `<strong>已通过检查</strong>等待上方“保存到共享库”写入共享库。`;
+          return `<strong>已通过检查</strong>点上方“同步”，预览确认后写入共享库。`;
         }
-        return `<strong>可保存</strong>先点检查；只有结果显示可以保存后，才会解锁保存到共享库。`;
+        return `<strong>待同步</strong>点上方“同步”会先检查，预览确认后写入共享库。`;
       }
       return `<strong>待判断</strong>先查看高级诊断里的状态、原因和建议动作。`;
     }
@@ -9355,22 +9376,21 @@ DASHBOARD_HTML = r"""<!doctype html>
       const actionableItems = actionableReviewItems(currentReviewQueueItems);
       const sourceChangedCount = reviewSourceChangedItems(actionableItems).length;
       const canPublishApprovedPush = Boolean(available && executorAllowPublish && (lastDryRunSafe || reviewReady));
-      const reviewDryRunAll = $("review-dry-run-all");
-      const reviewPublishAll = $("review-publish-all");
+      const reviewSyncAll = $("review-sync-all");
       const simpleDryRun = $("simple-dry-run");
       const simplePublish = $("simple-publish");
       const simpleDeferSource = $("simple-defer-source");
       const simpleActionHint = $("simple-action-disabled-note");
-      if (reviewDryRunAll) reviewDryRunAll.disabled = !available || actionSkills.length === 0;
-      if (reviewPublishAll) {
-        reviewPublishAll.disabled = !canPublishApprovedPush;
-        reviewPublishAll.title = !available
+      if (reviewSyncAll) {
+        const syncCount = publishCandidateSkillIds().length;
+        reviewSyncAll.disabled = !available || executorBusy || syncCount === 0;
+        reviewSyncAll.title = !available
           ? "本机助手未在线"
-          : (!executorAllowPublish
-            ? "保存开关未打开；当前只能检查，不能写入共享库"
-            : (!reviewReady && !lastDryRunSafe
-              ? "请先完成检查，确认结果显示可以保存"
-              : "写入共享库"));
+          : (syncCount === 0
+            ? "没有待同步的 skill；版本冲突和缺失确认需在清单中单独处理"
+            : (!executorAllowPublish
+              ? "保存开关未打开；点击只会检查，不会写入共享库"
+              : "先检查，预览确认后写入共享库"));
       }
       if (simpleDryRun) simpleDryRun.disabled = !available || actionSkills.length === 0;
       if (simplePublish) {
@@ -9381,7 +9401,7 @@ DASHBOARD_HTML = r"""<!doctype html>
             : (!executorAllowPublish ? "保存开关未打开" : (sourceChangedCount > 0 && !reviewReady && !lastDryRunSafe ? "先检查最新版本" : "保存到共享库")),
           !available
             ? "本机助手在线后可继续。"
-            : (!executorAllowPublish ? "当前只能检查。" : "会要求输入 PUBLISH。"),
+            : (!executorAllowPublish ? "当前只能检查。" : "检查后预览确认再写入。"),
         );
         simplePublish.disabled = !canPublishApprovedPush;
         simplePublish.title = !available
@@ -9412,7 +9432,7 @@ DASHBOARD_HTML = r"""<!doctype html>
           hint = "已检查通过，但保存开关未打开；当前只能检查，不能写共享库。";
           hintKind = "warn";
         } else if (canPublishApprovedPush) {
-          hint = "下一步：点“保存到共享库”；输入 PUBLISH 后才会写入。";
+          hint = "下一步：点“保存到共享库”；会先检查，预览确认后才写入。";
           hintKind = "ready";
         } else {
           hint = "先完成检查；通过后这里会提示可以保存。";
@@ -9708,7 +9728,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (currentReviewQueueItems.length > 0) renderReviewProgress(currentReviewQueueItems);
     }
 
-    async function runApprovedPushRequest(mode, actionSkills, confirmWord) {
+    async function runApprovedPushRequest(mode, actionSkills, confirmWord, expectedLocalHashes) {
       const endpoint = mode === "publish" ? "/api/openclaw-approved-push-publish" : "/api/openclaw-approved-push-dry-run";
       const response = await fetch(`${EXECUTOR_URL}${endpoint}`, {
         method: "POST",
@@ -9717,10 +9737,50 @@ DASHBOARD_HTML = r"""<!doctype html>
         body: JSON.stringify({
           skill_ids: actionSkills,
           confirm: confirmWord,
+          expected_local_hashes: expectedLocalHashes,
         }),
       });
       const payload = await response.json();
       return { response, payload };
+    }
+
+    function syncPreviewFromDryRun(payload, requestedSkills) {
+      const result = (payload && payload.result) || {};
+      const approved = Array.isArray(payload && payload.approved_skill_ids) ? payload.approved_skill_ids.map(text).filter(Boolean) : [];
+      const hashes = {};
+      (Array.isArray(result.items) ? result.items : []).forEach((item) => {
+        const skillId = text(item && item.skill_id);
+        if (skillId && approved.includes(skillId) && item.local_hash) hashes[skillId] = String(item.local_hash);
+      });
+      const upload = result.upload_preview || {};
+      return {
+        requested: requestedSkills,
+        approved,
+        hashes,
+        changed: Array.isArray(payload && payload.changed_skipped_skill_ids) ? payload.changed_skipped_skill_ids.map(text).filter(Boolean) : [],
+        stale: Array.isArray(payload && payload.stale_skipped_skill_ids) ? payload.stale_skipped_skill_ids.map(text).filter(Boolean) : [],
+        files: Number(upload.files || 0),
+        bytes: Number(upload.bytes || 0),
+      };
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function syncPreviewConfirmText(preview) {
+      const lines = [
+        `将写入共享库（${preview.approved.length} 个）：`,
+        ...preview.approved.map((skillId) => `  · ${skillId}`),
+      ];
+      if (preview.files > 0) lines.push(`上传：${preview.files} 个文件，约 ${formatBytes(preview.bytes)}`);
+      if (preview.changed.length) lines.push("", `本次跳过（OpenClaw 仍在修改）：${preview.changed.join("、")}`);
+      if (preview.stale.length) lines.push("", `本次跳过（已不再是待同步项）：${preview.stale.join("、")}`);
+      lines.push("", "只会写入上面检查过的版本；写入期间如果又有修改，对应 skill 会自动跳过。", "确认写入共享库？");
+      return lines.join("\n");
     }
 
     function syncReviewTaskResultForActionSkills(actionSkills) {
@@ -9736,8 +9796,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     async function runExecutorAction(mode) {
-      const actionSkills = currentActionSkillIds();
-      const requestedSkillsLabel = compactSkillList(actionSkills);
+      if (mode === "sync") mode = executorAllowPublish ? "publish" : "dry_run";
+      let actionSkills = currentActionSkillIds();
+      let requestedSkillsLabel = compactSkillList(actionSkills);
       if (!executorAvailable) {
         showExecutorOutput("本机助手未连接，无法执行检查或保存。按钮没有真正执行，请先确认本机助手在线。");
         setReviewFeedback("yellow", "本机助手未连接", `请先让${currentClientHelperName()}在线；状态已重新刷新。`);
@@ -9752,7 +9813,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         return;
       }
       const isPublish = mode === "publish";
-      const shouldRunDryRunFirst = isPublish && !allReviewPublishCandidatesReady();
+      let expectedLocalHashes;
+      let previewChanged = [];
       if (isPublish) {
         if (!executorAllowPublish) {
           showExecutorOutput("当前没有打开保存开关，所以只能检查，不能写入共享库。");
@@ -9760,50 +9822,61 @@ DASHBOARD_HTML = r"""<!doctype html>
           setExecutorButtons(executorAvailable);
           return;
         }
-        if (shouldRunDryRunFirst) {
-          setReviewFeedback("yellow", `先自动检查：${requestedSkillsLabel}`, "保存前先做一次公开校验，确认结果稳定后再写入共享库。");
-          setExecutorStatus("dry-run", `正在检查 ${requestedSkillsLabel}，请稍等。`, "yellow");
-          try {
-            const dryRunResult = await runApprovedPushRequest("dry_run", actionSkills);
-            const { response: dryRunResponse, payload: dryRunPayload } = dryRunResult;
-            lastDryRunSafe = Boolean(dryRunPayload.ok && dryRunPayload.safe_to_push);
-            showExecutorOutput(formatExecutorResult(dryRunPayload));
-            if (!dryRunResponse.ok) {
-              if (executorPayloadIsStaleSourceChange(dryRunPayload)) {
-                await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
-                await refresh(true);
-                setExecutorStatus("needs review", staleSourceChangeDetail(dryRunPayload), "yellow");
-                setReviewFeedback("yellow", "OpenClaw 仍在修改", staleSourceChangeDetail(dryRunPayload));
-                return;
-              }
-              throw new Error(executorErrorDetail(dryRunPayload));
-            }
-            if (dryRunPayload.ok && dryRunPayload.safe_to_push) {
-              syncReviewTaskResultForActionSkills(actionSkills);
-              setExecutorStatus("check ready", `${requestedSkillsLabel} 检查通过，可继续保存。`, "green");
-              setReviewFeedback("green", `检查通过：${requestedSkillsLabel}`, "你可以继续保存到共享库。");
-              lastDryRunSafe = true;
-              if (!allReviewPublishCandidatesReady()) {
-                setExecutorStatus("needs review", "部分 skill 检查仍待确认", "yellow");
-                setReviewFeedback("yellow", "暂未全部可保存", "有部分技能仍在变化，请继续检查后再保存。");
-                return;
-              }
-            } else {
-              setReviewFeedback("yellow", "不能保存", "检查返回未通过；先按提示处理后再试。");
+        let preview;
+        executorBusy = true;
+        setExecutorButtons(false);
+        setReviewFeedback("yellow", `正在检查：${requestedSkillsLabel}`, "同步第 1 步：只读检查，不会写入共享库。");
+        setExecutorStatus("dry-run", `正在检查 ${requestedSkillsLabel}，请稍等。`, "yellow");
+        try {
+          const { response: dryRunResponse, payload: dryRunPayload } = await runApprovedPushRequest("dry_run", actionSkills);
+          showExecutorOutput(formatExecutorResult(dryRunPayload));
+          if (!dryRunResponse.ok) {
+            lastDryRunSafe = false;
+            if (executorPayloadIsStaleSourceChange(dryRunPayload)) {
+              await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "检查被拒绝；这里只重新读取 OpenClaw 最新队列。");
+              await refresh(true);
+              setExecutorStatus("needs review", staleSourceChangeDetail(dryRunPayload), "yellow");
+              setReviewFeedback("yellow", "OpenClaw 仍在修改", staleSourceChangeDetail(dryRunPayload));
               return;
             }
-          } catch (err) {
-            setExecutorStatus("failed", "检查失败，请查看输出。", "red");
-            setReviewFeedback("red", "检查失败", String(err));
-            return;
+            throw new Error(executorErrorDetail(dryRunPayload));
           }
+          preview = syncPreviewFromDryRun(dryRunPayload, actionSkills);
+        } catch (err) {
+          setExecutorStatus("failed", "检查失败，请查看输出。", "red");
+          setReviewFeedback("red", "检查失败", String(err));
+          return;
+        } finally {
+          executorBusy = false;
+          setExecutorButtons(executorAvailable);
         }
-        const typed = window.prompt("保存会写入共享库。请输入 PUBLISH 确认：");
-        if (typed !== "PUBLISH") {
-          showExecutorOutput("已取消保存。");
-          setReviewFeedback("yellow", "保存已取消", "没有写入共享库，待确认项仍保留。");
+        lastSyncChangedSkillIds = new Set(preview.changed);
+        previewChanged = preview.changed;
+        syncReviewTaskResultForActionSkills(preview.approved);
+        if (preview.approved.length === 0) {
+          lastDryRunSafe = false;
+          const skipped = [...preview.changed, ...preview.stale];
+          setExecutorStatus("no changes", "检查后没有可写入的 skill。", "yellow");
+          setReviewFeedback(
+            "yellow",
+            "没有可写入的 skill",
+            skipped.length
+              ? `本批 ${preview.requested.length} 个都已跳过：${compactSkillList(skipped)}。通常是已保存、已恢复、仍在修改，或变成了版本差异。`
+              : "检查返回 approved=0；请看当前确认分类。",
+          );
+          await refresh(true);
           return;
         }
+        lastDryRunSafe = true;
+        if (!window.confirm(syncPreviewConfirmText(preview))) {
+          showExecutorOutput("已取消同步。");
+          setExecutorStatus("check ready", `${compactSkillList(preview.approved)} 检查通过，未写入。`, "green");
+          setReviewFeedback("yellow", "同步已取消", "检查结果已保留；没有写入共享库。");
+          return;
+        }
+        actionSkills = preview.approved;
+        requestedSkillsLabel = compactSkillList(actionSkills);
+        expectedLocalHashes = preview.hashes;
       }
       executorBusy = true;
       setExecutorButtons(false);
@@ -9813,7 +9886,8 @@ DASHBOARD_HTML = r"""<!doctype html>
           const request = await runApprovedPushRequest(
             isPublish ? "publish" : "dry_run",
             actionSkills,
-            isPublish ? "PUBLISH" : undefined
+            isPublish ? "PUBLISH" : undefined,
+            isPublish ? expectedLocalHashes : undefined,
           );
           const response = request.response;
           const payload = request.payload;
@@ -9828,10 +9902,14 @@ DASHBOARD_HTML = r"""<!doctype html>
               const resultPayload = payload.result || {};
               const requested = Array.isArray(resultPayload.requested_skill_ids) ? resultPayload.requested_skill_ids : actionSkills;
               const skipped = Array.isArray(resultPayload.stale_skipped_skill_ids) ? resultPayload.stale_skipped_skill_ids : [];
+              const changedSkipped = Array.isArray(payload.changed_skipped_skill_ids) ? payload.changed_skipped_skill_ids.map(text).filter(Boolean) : [];
+              lastSyncChangedSkillIds = new Set([...previewChanged, ...changedSkipped]);
               const staleCount = skipped.filter(Boolean).length;
-              const staleHint = staleCount > 0
+              const staleHint = (staleCount > 0
                 ? ` 本批操作共 ${requested.length} 个，其中 ${staleCount} 个当前不再是可保存更新（已恢复、已保存，或已变为其他状态）：${compactSkillList(skipped)}。`
-                : "";
+                : "") + (changedSkipped.length
+                ? ` 检查后 OpenClaw 又改过，已跳过：${compactSkillList(changedSkipped)}；改完后再点同步。`
+                : "");
               await refreshOpenclawPeerStatus("正在刷新 OpenClaw 状态", "保存已被拒绝；这里只重新读取 OpenClaw 最新队列。");
               await refresh(true);
               const safeNoWriteNote = publishReason
@@ -9857,31 +9935,41 @@ DASHBOARD_HTML = r"""<!doctype html>
               });
               renderReviewQueue(currentReviewQueueItems);
               rerenderTopActionPanel();
-              setReviewFeedback("green", `检查通过：${requestedSkillsLabel}`, "现在可以点“保存到共享库”完成同步。");
+              setReviewFeedback("green", `检查通过：${requestedSkillsLabel}`, "现在可以点“同步”写入共享库。");
             }
           if (isPublish) {
+            const writtenSkills = Array.isArray(payload.approved_skill_ids) && payload.approved_skill_ids.length
+              ? payload.approved_skill_ids.map(text).filter(Boolean)
+              : actionSkills;
+            const changedSkipped = Array.isArray(payload.changed_skipped_skill_ids) ? payload.changed_skipped_skill_ids.map(text).filter(Boolean) : [];
+            const writtenLabel = compactSkillList(writtenSkills);
+            const changedNote = changedSkipped.length
+              ? ` 检查后 OpenClaw 又改过，已跳过：${compactSkillList(changedSkipped)}；改完后再点同步。`
+              : "";
             lastPublishReceipt = {
-              skill_ids: actionSkills,
+              skill_ids: writtenSkills,
               approved: payload.approved,
               approved_skill_ids: payload.approved_skill_ids,
               published_at: new Date().toISOString(),
             };
-            const resolution = await waitForSkillsResolution(actionSkills, "保存到共享库");
+            const resolution = await waitForSkillsResolution(writtenSkills, "保存到共享库");
             lastDryRunSafe = false;
             reviewTaskResults = {};
+            lastSyncChangedSkillIds = new Set([...previewChanged, ...changedSkipped]);
             const remaining = currentReviewQueueItems.length;
-            const relatedRemaining = reviewItemsForSkills(actionSkills);
-            const unrelatedRemaining = currentReviewQueueItems.filter((item) => !actionSkills.includes(text(item.skill_id)));
+            const relatedRemaining = reviewItemsForSkills(writtenSkills);
+            const unrelatedRemaining = currentReviewQueueItems.filter((item) => !writtenSkills.includes(text(item.skill_id)));
             const unrelatedNames = compactSkillList(unrelatedRemaining.map((item) => item.skill_id));
             const publishedCleanly = resolution.done && relatedRemaining.length === 0;
-            const relatedFeedback = publishRemainingFeedback(requestedSkillsLabel, relatedRemaining);
-            const detail = publishedCleanly && remaining === 0
-              ? `已保存 ${requestedSkillsLabel}，当前没有确认项。`
+            const relatedFeedback = publishRemainingFeedback(writtenLabel, relatedRemaining);
+            const detail = (publishedCleanly && remaining === 0
+              ? `已保存 ${writtenLabel}，当前没有确认项。`
               : (publishedCleanly
-                ? `已保存 ${requestedSkillsLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批保存失败。`
-                : relatedFeedback.detail);
+                ? `已保存 ${writtenLabel}；剩余 ${remaining} 个是其他或新检测到的确认项：${unrelatedNames}。这不是同一批保存失败。`
+                : relatedFeedback.detail)) + changedNote;
+            renderReviewQueue(currentReviewQueueItems);
             setReviewFeedback(
-              publishedCleanly && remaining === 0 ? "green" : "yellow",
+              publishedCleanly && remaining === 0 && !changedNote ? "green" : "yellow",
               publishedCleanly ? "本次保存已完成" : relatedFeedback.title,
               detail,
             );
