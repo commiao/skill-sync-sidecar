@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PYTHONPATH_VALUE="${PYTHONPATH:-$ROOT_DIR/src}"
-PYCACHE_PREFIX="${PYTHONPYCACHEPREFIX:-/private/tmp/skill-sync-pycache}"
+PYCACHE_PREFIX="${PYTHONPYCACHEPREFIX:-${TMPDIR:-/tmp}/skill-sync-pycache}"
 PROFILE="${1:-full}"
 
 case "$PROFILE" in
