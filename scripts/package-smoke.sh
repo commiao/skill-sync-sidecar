@@ -29,7 +29,7 @@ EOF
 
 cd "$ROOT_DIR"
 find "$OUT_DIR" -maxdepth 1 -name 'skill_sync_sidecar-*.whl' -delete
-"$PYTHON_BIN" -m pip wheel --no-deps --no-build-isolation . -w "$OUT_DIR"
+"$PYTHON_BIN" -m pip wheel --no-deps . -w "$OUT_DIR"
 
 wheel="$(ls -t "$OUT_DIR"/skill_sync_sidecar-*.whl | head -n 1)"
 case "$wheel" in
