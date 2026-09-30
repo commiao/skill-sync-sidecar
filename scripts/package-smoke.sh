@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/dist}"
-WORK_DIR="${WORK_DIR:-/private/tmp/skill-sync-package-smoke}"
+WORK_DIR="${WORK_DIR:-${TMPDIR:-/tmp}/skill-sync-package-smoke}"
 export PIP_NO_CACHE_DIR=1
 EXPECTED_VERSION="$("$PYTHON_BIN" - <<'PY'
 import configparser
