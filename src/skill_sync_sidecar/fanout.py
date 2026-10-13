@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 import shutil
@@ -25,7 +26,7 @@ from typing import Dict, Iterable, List, Optional, Sequence
 from .config import ConfigError, LEGACY_LOCAL_ROOT, _read_config, default_config_path, sidecar_state_dir
 from .model import SkillRecord
 from .protect import move_path, protect_skill_dirs, remove_path
-from .scanner import scan_roots, scan_skill
+from .scanner import scan_roots
 
 HOME = Path.home()
 
@@ -117,10 +118,19 @@ def _within(path: Path, root: Path) -> bool:
 
 
 def _hash_of(path: Path) -> Optional[str]:
+    """整树哈希：技能自身 + 嵌套子技能。
+
+    scanner 的 content_hash 不含嵌套子技能（如 gstack/ 下那批），只比它会把子技能
+    改过的复制品判成「一致」，复制模式就永远不更新了。
+    """
     resolved = path.resolve()
     if not (resolved / "SKILL.md").is_file():
         return None
-    return scan_skill("fanout", resolved, resolved / "SKILL.md").content_hash
+    pairs = sorted(
+        (str(skill.path.relative_to(resolved)), skill.content_hash)
+        for skill in scan_roots([f"fanout={resolved}"]).skills
+    )
+    return hashlib.sha256(json.dumps(pairs).encode("utf-8")).hexdigest()
 
 
 def _skill_decision(skill: SkillRecord, canonical: Path, tool: FanoutTool, entry: Path) -> Optional[str]:
@@ -140,11 +150,12 @@ def _skill_decision(skill: SkillRecord, canonical: Path, tool: FanoutTool, entry
 
 def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTool, ledger: Dict[str, str]) -> Dict[str, object]:
     source = skill.path.resolve()
+    canonical_hash = _hash_of(source)
     item: Dict[str, object] = {
         "name": entry.name,
         "skill_id": skill.skill_id,
         "risk_level": skill.risk_level,
-        "content_hash": skill.content_hash,
+        "content_hash": canonical_hash,
         "source_path": str(source),
     }
     if not entry.exists() and not entry.is_symlink():
@@ -163,7 +174,7 @@ def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTo
         if not adoptable:
             item["action"] = "foreign_link"
             return item
-        same = _hash_of(entry) == skill.content_hash
+        same = _hash_of(entry) == canonical_hash
         item["action"] = ("relink" if tool.mode == "link" else "replace_link_with_copy") if same else "conflict"
         if not same:
             item["reason"] = "linked content differs from canonical"
@@ -174,12 +185,12 @@ def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTo
         return item
     current = _hash_of(entry)
     if tool.mode == "link":
-        item["action"] = "replace_dir_with_link" if current == skill.content_hash else "conflict"
+        item["action"] = "replace_dir_with_link" if current == canonical_hash else "conflict"
         if item["action"] == "conflict":
             item["reason"] = "existing directory differs from canonical"
         return item
     recorded = ledger.get(entry.name)
-    if current == skill.content_hash:
+    if current == canonical_hash:
         item["action"] = "ok" if recorded == current else "adopt"
     elif recorded is not None and recorded == current:
         item["action"] = "update_copy"
@@ -517,3 +528,95 @@ def fanout_protect_canonical(config_path: Optional[Path] = None) -> bool:
     if not isinstance(value, bool):
         raise ConfigError("sidecar config fanout.protect_canonical must be true or false")
     return value
+
+
+# ---- daemon 钩子（PR C）--------------------------------------------------------
+#
+# daemon 每轮同步后调 FanoutScheduler.maybe_run()。为免每 5 分钟把所有工具目录
+# 哈希一遍，只在以下情况才真的扇出：正本指纹变了（拉到新版、本地安装）、距上次
+# 超过 interval（修复有人手动动过工具目录）、或上次有失败项。扇出出错只记进本轮
+# 结果，不影响同步本身。
+
+
+def canonical_fingerprint(canonical_root: Path) -> str:
+    """正本里所有技能（含嵌套子技能）的路径与哈希；任何一个变了指纹就变。"""
+    canonical = canonical_root.expanduser().resolve()
+    pairs = sorted(
+        (str(skill.path.resolve().relative_to(canonical)), skill.content_hash)
+        for skill in scan_roots([f"canonical={canonical}"]).skills
+    )
+    return hashlib.sha256(json.dumps(pairs).encode("utf-8")).hexdigest()
+
+
+class FanoutScheduler:
+    def __init__(
+        self,
+        canonical_root: Path,
+        *,
+        yes: bool,
+        interval_seconds: float = 3600.0,
+        protect: bool = True,
+        state_dir: Optional[Path] = None,
+        runner=None,
+        planner=None,
+        clock=time.monotonic,
+    ) -> None:
+        self.canonical = canonical_root.expanduser()
+        self.yes = yes
+        self.interval_seconds = interval_seconds
+        self.protect = protect
+        self.state_dir = state_dir
+        self.runner = runner or run_fanout
+        self.planner = planner or build_fanout_plan
+        self.clock = clock
+        self.last_fingerprint: Optional[str] = None
+        self.last_at: Optional[float] = None
+        self.last_failed = False
+
+    def _due(self, fingerprint: str) -> Optional[str]:
+        if self.last_at is None:
+            return "first run"
+        if self.last_failed:
+            return "previous run had failures"
+        if fingerprint != self.last_fingerprint:
+            return "canonical changed"
+        if self.clock() - self.last_at >= self.interval_seconds:
+            return "periodic check"
+        return None
+
+    def maybe_run(self) -> Dict[str, object]:
+        try:
+            fingerprint = canonical_fingerprint(self.canonical)
+            reason = self._due(fingerprint)
+            if reason is None:
+                return {"status": "skipped", "reason": "canonical unchanged"}
+            if not self.yes:
+                plan = self.planner(self.canonical)
+                changes = sum(
+                    count
+                    for tool in plan["tools"]
+                    for action, count in tool.get("summary", {}).items()
+                    if action not in NOOP_ACTIONS
+                )
+                result = {"status": "planned", "reason": reason, "changes": changes}
+                failed = 0
+            else:
+                record = self.runner(self.canonical, yes=True, protect=self.protect, state_dir=self.state_dir)
+                failed = sum(len(t.get("failed", [])) for t in record["tools"])
+                result = {
+                    "status": "ran",
+                    "reason": reason,
+                    "run_id": record["run_id"],
+                    "executed": sum(len(t.get("executed", [])) for t in record["tools"]),
+                    "failed": failed,
+                    "conflicts": sum(len(t.get("conflicts", [])) for t in record["tools"]),
+                    "record_path": record["record_path"],
+                }
+        except Exception as exc:  # 扇出失败不能拖垮同步
+            self.last_failed = True
+            self.last_at = self.clock()
+            return {"status": "error", "error": f"{exc.__class__.__name__}: {exc}"}
+        self.last_fingerprint = fingerprint
+        self.last_at = self.clock()
+        self.last_failed = failed > 0
+        return result

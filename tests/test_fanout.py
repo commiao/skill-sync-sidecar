@@ -126,6 +126,18 @@ class FanoutPlanTest(unittest.TestCase):
         self.assertEqual(items["edited"]["action"], "conflict")
         self.assertEqual(items["removed"]["action"], "remove_copy")
 
+    def test_copy_mode_sees_changes_inside_nested_skills(self):
+        # scanner 的父技能哈希不含嵌套子技能；复制模式若只比它，gstack 这类技能包永远不会更新
+        manifest = {"skill_id": "bundle", "scope": "global", "targets": ["cursor"]}
+        canon = _skill(self.canonical, "bundle", manifest=manifest)
+        _skill(canon / "skills", "child", body="v2")
+        copy = _skill(self.tool_root, "bundle", manifest=manifest)
+        _skill(copy / "skills", "child", body="v1")
+        cursor = FanoutTool("cursor", self.tool_root, "copy", frozenset({"cursor"}))
+        ledger = {"bundle": fanout._hash_of(copy)}
+        items = _items(self.plan(tools=[cursor], ledgers={"cursor": ledger}), "cursor")
+        self.assertEqual(items["bundle"]["action"], "update_copy")
+
     def test_plan_writes_nothing(self):
         _skill(self.canonical, "a", manifest={"skill_id": "a", "scope": "global", "targets": ["codex"]})
         before = sorted(p.name for p in self.tool_root.iterdir())

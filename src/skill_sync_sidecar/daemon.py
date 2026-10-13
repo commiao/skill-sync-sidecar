@@ -30,6 +30,7 @@ def run_sync_daemon(
     state_file: Optional[Path] = None,
     base_record_file: Optional[Path] = None,
     sleep_fn: Callable[[float], None] = time.sleep,
+    fanout: Optional[Callable[[], Dict[str, object]]] = None,
 ) -> Dict[str, object]:
     cycles: List[Dict[str, object]] = []
     count = 0
@@ -73,6 +74,9 @@ def run_sync_daemon(
             cycle = _cycle_summary(result)
         except Exception as exc:
             cycle = _cycle_error_summary(exc)
+        # 同步出错时正本状态不确定，不扇出；blocked / dry_run 表示这轮没写正本，它仍是一致的
+        if fanout is not None and cycle["status"] in {"complete", "blocked", "dry_run"}:
+            cycle["fanout"] = fanout()
         count += 1
         cycles.append(cycle)
         _write_state_file(

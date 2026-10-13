@@ -217,6 +217,10 @@ python3 -m skill_sync_sidecar fanout-rollback --record <run record> --dry-run   
 
 `--yes` takes a per-tool lock, re-plans inside it, moves anything it replaces to `fanout/backups/<run_id>/` under the sidecar state directory (the last 5 runs are kept; nothing is written into the tool root besides the entries themselves), and writes `fanout/runs/<run_id>.json`. Rollback undoes a run in reverse order and skips entries that changed after the run. Re-running is idempotent.
 
+**From the daemon.** `sync-daemon --fanout` runs fanout after every cycle that leaves the canonical root consistent (`complete`, `blocked` or `dry_run`, not `error`), but only when it is due: the canonical fingerprint changed (every skill, nested ones included), `--fanout-interval-seconds` (default 3600) passed, or the previous run had failures. With `--dry-run` it only plans. A fanout failure is recorded in the cycle (`cycles[].fanout` in the state file) and never fails the sync. It is off unless `--fanout` is passed.
+
+Content comparisons in fanout hash the whole tree, nested skills included; the scanner's per-skill hash leaves nested skills out, which would make a stale Cursor copy of a bundle like `gstack` look current.
+
 **Read-only canonical.** Once any tool links to the canonical root, an edit made "in the tool" is an edit to the canonical copy, which sync-daemon pushes to the central library within minutes. So after a run that leaves links in place, the canonical skill directories and files lose their write bits: an in-place edit fails with a permission error instead of spreading. The sidecar lifts the protection itself when it replaces or moves a skill. Disable with `"fanout": {"protect_canonical": false}`.
 
 - Tools: Codex, Claude Code, Qoder, DeepSeek Harness and (while cc-switch is retired) `~/.cc-switch/skills` get a **symlink** to the canonical skill directory; Cursor gets a **copy** until it is verified to load symlinked skills. Override per tool with `fanout.tools.<id>.mode` (`link`/`copy`) or `"enabled": false` in the sidecar config.
