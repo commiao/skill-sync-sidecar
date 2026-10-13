@@ -90,6 +90,8 @@ python3 -m skill_sync_sidecar local-skill-publish \
   --dry-run
 ```
 
+Tool target paths come from the code that runs, so `local-skill-install --yes` refuses to run from a development checkout. Run it from the installed release (`cd ~/.local/share/skill-sync-sidecar/current && PYTHONPATH=src python3 -m skill_sync_sidecar ...`); the first output line, `code: ...`, says which code is running. `--allow-dev-tree` overrides this for a checkout you mean to use.
+
 ## Install
 
 From a checked-out repository:
