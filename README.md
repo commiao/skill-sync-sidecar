@@ -182,6 +182,16 @@ The sidecar scans existing local roots when they exist:
 - `~/.qoder/skills`
 - `~/.dsh/skills`
 
+## Canonical Local Root
+
+The sync daemon treats one directory as this device's canonical copy. It is `local_root` in the sidecar config, and `~/.cc-switch/skills` on a device that has not migrated. The sidecar is meant to replace cc-switch, so the canonical copy moves to the sidecar's own root (`~/Library/Application Support/skill-sync-sidecar/skills` on macOS, `$XDG_DATA_HOME/skill-sync-sidecar/skills` elsewhere):
+
+```bash
+python3 -m skill_sync_sidecar local-root-migrate --dry-run   # then --yes
+```
+
+`--yes` copies the old root, then checks that every skill's `content_hash` matches and that the sync actions against the current central snapshot and base record are the same as for the old root. Only then does it write `local_root`; on any mismatch it deletes the copy and leaves the config alone. Backups and old base records stay in the old root. It does not touch launchd: services that pass `--local-root` explicitly keep the old root until they are switched, and `ops-status`, `dashboard`, `publish-peer-status` and `local-skill-publish` use the configured root only when `--local-root` is omitted. After migration, `local-skill-install` also writes into the canonical root (tool id `sidecar`).
+
 ## Sync Boundary
 
 The sync unit is a skill package, not an entire application state. API keys, accounts, local provider settings, and tool-specific runtime caches are out of scope.

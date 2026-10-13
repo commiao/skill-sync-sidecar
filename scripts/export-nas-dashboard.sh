@@ -4,7 +4,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python_bin="${PYTHON:-python3}"
 out_dir="${SKILL_SYNC_NAS_DASHBOARD_OUT:-$HOME/public-sync/skill-sync-sidecar-dashboard}"
-local_root="${SKILL_SYNC_LOCAL_ROOT:-$HOME/.cc-switch/skills}"
+# 不设 SKILL_SYNC_LOCAL_ROOT 时用配置里的本机正本（未迁移的机器仍是 ~/.cc-switch/skills）
+local_root="${SKILL_SYNC_LOCAL_ROOT:-$(PYTHONPATH="$repo_root/src" "$python_bin" -c 'from skill_sync_sidecar.config import configured_local_root; print(configured_local_root())')}"
 remote_snapshot="${SKILL_SYNC_REMOTE_SNAPSHOT:-$HOME/public-sync/skill-sync-sidecar-dev/current-mac}"
 app_dir="$HOME/Library/Application Support/skill-sync-sidecar"
 base_record="${SKILL_SYNC_BASE_RECORD:-$app_dir/base-record.json}"
