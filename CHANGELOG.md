@@ -13,6 +13,7 @@ All notable changes to Skill Sync Sidecar are documented here.
 - Sidecar-owned WebDAV config (`config-init --from-cc-switch`, `--webdav-config`): URL/username in the sidecar config, password from Keychain, env or a mode-600 file. Falls back to cc-switch while no config exists (T-0260 step 1).
 - Configurable canonical local root (`local_root` in the sidecar config) and `local-root-migrate --dry-run|--yes`, which copies `~/.cc-switch/skills` to the sidecar's own root and switches the config only after per-skill hashes and sync actions match (T-0260 step 2).
 - `remote_snapshot`, `remote_prefix` and `base_record` in the sidecar config, used by the operator executor instead of hardcoded `~/public-sync/...`, prefix and base-record paths; defaults are unchanged (T-0260 step 3).
+- `fanout --dry-run`: read-only plan for placing canonical skills into each tool (symlinks; copies for Cursor), adopting same-content entries and never touching foreign or diverged ones (T-0260 step 4, PR A).
 
 ### Changed
 
