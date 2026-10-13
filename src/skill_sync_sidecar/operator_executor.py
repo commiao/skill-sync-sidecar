@@ -79,7 +79,7 @@ def run_openclaw_approved_push_batch(
     refresh_peer_status: bool = False,
     expected_local_hashes: Optional[dict] = None,
 ) -> dict:
-    repo = repo_root.expanduser().resolve()
+    repo = repo_root.expanduser().absolute()
     script = repo / "scripts" / "openclaw-approved-push-batch.sh"
     if not script.exists():
         raise OperatorExecutorError(f"approved-push helper not found: {script}")
@@ -138,7 +138,7 @@ def run_openclaw_approved_push_batch(
 
 
 def run_openclaw_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 300) -> dict:
-    repo = repo_root.expanduser().resolve()
+    repo = repo_root.expanduser().absolute()
     script = repo / "scripts" / "publish-openclaw-peer-status.sh"
     if not script.exists():
         raise OperatorExecutorError(f"OpenClaw peer status helper not found: {script}")
@@ -165,7 +165,7 @@ def run_openclaw_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 
 
 
 def run_mac_peer_status_refresh(repo_root: Path, *, timeout_seconds: int = 300) -> dict:
-    repo = repo_root.expanduser().resolve()
+    repo = repo_root.expanduser().absolute()
     script = repo / "scripts" / "publish-mac-peer-status.sh"
     if not script.exists():
         raise OperatorExecutorError(f"Mac peer status helper not found: {script}")
@@ -391,7 +391,7 @@ def run_openclaw_central_restore(
 ) -> dict:
     if yes and not allow_local_writes:
         raise OperatorExecutorError("OpenClaw restore is disabled; start operator-executor with --allow-local-writes")
-    repo = repo_root.expanduser().resolve()
+    repo = repo_root.expanduser().absolute()
     script = repo / "scripts" / "openclaw-restore-from-central.sh"
     if not script.exists():
         raise OperatorExecutorError(f"OpenClaw restore helper not found: {script}")
@@ -454,7 +454,7 @@ def run_openclaw_conflict_package(
     *,
     timeout_seconds: int = 900,
 ) -> dict:
-    repo = repo_root.expanduser().resolve()
+    repo = repo_root.expanduser().absolute()
     script = repo / "scripts" / "openclaw-conflict-package.sh"
     if not script.exists():
         raise OperatorExecutorError(f"OpenClaw conflict package helper not found: {script}")
@@ -661,7 +661,10 @@ def _tail(text: str, *, max_chars: int = 6000) -> str:
 
 
 def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publish: bool = False, allow_local_writes: bool = False) -> None:
-    repo = repo_root.expanduser().resolve()
+    # 不 resolve()：launchd 传的是 ~/.local/share/skill-sync-sidecar/current，
+    # resolve 会把启动那一刻的 releases/<sha> 钉进这个常驻进程。发布清理掉那个目录后，
+    # 每个要调 scripts/ 的接口都报 helper not found（2026-10-13 central-deprecate 两次）。
+    repo = repo_root.expanduser().absolute()
 
     class OperatorExecutorHandler(BaseHTTPRequestHandler):
         server_version = "SkillSyncOperatorExecutor/0"
