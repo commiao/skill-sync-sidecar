@@ -15,7 +15,7 @@ from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execu
 from .blocked_report import build_blocked_report
 from .config import ConfigError, configured_local_root, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings, sidecar_skills_root
 from .local_root import LocalRootMigrationError, migrate_local_root
-from .fanout import FanoutError, build_fanout_plan, fanout_protect_canonical, rollback_fanout, run_fanout
+from .fanout import FanoutError, FanoutScheduler, build_fanout_plan, fanout_protect_canonical, rollback_fanout, run_fanout
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
@@ -562,6 +562,8 @@ def build_parser() -> argparse.ArgumentParser:
     sync_daemon.add_argument("--continue-on-blocked", action="store_true", help="Keep polling when a cycle is blocked.")
     sync_daemon.add_argument("--state-file", help="Write latest daemon status JSON to this path after every cycle.")
     sync_daemon.add_argument("--base-record-file", help="Copy each successful apply/push base record to this stable path for future cycles.")
+    sync_daemon.add_argument("--fanout", action="store_true", help="After each cycle, place the local root into tools (see fanout) when it changed, hourly, or after a failed run. With --dry-run only plans.")
+    sync_daemon.add_argument("--fanout-interval-seconds", type=float, default=3600.0, help="Re-run fanout at least this often even if the local root did not change.")
     sync_daemon_mode = sync_daemon.add_mutually_exclusive_group(required=True)
     sync_daemon_mode.add_argument("--dry-run", action="store_true", help="Poll and plan without changing local or remote skill contents.")
     sync_daemon_mode.add_argument("--yes", action="store_true", help="Apply supported pull/push actions when each cycle is safe.")
@@ -1922,6 +1924,14 @@ def cmd_sync_daemon(args: argparse.Namespace) -> int:
         if args.yes:
             guard_http_upload(args)
         remote = open_remote_from_args(args)
+        scheduler = None
+        if args.fanout:
+            scheduler = FanoutScheduler(
+                local_root,
+                yes=args.yes,
+                interval_seconds=args.fanout_interval_seconds,
+                protect=fanout_protect_canonical(),
+            )
         result = run_sync_daemon(
             local_root,
             remote,
@@ -1940,6 +1950,7 @@ def cmd_sync_daemon(args: argparse.Namespace) -> int:
             stop_on_blocked=not args.continue_on_blocked,
             state_file=Path(args.state_file).expanduser() if args.state_file else None,
             base_record_file=Path(args.base_record_file).expanduser() if args.base_record_file else None,
+            fanout=scheduler.maybe_run if scheduler else None,
         )
     except (ValueError, ConfigError, RemoteError, SyncStateError, StageError, ApplyError, SyncApplyError, ConflictPackageError, TombstoneError) as exc:
         print(f"sync-daemon failed: {exc}", file=sys.stderr)
@@ -1951,7 +1962,8 @@ def cmd_sync_daemon(args: argparse.Namespace) -> int:
         print(f"status: {result['status']}")
         print(f"cycles_run: {result['cycles_run']}")
         for index, cycle in enumerate(result["cycles"], start=1):
-            print(f"cycle {index}: {cycle['status']} {cycle['summary']} blocked={cycle['blocked']}")
+            fanout_note = f" fanout={cycle['fanout']}" if cycle.get("fanout") else ""
+            print(f"cycle {index}: {cycle['status']} {cycle['summary']} blocked={cycle['blocked']}{fanout_note}")
     return 0
 
 

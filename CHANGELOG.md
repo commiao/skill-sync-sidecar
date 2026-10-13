@@ -15,6 +15,7 @@ All notable changes to Skill Sync Sidecar are documented here.
 - `remote_snapshot`, `remote_prefix` and `base_record` in the sidecar config, used by the operator executor instead of hardcoded `~/public-sync/...`, prefix and base-record paths; defaults are unchanged (T-0260 step 3).
 - `fanout --dry-run`: read-only plan for placing canonical skills into each tool (symlinks; copies for Cursor), adopting same-content entries and never touching foreign or diverged ones (T-0260 step 4, PR A).
 - `fanout --yes` and `fanout-rollback`: per-tool lock, backups and run records in the sidecar state directory, idempotent re-runs, and a read-only canonical root once tools link to it; sidecar deletes/moves lift the protection first (T-0260 step 4, PR B).
+- `sync-daemon --fanout` / `--fanout-interval-seconds`: run fanout after consistent cycles when the canonical fingerprint changes, hourly, or after failures; failures are recorded per cycle and never fail the sync. Fanout content comparisons now include nested skills (T-0260 step 4, PR C).
 
 ### Changed
 
