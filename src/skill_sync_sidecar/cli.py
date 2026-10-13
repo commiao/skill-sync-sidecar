@@ -81,6 +81,23 @@ APPLY_TARGETS = [
 ]
 TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global", "qoder-global", "deepseek-harness-global"}
 
+# 本包所在的代码根。发布产物（~/.local/share/skill-sync-sidecar/releases/<sha>）
+# 根目录有发布脚本写入的 RELEASE.json，开发检出没有 —— 它不进 git。
+# 2026-10-13：在停在 9-30 的共享树上 `PYTHONPATH=src ... local-skill-install --yes`，
+# 跑的是 #11 之前的代码，Cursor 那份被写进了内置区 ~/.cursor/skills-cursor，
+# 而 dry-run 只看 action 时看不出来。
+CODE_ROOT = Path(__file__).resolve().parents[2]
+RELEASE_META = "RELEASE.json"
+
+
+def _code_release(root: Path) -> Optional[dict]:
+    """发布产物返回 RELEASE.json 的内容；开发检出（或读不了）返回 None。"""
+    try:
+        value = json.loads((root / RELEASE_META).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -219,6 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
     local_skill_install.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
     local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, or deepseek-harness.")
     local_skill_install.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    local_skill_install.add_argument("--allow-dev-tree", action="store_true", help="Allow --yes from a development checkout instead of an installed release.")
     local_skill_install_mode = local_skill_install.add_mutually_exclusive_group(required=True)
     local_skill_install_mode.add_argument("--dry-run", action="store_true", help="Only print the install plan.")
     local_skill_install_mode.add_argument("--yes", action="store_true", help="Install into local tool roots and write backup records.")
@@ -907,6 +925,22 @@ def cmd_local_skill_analyze(args: argparse.Namespace) -> int:
 
 
 def cmd_local_skill_install(args: argparse.Namespace) -> int:
+    release = _code_release(CODE_ROOT)
+    if release is None:
+        code_label = f"development checkout {CODE_ROOT}"
+    else:
+        code_label = f"release {str(release.get('commit') or '?')[:12]} at {CODE_ROOT}"
+    if args.yes and release is None and not args.allow_dev_tree:
+        print(
+            f"local-skill-install refused: running from a {code_label}, not an installed release.\n"
+            "Tool target paths come from this code, and a stale checkout writes to the wrong places.\n"
+            "Run it from ~/.local/share/skill-sync-sidecar/current (PYTHONPATH=src), "
+            "or pass --allow-dev-tree if this checkout is intentional.",
+            file=sys.stderr,
+        )
+        return 2
+    if not args.json:
+        print(f"code: {code_label}")
     try:
         result = install_local_skill(
             Path(args.path),
