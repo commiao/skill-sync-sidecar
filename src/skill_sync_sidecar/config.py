@@ -217,3 +217,56 @@ def init_config_from_cc_switch(
     os.chmod(tmp, 0o600)
     tmp.replace(path)
     return plan
+
+
+# ---- 本机正本目录（T-0260 第 2 步：本机正本不再借用 ~/.cc-switch/skills）----
+#
+# config.json 的 local_root 指向 sidecar 自己的正本；没写（还没迁移的机器）时仍是
+# ~/.cc-switch/skills，行为与迁移前一致。迁移只能经 local-root-migrate 完成，
+# 它校验新旧两个根逐技能哈希一致后才写 local_root。
+
+LEGACY_LOCAL_ROOT = Path.home() / ".cc-switch" / "skills"
+
+
+def sidecar_skills_root() -> Path:
+    """sidecar 自有正本的默认位置（迁移目标），不代表当前生效的正本。"""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "skills"
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "share"
+    return base / "skill-sync-sidecar" / "skills"
+
+
+def _read_config(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"sidecar config is not valid JSON: {path}") from exc
+    if not isinstance(data, dict):
+        raise ConfigError(f"sidecar config must be a JSON object: {path}")
+    return data
+
+
+def configured_local_root(config_path: Optional[Path] = None) -> Path:
+    data = _read_config(config_path or default_config_path())
+    value = data.get("local_root")
+    if value is None:
+        return LEGACY_LOCAL_ROOT
+    if not isinstance(value, str) or not value:
+        raise ConfigError("sidecar config local_root must be a non-empty path string")
+    return Path(value).expanduser()
+
+
+def write_config_local_root(local_root: Path, config_path: Optional[Path] = None) -> Path:
+    """只改 local_root 一项，其余配置（webdav 等）原样保留；原子替换、权限 600。"""
+    path = config_path or default_config_path()
+    data = _read_config(path)
+    data["local_root"] = str(local_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    tmp.replace(path)
+    return path

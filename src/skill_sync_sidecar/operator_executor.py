@@ -18,7 +18,7 @@ from .central_lifecycle import (
     execute_central_deprecate,
     execute_central_reactivate,
 )
-from .config import ConfigError, load_webdav_settings
+from .config import ConfigError, configured_local_root, load_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .legacy_skillshub_migration import (
     LegacySkillshubMigrationError,
@@ -192,7 +192,7 @@ def run_mac_central_restore(
     if yes and not allow_local_writes:
         raise OperatorExecutorError("local restore is disabled; start operator-executor with --allow-local-writes")
     result = restore_from_central(
-        Path.home() / ".cc-switch" / "skills",
+        configured_local_root(),
         Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
         skill_ids,
         target="mixed-scope-root",

@@ -13,7 +13,8 @@ from .apply import ApplyError, ApplyPlanError, build_apply_plan, execute_apply_p
 from .approved_push import ApprovedPushError, build_approved_push_preview, execute_approved_push, write_approved_push_preview
 from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from .blocked_report import build_blocked_report
-from .config import ConfigError, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings
+from .config import ConfigError, configured_local_root, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings, sidecar_skills_root
+from .local_root import LocalRootMigrationError, migrate_local_root
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
@@ -105,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     status.set_defaults(func=cmd_status)
 
     ops_status = subcommands.add_parser("ops-status", help="Summarize daemon, base record, remote snapshot, and optional OpenClaw reconcile state.")
-    ops_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
+    ops_status.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     ops_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     ops_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
     ops_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
@@ -130,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     publish_status_mode.add_argument("--status-only", action="store_true", help="Publish only local tool observation; do not create a sync plan or manage skills.")
     publish_peer_status.add_argument("--tool-root", action="append", default=[], metavar="TOOL_ID=PATH", help="Restrict v1 tool observation to this tool root. Repeat for multiple roots.")
     publish_peer_status.add_argument("--tool-plugin-manifest", action="append", default=[], metavar="TOOL_ID=PATH", help="Read a tool's package manifest for installed plugins. Plugin data is observation-only.")
-    publish_peer_status.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
+    publish_peer_status.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     publish_peer_status.add_argument("--legacy-skillshub-root", default="~/.skillshub", help="Legacy Skills Hub root to audit when publishing Mac status.")
     publish_peer_status.add_argument("--legacy-skillshub-report-file", default="~/Library/Application Support/skill-sync-sidecar/peers/legacy-skillshub-report.json", help="Local cache for the sanitized legacy dependency report.")
@@ -145,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     publish_peer_status.set_defaults(func=cmd_publish_peer_status)
 
     dashboard = subcommands.add_parser("dashboard", help="Serve a read-only local status dashboard.")
-    dashboard.add_argument("--local-root", default="~/.cc-switch/skills", help="Local installed skill root to scan.")
+    dashboard.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     dashboard.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     dashboard.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
     dashboard.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
@@ -225,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     local_skill_publish = subcommands.add_parser("local-skill-publish", help="Save one installed local skill to the central snapshot without applying unrelated conflicts.")
     add_common_remote_args(local_skill_publish)
     local_skill_publish.add_argument("--path", required=True, help="Skill directory or SKILL.md path used to determine the skill id.")
-    local_skill_publish.add_argument("--local-root", default="~/.cc-switch/skills", help="Local canonical tool root to save from.")
+    local_skill_publish.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     local_skill_publish.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
     local_skill_publish.add_argument("--last-applied-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used as common ancestor.")
     local_skill_publish.add_argument("--base-record-out", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record path to update after --yes.")
@@ -246,6 +247,19 @@ def build_parser() -> argparse.ArgumentParser:
     config_init_mode.add_argument("--dry-run", action="store_true", help="Only print what would be written.")
     config_init_mode.add_argument("--yes", action="store_true", help="Write the Keychain item and the config file.")
     config_init.set_defaults(func=cmd_config_init)
+
+    local_root_migrate = subcommands.add_parser(
+        "local-root-migrate",
+        help="Copy the canonical local skill root (default ~/.cc-switch/skills) to the sidecar's own root, verify, then point the config at it.",
+    )
+    local_root_migrate.add_argument("--to", default=None, help="Destination root. Defaults to the sidecar skills root for this platform.")
+    local_root_migrate.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json, used to compare sync actions.")
+    local_root_migrate.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Base record used by sync-daemon.")
+    local_root_migrate.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    local_root_migrate_mode = local_root_migrate.add_mutually_exclusive_group(required=True)
+    local_root_migrate_mode.add_argument("--dry-run", action="store_true", help="Only check and report.")
+    local_root_migrate_mode.add_argument("--yes", action="store_true", help="Copy, verify, then update the config's local_root.")
+    local_root_migrate.set_defaults(func=cmd_local_root_migrate)
 
     legacy_migration = subcommands.add_parser(
         "legacy-skillshub-migration",
@@ -1934,6 +1948,35 @@ def _uses_configured_webdav(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "webdav_config", False) or getattr(args, "cc_switch_webdav", False))
 
 
+def cmd_local_root_migrate(args: argparse.Namespace) -> int:
+    base_record = Path(args.base_record).expanduser()
+    try:
+        result = migrate_local_root(
+            configured_local_root(),
+            Path(args.to).expanduser() if args.to else sidecar_skills_root(),
+            Path(args.remote_snapshot).expanduser(),
+            base_record if base_record.exists() else None,
+            yes=args.yes,
+        )
+    except (ConfigError, LocalRootMigrationError) as exc:
+        print(f"local-root-migrate failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    print(f"source: {result['source']}")
+    print(f"dest: {result['dest']}")
+    print(f"skills: {result['skills']}  sync actions: {result['sync_actions']}")
+    if result["skipped"]:
+        print(f"left in source (not copied): {', '.join(result['skipped'])}")
+    if result["config_updated"]:
+        print(f"config local_root -> {result['dest']} ({result['config_path']})")
+        print("services that pass --local-root explicitly (launchd) still use the old root until switched")
+    else:
+        print("dry run: nothing copied, config unchanged")
+    return 0
+
+
 def cmd_config_init(args: argparse.Namespace) -> int:
     try:
         plan = init_config_from_cc_switch(
@@ -2010,9 +2053,20 @@ def _redact_remote(remote: str) -> str:
     return f"{scheme}://***@{host}" if scheme else f"***@{host}"
 
 
+# 这几个命令的 --local-root 不传时取配置里的本机正本；其余命令要么必须显式传，
+# 要么 None 有别的含义（codex-project 用 <project-root>/skills），不在此列
+LOCAL_ROOT_FROM_CONFIG = {"ops-status", "publish-peer-status", "dashboard", "local-skill-publish"}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if getattr(args, "local_root", "unset") is None and args.command in LOCAL_ROOT_FROM_CONFIG:
+        try:
+            args.local_root = str(configured_local_root())
+        except ConfigError as exc:
+            print(f"{args.command} failed: {exc}", file=sys.stderr)
+            return 2
     try:
         return args.func(args)
     except BrokenPipeError:

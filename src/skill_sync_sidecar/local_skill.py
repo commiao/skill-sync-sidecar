@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Sequence
 
+from .config import ConfigError, configured_local_root
 from .approved_push import _assert_remote_matches_cache, _build_merged_snapshot, _snapshot_id, _write_sync_base_record
 from .model import SkillFile
 from .remote import Remote, build_upload_plan, upload_snapshot
@@ -49,6 +50,24 @@ DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
     LocalToolTarget("deepseek-harness", "DeepSeek Harness", Path.home() / ".dsh" / "skills", "deepseek-harness"),
 )
 
+
+
+def default_local_tool_targets() -> tuple[LocalToolTarget, ...]:
+    """安装目标 = 各工具目录 + sidecar 本机正本（迁移后才有）。
+
+    迁移前正本就是 ~/.cc-switch/skills，已在列表里，不重复加；迁移后正本是
+    sidecar 自己的目录，daemon 只同步它，所以本机安装必须写进去，否则新技能
+    推不到中央。正本不是「工具」，不看 manifest targets。
+    """
+    try:
+        canonical = configured_local_root().expanduser()
+    except ConfigError as exc:
+        raise LocalSkillError(str(exc)) from exc
+    if any(_same_path(canonical, target.root.expanduser()) for target in DEFAULT_LOCAL_TOOL_TARGETS):
+        return DEFAULT_LOCAL_TOOL_TARGETS
+    return (LocalToolTarget("sidecar", "Sidecar 本机正本", canonical, "sidecar"),) + DEFAULT_LOCAL_TOOL_TARGETS
+
+
 DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "skillshub", "cursor", "claude-code", "qoder", "deepseek-harness", "openclaw"]
 DEFAULT_PROJECT_TARGETS = ["codex", "cursor", "qoder"]
 DEFAULT_EXCLUDES = ["__pycache__", "*.pyc", ".DS_Store"]
@@ -60,8 +79,10 @@ def analyze_local_skill(
     source_path: Path,
     *,
     tool_ids: Optional[Sequence[str]] = None,
-    tool_targets: Sequence[LocalToolTarget] = DEFAULT_LOCAL_TOOL_TARGETS,
+    tool_targets: Optional[Sequence[LocalToolTarget]] = None,
 ) -> dict:
+    if tool_targets is None:
+        tool_targets = default_local_tool_targets()
     source = _skill_dir(source_path)
     record = scan_skill("local-import", source, source / "SKILL.md")
     manifest = _load_manifest(source / "manifest.json")
@@ -105,7 +126,7 @@ def install_local_skill(
     source_path: Path,
     *,
     tool_ids: Optional[Sequence[str]] = None,
-    tool_targets: Sequence[LocalToolTarget] = DEFAULT_LOCAL_TOOL_TARGETS,
+    tool_targets: Optional[Sequence[LocalToolTarget]] = None,
     yes: bool = False,
     allow_local_writes: bool = False,
 ) -> dict:
@@ -287,6 +308,10 @@ def _infer_scope(source: Path) -> str:
         home / ".qoder" / "skills",
         home / ".dsh" / "skills",
     ]
+    try:
+        global_roots.append(configured_local_root().expanduser().resolve())
+    except ConfigError:
+        pass
     for root in global_roots:
         try:
             source.relative_to(root)
