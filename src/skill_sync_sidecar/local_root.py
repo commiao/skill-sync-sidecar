@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .config import ConfigError, configured_local_root, write_config_local_root
+from .protect import remove_path
 from .scanner import scan_roots
 from .sync_state import build_sync_status
 
@@ -117,9 +118,9 @@ def migrate_local_root(
             raise LocalRootMigrationError(f"sync actions differ after copy: {', '.join(changed[:10])}")
     except (OSError, LocalRootMigrationError) as exc:
         if staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
+            remove_path(staging)
         if renamed and dest.exists():
-            shutil.rmtree(dest, ignore_errors=True)
+            remove_path(dest)
         if isinstance(exc, LocalRootMigrationError):
             raise
         raise LocalRootMigrationError(f"copy failed: {exc}") from exc
@@ -127,7 +128,7 @@ def migrate_local_root(
     try:
         result["config_path"] = str(write_config_local_root(dest, config_path))
     except ConfigError:
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_path(dest)
         raise
     result["config_updated"] = True
     return result

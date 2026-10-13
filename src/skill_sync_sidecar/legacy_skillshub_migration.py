@@ -11,6 +11,7 @@ from typing import Iterable, Optional, Sequence
 from zipfile import ZipFile
 
 from .local_skill import DEFAULT_LOCAL_TOOL_TARGETS, LocalToolTarget
+from .protect import remove_path
 from .scanner import scan_skill
 from .stage import StageError, stage_snapshot
 
@@ -539,12 +540,8 @@ def _normalize_skill_ids(skill_ids: Sequence[str]) -> list[str]:
 
 
 def _remove_path(path: Path) -> None:
-    if not path.exists() and not path.is_symlink():
-        return
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
-    else:
-        path.unlink()
+    # 正本技能可能是只读的（fanout 只读保护），删除要先解除
+    remove_path(path)
 
 
 def _timestamp_id() -> str:

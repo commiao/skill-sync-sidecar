@@ -15,7 +15,7 @@ from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execu
 from .blocked_report import build_blocked_report
 from .config import ConfigError, configured_local_root, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings, sidecar_skills_root
 from .local_root import LocalRootMigrationError, migrate_local_root
-from .fanout import build_fanout_plan
+from .fanout import FanoutError, build_fanout_plan, fanout_protect_canonical, rollback_fanout, run_fanout
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
@@ -264,14 +264,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     fanout = subcommands.add_parser(
         "fanout",
-        help="Plan placing canonical skills into each tool (symlink, or copy for tools configured as copy). Read-only for now.",
+        help="Place canonical skills into each tool (symlink, or copy for tools configured as copy).",
     )
     fanout.add_argument("--tool", action="append", default=[], help="Limit to a tool id (codex, cursor, claude-code, qoder, deepseek-harness, cc-switch). Repeatable.")
     fanout.add_argument("--local-root", default=None, help="Canonical root. Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     fanout.add_argument("--all-items", action="store_true", help="List every item, including ok and foreign links.")
     fanout.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
-    fanout.add_argument("--dry-run", action="store_true", required=True, help="Only print the plan (the only mode for now).")
+    fanout_mode = fanout.add_mutually_exclusive_group(required=True)
+    fanout_mode.add_argument("--dry-run", action="store_true", help="Only print the plan.")
+    fanout_mode.add_argument("--yes", action="store_true", help="Execute: lock each tool, back up what is replaced, write a run record, then make the canonical skills read-only.")
     fanout.set_defaults(func=cmd_fanout)
+
+    fanout_rollback = subcommands.add_parser("fanout-rollback", help="Undo a fanout run from its run record.")
+    fanout_rollback.add_argument("--record", required=True, help="Run record path printed by fanout --yes (fanout/runs/<run_id>.json).")
+    fanout_rollback.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    fanout_rollback_mode = fanout_rollback.add_mutually_exclusive_group(required=True)
+    fanout_rollback_mode.add_argument("--dry-run", action="store_true", help="Only show what would be restored.")
+    fanout_rollback_mode.add_argument("--yes", action="store_true", help="Restore.")
+    fanout_rollback.set_defaults(func=cmd_fanout_rollback)
 
     legacy_migration = subcommands.add_parser(
         "legacy-skillshub-migration",
@@ -1962,10 +1972,34 @@ def _uses_configured_webdav(args: argparse.Namespace) -> bool:
 
 def cmd_fanout(args: argparse.Namespace) -> int:
     try:
-        plan = build_fanout_plan(Path(args.local_root).expanduser(), tool_ids=args.tool or None)
-    except ConfigError as exc:
+        if args.yes:
+            record = run_fanout(
+                Path(args.local_root).expanduser(),
+                tool_ids=args.tool or None,
+                yes=True,
+                protect=fanout_protect_canonical(),
+            )
+        else:
+            plan = build_fanout_plan(Path(args.local_root).expanduser(), tool_ids=args.tool or None)
+    except (ConfigError, FanoutError) as exc:
         print(f"fanout failed: {exc}", file=sys.stderr)
         return 2
+    if args.yes:
+        if args.json:
+            print(json.dumps(record, ensure_ascii=False, indent=2))
+        else:
+            for tool in record["tools"]:
+                if tool.get("skipped"):
+                    print(f"{tool['tool_id']}: skipped ({tool['skipped']})")
+                    continue
+                print(f"{tool['tool_id']}: executed {len(tool['executed'])}, failed {len(tool['failed'])}, conflicts left alone {len(tool['conflicts'])}")
+                for failed in tool["failed"]:
+                    print(f"  FAILED {failed['action']} {failed['name']}: {failed['error']}")
+            if "protected_entries" in record:
+                print(f"canonical made read-only: {record['protected_entries']} entries")
+            print(f"run record: {record['record_path']}")
+        failed = sum(len(t.get("failed", [])) for t in record["tools"])
+        return 1 if failed else 0
     if args.json:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
         return 0
@@ -1986,6 +2020,20 @@ def cmd_fanout(args: argparse.Namespace) -> int:
                 extra = f"  ({item['reason']})" if item.get("reason") else ""
                 link = f"  -> {item['link_target']}" if item.get("link_target") else ""
                 print(f"  {item['action']:<22} {item['name']}{link}{extra}")
+    return 0
+
+
+def cmd_fanout_rollback(args: argparse.Namespace) -> int:
+    try:
+        result = rollback_fanout(Path(args.record).expanduser(), yes=args.yes)
+    except (OSError, json.JSONDecodeError, FanoutError) as exc:
+        print(f"fanout-rollback failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    for item in result["items"]:
+        print(f"{item['result']:<40} {item['tool_id']}/{item['name']} ({item['action']})")
     return 0
 
 

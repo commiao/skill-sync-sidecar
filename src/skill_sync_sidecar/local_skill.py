@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Sequence
 
+from .protect import remove_path
 from .config import ConfigError, configured_local_root
 from .approved_push import _assert_remote_matches_cache, _build_merged_snapshot, _snapshot_id, _write_sync_base_record
 from .model import SkillFile
@@ -503,12 +504,8 @@ def _same_path(left: Path, right: Path) -> bool:
 
 
 def _remove_path(path: Path) -> None:
-    if not path.exists() and not path.is_symlink():
-        return
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
-    else:
-        path.unlink()
+    # 正本技能可能是只读的（fanout 只读保护），删除要先解除
+    remove_path(path)
 
 
 def _timestamp_id() -> str:
