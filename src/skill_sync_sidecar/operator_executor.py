@@ -11,6 +11,7 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Optional, Sequence
 
+from .protect import move_path
 from .central_lifecycle import (
     CentralLifecycleError,
     build_central_deprecate_preview,
@@ -315,7 +316,7 @@ def run_mac_tool_uninstall(
         backup.parent.mkdir(parents=True, exist_ok=True)
         if backup.exists():
             raise OperatorExecutorError(f"backup path already exists: {backup}")
-        shutil.move(str(source), str(backup))
+        move_path(source, backup)
         removed += 1
     record_path = backup_root / "uninstall-record.json"
     record = {**result, "removed": removed, "record_path": str(record_path)}

@@ -206,12 +206,18 @@ CLI commands keep their own `--remote-snapshot` / `--prefix` / `--base-record` d
 
 ## Fan-out To Tools
 
-`fanout --dry-run` plans how the canonical root is placed into each tool (read-only for now; writing comes next):
+`fanout` places the canonical root into each tool:
 
 ```bash
-python3 -m skill_sync_sidecar fanout --dry-run            # changes only
+python3 -m skill_sync_sidecar fanout --dry-run            # plan, changes only
 python3 -m skill_sync_sidecar fanout --dry-run --all-items --tool codex
+python3 -m skill_sync_sidecar fanout --yes                # execute
+python3 -m skill_sync_sidecar fanout-rollback --record <run record> --dry-run   # then --yes
 ```
+
+`--yes` takes a per-tool lock, re-plans inside it, moves anything it replaces to `fanout/backups/<run_id>/` under the sidecar state directory (the last 5 runs are kept; nothing is written into the tool root besides the entries themselves), and writes `fanout/runs/<run_id>.json`. Rollback undoes a run in reverse order and skips entries that changed after the run. Re-running is idempotent.
+
+**Read-only canonical.** Once any tool links to the canonical root, an edit made "in the tool" is an edit to the canonical copy, which sync-daemon pushes to the central library within minutes. So after a run that leaves links in place, the canonical skill directories and files lose their write bits: an in-place edit fails with a permission error instead of spreading. The sidecar lifts the protection itself when it replaces or moves a skill. Disable with `"fanout": {"protect_canonical": false}`.
 
 - Tools: Codex, Claude Code, Qoder, DeepSeek Harness and (while cc-switch is retired) `~/.cc-switch/skills` get a **symlink** to the canonical skill directory; Cursor gets a **copy** until it is verified to load symlinked skills. Override per tool with `fanout.tools.<id>.mode` (`link`/`copy`) or `"enabled": false` in the sidecar config.
 - A skill whose manifest declares `targets` goes to those tools. A skill without declared targets is only **maintained where it already is**; it is never added to a new tool (placing all undeclared skills everywhere would add 44–46 skills to every tool on the current Mac).

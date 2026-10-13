@@ -1,4 +1,4 @@
-"""正本 → 各工具的扇出（T-0260 第 4 步）。本模块目前只出计划，不写任何文件。
+"""正本 → 各工具的扇出（T-0260 第 4 步）。build_fanout_plan 只出计划；run_fanout 执行。
 
 写入方式按工具配置：
 - link：工具目录里放一个指向正本技能目录的软链。「指向正本的软链」就是 sidecar
@@ -11,14 +11,20 @@
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import shutil
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence
 
 from .config import ConfigError, LEGACY_LOCAL_ROOT, _read_config, default_config_path, sidecar_state_dir
 from .model import SkillRecord
+from .protect import move_path, protect_skill_dirs, remove_path
 from .scanner import scan_roots, scan_skill
 
 HOME = Path.home()
@@ -134,7 +140,13 @@ def _skill_decision(skill: SkillRecord, canonical: Path, tool: FanoutTool, entry
 
 def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTool, ledger: Dict[str, str]) -> Dict[str, object]:
     source = skill.path.resolve()
-    item: Dict[str, object] = {"name": entry.name, "skill_id": skill.skill_id, "risk_level": skill.risk_level}
+    item: Dict[str, object] = {
+        "name": entry.name,
+        "skill_id": skill.skill_id,
+        "risk_level": skill.risk_level,
+        "content_hash": skill.content_hash,
+        "source_path": str(source),
+    }
     if not entry.exists() and not entry.is_symlink():
         item["action"] = "link" if tool.mode == "link" else "copy"
         return item
@@ -250,3 +262,258 @@ def build_fanout_plan(
         )
         result_tools.append(report)
     return {"canonical_root": str(canonical), "skills": len(skills), "dry_run": True, "tools": result_tools}
+
+
+# ---- 执行（PR B）----------------------------------------------------------------
+#
+# 每个工具在锁内重新出计划再执行，计划与执行之间不留可被别的进程插入的窗口。
+# 备份放在 sidecar 状态目录（不放工具目录，免得被工具当技能扫到），每次运行写
+# runs/<run_id>.json，可用 rollback_fanout 按记录撤销。
+
+
+NOOP_ACTIONS = {"ok", "conflict", "foreign_link"}
+KEEP_BACKUP_RUNS = 5
+
+
+class FanoutError(RuntimeError):
+    pass
+
+
+def fanout_dir(state_dir: Optional[Path] = None) -> Path:
+    return (state_dir or sidecar_state_dir()) / "fanout"
+
+
+@contextmanager
+def tool_lock(tool_id: str, state_dir: Optional[Path] = None, timeout: float = 30.0):
+    lock_path = fanout_dir(state_dir) / "locks" / f"{tool_id}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w") as handle:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise FanoutError(f"another fanout is writing {tool_id}; gave up after {timeout:.0f}s")
+                time.sleep(0.2)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _write_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _save_ledger(tool_id: str, ledger: Dict[str, str], state_dir: Optional[Path]) -> None:
+    entries = {name: {"content_hash": h} for name, h in sorted(ledger.items())}
+    _write_json(fanout_dir(state_dir) / f"{tool_id}.json", {"tool_id": tool_id, "entries": entries})
+
+
+def _swap_symlink(entry: Path, target: str, run_id: str) -> None:
+    """原子地让 entry 成为指向 target 的软链（entry 不存在或本身是软链时）。"""
+    tmp = entry.parent / f".{entry.name}.skill-sync-tmp-{run_id}"
+    if tmp.exists() or tmp.is_symlink():
+        tmp.unlink()
+    os.symlink(target, tmp)
+    os.replace(tmp, entry)
+
+
+def _copy_into(source: Path, entry: Path, run_id: str) -> Path:
+    tmp = entry.parent / f".{entry.name}.skill-sync-tmp-{run_id}"
+    if tmp.exists() or tmp.is_symlink():
+        remove_path(tmp)
+    shutil.copytree(source, tmp, symlinks=True)
+    return tmp
+
+
+def _execute_item(tool: FanoutTool, item: Dict[str, object], ledger: Dict[str, str], run_id: str, backup_root: Path) -> Dict[str, object]:
+    action = str(item["action"])
+    entry = tool.root.expanduser() / str(item["name"])
+    source = Path(str(item.get("source_path", "")))
+    done = {"name": item["name"], "action": action, "content_hash": item.get("content_hash")}
+    backup = backup_root / str(item["name"])
+    if action == "link":
+        if entry.exists() or entry.is_symlink():
+            raise FanoutError(f"{entry} appeared since planning")
+        _swap_symlink(entry, str(source), run_id)
+    elif action == "relink":
+        done["old_link_target"] = os.readlink(entry)
+        _swap_symlink(entry, str(source), run_id)
+    elif action == "replace_dir_with_link":
+        move_path(entry, backup)
+        done["backup_path"] = str(backup)
+        try:
+            _swap_symlink(entry, str(source), run_id)
+        except OSError:
+            move_path(backup, entry)
+            raise
+    elif action == "copy":
+        tmp = _copy_into(source, entry, run_id)
+        if entry.exists() or entry.is_symlink():
+            remove_path(tmp)
+            raise FanoutError(f"{entry} appeared since planning")
+        tmp.rename(entry)
+        ledger[entry.name] = str(item["content_hash"])
+    elif action == "update_copy":
+        tmp = _copy_into(source, entry, run_id)
+        move_path(entry, backup)
+        done["backup_path"] = str(backup)
+        tmp.rename(entry)
+        ledger[entry.name] = str(item["content_hash"])
+    elif action == "adopt":
+        ledger[entry.name] = str(item["content_hash"])
+    elif action == "replace_link_with_copy":
+        done["old_link_target"] = os.readlink(entry)
+        tmp = _copy_into(source, entry, run_id)
+        entry.unlink()
+        try:
+            tmp.rename(entry)
+        except OSError:
+            os.symlink(str(done["old_link_target"]), entry)
+            raise
+        ledger[entry.name] = str(item["content_hash"])
+    elif action == "remove_dangling_link":
+        done["old_link_target"] = os.readlink(entry)
+        entry.unlink()
+    elif action == "remove_copy":
+        move_path(entry, backup)
+        done["backup_path"] = str(backup)
+        ledger.pop(entry.name, None)
+    else:
+        raise FanoutError(f"unknown fanout action: {action}")
+    return done
+
+
+def _prune_backups(state_dir: Optional[Path], keep: int = KEEP_BACKUP_RUNS) -> List[str]:
+    root = fanout_dir(state_dir) / "backups"
+    if not root.is_dir():
+        return []
+    runs = sorted((p for p in root.iterdir() if p.is_dir()), key=lambda p: p.name)
+    pruned = []
+    for old in runs[:-keep] if keep else runs:
+        remove_path(old)
+        pruned.append(old.name)
+    return pruned
+
+
+def run_fanout(
+    canonical_root: Path,
+    *,
+    tool_ids: Optional[Sequence[str]] = None,
+    tools: Optional[Sequence[FanoutTool]] = None,
+    yes: bool = False,
+    protect: bool = True,
+    state_dir: Optional[Path] = None,
+) -> Dict[str, object]:
+    """yes=False 等同 build_fanout_plan；yes=True 逐工具加锁执行并写运行记录。"""
+    canonical = canonical_root.expanduser()
+    tools = list(tools if tools is not None else configured_tools())
+    if not yes:
+        return build_fanout_plan(canonical, tools=tools, tool_ids=tool_ids)
+    if tool_ids:
+        unknown = set(tool_ids) - {t.tool_id for t in tools}
+        if unknown:
+            raise ConfigError(f"unknown or disabled fanout tool: {', '.join(sorted(unknown))}")
+        tools = [t for t in tools if t.tool_id in set(tool_ids)]
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    record: Dict[str, object] = {
+        "record_type": "skill-sync-fanout-run",
+        "run_id": run_id,
+        "canonical_root": str(canonical),
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "tools": [],
+    }
+    record_path = fanout_dir(state_dir) / "runs" / f"{run_id}.json"
+    linked_any = False
+    try:
+        for tool in tools:
+            with tool_lock(tool.tool_id, state_dir):
+                ledger = load_ledger(tool.tool_id, fanout_dir(state_dir) / f"{tool.tool_id}.json") if tool.mode == "copy" else {}
+                plan = build_fanout_plan(canonical, tools=[tool], ledgers={tool.tool_id: dict(ledger)})["tools"][0]
+                report: Dict[str, object] = {"tool_id": tool.tool_id, "mode": tool.mode, "root": plan["root"]}
+                if plan.get("skipped"):
+                    report["skipped"] = plan["skipped"]
+                    record["tools"].append(report)
+                    continue
+                report["ledger_before"] = dict(ledger)
+                report["executed"], report["failed"] = [], []
+                backup_root = fanout_dir(state_dir) / "backups" / run_id / tool.tool_id
+                for item in plan["items"]:
+                    if item["action"] in NOOP_ACTIONS:
+                        continue
+                    try:
+                        report["executed"].append(_execute_item(tool, item, ledger, run_id, backup_root))
+                    except (OSError, FanoutError) as exc:
+                        report["failed"].append({"name": item["name"], "action": item["action"], "error": str(exc)})
+                if tool.mode == "copy":
+                    _save_ledger(tool.tool_id, ledger, state_dir)
+                if tool.mode == "link" and any(i.get("action") in {"ok", "link", "relink", "replace_dir_with_link"} for i in plan["items"]):
+                    linked_any = True
+                report["summary"] = plan["summary"]
+                report["conflicts"] = sorted(str(i["name"]) for i in plan["items"] if i["action"] == "conflict")
+                record["tools"].append(report)
+    finally:
+        if linked_any and protect:
+            # 工具软链指向正本后，正本就得只读：就地改技能会当场失败，而不是被 daemon 推到中央
+            record["protected_entries"] = protect_skill_dirs(canonical)
+        record["finished_at"] = datetime.now(timezone.utc).isoformat()
+        record["pruned_backup_runs"] = _prune_backups(state_dir)
+        record["record_path"] = str(record_path)
+        _write_json(record_path, record)
+    return record
+
+
+def rollback_fanout(record_path: Path, *, yes: bool = False, state_dir: Optional[Path] = None) -> Dict[str, object]:
+    """按运行记录逆序撤销。只撤销「现在仍是那次运行留下的样子」的条目，其余跳过。"""
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    canonical = Path(record["canonical_root"])
+    results = []
+    for tool_report in reversed(record.get("tools", [])):
+        if tool_report.get("skipped"):
+            continue
+        root = Path(tool_report["root"])
+        tool_id = tool_report["tool_id"]
+        with tool_lock(tool_id, state_dir):
+            for done in reversed(tool_report.get("executed", [])):
+                entry = root / str(done["name"])
+                action = done["action"]
+                outcome = {"tool_id": tool_id, "name": done["name"], "action": action}
+                if action in {"link", "relink", "replace_dir_with_link"}:
+                    still_ours = entry.is_symlink() and _within(Path(os.path.realpath(entry)), canonical.resolve())
+                elif action in {"copy", "update_copy", "replace_link_with_copy"}:
+                    # 复制品被人改过就不删：那已经是别人的东西了
+                    still_ours = entry.is_dir() and not entry.is_symlink() and _hash_of(entry) == done.get("content_hash")
+                else:  # adopt / remove_*：撤销只是把东西放回去，不会覆盖现有内容
+                    still_ours = not (entry.exists() or entry.is_symlink()) or action == "adopt"
+                if not still_ours:
+                    outcome["result"] = "skipped: entry changed since the run"
+                    results.append(outcome)
+                    continue
+                if yes:
+                    if action in {"link", "relink", "replace_dir_with_link"}:
+                        entry.unlink()
+                    if action in {"copy", "update_copy", "replace_link_with_copy"} and entry.exists():
+                        remove_path(entry)
+                    if done.get("backup_path") and Path(done["backup_path"]).exists():
+                        move_path(Path(done["backup_path"]), entry)
+                    if done.get("old_link_target") and not entry.exists() and not entry.is_symlink():
+                        os.symlink(str(done["old_link_target"]), entry)
+                outcome["result"] = "restored" if yes else "would restore"
+                results.append(outcome)
+            if yes and tool_report.get("mode") == "copy" and "ledger_before" in tool_report:
+                _save_ledger(tool_id, dict(tool_report["ledger_before"]), state_dir)
+    return {"record_path": str(record_path), "run_id": record.get("run_id"), "dry_run": not yes, "items": results}
+
+
+def fanout_protect_canonical(config_path: Optional[Path] = None) -> bool:
+    """config.json 的 fanout.protect_canonical（默认 true）。"""
+    value = _read_config(config_path or default_config_path()).get("fanout", {}).get("protect_canonical", True)
+    if not isinstance(value, bool):
+        raise ConfigError("sidecar config fanout.protect_canonical must be true or false")
+    return value
