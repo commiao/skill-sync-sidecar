@@ -18,7 +18,7 @@ writer_policy="${SKILL_SYNC_WRITER_POLICY:-push-pull}"
 args=(
   -m skill_sync_sidecar
   publish-peer-status
-  --cc-switch-webdav
+  --webdav-config
   --peer-id "$peer_id"
   --peer-name "$device_name"
   --status-path "$status_path"

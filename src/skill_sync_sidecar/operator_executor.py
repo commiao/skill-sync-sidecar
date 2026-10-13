@@ -18,7 +18,7 @@ from .central_lifecycle import (
     execute_central_deprecate,
     execute_central_reactivate,
 )
-from .config import ConfigError, load_cc_switch_webdav_settings
+from .config import ConfigError, load_webdav_settings
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .legacy_skillshub_migration import (
     LegacySkillshubMigrationError,
@@ -1039,7 +1039,7 @@ def _payload_reason(payload: object) -> str:
 
 
 def _local_publish_remote():
-    settings = load_cc_switch_webdav_settings()
+    settings = load_webdav_settings()
     remote = open_remote(settings.base_url, username=settings.username, password=settings.password)
     prefix = os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac")
     return remote, prefix

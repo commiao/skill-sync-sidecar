@@ -87,13 +87,13 @@ export PYTHONPATH="$repo_root/src"
 
 "$python_bin" -m skill_sync_sidecar push \
   --snapshot-dir "$snapshot_dir" \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --yes \
   --json >"$run_base/push.json"
 
 "$python_bin" -m skill_sync_sidecar pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --out "$pull_cache" \
   --json >"$run_base/pull-cache.json"
@@ -138,7 +138,7 @@ fi
 "$python_bin" -m skill_sync_sidecar sync-daemon \
   --local-root "$local_root" \
   --target "$sync_target" \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --cache-dir "$cache_dir" \
   --work-dir "$work_dir" \
@@ -165,7 +165,7 @@ program_args = [
     os.environ["SYNC_TARGET"],
     "--local-root",
     os.environ["LOCAL_ROOT"],
-    "--cc-switch-webdav",
+    "--webdav-config",
     "--prefix",
     os.environ["PREFIX"],
     "--cache-dir",

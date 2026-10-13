@@ -13,7 +13,7 @@ from .apply import ApplyError, ApplyPlanError, build_apply_plan, execute_apply_p
 from .approved_push import ApprovedPushError, build_approved_push_preview, execute_approved_push, write_approved_push_preview
 from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from .blocked_report import build_blocked_report
-from .config import ConfigError, load_cc_switch_webdav_settings
+from .config import ConfigError, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
@@ -234,6 +234,19 @@ def build_parser() -> argparse.ArgumentParser:
     local_skill_publish_mode.add_argument("--yes", action="store_true", help="Save the selected local skill and merged index to the shared library.")
     local_skill_publish.set_defaults(func=cmd_local_skill_publish)
 
+    config_init = subcommands.add_parser(
+        "config-init",
+        help="Create the sidecar's own WebDAV config, importing URL/username from cc-switch and the password into Keychain.",
+    )
+    config_init.add_argument("--from-cc-switch", action="store_true", required=True, help="Import from ~/.cc-switch/settings.json (the only source for now).")
+    config_init.add_argument("--config", default=None, help="Config path to write. Defaults to the platform config path or $SKILL_SYNC_CONFIG.")
+    config_init.add_argument("--keychain-service", default="skill-sync-sidecar-webdav", help="Keychain service name for the password.")
+    config_init.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    config_init_mode = config_init.add_mutually_exclusive_group(required=True)
+    config_init_mode.add_argument("--dry-run", action="store_true", help="Only print what would be written.")
+    config_init_mode.add_argument("--yes", action="store_true", help="Write the Keychain item and the config file.")
+    config_init.set_defaults(func=cmd_config_init)
+
     legacy_migration = subcommands.add_parser(
         "legacy-skillshub-migration",
         help="Preview or detach verified tool symlinks from the legacy ~/.skillshub root.",
@@ -387,7 +400,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_writer_policy_arg(sync_apply)
     sync_apply_remote = sync_apply.add_mutually_exclusive_group()
     sync_apply_remote.add_argument("--remote", help="Remote URL for push actions. Supports file:// for tests and http(s) WebDAV.")
-    sync_apply_remote.add_argument("--cc-switch-webdav", action="store_true", help="Use WebDAV settings from ~/.cc-switch/settings.json for push actions.")
+    sync_apply_remote.add_argument("--webdav-config", action="store_true", help="Use WebDAV settings from the sidecar config (see config-init); falls back to ~/.cc-switch/settings.json while no config exists.")
+    sync_apply_remote.add_argument("--cc-switch-webdav", action="store_true", help="Legacy: always read WebDAV settings from ~/.cc-switch/settings.json.")
     sync_apply.add_argument("--prefix", default="", help="Remote path prefix under the remote URL for push actions.")
     sync_apply.add_argument("--username-env", default="SKILL_SYNC_WEBDAV_USER", help="Environment variable containing WebDAV username.")
     sync_apply.add_argument("--password-env", default="SKILL_SYNC_WEBDAV_PASSWORD", help="Environment variable containing WebDAV password.")
@@ -472,7 +486,8 @@ def build_parser() -> argparse.ArgumentParser:
     sync_cycle.add_argument("--project-root", help="Project root for codex-project; defaults local root to <project-root>/skills.")
     sync_cycle_remote = sync_cycle.add_mutually_exclusive_group(required=True)
     sync_cycle_remote.add_argument("--remote", help="Remote URL. Supports file:// for tests and http(s) WebDAV.")
-    sync_cycle_remote.add_argument("--cc-switch-webdav", action="store_true", help="Use WebDAV settings from ~/.cc-switch/settings.json.")
+    sync_cycle_remote.add_argument("--webdav-config", action="store_true", help="Use WebDAV settings from the sidecar config (see config-init); falls back to ~/.cc-switch/settings.json while no config exists.")
+    sync_cycle_remote.add_argument("--cc-switch-webdav", action="store_true", help="Legacy: always read WebDAV settings from ~/.cc-switch/settings.json.")
     sync_cycle.add_argument("--prefix", default="", help="Remote path prefix under the remote URL.")
     sync_cycle.add_argument("--username-env", default="SKILL_SYNC_WEBDAV_USER", help="Environment variable containing WebDAV username.")
     sync_cycle.add_argument("--password-env", default="SKILL_SYNC_WEBDAV_PASSWORD", help="Environment variable containing WebDAV password.")
@@ -495,7 +510,8 @@ def build_parser() -> argparse.ArgumentParser:
     sync_daemon.add_argument("--project-root", help="Project root for codex-project; defaults local root to <project-root>/skills.")
     sync_daemon_remote = sync_daemon.add_mutually_exclusive_group(required=True)
     sync_daemon_remote.add_argument("--remote", help="Remote URL. Supports file:// for tests and http(s) WebDAV.")
-    sync_daemon_remote.add_argument("--cc-switch-webdav", action="store_true", help="Use WebDAV settings from ~/.cc-switch/settings.json.")
+    sync_daemon_remote.add_argument("--webdav-config", action="store_true", help="Use WebDAV settings from the sidecar config (see config-init); falls back to ~/.cc-switch/settings.json while no config exists.")
+    sync_daemon_remote.add_argument("--cc-switch-webdav", action="store_true", help="Legacy: always read WebDAV settings from ~/.cc-switch/settings.json.")
     sync_daemon.add_argument("--prefix", default="", help="Remote path prefix under the remote URL.")
     sync_daemon.add_argument("--username-env", default="SKILL_SYNC_WEBDAV_USER", help="Environment variable containing WebDAV username.")
     sync_daemon.add_argument("--password-env", default="SKILL_SYNC_WEBDAV_PASSWORD", help="Environment variable containing WebDAV password.")
@@ -531,7 +547,8 @@ def add_common_scan_args(parser: argparse.ArgumentParser) -> None:
 def add_common_remote_args(parser: argparse.ArgumentParser) -> None:
     remote_group = parser.add_mutually_exclusive_group(required=True)
     remote_group.add_argument("--remote", help="Remote URL. Supports file:// for tests and http(s) WebDAV.")
-    remote_group.add_argument("--cc-switch-webdav", action="store_true", help="Use WebDAV settings from ~/.cc-switch/settings.json.")
+    remote_group.add_argument("--webdav-config", action="store_true", help="Use WebDAV settings from the sidecar config (see config-init); falls back to ~/.cc-switch/settings.json while no config exists.")
+    remote_group.add_argument("--cc-switch-webdav", action="store_true", help="Legacy: always read WebDAV settings from ~/.cc-switch/settings.json.")
     parser.add_argument("--prefix", default="", help="Remote path prefix under the remote URL.")
     parser.add_argument("--username-env", default="SKILL_SYNC_WEBDAV_USER", help="Environment variable containing WebDAV username.")
     parser.add_argument("--password-env", default="SKILL_SYNC_WEBDAV_PASSWORD", help="Environment variable containing WebDAV password.")
@@ -1550,7 +1567,7 @@ def cmd_sync_apply(args: argparse.Namespace) -> int:
         return 0 if preview["supported_to_apply"] else 3
 
     remote = None
-    if args.remote or args.cc_switch_webdav:
+    if args.remote or args.cc_switch_webdav or args.webdav_config:
         try:
             guard_http_upload(args)
             remote = open_remote_from_args(args)
@@ -1907,10 +1924,43 @@ def _remote_index_path(prefix: str) -> str:
     return f"{clean}/index.json" if clean else "index.json"
 
 
+def _webdav_settings_from_args(args: argparse.Namespace):
+    if getattr(args, "webdav_config", False):
+        return load_webdav_settings()
+    return load_cc_switch_webdav_settings()
+
+
+def _uses_configured_webdav(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "webdav_config", False) or getattr(args, "cc_switch_webdav", False))
+
+
+def cmd_config_init(args: argparse.Namespace) -> int:
+    try:
+        plan = init_config_from_cc_switch(
+            config_path=Path(args.config).expanduser() if args.config else None,
+            keychain_service=args.keychain_service,
+            dry_run=not args.yes,
+        )
+    except ConfigError as exc:
+        print(f"config-init failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        return 0
+    verb = "would write" if plan["dry_run"] else "wrote"
+    print(f"{verb} config: {plan['config_path']}")
+    print(json.dumps(plan["config"], ensure_ascii=False, indent=2))
+    if plan["keychain"]:
+        print(f"{verb} Keychain item: service={plan['keychain']['service']} account={plan['keychain']['account']}")
+    else:
+        print("cc-switch has no WebDAV password; no Keychain item")
+    return 0
+
+
 def open_remote_from_args(args: argparse.Namespace):
-    if getattr(args, "cc_switch_webdav", False):
+    if _uses_configured_webdav(args):
         try:
-            settings = load_cc_switch_webdav_settings()
+            settings = _webdav_settings_from_args(args)
         except ConfigError as exc:
             raise SystemExit(str(exc))
         return open_remote(
@@ -1936,12 +1986,17 @@ def guard_http_upload(args: argparse.Namespace) -> None:
 
 
 def _remote_url_for_guard(args: argparse.Namespace) -> str:
-    if getattr(args, "cc_switch_webdav", False):
-        return load_cc_switch_webdav_settings().base_url
+    if _uses_configured_webdav(args):
+        try:
+            return _webdav_settings_from_args(args).base_url
+        except ConfigError as exc:
+            raise SystemExit(str(exc))
     return args.remote or ""
 
 
 def _remote_label(args: argparse.Namespace) -> str:
+    if getattr(args, "webdav_config", False):
+        return "sidecar-webdav-config"
     if getattr(args, "cc_switch_webdav", False):
         return "cc-switch-webdav"
     return _redact_remote(args.remote)
