@@ -15,6 +15,7 @@ from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execu
 from .blocked_report import build_blocked_report
 from .config import ConfigError, configured_local_root, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings, sidecar_skills_root
 from .local_root import LocalRootMigrationError, migrate_local_root
+from .fanout import build_fanout_plan
 from .conflicts import ConflictPackageError, build_conflict_packages
 from .dashboard import DashboardConfig, GatewayConfig, serve_dashboard, serve_gateway
 from .daemon import run_sync_daemon
@@ -260,6 +261,17 @@ def build_parser() -> argparse.ArgumentParser:
     local_root_migrate_mode.add_argument("--dry-run", action="store_true", help="Only check and report.")
     local_root_migrate_mode.add_argument("--yes", action="store_true", help="Copy, verify, then update the config's local_root.")
     local_root_migrate.set_defaults(func=cmd_local_root_migrate)
+
+    fanout = subcommands.add_parser(
+        "fanout",
+        help="Plan placing canonical skills into each tool (symlink, or copy for tools configured as copy). Read-only for now.",
+    )
+    fanout.add_argument("--tool", action="append", default=[], help="Limit to a tool id (codex, cursor, claude-code, qoder, deepseek-harness, cc-switch). Repeatable.")
+    fanout.add_argument("--local-root", default=None, help="Canonical root. Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
+    fanout.add_argument("--all-items", action="store_true", help="List every item, including ok and foreign links.")
+    fanout.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    fanout.add_argument("--dry-run", action="store_true", required=True, help="Only print the plan (the only mode for now).")
+    fanout.set_defaults(func=cmd_fanout)
 
     legacy_migration = subcommands.add_parser(
         "legacy-skillshub-migration",
@@ -1948,6 +1960,35 @@ def _uses_configured_webdav(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "webdav_config", False) or getattr(args, "cc_switch_webdav", False))
 
 
+def cmd_fanout(args: argparse.Namespace) -> int:
+    try:
+        plan = build_fanout_plan(Path(args.local_root).expanduser(), tool_ids=args.tool or None)
+    except ConfigError as exc:
+        print(f"fanout failed: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        return 0
+    print(f"canonical: {plan['canonical_root']} ({plan['skills']} skills)  [dry run]")
+    quiet = {"ok", "foreign_link"}
+    for tool in plan["tools"]:
+        print(f"\n## {tool['tool_id']} ({tool['mode']}) {tool['root']}")
+        if tool.get("skipped"):
+            print(f"  skipped: {tool['skipped']}")
+            continue
+        print(f"  actions: {tool['summary']}")
+        if tool["not_placed"]:
+            print(f"  not placed: {tool['not_placed']}")
+        if tool["warnings"]:
+            print(f"  risk warnings among changes: {', '.join(tool['warnings'])}")
+        for item in tool["items"]:
+            if args.all_items or item["action"] not in quiet:
+                extra = f"  ({item['reason']})" if item.get("reason") else ""
+                link = f"  -> {item['link_target']}" if item.get("link_target") else ""
+                print(f"  {item['action']:<22} {item['name']}{link}{extra}")
+    return 0
+
+
 def cmd_local_root_migrate(args: argparse.Namespace) -> int:
     base_record = Path(args.base_record).expanduser()
     try:
@@ -2055,7 +2096,7 @@ def _redact_remote(remote: str) -> str:
 
 # 这几个命令的 --local-root 不传时取配置里的本机正本；其余命令要么必须显式传，
 # 要么 None 有别的含义（codex-project 用 <project-root>/skills），不在此列
-LOCAL_ROOT_FROM_CONFIG = {"ops-status", "publish-peer-status", "dashboard", "local-skill-publish"}
+LOCAL_ROOT_FROM_CONFIG = {"ops-status", "publish-peer-status", "dashboard", "local-skill-publish", "fanout"}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
