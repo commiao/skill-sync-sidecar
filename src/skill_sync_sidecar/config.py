@@ -270,3 +270,49 @@ def write_config_local_root(local_root: Path, config_path: Optional[Path] = None
     os.chmod(tmp, 0o600)
     tmp.replace(path)
     return path
+
+
+# ---- 中央快照缓存、前缀与基线位置（T-0260 第 3 步：不在调用处写死）----
+#
+# 默认值与写死时完全一致；config.json 可分别覆盖 remote_snapshot / remote_prefix /
+# base_record。SKILL_SYNC_PREFIX 环境变量照旧优先于配置（launchd 里已有在用的）。
+
+DEFAULT_REMOTE_PREFIX = "skill-sync-sidecar-dev/current-mac"
+
+
+def sidecar_state_dir() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "skill-sync-sidecar"
+    xdg = os.environ.get("XDG_STATE_HOME")
+    base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "state"
+    return base / "skill-sync-sidecar"
+
+
+def _config_path_value(key: str, config_path: Optional[Path]) -> Optional[Path]:
+    value = _read_config(config_path or default_config_path()).get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ConfigError(f"sidecar config {key} must be a non-empty path string")
+    return Path(value).expanduser()
+
+
+def configured_remote_prefix(config_path: Optional[Path] = None) -> str:
+    env = os.environ.get("SKILL_SYNC_PREFIX")
+    if env:
+        return env
+    value = _read_config(config_path or default_config_path()).get("remote_prefix")
+    if value is None:
+        return DEFAULT_REMOTE_PREFIX
+    if not isinstance(value, str) or not value.strip("/"):
+        raise ConfigError("sidecar config remote_prefix must be a non-empty string")
+    return value
+
+
+def configured_remote_snapshot(config_path: Optional[Path] = None) -> Path:
+    """本机的中央快照缓存目录（daemon 的 file:// 远端在本机的落点）。"""
+    return _config_path_value("remote_snapshot", config_path) or Path.home() / "public-sync" / DEFAULT_REMOTE_PREFIX
+
+
+def configured_base_record(config_path: Optional[Path] = None) -> Path:
+    return _config_path_value("base_record", config_path) or sidecar_state_dir() / "base-record.json"
