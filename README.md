@@ -192,6 +192,18 @@ python3 -m skill_sync_sidecar local-root-migrate --dry-run   # then --yes
 
 `--yes` copies the old root, then checks that every skill's `content_hash` matches and that the sync actions against the current central snapshot and base record are the same as for the old root. Only then does it write `local_root`; on any mismatch it deletes the copy and leaves the config alone. Backups and old base records stay in the old root. It does not touch launchd: services that pass `--local-root` explicitly keep the old root until they are switched, and `ops-status`, `dashboard`, `publish-peer-status` and `local-skill-publish` use the configured root only when `--local-root` is omitted. After migration, `local-skill-install` also writes into the canonical root (tool id `sidecar`).
 
+### Other Paths In The Sidecar Config
+
+The operator executor reads three more locations from the same config, with defaults equal to the values it used to hardcode:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `remote_snapshot` | `~/public-sync/skill-sync-sidecar-dev/current-mac` | Local copy of the central snapshot |
+| `remote_prefix` | `skill-sync-sidecar-dev/current-mac` (`SKILL_SYNC_PREFIX` still wins) | Remote path prefix for publishes |
+| `base_record` | `~/Library/Application Support/skill-sync-sidecar/base-record.json` on macOS | Base record shared with sync-daemon |
+
+CLI commands keep their own `--remote-snapshot` / `--prefix` / `--base-record` defaults; launchd jobs pass them explicitly.
+
 ## Sync Boundary
 
 The sync unit is a skill package, not an entire application state. API keys, accounts, local provider settings, and tool-specific runtime caches are out of scope.

@@ -18,7 +18,14 @@ from .central_lifecycle import (
     execute_central_deprecate,
     execute_central_reactivate,
 )
-from .config import ConfigError, configured_local_root, load_webdav_settings
+from .config import (
+    ConfigError,
+    configured_base_record,
+    configured_local_root,
+    configured_remote_prefix,
+    configured_remote_snapshot,
+    load_webdav_settings,
+)
 from .local_skill import LocalSkillError, analyze_local_skill, install_local_skill, publish_local_skill
 from .legacy_skillshub_migration import (
     LegacySkillshubMigrationError,
@@ -193,11 +200,11 @@ def run_mac_central_restore(
         raise OperatorExecutorError("local restore is disabled; start operator-executor with --allow-local-writes")
     result = restore_from_central(
         configured_local_root(),
-        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+        configured_remote_snapshot(),
         skill_ids,
         target="mixed-scope-root",
-        remote_prefix=os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac"),
-        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+        remote_prefix=configured_remote_prefix(),
+        base_record_out=configured_base_record(),
         yes=yes,
     )
     return result
@@ -226,10 +233,10 @@ def run_mac_tool_install_from_central(
     target_root = Path.home().joinpath(*root_parts)
     result = restore_from_central(
         target_root,
-        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+        configured_remote_snapshot(),
         skill_ids,
         target=target,
-        remote_prefix=os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac"),
+        remote_prefix=configured_remote_prefix(),
         yes=yes,
     )
     result["operation"] = "mac-tool-install-from-central"
@@ -324,7 +331,7 @@ def run_central_deprecate(
     yes: bool = False,
     allow_publish: bool = False,
 ) -> dict:
-    snapshot_dir = Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
+    snapshot_dir = configured_remote_snapshot()
     if yes and not allow_publish:
         raise OperatorExecutorError("central deprecate is disabled; start operator-executor with --allow-publish")
     if not yes:
@@ -347,7 +354,7 @@ def run_central_reactivate(
     yes: bool = False,
     allow_publish: bool = False,
 ) -> dict:
-    snapshot_dir = Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac"
+    snapshot_dir = configured_remote_snapshot()
     if yes and not allow_publish:
         raise OperatorExecutorError("central reactivate is disabled; start operator-executor with --allow-publish")
     if not yes:
@@ -920,12 +927,12 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     remote, prefix = _local_publish_remote()
                     result = publish_local_skill(
                         local_root,
-                        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+                        configured_remote_snapshot(),
                         skill_id,
                         remote,
                         remote_prefix=prefix,
-                        last_applied_record=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
-                        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                        last_applied_record=configured_base_record(),
+                        base_record_out=configured_base_record(),
                     )
                     self._send_json(200, result)
                     return
@@ -944,12 +951,12 @@ def serve_operator_executor(host: str, port: int, repo_root: Path, *, allow_publ
                     remote, prefix = _local_publish_remote()
                     result = publish_local_skill(
                         local_root,
-                        Path.home() / "public-sync" / "skill-sync-sidecar-dev" / "current-mac",
+                        configured_remote_snapshot(),
                         skill_id,
                         remote,
                         remote_prefix=prefix,
-                        last_applied_record=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
-                        base_record_out=Path.home() / "Library" / "Application Support" / "skill-sync-sidecar" / "base-record.json",
+                        last_applied_record=configured_base_record(),
+                        base_record_out=configured_base_record(),
                         yes=True,
                     )
                     self._send_json(200, result)
@@ -1041,5 +1048,5 @@ def _payload_reason(payload: object) -> str:
 def _local_publish_remote():
     settings = load_webdav_settings()
     remote = open_remote(settings.base_url, username=settings.username, password=settings.password)
-    prefix = os.environ.get("SKILL_SYNC_PREFIX", "skill-sync-sidecar-dev/current-mac")
+    prefix = configured_remote_prefix()
     return remote, prefix
