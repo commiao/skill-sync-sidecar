@@ -56,7 +56,7 @@ program_args = [
     "-m",
     "skill_sync_sidecar",
     "gateway",
-    "--cc-switch-webdav",
+    "--webdav-config",
     "--prefix",
     os.environ["PREFIX"],
     "--cache-dir",

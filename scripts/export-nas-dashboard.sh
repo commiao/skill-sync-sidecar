@@ -76,7 +76,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from skill_sync_sidecar.config import load_cc_switch_webdav_settings
+from skill_sync_sidecar.config import load_webdav_settings
 from skill_sync_sidecar.dashboard import DashboardConfig, build_dashboard_status
 
 peer = Path(os.environ["PEER_STATUS"]).expanduser()
@@ -97,7 +97,7 @@ status["export_note"] = "Static NAS observer. This artifact is read-only and per
 
 out = Path(os.environ["OUT_DIR"])
 try:
-    settings = load_cc_switch_webdav_settings()
+    settings = load_webdav_settings()
     base_url = settings.base_url.rstrip("/")
     access = {
         "webdav_index_url": f"{base_url}/skill-sync-sidecar-dashboard/index.html",

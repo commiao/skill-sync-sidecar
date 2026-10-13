@@ -215,13 +215,20 @@ python3 -m skill_sync_sidecar remote-status --remote "https://example.com/dav/cc
 
 Credentials are never printed. Use `--username-env` and `--password-env` to point at different environment variables.
 
-You can also reuse the existing cc-switch WebDAV configuration without putting credentials in the command line:
+To keep credentials out of the command line, give the sidecar its own config and pass `--webdav-config`:
 
 ```bash
+# Import URL/username from cc-switch and store the password in the macOS Keychain
+python3 -m skill_sync_sidecar config-init --from-cc-switch --dry-run   # then --yes
+
 python3 -m skill_sync_sidecar remote-status \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/test"
 ```
+
+The config lives at `~/Library/Application Support/skill-sync-sidecar/config.json` on macOS and `$XDG_CONFIG_HOME/skill-sync-sidecar/config.json` (default `~/.config/...`) elsewhere; `SKILL_SYNC_CONFIG` overrides the path. It holds only the URL and username. The password comes from `password_source`, exactly one of `{"keychain": {"service": ..., "account": ...}}`, `{"env": "VAR"}` or `{"file": "/path"}` (the file must be mode 600); a plaintext `password` field is rejected.
+
+While a machine has no sidecar config, `--webdav-config` falls back to `~/.cc-switch/settings.json` and prints a notice. A config file that exists but is invalid is an error, never a silent fallback. `--cc-switch-webdav` remains as a legacy flag that always reads cc-switch; the sidecar is meant to replace cc-switch, so new scripts should use `--webdav-config`.
 
 `push` is safe by default:
 

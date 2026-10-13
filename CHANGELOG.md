@@ -10,6 +10,7 @@ All notable changes to Skill Sync Sidecar are documented here.
 - `pull-only`, `push-only`, and `no-writes` modes for peers that must not publish or consume changes automatically.
 - `blocked-report` command and automatic `sync-cycle` blocked review reports for policy blocks, conflicts, new-skill review, and delete review.
 - OpenClaw base-adoption, writer-policy, and blocked-report deployment validation documents.
+- Sidecar-owned WebDAV config (`config-init --from-cc-switch`, `--webdav-config`): URL/username in the sidecar config, password from Keychain, env or a mode-600 file. Falls back to cc-switch while no config exists (T-0260 step 1).
 
 ### Changed
 

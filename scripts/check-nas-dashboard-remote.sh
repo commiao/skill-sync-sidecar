@@ -17,7 +17,7 @@ WEBDAV_HTTP_PATH="$webdav_http_path" \
 import json
 import os
 
-from skill_sync_sidecar.config import load_cc_switch_webdav_settings
+from skill_sync_sidecar.config import load_webdav_settings
 from skill_sync_sidecar.remote import RemoteError
 from skill_sync_sidecar.remote import WebDavRemote
 from skill_sync_sidecar.config import ConfigError
@@ -29,7 +29,7 @@ def report_failure(reason: str, detail: str) -> None:
     raise SystemExit(2)
 
 try:
-    settings = load_cc_switch_webdav_settings()
+    settings = load_webdav_settings()
 except (ConfigError, RuntimeError) as exc:
     report_failure("config", str(exc))
 
