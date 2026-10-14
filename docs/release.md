@@ -59,6 +59,66 @@ scripts/status-current.sh
 
 The gate must be green before a release is promoted from the current Mac validation node.
 
+## Mac installed release
+
+The Mac runtime is `~/.local/share/skill-sync-sidecar/current`, a link to
+`releases/<sha>/`. Releasing switches the link; it does not touch processes that
+are already running. A long-running Python job keeps the code it imported at
+startup until it is restarted, so a release that does not restart them is not
+live. On 2026-10-13 `com.skill-sync-sidecar` and `.dashboard` were still running
+code from 2026-09-30, and `.operator-executor` was still using a release
+directory that had already been pruned.
+
+Release a main commit and restart every long-running job in the same command:
+
+```bash
+python3 ~/.local/share/fleet-ops/current/bin/mac-release.py skill-sync-sidecar \
+  --repo ~/work-ai/skill-sync-sidecar --ref <main-sha> \
+  --reload com.skill-sync-sidecar.operator-executor \
+  --reload com.skill-sync-sidecar.dashboard \
+  --reload com.skill-sync-sidecar.gateway \
+  --reload com.skill-sync-sidecar
+```
+
+`--reload` runs `launchctl kickstart -k` for each label after `current` has been
+switched.
+
+| Label | How it runs | Restart on release |
+| --- | --- | --- |
+| `com.skill-sync-sidecar` | `sync-daemon`, one cycle every 300 s | yes, between cycles |
+| `com.skill-sync-sidecar.operator-executor` | KeepAlive HTTP server, port 18765 | yes |
+| `com.skill-sync-sidecar.dashboard` | KeepAlive HTTP server, port 8765 | yes |
+| `com.skill-sync-sidecar.gateway` | KeepAlive HTTP server, port 8877 | yes |
+| `com.skill-sync-sidecar.mac-peer-status` | `StartInterval` 300 s | no, each run starts fresh |
+| `com.skill-sync-sidecar.nas-dashboard-export` | `StartInterval` 300 s | no, each run starts fresh |
+
+When you add a long-running job, add its label to this table and to the command.
+
+Do not restart `sync-daemon` in the middle of a cycle. Start the release right after
+a cycle has finished: `updated_at` in
+`~/Library/Application Support/skill-sync-sidecar/state.json` should be less than
+a few minutes old, with the last cycle `complete`. If that isn't practical, leave
+`--reload com.skill-sync-sidecar` out and run
+`launchctl kickstart -k gui/$(id -u)/com.skill-sync-sidecar` in the next gap.
+
+After the release, check the running processes, not the files on disk:
+
+```bash
+python3 ~/.local/share/fleet-ops/current/bin/mac-release.py skill-sync-sidecar \
+  --repo ~/work-ai/skill-sync-sidecar --check
+for l in com.skill-sync-sidecar com.skill-sync-sidecar.operator-executor \
+         com.skill-sync-sidecar.dashboard com.skill-sync-sidecar.gateway; do
+  pid=$(launchctl list | awk -v l="$l" '$3==l{print $1}')
+  echo "$l pid=$pid started=$(ps -o lstart= -p "$pid")"
+done
+curl -s http://127.0.0.1:18765/healthz   # repo_root must be .../skill-sync-sidecar/current
+```
+
+- Every start time must be later than the release.
+- The executor must report the `current` path, not a `releases/<sha>` path.
+- The first `sync-daemon` cycle after the restart must be `complete` with no
+  `blocked` items.
+
 ## Read-only NAS dashboard release
 
 The NAS Gateway is a read-only dashboard/aggregator. A release that changes
