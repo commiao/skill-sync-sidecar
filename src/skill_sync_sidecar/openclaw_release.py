@@ -45,8 +45,10 @@ def rollback(backup, run=command):
     manifest = json.loads((backup / 'manifest.json').read_text())
     runtime, units = Path(manifest['runtime']), Path(manifest['units'])
     # Stop the cleanup first; restoring a producer while cleanup is running is unsafe.
-    run('systemctl', 'disable', '--now', TIMER)
-    run('systemctl', 'stop', 'openclaw-skill-sync-retention.service')
+    if (units / TIMER).exists():
+        run('systemctl', 'disable', '--now', TIMER)
+    if (units / 'openclaw-skill-sync-retention.service').exists():
+        run('systemctl', 'stop', 'openclaw-skill-sync-retention.service')
     run('systemctl', 'stop', SYNC)
     for name, existed in manifest['files'].items():
         target = units / name
@@ -130,7 +132,8 @@ def promote(release, runtime=Path('/opt/skill-sync-sidecar'), units=Path('/etc/s
         run('systemctl', 'start', 'openclaw-skill-sync-peer-status.timer')
         run('systemctl', 'enable', '--now', TIMER)
         run('systemctl', 'start', 'openclaw-skill-sync-retention.service')
-        run('systemctl', 'is-active', '--quiet', SYNC, TIMER)
+        for unit in (SYNC, TIMER):
+            run('systemctl', 'is-active', '--quiet', unit)
     except Exception:
         rollback(backup, run)
         run('systemctl', 'start', 'openclaw-skill-sync-peer-status.timer')

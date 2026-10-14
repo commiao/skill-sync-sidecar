@@ -71,3 +71,15 @@ class OpenClawReleaseTest(unittest.TestCase):
         self.assertNotIn('push-pull', content)
         self.assertNotIn('openclaw-gateway', content)
         self.assertNotIn('/releases/', content)
+
+    def test_failure_before_timer_creation_still_restores_daemon(self):
+        def runner(*args):
+            self.calls.append(args)
+            if args == ('systemctl', 'stop', 'openclaw-skill-sync-peer-status.timer'):
+                raise RuntimeError('simulated timer-stop failure')
+            if args == ('systemctl', 'disable', '--now', TIMER):
+                raise AssertionError('must not disable a nonexistent timer')
+        with self.assertRaises(RuntimeError):
+            promote(self.release, self.runtime, self.units, runner, wait=False)
+        self.assertEqual((self.runtime / 'current').resolve(), self.old)
+        self.assertIn(('systemctl', 'start', SYNC), self.calls)
