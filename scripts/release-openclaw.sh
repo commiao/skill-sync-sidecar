@@ -50,7 +50,10 @@ manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest()
     'source_sha256':manifest},indent=2)+'\n')
 PY
 tar -czf "$stage/payload.tar.gz" -C "$stage/payload" .
-remote_upload="/opt/skill-sync-sidecar/downloads/retention-${sha}-$(date +%s).tar.gz"
+remote_upload="$(ssh admin@100.79.177.102 'umask 077; mktemp /home/admin/clawd/logs/skill-sync-release.XXXXXX')"
+[[ "$remote_upload" =~ ^/home/admin/clawd/logs/skill-sync-release\.[a-zA-Z0-9]+$ ]] || {
+  echo 'unexpected remote upload path' >&2; exit 1;
+}
 scp "$stage/payload.tar.gz" "admin@100.79.177.102:$remote_upload"
 ssh admin@100.79.177.102 sudo -n /opt/skill-sync-sidecar/venv-0.1.3/bin/python - "$remote_upload" "$sha" <<'PY'
 import hashlib,json,subprocess,sys,tarfile
