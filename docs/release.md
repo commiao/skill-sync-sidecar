@@ -69,19 +69,19 @@ live. On 2026-10-13 `com.skill-sync-sidecar` and `.dashboard` were still running
 code from 2026-09-30, and `.operator-executor` was still using a release
 directory that had already been pruned.
 
-Release a main commit and restart every long-running job in the same command:
+Release a main commit:
 
 ```bash
 python3 ~/.local/share/fleet-ops/current/bin/mac-release.py skill-sync-sidecar \
-  --repo ~/work-ai/skill-sync-sidecar --ref <main-sha> \
-  --reload com.skill-sync-sidecar.operator-executor \
-  --reload com.skill-sync-sidecar.dashboard \
-  --reload com.skill-sync-sidecar.gateway \
-  --reload com.skill-sync-sidecar
+  --repo ~/work-ai/skill-sync-sidecar --ref <main-sha>
 ```
 
-`--reload` runs `launchctl kickstart -k` for each label after `current` has been
-switched.
+After `current` has been switched, `mac-release.py` restarts (`launchctl kickstart
+-k`) every job declared in [`mac-release.json`](../mac-release.json) at the repo
+root. The release command used to need four `--reload` flags typed by hand; the
+list now travels with the commit. This needs fleet-ops with declared-reload
+support (fleet-ops T-0277); an older `mac-release.py` ignores the file and
+restarts nothing.
 
 | Label | How it runs | Restart on release |
 | --- | --- | --- |
@@ -91,15 +91,24 @@ switched.
 | `com.skill-sync-sidecar.gateway` | KeepAlive HTTP server, port 8877 | yes |
 | `com.skill-sync-sidecar.mac-peer-status` | `StartInterval` 300 s | no, each run starts fresh |
 | `com.skill-sync-sidecar.nas-dashboard-export` | `StartInterval` 300 s | no, each run starts fresh |
+| `com.skill-sync-sidecar.openclaw-peer-status` | `StartInterval` | no, each run starts fresh |
 
-When you add a long-running job, add its label to this table and to the command.
+When you add a long-running job (an installer whose plist has no
+`StartInterval`), add its label to `mac-release.json` and to this table.
+`tests/test_mac_release_decl.py` derives the resident jobs from `scripts/` and
+fails if the declaration does not match.
 
-Do not restart `sync-daemon` in the middle of a cycle. Start the release right after
-a cycle has finished: `updated_at` in
-`~/Library/Application Support/skill-sync-sidecar/state.json` should be less than
-a few minutes old, with the last cycle `complete`. If that isn't practical, leave
-`--reload com.skill-sync-sidecar` out and run
-`launchctl kickstart -k gui/$(id -u)/com.skill-sync-sidecar` in the next gap.
+`sync-daemon` must not be killed in the middle of a cycle. Its entry carries
+`when_idle: scripts/sync-daemon-idle.py`, which `mac-release.py` polls from the
+release directory (up to 360 s) and restarts the daemon only once it exits 0:
+no `active_cycle` in `state.json` and the next cycle more than 60 s away. If it
+never sees a gap, it leaves the daemon running, exits 3 and prints the
+`launchctl kickstart -k gui/$(id -u)/com.skill-sync-sidecar` command to run in
+the next gap. Exit 3 means `current` was switched but some job is still on old
+code; it is not a success.
+
+`--no-reload` skips the declared jobs. Use it only when you will restart them
+yourself.
 
 After the release, check the running processes, not the files on disk:
 
