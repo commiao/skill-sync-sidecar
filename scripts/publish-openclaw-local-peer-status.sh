@@ -92,6 +92,7 @@ if not isinstance(tools, list) or not tools or tools[0].get("id") != "openclaw":
 PY
 
 mv "$tmp_file" "$STATUS_FILE"
+rm -f "$tools_file"
 trap - EXIT
 
 PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar publish-peer-status \

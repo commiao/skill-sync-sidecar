@@ -109,11 +109,9 @@ def _build_tombstones_if_needed(
     work_dir: Path,
     last_applied_record: Optional[Path],
 ) -> Optional[Dict[str, object]]:
-    if not any(item["action"] in {"local_deleted", "remote_deleted"} for item in status.get("items", [])):
-        _reset_generated_report_dir(work_dir / "tombstones")
-        return None
-    _reset_generated_report_dir(work_dir / "tombstones")
-    return build_tombstones(local_root, cache_dir, work_dir / "tombstones", last_applied_record)
+    # Refresh even an empty index, while preserving historical rollback material.
+    result = build_tombstones(local_root, cache_dir, work_dir / "tombstones", last_applied_record)
+    return result if result["total_tombstones"] else None
 
 
 def _reset_generated_report_dir(path: Path) -> None:
