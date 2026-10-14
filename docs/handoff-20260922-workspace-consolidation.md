@@ -59,8 +59,9 @@ reports its independently deployed commit and current Gateway health.
   `docs/nas-gateway-deployment.md` contracts. Compare the intended commit with
   real `origin/main` before release.
 - The Mac and NAS are separate release surfaces. Verify both after deployment.
-- A Mac release must restart the long-running LaunchAgents (`--reload`), or the
-  running jobs keep the old code. See "Mac installed release" in `docs/release.md`.
+- A Mac release must restart the long-running LaunchAgents, or the running jobs
+  keep the old code. `mac-release.py` does it from `mac-release.json`; exit 3 means
+  some job was not restarted. See "Mac installed release" in `docs/release.md`.
   Do not treat a NAS dashboard-only exception as permission to skip the full
   gate for Mac installation or sync behavior changes.
 - Before any NAS deployment, read the deployed commit, Gateway health, agent

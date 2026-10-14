@@ -1,0 +1,16 @@
+{
+  "_note": "Long-running launchd jobs that fleet-ops mac-release.py restarts after every Mac release. A new resident job (an installer without StartInterval) must be added here; tests/test_mac_release_decl.py checks. sync-daemon is restarted only between cycles.",
+  "reload": [
+    "com.skill-sync-sidecar.operator-executor",
+    "com.skill-sync-sidecar.dashboard",
+    "com.skill-sync-sidecar.gateway",
+    {
+      "label": "com.skill-sync-sidecar",
+      "when_idle": [
+        "/usr/bin/python3",
+        "scripts/sync-daemon-idle.py"
+      ],
+      "idle_timeout_seconds": 360
+    }
+  ]
+}
