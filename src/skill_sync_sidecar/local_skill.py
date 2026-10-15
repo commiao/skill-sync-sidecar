@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -371,6 +372,11 @@ def _target_status(source: Path, skill_id: str, manifest: dict, raw_source_hash:
         action = "skip"
         allowed = False
         reason = "tool root not found on this device"
+    elif target.tool_id != "sidecar" and _links_into_canonical(target_path, root):
+        # 切换后各工具里是指向正本的软链，由 fanout 维护：正本一更新它就是新内容。
+        # 照常「替换」会把软链换成实体副本，悄悄退出软链方案（T-0260）。
+        action = "noop"
+        reason = "linked to the canonical copy; fanout keeps it current"
     elif same_path and not target_manifest_exists:
         action = "write_manifest"
         reason = "sidecar metadata will be written into the existing source skill"
@@ -494,6 +500,19 @@ def _write_install_record(result: dict) -> Path:
     record_path = record_dir / ".local-skill-install-record.json"
     record_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return record_path
+
+
+def _links_into_canonical(target_path: Path, tool_root: Path) -> bool:
+    if not target_path.is_symlink():
+        return False
+    try:
+        canonical = configured_local_root().expanduser().resolve()
+    except ConfigError:
+        return False
+    if _same_path(tool_root, canonical):
+        return False
+    resolved = Path(os.path.realpath(target_path))
+    return resolved == canonical or canonical in resolved.parents
 
 
 def _same_path(left: Path, right: Path) -> bool:
