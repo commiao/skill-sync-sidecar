@@ -1,7 +1,9 @@
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest import mock
 
 from skill_sync_sidecar.local_skill import LocalSkillError, LocalToolTarget, analyze_local_skill, install_local_skill, publish_local_skill
 from skill_sync_sidecar.remote import FileRemote, upload_snapshot
@@ -289,6 +291,51 @@ class LocalSkillTest(unittest.TestCase):
 
             with self.assertRaisesRegex(LocalSkillError, "shared-library save is blocked"):
                 publish_local_skill(local_root, remote_snapshot, "demo", remote)
+
+    def test_install_leaves_tool_links_into_the_canonical_root_to_fanout(self):
+        # 切换后工具里是指向正本的软链；先写正本、再按旧计划「替换」工具条目，
+        # 会把软链换成实体副本（T-0260）。指向正本的软链必须跳过。
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "release" / "demo"
+            canonical = root / "canonical"
+            tool_root = root / "tool"
+            self._write_skill(source, "demo", body="new")
+            self._write_skill(canonical / "demo", "demo", body="old")
+            tool_root.mkdir()
+            (tool_root / "demo").symlink_to(canonical / "demo")
+            config = root / "config.json"
+            config.write_text(json.dumps({"local_root": str(canonical)}), encoding="utf-8")
+            targets = [
+                LocalToolTarget("sidecar", "Sidecar", canonical, "sidecar"),
+                LocalToolTarget("codex", "Codex", tool_root, "codex"),
+            ]
+
+            with mock.patch.dict(os.environ, {"SKILL_SYNC_CONFIG": str(config)}):
+                result = install_local_skill(source, tool_targets=targets, yes=True, allow_local_writes=True)
+
+            actions = {item["tool_id"]: item["action"] for item in result["items"]}
+            self.assertEqual(actions["codex"], "noop")
+            self.assertTrue((tool_root / "demo").is_symlink())
+            self.assertIn("new", (tool_root / "demo" / "SKILL.md").read_text(encoding="utf-8"))
+
+    def test_install_still_replaces_links_elsewhere(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "release" / "demo"
+            other = root / "skillshub" / "demo"
+            tool_root = root / "tool"
+            self._write_skill(source, "demo", body="new")
+            self._write_skill(other, "demo", body="old")
+            tool_root.mkdir()
+            (tool_root / "demo").symlink_to(other)
+            config = root / "config.json"
+            config.write_text(json.dumps({"local_root": str(root / "canonical")}), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"SKILL_SYNC_CONFIG": str(config)}):
+                result = install_local_skill(
+                    source, tool_targets=[LocalToolTarget("codex", "Codex", tool_root, "codex")], yes=True, allow_local_writes=True
+                )
+            self.assertEqual(result["items"][0]["action"], "replace_with_backup")
 
     def _write_skill(self, path: Path, skill_id: str, body: str = "body") -> None:
         path.mkdir(parents=True, exist_ok=True)
