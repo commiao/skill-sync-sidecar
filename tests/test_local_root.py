@@ -139,13 +139,18 @@ class MigrateLocalRootTest(unittest.TestCase):
 
 
 class DefaultToolTargetsTest(unittest.TestCase):
-    def test_no_extra_target_before_migration(self):
+    def test_canonical_is_the_first_target_even_before_migration(self):
+        # 未迁移的设备上正本就是 ~/.cc-switch/skills，以 sidecar 目标写入；cc-switch 与
+        # skillshub 不再作为独立安装目标（T-0260 第 6 步）
         with TemporaryDirectory() as tmp:
             config = Path(tmp) / "config.json"
             with mock.patch.dict(os.environ, {"SKILL_SYNC_CONFIG": str(config)}):
-                ids = [t.tool_id for t in default_local_tool_targets()]
-            self.assertNotIn("sidecar", ids)
-            self.assertIn("cc-switch", ids)
+                targets = default_local_tool_targets()
+            self.assertEqual(targets[0].tool_id, "sidecar")
+            self.assertEqual(targets[0].root, Path.home() / ".cc-switch" / "skills")
+            ids = [t.tool_id for t in targets]
+            self.assertNotIn("cc-switch", ids)
+            self.assertNotIn("skillshub", ids)
 
     def test_sidecar_root_is_an_install_target_after_migration(self):
         with TemporaryDirectory() as tmp:

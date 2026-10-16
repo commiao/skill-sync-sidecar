@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
+from .config import sidecar_skills_root
 from .scanner import scan_roots
 
 
@@ -12,8 +13,9 @@ ToolRoot = tuple[str, str, tuple[Path, ...], str]
 
 
 DEFAULT_TOOL_ROOTS: tuple[ToolRoot, ...] = (
-    ("cc-switch", "cc-switch", (Path.home() / ".cc-switch" / "skills",), "主同步目录"),
-    ("skillshub", "skillshub", (Path.home() / ".skillshub",), "工具技能目录"),
+    ("sidecar", "Sidecar 本机正本", (sidecar_skills_root(),), "本机正本（daemon 同步它）"),
+    ("cc-switch", "cc-switch", (Path.home() / ".cc-switch" / "skills",), "过渡期分发目标（fanout 软链）"),
+    ("skillshub", "skillshub", (Path.home() / ".skillshub",), "已退役，不再写入"),
     ("codex", "Codex", (Path.home() / ".codex" / "skills", Path.home() / ".agents" / "skills"), "Codex 可发现目录"),
     ("cursor", "Cursor", (Path.home() / ".cursor" / "skills",
                           Path.home() / ".cursor" / "skills-cursor"), "Cursor 技能目录"),

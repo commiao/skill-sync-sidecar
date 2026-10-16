@@ -426,8 +426,10 @@ class ScannerTest(unittest.TestCase):
 
     def test_global_default_targets_include_ide_tools(self):
         targets = default_targets_for_scope("global")
-        for tool in ("cc-switch", "skillshub", "codex", "openclaw", "claude-code", "cursor", "qoder"):
+        for tool in ("cc-switch", "codex", "openclaw", "claude-code", "cursor", "qoder"):
             self.assertIn(tool, targets)
+        # skillshub 已退役（T-0260 第 6 步），不再是默认投放目标
+        self.assertNotIn("skillshub", targets)
 
     def test_scan_follows_symlinked_tool_skills(self):
         with TemporaryDirectory() as tmp:

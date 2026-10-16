@@ -45,7 +45,6 @@ SKILL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 CONTENT_HASH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$")
 MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "cc-switch": ("cc-switch-global", (".cc-switch", "skills"), "cc-switch"),
-    "skillshub": ("skillshub-global", (".skillshub",), "skillshub"),
     "codex": ("codex-global", (".codex", "skills"), "Codex"),
     "cursor": ("cursor-global", (".cursor", "skills"), "Cursor"),
     "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),

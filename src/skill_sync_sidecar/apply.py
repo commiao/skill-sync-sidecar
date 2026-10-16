@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -104,6 +105,10 @@ def build_apply_plan(
             scope = str(skill.get("scope") or "global")
             targets = [str(item) for item in (skill.get("targets") or [])]
             allowed, reason = _global_tool_allowance(skill_id, scope, targets, config, selected_skill_ids)
+            if allowed and _links_into_canonical(root / skill_id, root):
+                # 切换后工具里是指向正本的软链，由 fanout 维护；照常替换会把软链换成
+                # 实体副本（dashboard「从中央装到某工具」就走这里，T-0260）
+                allowed, reason = False, "linked to the canonical copy; fanout keeps it current"
             items.append(
                 ApplyPlanItem(
                     key=str(skill.get("key")),
@@ -376,6 +381,21 @@ def _write_apply_record(record: Dict[str, object], record_path: Path) -> Dict[st
     record["record_path"] = str(record_path)
     record_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return record
+
+
+def _links_into_canonical(target_path: Path, tool_root: Path) -> bool:
+    if not target_path.is_symlink():
+        return False
+    from .config import ConfigError, configured_local_root
+
+    try:
+        canonical = configured_local_root().expanduser().resolve()
+    except ConfigError:
+        return False
+    if tool_root.expanduser().resolve() == canonical:
+        return False
+    resolved = Path(os.path.realpath(target_path))
+    return resolved == canonical or canonical in resolved.parents
 
 
 def _copy_path(source: Path, target: Path) -> None:
