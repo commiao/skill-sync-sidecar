@@ -11,7 +11,7 @@ status_file="${OPENCLAW_PEER_STATUS_OUT:-$HOME/Library/Application Support/skill
 OPENCLAW_PEER_STATUS_OUT="$status_file" "$repo_root/scripts/refresh-openclaw-peer-status.sh"
 
 PYTHONPATH="$repo_root/src" "$python_bin" -m skill_sync_sidecar publish-peer-status \
-  --cc-switch-webdav \
+  --webdav-config \
   --peer-id "$peer_id" \
   --status-path "$status_path" \
   --status-file "$status_file"

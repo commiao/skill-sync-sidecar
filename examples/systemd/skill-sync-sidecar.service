@@ -9,8 +9,8 @@ User=YOUR_USER
 WorkingDirectory=/PATH/TO/skill-sync-sidecar
 Environment=PYTHONPATH=/PATH/TO/skill-sync-sidecar/src
 ExecStart=/usr/bin/python3 -m skill_sync_sidecar sync-daemon \
-  --local-root /home/YOUR_USER/.cc-switch/skills \
-  --cc-switch-webdav \
+  --local-root /home/YOUR_USER/.local/share/skill-sync-sidecar/skills \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/YOUR_DEVICE \
   --cache-dir /home/YOUR_USER/.cache/skill-sync-sidecar/cache \
   --work-dir /home/YOUR_USER/.local/state/skill-sync-sidecar/work \

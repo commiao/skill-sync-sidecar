@@ -85,7 +85,7 @@ python3 -m skill_sync_sidecar local-skill-install \
 
 python3 -m skill_sync_sidecar local-skill-publish \
   --path /Users/mac/.codex/skills/read-wechat-article \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --dry-run
 ```
@@ -116,11 +116,11 @@ python3 -m skill_sync_sidecar status
 python3 -m skill_sync_sidecar ops-status --allow-new
 python3 -m skill_sync_sidecar ops-status --allow-new --writer-policy pull-only --blocked-report ./blocked-report/blocked-report.json
 python3 -m skill_sync_sidecar dashboard --allow-new --writer-policy pull-only --peer-status oc-vps=./openclaw-status.json
-python3 -m skill_sync_sidecar gateway --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --host 127.0.0.1 --port 8877
+python3 -m skill_sync_sidecar gateway --webdav-config --prefix skill-sync-sidecar-dev/current-mac --host 127.0.0.1 --port 8877
 python3 -m skill_sync_sidecar monitor-summary --brief
 python3 -m skill_sync_sidecar local-skill-analyze --path ~/.codex/skills/read-wechat-article
 python3 -m skill_sync_sidecar local-skill-install --path ~/.codex/skills/read-wechat-article --dry-run
-python3 -m skill_sync_sidecar local-skill-publish --path ~/.codex/skills/read-wechat-article --cc-switch-webdav --prefix skill-sync-sidecar-dev/current-mac --dry-run
+python3 -m skill_sync_sidecar local-skill-publish --path ~/.codex/skills/read-wechat-article --webdav-config --prefix skill-sync-sidecar-dev/current-mac --dry-run
 scripts/refresh-openclaw-peer-status.sh
 scripts/install-openclaw-peer-status-launchd.sh
 python3 -m skill_sync_sidecar openclaw-gate --fail-on-blocked
@@ -167,15 +167,15 @@ scripts/verify-release.sh
 Run against explicit roots:
 
 ```bash
-python3 -m skill_sync_sidecar scan --root cc-switch=~/.cc-switch/skills --root skillshub=~/.skillshub
+python3 -m skill_sync_sidecar scan --root canonical="$HOME/Library/Application Support/skill-sync-sidecar/skills" --root codex=~/.codex/skills
 ```
 
 ## Default Roots
 
 The sidecar scans existing local roots when they exist:
 
-- `~/.cc-switch/skills`
-- `~/.skillshub`
+- `~/Library/Application Support/skill-sync-sidecar/skills`（本机正本；Linux 为 `$XDG_DATA_HOME/skill-sync-sidecar/skills`）
+- `~/.cc-switch/skills`（过渡期的 fanout 目标；未迁移的设备上仍是正本）
 - `~/.codex/skills`
 - `~/.agents/skills`
 - `~/.cursor/skills`（Cursor 的用户技能目录。`~/.cursor/skills-cursor` 是 Cursor
@@ -185,6 +185,8 @@ The sidecar scans existing local roots when they exist:
 - `~/.dsh/skills`
 
 ## Canonical Local Root
+
+Cutting a device over from `~/.cc-switch/skills` to the sidecar's own root, step by step with checkpoints and rollback: [docs/canonical-root-cutover-runbook.md](docs/canonical-root-cutover-runbook.md).
 
 The sync daemon treats one directory as this device's canonical copy. It is `local_root` in the sidecar config, and `~/.cc-switch/skills` on a device that has not migrated. The sidecar is meant to replace cc-switch, so the canonical copy moves to the sidecar's own root (`~/Library/Application Support/skill-sync-sidecar/skills` on macOS, `$XDG_DATA_HOME/skill-sync-sidecar/skills` elsewhere):
 
@@ -285,13 +287,13 @@ While a machine has no sidecar config, `--webdav-config` falls back to `~/.cc-sw
 # Dry-run only
 python3 -m skill_sync_sidecar push \
   --snapshot-dir ./snapshot-preview \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/test"
 
 # Actually uploads
 python3 -m skill_sync_sidecar push \
   --snapshot-dir ./snapshot-preview \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/test" \
   --yes
 ```
@@ -311,7 +313,7 @@ The smoke test uploads only synthetic data under the provided dev prefix. It che
 Run the real local root through a non-network dry run before uploading private skill content anywhere:
 
 ```bash
-scripts/local-real-dryrun.sh "$HOME/.cc-switch/skills"
+scripts/local-real-dryrun.sh   # 默认用配置里的本机正本
 ```
 
 This packages the real local root, pushes it to a file-backed remote under `/private/tmp`, and runs `sync-daemon --dry-run --max-cycles 1` with a state file. It does not upload private skills to WebDAV.
@@ -320,7 +322,7 @@ After explicit approval to upload private skill content, run the real WebDAV dry
 
 ```bash
 SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD=1 \
-  scripts/real-webdav-dryrun.sh "$HOME/.cc-switch/skills" "skill-sync-sidecar-dev/real-$(hostname -s)-$(date +%Y%m%d%H%M%S)"
+  scripts/real-webdav-dryrun.sh "" "skill-sync-sidecar-dev/real-$(hostname -s)-$(date +%Y%m%d%H%M%S)"
 ```
 
 This uploads the real local root to the provided WebDAV prefix, reads it back, and runs `sync-daemon --dry-run --max-cycles 1` with a state file. It still does not install a daemon or write changes into the source skill root.
@@ -469,7 +471,7 @@ python3 -m skill_sync_sidecar sync-apply \
   --dry-run
 ```
 
-Real execution requires `--yes`. Pull actions stage and validate the remote snapshot, write through the same `apply` backup/rollback path, and emit a fresh `.apply-record.json`. Push actions require `--remote` or `--cc-switch-webdav`; before uploading, the sidecar verifies that the remote's current `index.json` still matches the local cache so a stale cache cannot overwrite another device's newer change. A successful push writes a `.skill-sync-bases/<sync-id>.json` base record that should be used as the next `--last-applied-record`.
+Real execution requires `--yes`. Pull actions stage and validate the remote snapshot, write through the same `apply` backup/rollback path, and emit a fresh `.apply-record.json`. Push actions require `--remote` or `--webdav-config`; before uploading, the sidecar verifies that the remote's current `index.json` still matches the local cache so a stale cache cannot overwrite another device's newer change. A successful push writes a `.skill-sync-bases/<sync-id>.json` base record that should be used as the next `--last-applied-record`.
 
 ```bash
 python3 -m skill_sync_sidecar sync-apply \
@@ -598,16 +600,16 @@ python3 -m skill_sync_sidecar snapshot \
 
 python3 -m skill_sync_sidecar push \
   --snapshot-dir webdav-canary-preview \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/canary-<timestamp>" \
   --yes
 
 python3 -m skill_sync_sidecar remote-status \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/canary-<timestamp>"
 
 python3 -m skill_sync_sidecar pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/canary-<timestamp>" \
   --out webdav-canary-cache
 ```
@@ -621,7 +623,7 @@ Uploading a real snapshot transfers local skill content to WebDAV. If an automat
 ```bash
 python3 -m skill_sync_sidecar push \
   --snapshot-dir snapshot-preview \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/<timestamp>" \
   --yes
 ```

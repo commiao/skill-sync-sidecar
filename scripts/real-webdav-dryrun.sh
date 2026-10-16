@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 if [ "${SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD:-}" != "1" ]; then
   echo "refusing to upload private skills without SKILL_SYNC_ALLOW_PRIVATE_WEBDAV_UPLOAD=1" >&2
   exit 2
 fi
 
-local_root="${1:-$HOME/.cc-switch/skills}"
+local_root="${1:-}"
+# 第一个参数留空或传 "" 时用配置里的本机正本（未迁移的机器仍是 ~/.cc-switch/skills）
+[ -n "$local_root" ] || local_root="$(PYTHONPATH="$repo_root/src" python3 -c 'from skill_sync_sidecar.config import configured_local_root; print(configured_local_root())')"
 prefix="${2:-skill-sync-sidecar-dev/real-$(hostname -s)-$(date +%Y%m%d%H%M%S)}"
 
 case "$prefix" in
@@ -39,25 +43,25 @@ mkdir -p "$base"
 
 "$python_bin" -m skill_sync_sidecar push \
   --snapshot-dir "$snapshot" \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --yes \
   --json >"$base/push.json"
 
 "$python_bin" -m skill_sync_sidecar remote-status \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --json >"$base/remote-status.json"
 
 "$python_bin" -m skill_sync_sidecar pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --out "$cache" \
   --json >"$base/pull-cache.json"
 
 "$python_bin" -m skill_sync_sidecar sync-daemon \
   --local-root "$local_root" \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$prefix" \
   --cache-dir "$cache" \
   --work-dir "$work" \

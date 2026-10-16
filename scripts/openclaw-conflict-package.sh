@@ -71,7 +71,7 @@ echo "skills=${skill_ids[*]:-all}"
 echo "out=${out_dir}"
 
 run_remote "${python_cmd[@]}" pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$SKILL_SYNC_PREFIX" \
   --out "$cache_dir" \
   --json

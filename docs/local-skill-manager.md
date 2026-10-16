@@ -140,7 +140,7 @@ Check shared-library save:
 ```bash
 python3 -m skill_sync_sidecar local-skill-publish \
   --path /Users/mac/.codex/skills/read-wechat-article \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --dry-run
 ```

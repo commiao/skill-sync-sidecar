@@ -19,7 +19,7 @@ tools_file="$(mktemp "${STATUS_FILE}.tools.XXXXXX")"
 trap 'rm -f "$tmp_file" "$tools_file"' EXIT
 
 PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$SKILL_SYNC_PREFIX" \
   --out "$REMOTE_SNAPSHOT" \
   --json >/dev/null
@@ -96,7 +96,7 @@ rm -f "$tools_file"
 trap - EXIT
 
 PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar publish-peer-status \
-  --cc-switch-webdav \
+  --webdav-config \
   --peer-id "$PEER_ID" \
   --status-path "$STATUS_PATH" \
   --status-file "$STATUS_FILE"
