@@ -380,7 +380,7 @@ def detect_project_path(skill_dir: Path) -> Optional[Path]:
 def default_targets_for_scope(scope: str) -> List[str]:
     if scope == "project":
         return ["codex", "cursor", "qoder"]
-    return ["cc-switch", "skillshub", "codex", "openclaw", "claude-code", "cursor", "qoder"]
+    return ["cc-switch", "codex", "openclaw", "claude-code", "cursor", "qoder"]
 
 
 def is_excluded(rel_path: str, patterns: Sequence[str]) -> bool:

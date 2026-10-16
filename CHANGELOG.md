@@ -19,6 +19,7 @@ All notable changes to Skill Sync Sidecar are documented here.
 - `local-skill-install` leaves tool entries that are symlinks into the canonical root alone (`noop`, fanout keeps them current) instead of replacing them with copies (T-0260).
 - Fanout adoption ignores `manifest.json` and dotfiles when deciding whether a tool entry is the same skill (resolves 10 false conflicts on the current Mac); fanout run records are capped at the latest 200 (T-0260).
 - Everything copied out of the read-only canonical root is made writable (`copy_tree_writable`): fanout copies, `local-skill-publish` / `local-skill-install` temporary trees and backups, conflict packages and tombstones; `sync-cycle` resets report directories even when they hold read-only copies; a failed fanout copy action removes its temporary directory (T-0260).
+- skillshub is retired as a destination and cc-switch is no longer written directly: `local-skill-install` targets the canonical root (`sidecar`, always first) plus the tool roots; skillshub left the default manifest/scanner targets, the executor's install targets and the projection adapters; `apply` into a tool skips entries that are symlinks into the canonical root; tool status labels the canonical root, cc-switch (fanout target) and skillshub (retired) (T-0260 step 6).
 
 ### Changed
 

@@ -1701,6 +1701,11 @@ class OpsStatusTest(unittest.TestCase):
             self._write_skill(hub / "stale", "stale", "old")
             self._write_skill(cc_switch / "stale", "stale", "new")
             self._write_skill(cc_switch / "fresh", "fresh", "fresh")
+            # skillshub 已不在默认 targets 里（T-0260 第 6 步）；要导入 Hub 的技能得显式声明
+            for name in ("stale", "fresh"):
+                (cc_switch / name / "manifest.json").write_text(
+                    json.dumps({"skill_id": name, "scope": "global", "targets": ["skillshub"]}), encoding="utf-8"
+                )
 
             response = build_hub_import_preview_response(
                 work,

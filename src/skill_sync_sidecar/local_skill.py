@@ -43,8 +43,6 @@ class LocalToolTarget:
 # 随时可能被它清理。Cursor 两个目录都会加载，所以这不是「读不到」，
 # 是「放错了地方」。
 DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
-    LocalToolTarget("cc-switch", "cc-switch", Path.home() / ".cc-switch" / "skills", "cc-switch"),
-    LocalToolTarget("skillshub", "skillshub", Path.home() / ".skillshub", "skillshub"),
     LocalToolTarget("codex", "Codex", Path.home() / ".codex" / "skills", "codex"),
     LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills", "cursor"),
     LocalToolTarget("claude-code", "Claude Code", Path.home() / ".claude" / "skills", "claude-code"),
@@ -55,22 +53,21 @@ DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
 
 
 def default_local_tool_targets() -> tuple[LocalToolTarget, ...]:
-    """安装目标 = 各工具目录 + sidecar 本机正本（迁移后才有）。
+    """安装目标 = sidecar 本机正本 + 各工具目录。
 
-    迁移前正本就是 ~/.cc-switch/skills，已在列表里，不重复加；迁移后正本是
-    sidecar 自己的目录，daemon 只同步它，所以本机安装必须写进去，否则新技能
-    推不到中央。正本不是「工具」，不看 manifest targets。
+    正本（daemon 只同步它）永远是第一个目标；它不是「工具」，不看 manifest targets。
+    未迁移的设备上正本就是 ~/.cc-switch/skills，同样以 sidecar 目标写入。
+    不再直接写 ~/.cc-switch/skills（切换后由 fanout 以软链维护）和 ~/.skillshub
+    （已退役，T-0260 第 6 步）。
     """
     try:
         canonical = configured_local_root().expanduser()
     except ConfigError as exc:
         raise LocalSkillError(str(exc)) from exc
-    if any(_same_path(canonical, target.root.expanduser()) for target in DEFAULT_LOCAL_TOOL_TARGETS):
-        return DEFAULT_LOCAL_TOOL_TARGETS
     return (LocalToolTarget("sidecar", "Sidecar 本机正本", canonical, "sidecar"),) + DEFAULT_LOCAL_TOOL_TARGETS
 
 
-DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "skillshub", "cursor", "claude-code", "qoder", "deepseek-harness", "openclaw"]
+DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "cursor", "claude-code", "qoder", "deepseek-harness", "openclaw"]
 DEFAULT_PROJECT_TARGETS = ["codex", "cursor", "qoder"]
 DEFAULT_EXCLUDES = ["__pycache__", "*.pyc", ".DS_Store"]
 SECRET_HINTS = {".env", ".env.local", ".npmrc", ".pypirc"}
