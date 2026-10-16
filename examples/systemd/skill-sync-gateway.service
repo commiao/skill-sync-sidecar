@@ -9,7 +9,7 @@ User=YOUR_USER
 WorkingDirectory=/PATH/TO/skill-sync-sidecar
 Environment=PYTHONPATH=/PATH/TO/skill-sync-sidecar/src
 ExecStart=/usr/bin/python3 -m skill_sync_sidecar gateway \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --cache-dir /home/YOUR_USER/.cache/skill-sync-sidecar/gateway/current \
   --refresh-interval-seconds 60 \

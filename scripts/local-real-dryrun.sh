@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-local_root="${1:-$HOME/.cc-switch/skills}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+local_root="${1:-$(PYTHONPATH="$repo_root/src" python3 -c 'from skill_sync_sidecar.config import configured_local_root; print(configured_local_root())')}"
 if [ ! -d "$local_root" ]; then
   echo "local skill root not found: $local_root" >&2
   exit 2

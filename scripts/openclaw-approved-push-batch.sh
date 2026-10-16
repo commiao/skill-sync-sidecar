@@ -121,7 +121,7 @@ echo "skills=${skill_ids[*]}"
 echo "out=${out_dir}"
 
 run_remote "${python_cmd[@]}" pull-cache \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$SKILL_SYNC_PREFIX" \
   --out /opt/skill-sync-sidecar/cache/current-mac-pullonly \
   --json
@@ -134,7 +134,7 @@ run_remote "${python_cmd[@]}" sync-cycle \
   --work-dir /opt/skill-sync-sidecar/work/current-mac-pullonly \
   --allow-new \
   --writer-policy pull-only \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "$SKILL_SYNC_PREFIX" \
   --dry-run \
   --json
@@ -277,7 +277,7 @@ fi
 approved_args+=(
   --base-record-out /opt/skill-sync-sidecar/state/openclaw-base-record.json
   --out "$out_dir"
-  --cc-switch-webdav
+  --webdav-config
   --prefix "$SKILL_SYNC_PREFIX"
   "$mode"
   --json

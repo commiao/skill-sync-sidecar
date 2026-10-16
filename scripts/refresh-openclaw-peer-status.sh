@@ -18,7 +18,7 @@ trap 'rm -f "$tmp_file" "$tools_file"' EXIT
 
 ssh -o BatchMode=yes -o ConnectTimeout="$OPENCLAW_CONNECT_TIMEOUT" "$OPENCLAW_SSH_TARGET" \
   "sudo -iu admin env PYTHONPATH=/opt/skill-sync-sidecar/releases/${OPENCLAW_RELEASE}/src ${OPENCLAW_PYTHON} -m skill_sync_sidecar pull-cache \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix ${SKILL_SYNC_PREFIX} \
     --out /opt/skill-sync-sidecar/cache/current-mac-pullonly \
     --json >/dev/null"

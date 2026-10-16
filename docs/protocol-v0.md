@@ -224,7 +224,7 @@ After a successful push, the sidecar writes `.skill-sync-bases/<sync-id>.json` u
 When reusing cc-switch WebDAV settings, use:
 
 ```bash
-skill-sync push --snapshot-dir ./snapshot-preview --cc-switch-webdav --prefix skill-sync-sidecar-dev/test
+skill-sync push --snapshot-dir ./snapshot-preview --webdav-config --prefix skill-sync-sidecar-dev/test
 ```
 
 HTTP uploads require a non-empty `--prefix`, and the official `cc-switch-sync` prefix is protected from sidecar writes.

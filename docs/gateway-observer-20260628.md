@@ -16,7 +16,7 @@ Smoke-tested command:
 
 ```bash
 PYTHONPATH=src python3 -m skill_sync_sidecar gateway \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --cache-dir /private/tmp/skill-sync-gateway-smoke \
   --refresh-interval-seconds 0 \

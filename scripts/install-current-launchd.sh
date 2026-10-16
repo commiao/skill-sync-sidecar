@@ -9,7 +9,8 @@ fi
 . "$(dirname "${BASH_SOURCE[0]}")/_install-common.sh"
 repo_root="$(skill_sync_resolve_repo_root "$(dirname "${BASH_SOURCE[0]}")")"
 python_bin="${PYTHON:-python3}"
-local_root="${SKILL_SYNC_LOCAL_ROOT:-$HOME/.cc-switch/skills}"
+# 不设 SKILL_SYNC_LOCAL_ROOT 时用配置里的本机正本（未迁移的机器仍是 ~/.cc-switch/skills）
+local_root="${SKILL_SYNC_LOCAL_ROOT:-$(PYTHONPATH="$repo_root/src" "$python_bin" -c 'from skill_sync_sidecar.config import configured_local_root; print(configured_local_root())')}"
 device_name="$(hostname -s | tr -c 'A-Za-z0-9._-' '-' | sed 's/-$//')"
 prefix="${SKILL_SYNC_PREFIX:-skill-sync-sidecar-dev/current-${device_name}}"
 mode="${SKILL_SYNC_DAEMON_MODE:-yes}"

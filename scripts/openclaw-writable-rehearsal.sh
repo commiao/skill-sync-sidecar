@@ -18,7 +18,7 @@ Environment overrides:
   PYTHON_BIN                         Python 3.9+ interpreter. Default: python3
   SKILL_SYNC_LOCAL_ROOT              Target skill root. Default: /home/admin/clawd/skills
   SKILL_SYNC_PREFIX                  WebDAV prefix. Default: skill-sync-sidecar-dev/current-mac
-  SKILL_SYNC_REMOTE                  Optional remote URL. If unset, uses --cc-switch-webdav.
+  SKILL_SYNC_REMOTE                  Optional remote URL. If unset, uses --webdav-config (sidecar config, falling back to cc-switch).
   SKILL_SYNC_USE_CC_SWITCH_WEBDAV    Set 0 to require SKILL_SYNC_REMOTE. Default: 1
   SKILL_SYNC_CACHE_DIR               Download cache. Default: /opt/skill-sync-sidecar/cache/openclaw-writable-rehearsal
   SKILL_SYNC_WORK_DIR                Work dir. Default: /opt/skill-sync-sidecar/work/openclaw-writable-rehearsal
@@ -96,7 +96,7 @@ fi
 if [[ -n "$REMOTE_URL" ]]; then
   daemon_args+=(--remote "$REMOTE_URL")
 elif [[ "$USE_CC_SWITCH_WEBDAV" == "1" ]]; then
-  daemon_args+=(--cc-switch-webdav)
+  daemon_args+=(--webdav-config)
 else
   printf 'SKILL_SYNC_REMOTE is required when SKILL_SYNC_USE_CC_SWITCH_WEBDAV=0\n' >&2
   exit 2

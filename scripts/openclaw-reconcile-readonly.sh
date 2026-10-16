@@ -26,7 +26,7 @@ if [[ -n "$REMOTE_CACHE" ]]; then
   remote_snapshot="$REMOTE_CACHE"
 else
   PYTHONPATH="$ROOT_DIR/src" "$PYTHON_BIN" -m skill_sync_sidecar pull-cache \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$PREFIX" \
     --out "$OUT/remote-cache" \
     --json \
