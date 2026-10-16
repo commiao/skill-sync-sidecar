@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Dict, Optional
 
+from .protect import remove_path
 from .blocked_report import build_blocked_report
 from .conflicts import build_conflict_packages
 from .remote import Remote, download_snapshot
@@ -115,8 +115,8 @@ def _build_tombstones_if_needed(
 
 
 def _reset_generated_report_dir(path: Path) -> None:
-    if path.exists():
-        shutil.rmtree(path)
+    # 冲突包、删除记录里有从只读正本复制来的目录，删除要先解除只读
+    remove_path(path)
 
 
 def _write_blocked_report(

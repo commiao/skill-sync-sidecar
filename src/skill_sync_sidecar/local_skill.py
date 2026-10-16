@@ -10,7 +10,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Sequence
 
-from .protect import remove_path
+from .protect import copy_tree_writable, remove_path
 from .config import ConfigError, configured_local_root
 from .approved_push import _assert_remote_matches_cache, _build_merged_snapshot, _snapshot_id, _write_sync_base_record
 from .model import SkillFile
@@ -191,7 +191,7 @@ def publish_local_skill(
     with TemporaryDirectory(prefix="skill-sync-local-skill-publish-") as tmp:
         isolated_root = Path(tmp) / "selected-skill"
         isolated_skill = isolated_root / normalized
-        shutil.copytree(local_skill_dir, isolated_skill, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
+        copy_tree_writable(local_skill_dir, isolated_skill, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
         (isolated_skill / "manifest.json").write_text(
             json.dumps(analysis["manifest"], ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
@@ -473,12 +473,12 @@ def _install_target(analysis: dict, item: dict, install_id: str) -> dict:
     if target.exists() and backup.exists():
         raise LocalSkillError(f"backup already exists: {backup}")
     try:
-        shutil.copytree(source, temp, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
+        copy_tree_writable(source, temp, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
         (temp / "manifest.json").write_text(json.dumps(analysis["manifest"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         had_existing = target.exists()
         if had_existing:
             backup.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(target, backup, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
+            copy_tree_writable(target, backup, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
             _remove_path(target)
         temp.replace(target)
     except Exception as exc:

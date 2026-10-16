@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, Optional
 
+from .protect import copy_tree_writable
 from .stage import sanitize_component, stage_snapshot
 from .sync_state import build_sync_status
 
@@ -100,7 +101,7 @@ def _write_conflict_package(
 def _write_local_material(package_dir: Path, local_root: Path, skill_id: str) -> None:
     local_path = local_root / skill_id
     if local_path.exists():
-        shutil.copytree(local_path, package_dir / "local")
+        copy_tree_writable(local_path, package_dir / "local")
         return
     (package_dir / "local.json").write_text(
         json.dumps({"state": "absent", "path": str(local_path)}, ensure_ascii=False, indent=2) + "\n",
@@ -129,7 +130,7 @@ def _write_base_material(package_dir: Path, item: dict, last_applied_record: Opt
     }
     source = _base_source_path(item, last_applied_record)
     if source and source.exists() and source.is_dir():
-        shutil.copytree(source, package_dir / "base")
+        copy_tree_writable(source, package_dir / "base")
         base["state"] = "copied"
         base["source_path"] = str(source)
     (package_dir / "base.json").write_text(json.dumps(base, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

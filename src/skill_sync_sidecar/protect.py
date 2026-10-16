@@ -85,3 +85,15 @@ def protect_skill_dirs(root: Path) -> int:
             continue
         changed += make_readonly(entry)
     return changed
+
+
+def copy_tree_writable(source: Path, target: Path, **kwargs) -> None:
+    """copytree 后恢复写权限。
+
+    只读的是正本本身；从它复制出去的东西（发布用的临时目录、冲突包、删除记录、备份、
+    工具里的复制品）都要能被后续代码改写和删除。copytree 会连权限一起复制，所以从
+    受保护的正本复制出来的目录默认也是只读的 —— 2026-10-16 local-skill-publish 往
+    复制品里写 manifest.json 就因此失败。
+    """
+    shutil.copytree(source, target, **kwargs)
+    make_writable(target)

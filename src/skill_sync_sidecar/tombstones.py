@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, Optional
 
+from .protect import copy_tree_writable
 from .report_retention import atomic_json, records, report_lock, signature, _prune_locked
 from .stage import sanitize_component, stage_snapshot
 from .sync_state import build_sync_status
@@ -124,7 +125,7 @@ def _write_tombstone(
 def _write_local_material(tombstone_dir: Path, local_root: Path, skill_id: str) -> None:
     local_path = local_root / skill_id
     if local_path.exists():
-        shutil.copytree(local_path, tombstone_dir / "local")
+        copy_tree_writable(local_path, tombstone_dir / "local")
         return
     (tombstone_dir / "local.json").write_text(
         json.dumps({"state": "absent", "path": str(local_path)}, ensure_ascii=False, indent=2) + "\n",

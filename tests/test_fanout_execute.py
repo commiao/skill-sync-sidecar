@@ -144,6 +144,34 @@ class CopyModeTest(FanoutExecuteBase):
         self.assertFalse((self.tool_root / "same").exists())
 
 
+class CopyFromReadOnlyCanonicalTest(FanoutExecuteBase):
+    def test_copy_actions_work_when_the_canonical_root_is_read_only(self):
+        # 切换后正本只读；复制模式的临时目录若带着只读权限，macOS 上改名会被拒
+        from skill_sync_sidecar.protect import make_readonly
+
+        tool = FanoutTool("cursor", self.tool_root, "copy", frozenset({"cursor"}))
+        for name in ("new", "linked", "stale"):
+            _skill(self.canonical, name, body="v2", manifest=_declared(name, "cursor"))
+        (self.tool_root / "linked").symlink_to(_skill(self.legacy, "linked", body="v2", manifest=_declared("linked", "cursor")))
+        stale = _skill(self.tool_root, "stale", body="v1", manifest=_declared("stale", "cursor"))
+        ledger_path = self.state / "fanout" / "cursor.json"
+        ledger_path.parent.mkdir(parents=True)
+        ledger_path.write_text(json.dumps({"entries": {"stale": {"content_hash": fanout._hash_of(stale)}}}), encoding="utf-8")
+        make_readonly(self.canonical)
+
+        record = run_fanout(self.canonical, tools=[tool], yes=True, state_dir=self.state)
+
+        report = record["tools"][0]
+        self.assertEqual(report["failed"], [])
+        self.assertEqual({e["name"]: e["action"] for e in report["executed"]}, {"new": "copy", "linked": "replace_link_with_copy", "stale": "update_copy"})
+        for name in ("new", "linked", "stale"):
+            entry = self.tool_root / name
+            self.assertFalse(entry.is_symlink())
+            self.assertIn("v2", (entry / "SKILL.md").read_text())
+            (entry / "SKILL.md").write_text("tool copies stay writable", encoding="utf-8")
+        self.assertEqual([p.name for p in self.tool_root.iterdir() if "skill-sync-tmp" in p.name], [])
+
+
 class LockAndRetentionTest(FanoutExecuteBase):
     def test_second_writer_times_out(self):
         with tool_lock("codex", self.state):

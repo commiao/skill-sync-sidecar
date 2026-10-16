@@ -15,7 +15,6 @@ import fcntl
 import hashlib
 import json
 import os
-import shutil
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -25,7 +24,7 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 from .config import ConfigError, LEGACY_LOCAL_ROOT, _read_config, default_config_path, sidecar_state_dir
 from .model import SkillRecord
-from .protect import move_path, protect_skill_dirs, remove_path
+from .protect import copy_tree_writable, move_path, protect_skill_dirs, remove_path
 from .scanner import scan_roots
 
 HOME = Path.home()
@@ -372,7 +371,9 @@ def _copy_into(source: Path, entry: Path, run_id: str) -> Path:
     tmp = entry.parent / f".{entry.name}.skill-sync-tmp-{run_id}"
     if tmp.exists() or tmp.is_symlink():
         remove_path(tmp)
-    shutil.copytree(source, tmp, symlinks=True)
+    # 正本是只读的，copytree 连权限一起复制；macOS 上只读目录连同一父目录内改名都会
+    # 被拒（2026-10-16 Cursor 的 kg-use 就这样失败）。复制品属于工具，不需要只读
+    copy_tree_writable(source, tmp, symlinks=True)
     return tmp
 
 
@@ -402,13 +403,23 @@ def _execute_item(tool: FanoutTool, item: Dict[str, object], ledger: Dict[str, s
         if entry.exists() or entry.is_symlink():
             remove_path(tmp)
             raise FanoutError(f"{entry} appeared since planning")
-        tmp.rename(entry)
+        try:
+            tmp.rename(entry)
+        except OSError:
+            remove_path(tmp)
+            raise
         ledger[entry.name] = str(item["content_hash"])
     elif action == "update_copy":
         tmp = _copy_into(source, entry, run_id)
-        move_path(entry, backup)
-        done["backup_path"] = str(backup)
-        tmp.rename(entry)
+        try:
+            move_path(entry, backup)
+            done["backup_path"] = str(backup)
+            tmp.rename(entry)
+        except OSError:
+            if not entry.exists() and backup.exists():
+                move_path(backup, entry)
+            remove_path(tmp)
+            raise
         ledger[entry.name] = str(item["content_hash"])
     elif action == "adopt":
         ledger[entry.name] = str(item["content_hash"])  # 复制品当前的整树哈希（见 _plan_entry）
@@ -420,6 +431,7 @@ def _execute_item(tool: FanoutTool, item: Dict[str, object], ledger: Dict[str, s
             tmp.rename(entry)
         except OSError:
             os.symlink(str(done["old_link_target"]), entry)
+            remove_path(tmp)
             raise
         ledger[entry.name] = str(item["content_hash"])
     elif action == "remove_dangling_link":
