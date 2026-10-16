@@ -133,6 +133,35 @@ def _hash_of(path: Path) -> Optional[str]:
     return hashlib.sha256(json.dumps(pairs).encode("utf-8")).hexdigest()
 
 
+# 认领（把工具里已有的同名技能换成指向正本的软链或认作复制品）时，这些差异不算
+# 「内容不同」：manifest.json 是 sidecar 写的元数据（skillshub 迁移工具比较时同样
+# 忽略它），点文件是打包残留（.gitignore、.npmignore 等），技能本身一字未变。
+# 2026-10-16 实测：当时的 4 个「冲突」全是这种情况。被替换的东西照样先备份。
+ADOPTION_IGNORED_FILES = {"manifest.json"}
+ADOPTION_IGNORED_DIRS = {"__pycache__", "node_modules"}
+
+
+def _adoption_hash(path: Path) -> Optional[str]:
+    resolved = path.resolve()
+    if not (resolved / "SKILL.md").is_file():
+        return None
+    entries = []
+    for root, dirs, files in os.walk(resolved):
+        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d not in ADOPTION_IGNORED_DIRS)
+        for name in sorted(files):
+            if name.startswith(".") or name.endswith(".pyc") or name in ADOPTION_IGNORED_FILES:
+                continue
+            file_path = Path(root) / name
+            entries.append((str(file_path.relative_to(resolved)), hashlib.sha256(file_path.read_bytes()).hexdigest()))
+    return hashlib.sha256(json.dumps(entries).encode("utf-8")).hexdigest()
+
+
+def _same_content(entry: Path, canonical_hash: Optional[str], source: Path) -> bool:
+    if _hash_of(entry) == canonical_hash:
+        return True
+    return _adoption_hash(entry) == _adoption_hash(source)
+
+
 def _skill_decision(skill: SkillRecord, canonical: Path, tool: FanoutTool, entry: Path) -> Optional[str]:
     """返回不投放的原因；None 表示要投放到这个工具。"""
     if skill.path.parent.resolve() != canonical.resolve():
@@ -174,7 +203,7 @@ def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTo
         if not adoptable:
             item["action"] = "foreign_link"
             return item
-        same = _hash_of(entry) == canonical_hash
+        same = _same_content(entry, canonical_hash, source)
         item["action"] = ("relink" if tool.mode == "link" else "replace_link_with_copy") if same else "conflict"
         if not same:
             item["reason"] = "linked content differs from canonical"
@@ -185,13 +214,15 @@ def _plan_entry(skill: SkillRecord, entry: Path, canonical: Path, tool: FanoutTo
         return item
     current = _hash_of(entry)
     if tool.mode == "link":
-        item["action"] = "replace_dir_with_link" if current == canonical_hash else "conflict"
+        item["action"] = "replace_dir_with_link" if _same_content(entry, canonical_hash, source) else "conflict"
         if item["action"] == "conflict":
             item["reason"] = "existing directory differs from canonical"
         return item
     recorded = ledger.get(entry.name)
-    if current == canonical_hash:
+    if current == canonical_hash or (recorded is None and _same_content(entry, canonical_hash, source)):
+        # 认领时台账记的是复制品自己的哈希，之后正本一变就按 update_copy 跟上
         item["action"] = "ok" if recorded == current else "adopt"
+        item["content_hash"] = current
     elif recorded is not None and recorded == current:
         item["action"] = "update_copy"
     else:
@@ -284,6 +315,8 @@ def build_fanout_plan(
 
 NOOP_ACTIONS = {"ok", "conflict", "foreign_link"}
 KEEP_BACKUP_RUNS = 5
+# daemon 每小时例行跑一次就写一份记录（约 10KB）；只留最近这么多份，约一周
+KEEP_RUN_RECORDS = 200
 
 
 class FanoutError(RuntimeError):
@@ -378,7 +411,7 @@ def _execute_item(tool: FanoutTool, item: Dict[str, object], ledger: Dict[str, s
         tmp.rename(entry)
         ledger[entry.name] = str(item["content_hash"])
     elif action == "adopt":
-        ledger[entry.name] = str(item["content_hash"])
+        ledger[entry.name] = str(item["content_hash"])  # 复制品当前的整树哈希（见 _plan_entry）
     elif action == "replace_link_with_copy":
         done["old_link_target"] = os.readlink(entry)
         tmp = _copy_into(source, entry, run_id)
@@ -411,6 +444,17 @@ def _prune_backups(state_dir: Optional[Path], keep: int = KEEP_BACKUP_RUNS) -> L
         remove_path(old)
         pruned.append(old.name)
     return pruned
+
+
+def _prune_run_records(state_dir: Optional[Path], keep: int = KEEP_RUN_RECORDS) -> int:
+    root = fanout_dir(state_dir) / "runs"
+    if not root.is_dir():
+        return 0
+    records = sorted((p for p in root.iterdir() if p.suffix == ".json"), key=lambda p: p.name)
+    old = records[:-keep] if keep else records
+    for path in old:
+        path.unlink()
+    return len(old)
 
 
 def run_fanout(
@@ -477,6 +521,7 @@ def run_fanout(
         record["pruned_backup_runs"] = _prune_backups(state_dir)
         record["record_path"] = str(record_path)
         _write_json(record_path, record)
+        _prune_run_records(state_dir)
     return record
 
 

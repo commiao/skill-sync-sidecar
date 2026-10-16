@@ -151,6 +151,17 @@ class LockAndRetentionTest(FanoutExecuteBase):
                 with tool_lock("codex", self.state, timeout=0.3):
                     pass
 
+    def test_only_recent_run_records_are_kept(self):
+        runs = self.state / "fanout" / "runs"
+        runs.mkdir(parents=True)
+        for i in range(205):
+            (runs / f"20260101T{i:06d}Z.json").write_text("{}", encoding="utf-8")
+        removed = fanout._prune_run_records(self.state, keep=200)
+        self.assertEqual(removed, 5)
+        names = sorted(p.name for p in runs.iterdir())
+        self.assertEqual(len(names), 200)
+        self.assertEqual(names[0], "20260101T000005Z.json")
+
     def test_only_recent_backup_runs_are_kept(self):
         backups = self.state / "fanout" / "backups"
         for i in range(8):

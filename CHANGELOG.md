@@ -17,6 +17,7 @@ All notable changes to Skill Sync Sidecar are documented here.
 - `fanout --yes` and `fanout-rollback`: per-tool lock, backups and run records in the sidecar state directory, idempotent re-runs, and a read-only canonical root once tools link to it; sidecar deletes/moves lift the protection first (T-0260 step 4, PR B).
 - `sync-daemon --fanout` / `--fanout-interval-seconds`: run fanout after consistent cycles when the canonical fingerprint changes, hourly, or after failures; failures are recorded per cycle and never fail the sync. Fanout content comparisons now include nested skills (T-0260 step 4, PR C).
 - `local-skill-install` leaves tool entries that are symlinks into the canonical root alone (`noop`, fanout keeps them current) instead of replacing them with copies (T-0260).
+- Fanout adoption ignores `manifest.json` and dotfiles when deciding whether a tool entry is the same skill (resolves 10 false conflicts on the current Mac); fanout run records are capped at the latest 200 (T-0260).
 
 ### Changed
 

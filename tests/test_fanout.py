@@ -138,6 +138,41 @@ class FanoutPlanTest(unittest.TestCase):
         items = _items(self.plan(tools=[cursor], ledgers={"cursor": ledger}), "cursor")
         self.assertEqual(items["bundle"]["action"], "update_copy")
 
+    def test_metadata_and_dotfile_differences_do_not_block_adoption(self):
+        # 2026-10-16 的 4 个「冲突」：正文一样，只差 sidecar 的 manifest.json 或打包残留的点文件
+        _skill(self.canonical, "meta-only", manifest={"skill_id": "meta-only", "scope": "global"})
+        _skill(self.canonical, "dotfile-only")
+        _skill(self.canonical, "real-diff")
+        _skill(self.tool_root, "meta-only")  # 工具里那份没有 manifest
+        dot = _skill(self.tool_root, "dotfile-only")
+        (dot / ".gitignore").write_text("node_modules\n", encoding="utf-8")
+        _skill(self.tool_root, "real-diff", body="edited")
+        hub = _skill(self.legacy, "linked-meta", manifest={"skill_id": "linked-meta", "scope": "global", "targets": ["x"]})
+        _skill(self.canonical, "linked-meta")
+        (self.tool_root / "linked-meta").symlink_to(hub)
+        items = _items(self.plan(), "codex")
+        self.assertEqual(items["meta-only"]["action"], "replace_dir_with_link")
+        self.assertEqual(items["dotfile-only"]["action"], "replace_dir_with_link")
+        self.assertEqual(items["linked-meta"]["action"], "relink")
+        self.assertEqual(items["real-diff"]["action"], "conflict")
+
+    def test_copy_mode_adopts_copies_that_differ_only_in_metadata(self):
+        cursor = FanoutTool("cursor", self.tool_root, "copy", frozenset({"cursor"}))
+        _skill(self.canonical, "meta-only", manifest={"skill_id": "meta-only", "scope": "global", "targets": ["cursor"]})
+        _skill(self.canonical, "real-diff", manifest={"skill_id": "real-diff", "scope": "global", "targets": ["cursor"]})
+        copy = _skill(self.tool_root, "meta-only")
+        _skill(self.tool_root, "real-diff", body="edited")
+        items = _items(self.plan(tools=[cursor], ledgers={"cursor": {}}), "cursor")
+        self.assertEqual(items["meta-only"]["action"], "adopt")
+        # 台账记复制品自己的哈希，之后正本一变才会按 update_copy 跟上
+        self.assertEqual(items["meta-only"]["content_hash"], fanout._hash_of(copy))
+        self.assertEqual(items["real-diff"]["action"], "conflict")
+        # 认领之后再算：复制品是台账里的那份、只是还缺正本的元数据 → 更新一次（先备份），
+        # 之后与正本完全一致，不会反复认领
+        ledger = {"meta-only": fanout._hash_of(copy)}
+        again = _items(self.plan(tools=[cursor], ledgers={"cursor": ledger}), "cursor")
+        self.assertEqual(again["meta-only"]["action"], "update_copy")
+
     def test_plan_writes_nothing(self):
         _skill(self.canonical, "a", manifest={"skill_id": "a", "scope": "global", "targets": ["codex"]})
         before = sorted(p.name for p in self.tool_root.iterdir())
