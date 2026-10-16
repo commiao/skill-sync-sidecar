@@ -226,6 +226,38 @@ class LocalSkillTest(unittest.TestCase):
             self.assertIn("demo", {skill["skill_id"] for skill in index["skills"]})
             self.assertIn("existing", {skill["skill_id"] for skill in index["skills"]})
 
+    def test_publish_and_install_work_from_a_read_only_canonical_root(self):
+        # 切换后正本只读；发布与安装都会把它复制到临时目录再写 manifest.json（2026-10-16 失败过）
+        from skill_sync_sidecar.protect import make_readonly, make_writable
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_root = root / "local"
+            remote_snapshot = root / "cache"
+            remote_root = root / "remote"
+            tool_root = root / "tool"
+            tool_root.mkdir()
+            self._write_skill(local_root / "demo", "demo", body="local")
+            self._write_skill(root / "seed" / "existing", "existing")
+            self._write_manifest(root / "seed" / "existing", "existing")
+            write_snapshot(scan_roots([f"canonical={root / 'seed'}"]), remote_snapshot, "remote-base")
+            remote = FileRemote(remote_root)
+            upload_snapshot(remote_snapshot, remote)
+            make_readonly(local_root / "demo")
+            try:
+                result = publish_local_skill(local_root, remote_snapshot, "demo", remote, yes=True)
+                self.assertFalse(result["dry_run"])
+                installed = install_local_skill(
+                    local_root / "demo",
+                    tool_targets=[LocalToolTarget("codex", "Codex", tool_root, "codex")],
+                    yes=True,
+                    allow_local_writes=True,
+                )
+                self.assertTrue(installed["items"][0]["executed"])
+                (tool_root / "demo" / "SKILL.md").write_text("copies in tools stay writable", encoding="utf-8")
+            finally:
+                make_writable(root)
+
     def test_publish_local_skill_ignores_unrelated_duplicate_local_skill_ids(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
