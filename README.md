@@ -229,7 +229,7 @@ Content comparisons in fanout hash the whole tree, nested skills included; the s
 - A skill whose manifest declares `targets` goes to those tools. A skill without declared targets is only **maintained where it already is**; it is never added to a new tool (placing all undeclared skills everywhere would add 44–46 skills to every tool on the current Mac).
 - Ownership: a symlink into the canonical root is sidecar-managed; Cursor copies are tracked in `fanout/<tool>.json` under the sidecar state directory.
 - Never touched: skills not in the canonical root, symlinks owned by other managers (e.g. `~/.agents/skills`), same-name skills whose content differs (reported as `conflict`), project-scope skills, skills with error-level risk.
-- Same-content directories and symlinks into `~/.skillshub` / `~/.cc-switch/skills` are adopted (`replace_dir_with_link`, `relink`); dangling links into the canonical root are removed.
+- Same-content directories and symlinks into `~/.skillshub` / `~/.cc-switch/skills` are adopted (for adoption, differences only in `manifest.json` or dotfiles such as `.gitignore` do not count) (`replace_dir_with_link`, `relink`); dangling links into the canonical root are removed.
 
 ## Sync Boundary
 
