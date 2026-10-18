@@ -29,16 +29,16 @@ run_canary() {
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar push \
     --snapshot-dir "$snapshot" \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --yes \
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar remote-status \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --json
   "$python_bin" -m skill_sync_sidecar pull-cache \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --out "$cache" \
     --json >/dev/null
@@ -61,13 +61,13 @@ run_sync_cycle_e2e() {
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar push \
     --snapshot-dir "$snapshot" \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --yes \
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar sync-cycle \
     --local-root "$target" \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --cache-dir "$cache" \
     --work-dir "$work" \
@@ -96,13 +96,13 @@ run_sync_daemon_e2e() {
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar push \
     --snapshot-dir "$snapshot" \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --yes \
     --json >/dev/null
   "$python_bin" -m skill_sync_sidecar sync-daemon \
     --local-root "$target" \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix "$prefix" \
     --cache-dir "$cache" \
     --work-dir "$work" \

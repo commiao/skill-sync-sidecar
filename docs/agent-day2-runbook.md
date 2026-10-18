@@ -193,7 +193,7 @@ Use this order when the dashboard is yellow or stale:
 
    ```bash
    PYTHONPATH=src python3 -m skill_sync_sidecar pull-cache \
-     --cc-switch-webdav \
+     --webdav-config \
      --prefix skill-sync-sidecar-dev/current-mac \
      --out "$HOME/Library/Application Support/skill-sync-sidecar/cache/current-mac" \
      --json

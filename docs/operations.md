@@ -55,7 +55,7 @@ The script uploads real private skill content to the provided WebDAV prefix, rea
 ```bash
 PYTHONPATH=src python3 -m skill_sync_sidecar sync-cycle \
   --local-root "$HOME/.cc-switch/skills" \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix "skill-sync-sidecar-dev/$(hostname -s)" \
   --cache-dir "$HOME/Library/Caches/skill-sync-sidecar/cache" \
   --work-dir "$HOME/Library/Application Support/skill-sync-sidecar/work" \
@@ -201,7 +201,7 @@ Run locally for smoke testing:
 
 ```bash
 PYTHONPATH=src python3 -m skill_sync_sidecar gateway \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --cache-dir /tmp/skill-sync-gateway-cache \
   --refresh-interval-seconds 60 \
@@ -494,7 +494,7 @@ Known OpenClaw constraints:
 
 - `/home/admin/clawd/skills` is the OpenClaw project skill root used for second-node validation.
 - `/home/admin/.cc-switch/settings.json` contains the cc-switch WebDAV configuration.
-- `/root/.cc-switch/settings.json` can exist without WebDAV credentials, so a root-owned service must not assume `--cc-switch-webdav` will read the admin user's config.
+- `/root/.cc-switch/settings.json` can exist without WebDAV credentials, so a root-owned service must not assume `--webdav-config` will read the admin user's config.
 - The observed system Python is 3.6.8, while sidecar requires Python >=3.9.
 - Do not replace `/usr/bin/python3`, use `alternatives`, or install sidecar dependencies into system Python. OpenClaw uses an isolated runtime under `/opt/skill-sync-sidecar`.
 
@@ -1110,7 +1110,7 @@ sudo -iu admin \
     --last-applied-record /opt/skill-sync-sidecar/state/openclaw-base-record.json \
     --blocked-report /opt/skill-sync-sidecar/work/current-mac-pullonly/blocked-report/blocked-report.json \
     --skill-id <reviewed-skill-id> \
-    --cc-switch-webdav \
+    --webdav-config \
     --prefix skill-sync-sidecar-dev/current-mac \
     --base-record-out /opt/skill-sync-sidecar/state/openclaw-base-record.json \
     --out /opt/skill-sync-sidecar/work/current-mac-pullonly/approved-push \

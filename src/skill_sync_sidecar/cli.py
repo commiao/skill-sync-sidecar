@@ -13,7 +13,17 @@ from .apply import ApplyError, ApplyPlanError, build_apply_plan, execute_apply_p
 from .approved_push import ApprovedPushError, build_approved_push_preview, execute_approved_push, write_approved_push_preview
 from .base_adoption import BaseAdoptionError, build_base_adoption_preview, execute_base_adoption
 from .blocked_report import build_blocked_report
-from .config import ConfigError, configured_local_root, init_config_from_cc_switch, load_cc_switch_webdav_settings, load_webdav_settings, sidecar_skills_root
+from .config import (
+    ConfigError,
+    configured_base_record,
+    configured_local_root,
+    configured_remote_snapshot,
+    init_config_from_cc_switch,
+    load_cc_switch_webdav_settings,
+    load_webdav_settings,
+    sidecar_skills_root,
+    sidecar_state_dir,
+)
 from .local_root import LocalRootMigrationError, migrate_local_root
 from .fanout import FanoutError, FanoutScheduler, build_fanout_plan, fanout_protect_canonical, rollback_fanout, run_fanout
 from .conflicts import ConflictPackageError, build_conflict_packages
@@ -99,6 +109,24 @@ def _code_release(root: Path) -> Optional[dict]:
     return value if isinstance(value, dict) else None
 
 
+def _default_or(fn, fallback: str) -> str:
+    """CLI 路径默认值取自 sidecar 配置；配置读不出来时回退旧字面量（解析器构造不能因配置坏掉而失败）。"""
+    try:
+        return str(fn())
+    except (ConfigError, OSError):
+        return fallback
+
+
+def _state_file(name: str) -> str:
+    return _default_or(lambda: sidecar_state_dir() / name, f"~/Library/Application Support/skill-sync-sidecar/{name}")
+
+
+DEFAULT_REMOTE_SNAPSHOT = _default_or(configured_remote_snapshot, "~/public-sync/skill-sync-sidecar-dev/current-mac")
+DEFAULT_BASE_RECORD = _default_or(configured_base_record, "~/Library/Application Support/skill-sync-sidecar/base-record.json")
+DEFAULT_STATE_FILE = _state_file("state.json")
+DEFAULT_LEGACY_SKILLSHUB_REPORT = _state_file("peers/legacy-skillshub-report.json")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="skill-sync",
@@ -125,9 +153,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ops_status = subcommands.add_parser("ops-status", help="Summarize daemon, base record, remote snapshot, and optional OpenClaw reconcile state.")
     ops_status.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
-    ops_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
-    ops_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
-    ops_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    ops_status.add_argument("--remote-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Local remote snapshot/cache directory with index.json.")
+    ops_status.add_argument("--base-record", default=DEFAULT_BASE_RECORD, help="Stable base record used by sync-daemon.")
+    ops_status.add_argument("--state-file", default=DEFAULT_STATE_FILE, help="Daemon state file written by sync-daemon.")
     ops_status.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
     ops_status.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
     ops_status.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
@@ -150,11 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
     publish_peer_status.add_argument("--tool-root", action="append", default=[], metavar="TOOL_ID=PATH", help="Restrict v1 tool observation to this tool root. Repeat for multiple roots.")
     publish_peer_status.add_argument("--tool-plugin-manifest", action="append", default=[], metavar="TOOL_ID=PATH", help="Read a tool's package manifest for installed plugins. Plugin data is observation-only.")
     publish_peer_status.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
-    publish_peer_status.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
+    publish_peer_status.add_argument("--remote-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Local remote snapshot/cache directory with index.json.")
     publish_peer_status.add_argument("--legacy-skillshub-root", default="~/.skillshub", help="Legacy Skills Hub root to audit when publishing Mac status.")
-    publish_peer_status.add_argument("--legacy-skillshub-report-file", default="~/Library/Application Support/skill-sync-sidecar/peers/legacy-skillshub-report.json", help="Local cache for the sanitized legacy dependency report.")
-    publish_peer_status.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
-    publish_peer_status.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
+    publish_peer_status.add_argument("--legacy-skillshub-report-file", default=DEFAULT_LEGACY_SKILLSHUB_REPORT, help="Local cache for the sanitized legacy dependency report.")
+    publish_peer_status.add_argument("--base-record", default=DEFAULT_BASE_RECORD, help="Stable base record used by sync-daemon.")
+    publish_peer_status.add_argument("--state-file", default=DEFAULT_STATE_FILE, help="Daemon state file written by sync-daemon.")
     publish_peer_status.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
     publish_peer_status.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
     publish_peer_status.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
@@ -165,10 +193,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     dashboard = subcommands.add_parser("dashboard", help="Serve a read-only local status dashboard.")
     dashboard.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
-    dashboard.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
-    dashboard.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used by sync-daemon.")
-    dashboard.add_argument("--state-file", default="~/Library/Application Support/skill-sync-sidecar/state.json", help="Daemon state file written by sync-daemon.")
-    dashboard.add_argument("--legacy-skillshub-report-file", default="~/Library/Application Support/skill-sync-sidecar/peers/legacy-skillshub-report.json", help="Sanitized Mac legacy dependency report cached by publish-peer-status.")
+    dashboard.add_argument("--remote-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Local remote snapshot/cache directory with index.json.")
+    dashboard.add_argument("--base-record", default=DEFAULT_BASE_RECORD, help="Stable base record used by sync-daemon.")
+    dashboard.add_argument("--state-file", default=DEFAULT_STATE_FILE, help="Daemon state file written by sync-daemon.")
+    dashboard.add_argument("--legacy-skillshub-report-file", default=DEFAULT_LEGACY_SKILLSHUB_REPORT, help="Sanitized Mac legacy dependency report cached by publish-peer-status.")
     dashboard.add_argument("--blocked-report", help="Optional blocked-report.json to show the current approval queue.")
     dashboard.add_argument("--openclaw-reconcile-report", help="Existing reconcile-report.json to include; this command does not SSH.")
     dashboard.add_argument("--openclaw-reconcile-root", default="/private/tmp/openclaw-skill-sync-validate", help="Directory to search for the latest OpenClaw reconcile-report.json when no explicit report is provided.")
@@ -246,9 +274,9 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_remote_args(local_skill_publish)
     local_skill_publish.add_argument("--path", required=True, help="Skill directory or SKILL.md path used to determine the skill id.")
     local_skill_publish.add_argument("--local-root", default=None, help="Local skill root (canonical copy). Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
-    local_skill_publish.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json.")
-    local_skill_publish.add_argument("--last-applied-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record used as common ancestor.")
-    local_skill_publish.add_argument("--base-record-out", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Stable base record path to update after --yes.")
+    local_skill_publish.add_argument("--remote-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Local remote snapshot/cache directory with index.json.")
+    local_skill_publish.add_argument("--last-applied-record", default=DEFAULT_BASE_RECORD, help="Stable base record used as common ancestor.")
+    local_skill_publish.add_argument("--base-record-out", default=DEFAULT_BASE_RECORD, help="Stable base record path to update after --yes.")
     local_skill_publish_mode = local_skill_publish.add_mutually_exclusive_group(required=True)
     local_skill_publish_mode.add_argument("--dry-run", action="store_true", help="Only preview the selective save.")
     local_skill_publish_mode.add_argument("--yes", action="store_true", help="Save the selected local skill and merged index to the shared library.")
@@ -272,8 +300,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Copy the canonical local skill root (default ~/.cc-switch/skills) to the sidecar's own root, verify, then point the config at it.",
     )
     local_root_migrate.add_argument("--to", default=None, help="Destination root. Defaults to the sidecar skills root for this platform.")
-    local_root_migrate.add_argument("--remote-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Local remote snapshot/cache directory with index.json, used to compare sync actions.")
-    local_root_migrate.add_argument("--base-record", default="~/Library/Application Support/skill-sync-sidecar/base-record.json", help="Base record used by sync-daemon.")
+    local_root_migrate.add_argument("--remote-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Local remote snapshot/cache directory with index.json, used to compare sync actions.")
+    local_root_migrate.add_argument("--base-record", default=DEFAULT_BASE_RECORD, help="Base record used by sync-daemon.")
     local_root_migrate.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     local_root_migrate_mode = local_root_migrate.add_mutually_exclusive_group(required=True)
     local_root_migrate_mode.add_argument("--dry-run", action="store_true", help="Only check and report.")
@@ -325,7 +353,7 @@ def build_parser() -> argparse.ArgumentParser:
     legacy_migration_rollback.set_defaults(func=cmd_legacy_skillshub_migration_rollback)
 
     tool_projection = subcommands.add_parser("tool-projection", help="Preview canonical snapshot projection into local tool skill roots.")
-    tool_projection.add_argument("--snapshot-dir", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot/cache directory with index.json.")
+    tool_projection.add_argument("--snapshot-dir", default=DEFAULT_REMOTE_SNAPSHOT, help="Canonical snapshot/cache directory with index.json.")
     tool_projection.add_argument("--tool", action="append", default=[], help="Tool root as id=/path or id=/path1,/path2. Repeat for multiple tools.")
     tool_projection.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     tool_projection.set_defaults(func=cmd_tool_projection)
@@ -333,14 +361,14 @@ def build_parser() -> argparse.ArgumentParser:
     hub_import_diagnosis = subcommands.add_parser("hub-import-diagnosis", help="Explain why external skills can or cannot be imported into skillshub.")
     hub_import_diagnosis.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
     hub_import_diagnosis.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
-    hub_import_diagnosis.add_argument("--canonical-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
+    hub_import_diagnosis.add_argument("--canonical-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
     hub_import_diagnosis.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     hub_import_diagnosis.set_defaults(func=cmd_hub_import_diagnosis)
 
     hub_import_preview = subcommands.add_parser("hub-import-preview", help="Write a dry-run skillshub import preview package.")
     hub_import_preview.add_argument("--hub-root", default="~/.skillshub", help="Skillshub Hub root.")
     hub_import_preview.add_argument("--source-root", action="append", default=[], help="External skill root as id=/path. Repeat for multiple roots.")
-    hub_import_preview.add_argument("--canonical-snapshot", default="~/public-sync/skill-sync-sidecar-dev/current-mac", help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
+    hub_import_preview.add_argument("--canonical-snapshot", default=DEFAULT_REMOTE_SNAPSHOT, help="Canonical snapshot used to recover scope/targets when local tool roots lack manifest.json. Use an empty value to disable.")
     hub_import_preview.add_argument("--out", required=True, help="Output directory for preview.json and preview.md.")
     hub_import_preview.add_argument("--max-diff-lines", type=int, default=160, help="Maximum SKILL.md diff lines per update action.")
     hub_import_preview.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")

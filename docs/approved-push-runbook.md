@@ -207,7 +207,7 @@ PYTHONPATH=src python3 -m skill_sync_sidecar sync-cycle \
   --work-dir "$HOME/Library/Application Support/skill-sync-sidecar/work" \
   --allow-new \
   --writer-policy push-pull \
-  --cc-switch-webdav \
+  --webdav-config \
   --prefix skill-sync-sidecar-dev/current-mac \
   --yes \
   --json
