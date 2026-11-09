@@ -1,6 +1,6 @@
 # Skill Sync Sidecar
 
-Skill Sync Sidecar is a WebDAV-backed tool for scanning, validating, staging, and syncing agent skills across local tools such as cc-switch, skillshub, Codex, Cursor, Claude Code, Qoder, DeepSeek Harness, and OpenClaw.
+Skill Sync Sidecar is a WebDAV-backed tool for scanning, validating, staging, and syncing agent skills across local tools such as cc-switch, skillshub, Codex, Cursor, Claude Code, Qoder, 豆包 (Doubao), WorkBuddy, DeepSeek Harness, and OpenClaw.
 
 The MVP keeps writes behind explicit confirmation flags:
 
@@ -182,6 +182,8 @@ The sidecar scans existing local roots when they exist:
   自己的内置区，由它托管，不作为写入目标；Cursor 两个目录都会加载）
 - `~/.claude/skills`
 - `~/.qoder/skills`
+- `~/Doubao/skills`（豆包桌面版）
+- `~/.workbuddy/skills`（WorkBuddy）
 - `~/.dsh/skills`
 
 ## Canonical Local Root
@@ -227,9 +229,9 @@ Content comparisons in fanout hash the whole tree, nested skills included; the s
 
 **Read-only canonical.** Once any tool links to the canonical root, an edit made "in the tool" is an edit to the canonical copy, which sync-daemon pushes to the central library within minutes. So after a run that leaves links in place, the canonical skill directories and files lose their write bits: an in-place edit fails with a permission error instead of spreading. The sidecar lifts the protection itself when it replaces or moves a skill. Disable with `"fanout": {"protect_canonical": false}`.
 
-- Tools: Codex, Claude Code, Qoder, DeepSeek Harness and (while cc-switch is retired) `~/.cc-switch/skills` get a **symlink** to the canonical skill directory; Cursor gets a **copy** until it is verified to load symlinked skills. Override per tool with `fanout.tools.<id>.mode` (`link`/`copy`) or `"enabled": false` in the sidecar config.
+- Tools: Codex, Claude Code, Qoder, DeepSeek Harness and (while cc-switch is retired) `~/.cc-switch/skills` get a **symlink** to the canonical skill directory; Cursor, 豆包 (Doubao), and WorkBuddy get a **copy** until they are verified to load symlinked skills. Override per tool with `fanout.tools.<id>.mode` (`link`/`copy`) or `"enabled": false` in the sidecar config.
 - A skill whose manifest declares `targets` goes to those tools. A skill without declared targets is only **maintained where it already is**; it is never added to a new tool (placing all undeclared skills everywhere would add 44–46 skills to every tool on the current Mac).
-- Ownership: a symlink into the canonical root is sidecar-managed; Cursor copies are tracked in `fanout/<tool>.json` under the sidecar state directory.
+- Ownership: a symlink into the canonical root is sidecar-managed; copies are tracked in `fanout/<tool>.json` under the sidecar state directory.
 - Never touched: skills not in the canonical root, symlinks owned by other managers (e.g. `~/.agents/skills`), same-name skills whose content differs (reported as `conflict`), project-scope skills, skills with error-level risk.
 - Same-content directories and symlinks into `~/.skillshub` / `~/.cc-switch/skills` are adopted (for adoption, differences only in `manifest.json` or dotfiles such as `.gitignore` do not count) (`replace_dir_with_link`, `relink`); dangling links into the canonical root are removed.
 

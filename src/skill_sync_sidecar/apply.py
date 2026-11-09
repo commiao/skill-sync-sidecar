@@ -72,6 +72,18 @@ GLOBAL_TOOL_TARGETS = {
         "aliases": {"qoder"},
         "scope_skip": "project-scoped skills are not installed into Qoder global root",
     },
+    "doubao-global": {
+        "default_root": Path.home() / "Doubao" / "skills",
+        "scopes": {"global"},
+        "aliases": {"doubao"},
+        "scope_skip": "project-scoped skills are not installed into 豆包 global root",
+    },
+    "workbuddy-global": {
+        "default_root": Path.home() / ".workbuddy" / "skills",
+        "scopes": {"global"},
+        "aliases": {"workbuddy"},
+        "scope_skip": "project-scoped skills are not installed into WorkBuddy global root",
+    },
     "deepseek-harness-global": {
         "default_root": Path.home() / ".dsh" / "skills",
         "scopes": {"global"},

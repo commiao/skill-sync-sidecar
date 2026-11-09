@@ -29,6 +29,8 @@ def default_tool_adapters() -> List[ToolAdapter]:
         ToolAdapter("cursor", "Cursor", [home / ".cursor" / "skills", home / ".cursor" / "skills-cursor"], ["cursor"], ["global"]),
         ToolAdapter("claude-code", "Claude Code", [home / ".claude" / "skills"], ["claude-code", "claude"], ["global"]),
         ToolAdapter("qoder", "Qoder", [home / ".qoder" / "skills"], ["qoder"], ["global"]),
+        ToolAdapter("doubao", "豆包", [home / "Doubao" / "skills"], ["doubao"], ["global"]),
+        ToolAdapter("workbuddy", "WorkBuddy", [home / ".workbuddy" / "skills"], ["workbuddy"], ["global"]),
         ToolAdapter("deepseek-harness", "DeepSeek Harness", [home / ".dsh" / "skills"], ["deepseek-harness", "deepseek"], ["global"]),
     ]
 

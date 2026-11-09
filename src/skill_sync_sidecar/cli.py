@@ -85,11 +85,13 @@ APPLY_TARGETS = [
     "cursor-global",
     "claude-code-global",
     "qoder-global",
+    "doubao-global",
+    "workbuddy-global",
     "deepseek-harness-global",
     "codex-project",
     "mixed-scope-root",
 ]
-TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global", "qoder-global", "deepseek-harness-global"}
+TOOL_GLOBAL_TARGETS = {"skillshub-global", "codex-global", "cursor-global", "claude-code-global", "qoder-global", "doubao-global", "workbuddy-global", "deepseek-harness-global"}
 
 # 本包所在的代码根。发布产物（~/.local/share/skill-sync-sidecar/releases/<sha>）
 # 根目录有发布脚本写入的 RELEASE.json，开发检出没有 —— 它不进 git。
@@ -256,13 +258,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     local_skill_analyze = subcommands.add_parser("local-skill-analyze", help="Analyze a local skill directory and infer one-click install metadata.")
     local_skill_analyze.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
-    local_skill_analyze.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, or deepseek-harness.")
+    local_skill_analyze.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, doubao, workbuddy, or deepseek-harness.")
     local_skill_analyze.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     local_skill_analyze.set_defaults(func=cmd_local_skill_analyze)
 
     local_skill_install = subcommands.add_parser("local-skill-install", help="Install a local skill into selected local tool roots with backups.")
     local_skill_install.add_argument("--path", required=True, help="Skill directory or SKILL.md path.")
-    local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, or deepseek-harness.")
+    local_skill_install.add_argument("--tool", action="append", default=[], help="Limit to a local tool id such as cc-switch, skillshub, codex, cursor, claude-code, qoder, doubao, workbuddy, or deepseek-harness.")
     local_skill_install.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     local_skill_install.add_argument("--allow-dev-tree", action="store_true", help="Allow --yes from a development checkout instead of an installed release.")
     local_skill_install_mode = local_skill_install.add_mutually_exclusive_group(required=True)
@@ -312,7 +314,7 @@ def build_parser() -> argparse.ArgumentParser:
         "fanout",
         help="Place canonical skills into each tool (symlink, or copy for tools configured as copy).",
     )
-    fanout.add_argument("--tool", action="append", default=[], help="Limit to a tool id (codex, cursor, claude-code, qoder, deepseek-harness, cc-switch). Repeatable.")
+    fanout.add_argument("--tool", action="append", default=[], help="Limit to a tool id (codex, cursor, claude-code, qoder, doubao, workbuddy, deepseek-harness, cc-switch). Repeatable.")
     fanout.add_argument("--local-root", default=None, help="Canonical root. Defaults to local_root in the sidecar config, else ~/.cc-switch/skills.")
     fanout.add_argument("--all-items", action="store_true", help="List every item, including ok and foreign links.")
     fanout.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")

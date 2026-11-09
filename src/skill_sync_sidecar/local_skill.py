@@ -47,6 +47,8 @@ DEFAULT_LOCAL_TOOL_TARGETS: tuple[LocalToolTarget, ...] = (
     LocalToolTarget("cursor", "Cursor", Path.home() / ".cursor" / "skills", "cursor"),
     LocalToolTarget("claude-code", "Claude Code", Path.home() / ".claude" / "skills", "claude-code"),
     LocalToolTarget("qoder", "Qoder", Path.home() / ".qoder" / "skills", "qoder"),
+    LocalToolTarget("doubao", "豆包", Path.home() / "Doubao" / "skills", "doubao"),
+    LocalToolTarget("workbuddy", "WorkBuddy", Path.home() / ".workbuddy" / "skills", "workbuddy"),
     LocalToolTarget("deepseek-harness", "DeepSeek Harness", Path.home() / ".dsh" / "skills", "deepseek-harness"),
 )
 
@@ -67,7 +69,7 @@ def default_local_tool_targets() -> tuple[LocalToolTarget, ...]:
     return (LocalToolTarget("sidecar", "Sidecar 本机正本", canonical, "sidecar"),) + DEFAULT_LOCAL_TOOL_TARGETS
 
 
-DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "cursor", "claude-code", "qoder", "deepseek-harness", "openclaw"]
+DEFAULT_GLOBAL_TARGETS = ["codex", "cc-switch", "cursor", "claude-code", "qoder", "doubao", "workbuddy", "deepseek-harness", "openclaw"]
 DEFAULT_PROJECT_TARGETS = ["codex", "cursor", "qoder"]
 DEFAULT_EXCLUDES = ["__pycache__", "*.pyc", ".DS_Store"]
 SECRET_HINTS = {".env", ".env.local", ".npmrc", ".pypirc"}
@@ -305,6 +307,8 @@ def _infer_scope(source: Path) -> str:
         home / ".cursor" / "skills",
         home / ".cursor" / "skills-cursor",   # 存量：改目标之前装进内置区的那些
         home / ".qoder" / "skills",
+        home / "Doubao" / "skills",
+        home / ".workbuddy" / "skills",
         home / ".dsh" / "skills",
     ]
     try:

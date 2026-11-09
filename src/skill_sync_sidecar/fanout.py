@@ -3,7 +3,7 @@
 写入方式按工具配置：
 - link：工具目录里放一个指向正本技能目录的软链。「指向正本的软链」就是 sidecar
   管的标志，不需要台账；正本更新各工具即时生效；正本删掉后清理失效链接。
-- copy：复制一份实体目录（Cursor 在验证能加载软链技能之前用这个）。复制品是不是
+- copy：复制一份实体目录（Cursor、豆包、WorkBuddy 在验证能加载软链之前用这个）。复制品是不是
   sidecar 装的，只能靠台账（状态目录里的 fanout/<tool>.json）判断。
 
 不碰的东西：正本以外来源的技能、指向其他管理者（如 ~/.agents/skills）的软链、
@@ -44,6 +44,9 @@ DEFAULT_TOOLS: Sequence[FanoutTool] = (
     FanoutTool("cursor", HOME / ".cursor" / "skills", "copy", frozenset({"cursor"})),
     FanoutTool("claude-code", HOME / ".claude" / "skills", "link", frozenset({"claude-code", "claude"})),
     FanoutTool("qoder", HOME / ".qoder" / "skills", "link", frozenset({"qoder"})),
+    # 豆包与 WorkBuddy 的软链加载未验证，先用带台账的实体副本。
+    FanoutTool("doubao", HOME / "Doubao" / "skills", "copy", frozenset({"doubao"})),
+    FanoutTool("workbuddy", HOME / ".workbuddy" / "skills", "copy", frozenset({"workbuddy"})),
     FanoutTool("deepseek-harness", HOME / ".dsh" / "skills", "link", frozenset({"deepseek-harness", "deepseek"})),
     # 过渡期：cc-switch 不再是正本后仍有工具软链到它的目录，扇出让它继续收到更新
     FanoutTool("cc-switch", LEGACY_LOCAL_ROOT, "link", frozenset({"cc-switch"})),
