@@ -21,6 +21,8 @@ DEFAULT_TOOL_ROOTS: tuple[ToolRoot, ...] = (
                           Path.home() / ".cursor" / "skills-cursor"), "Cursor 技能目录"),
     ("claude-code", "Claude Code", (Path.home() / ".claude" / "skills",), "Claude Code 技能目录"),
     ("qoder", "Qoder", (Path.home() / ".qoder" / "skills",), "Qoder 技能目录"),
+    ("doubao", "豆包", (Path.home() / "Doubao" / "skills",), "豆包 技能目录"),
+    ("workbuddy", "WorkBuddy", (Path.home() / ".workbuddy" / "skills",), "WorkBuddy 技能目录"),
     ("deepseek-harness", "DeepSeek Harness", (Path.home() / ".dsh" / "skills",), "DeepSeek Harness 技能目录"),
 )
 

@@ -27,6 +27,8 @@ TOOL_ALIASES = {
     "cursor": {"cursor"},
     "claude-code": {"claude-code", "claude"},
     "qoder": {"qoder"},
+    "doubao": {"doubao"},
+    "workbuddy": {"workbuddy"},
     "deepseek-harness": {"deepseek-harness", "deepseek"},
 }
 

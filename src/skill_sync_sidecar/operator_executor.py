@@ -49,6 +49,8 @@ MAC_TOOL_INSTALL_TARGETS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "cursor": ("cursor-global", (".cursor", "skills"), "Cursor"),
     "claude-code": ("claude-code-global", (".claude", "skills"), "Claude Code"),
     "qoder": ("qoder-global", (".qoder", "skills"), "Qoder"),
+    "doubao": ("doubao-global", ("Doubao", "skills"), "豆包"),
+    "workbuddy": ("workbuddy-global", (".workbuddy", "skills"), "WorkBuddy"),
     "deepseek-harness": ("deepseek-harness-global", (".dsh", "skills"), "DeepSeek Harness"),
 }
 
